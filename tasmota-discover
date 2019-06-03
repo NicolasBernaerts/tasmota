@@ -1,0 +1,44 @@
+#!/bin/bash
+# ---------------------------------------------------
+#  Tasmota devices network discovery
+# 
+# Revision history :
+#   15/04/2019, V1.0 - Creation by N. Bernaerts
+#   17/04/2019, V1.1 - Adjust timeout and retries
+#   18/04/2019, V1.2 - Add MQTT topic
+# ---------------------------------------------------
+
+# get first adapter netmask
+NETMASK=$(ip addr | grep inet | grep brd | head -n 1 | xargs | cut -d' ' -f2)
+echo "Netmask is ${NETMASK}"
+
+# load array from fping
+ARR_IP=( $(fping --addr --retry=1 --generate "${NETMASK}" 2>/dev/null | grep "alive" | cut -d' ' -f1) )
+
+# display number of IP
+NBR_IP="${#ARR_IP[@]}"
+echo "Found ${NBR_IP} IP addresses"
+
+# loop thru IP addresses
+for IP in "${ARR_IP[@]}"
+do
+	# display current IP
+	echo -ne "${IP}\r"
+
+	# get module type
+	TASMOTA_MODULE=$(wget --quiet --tries=1 --timeout=2 -O - "http://${IP}" | grep "Tasmota" | sed "s/[<>]/\n/g" | grep "Module")
+
+	# if tasmota detected, display
+	if [ "${TASMOTA_MODULE}" != "" ]
+	then
+		# get tasmota details
+		TASMOTA_DATA=$(wget --quiet --tries=1 --timeout=2 -O - "http://${IP}/in" | sed "s/}2/ /g" | sed "s/}1/\n/g" | sed "s/>/\n/g")
+		TASMOTA_VERSION=$(echo "${TASMOTA_DATA}" | grep "Program Version" | cut -d' ' -f3)
+		TASMOTA_HOSTNAME=$(echo "${TASMOTA_DATA}" | grep "Hostname" | cut -d' ' -f2)
+		TASMOTA_UPTIME=$(echo "${TASMOTA_DATA}" | grep "Uptime" | cut -d' ' -f2 | cut -d':' -f1-2 | tr 'T' 'd' | tr ':' 'h')
+		TASMOTA_MQTT=$(echo "${TASMOTA_DATA}" | grep "MQTT Full Topic" | cut -d' ' -f4)
+
+		# display
+		echo "${IP} : ${TASMOTA_MODULE} ver ${TASMOTA_VERSION}, host ${TASMOTA_HOSTNAME}, up ${TASMOTA_UPTIME}, mqtt ${TASMOTA_MQTT}"
+	fi
+done
