@@ -1,5 +1,5 @@
-tasmota
-==========
+Tasmota Extensions
+==================
 
 Some Tasmota firmware extensions used with OpenHab.
 
