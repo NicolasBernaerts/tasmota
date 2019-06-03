@@ -175,9 +175,11 @@ enum UserSelectablePins {
   GPIO_ROT1B,          // Rotary switch1 B Pin
   GPIO_ROT2A,          // Rotary switch2 A Pin
   GPIO_ROT2B,          // Rotary switch2 B Pin
+#ifdef USE_TELEINFO
   GPIO_TELEINFO_TX,    // Teleinfo TX (unused)
   GPIO_TELEINFO_1200,  // Teleinfo RX 1200
   GPIO_TELEINFO_9600,  // Teleinfo RX 9600
+#endif
   GPIO_SENSOR_END };
 
 // Programmer selectable GPIO functionality
@@ -241,7 +243,9 @@ const char kSensorNames[] PROGMEM =
   D_SENSOR_CSE7766_TX "|" D_SENSOR_CSE7766_RX "|"
   D_SENSOR_ARIRFRCV "|" D_SENSOR_TXD "|" D_SENSOR_RXD "|"
   D_SENSOR_ROTARY "1a|" D_SENSOR_ROTARY "1b|" D_SENSOR_ROTARY "2a|" D_SENSOR_ROTARY "2b|"
+#ifdef USE_TELEINFO
   D_SENSOR_TELEINFO_TX "|" D_SENSOR_TELEINFO_1200 "|" D_SENSOR_TELEINFO_9600 "|"
+#endif
   ;
 
 /********************************************************************************************/
