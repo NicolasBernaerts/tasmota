@@ -6,7 +6,8 @@
 
   Settings are stored using weighting scale parameters :
     - Settings.weight_reference   = Fil pilote mode
-    - Settings.weight_calibration = Target temperature (x10) 
+    - Settings.weight_max         = Target temperature x10 (192 = 19.2°C)
+    - Settings.weight_calibration = Temperature correction (0 = -5°C, 50 = 0°C, 100 = +5°C) 
     
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -23,7 +24,7 @@
 #ifdef USE_PILOTWIRE
 
 /*********************************************************************************************\
- *  Pilot Wire
+ * Fil Pilote
 \*********************************************************************************************/
 
 #define XSNS_99                         99
@@ -49,10 +50,10 @@
 #define PILOTWIRE_MESSAGE_BUFFER_SIZE   64
 #define PILOTWIRE_OFFLOAD_TIMEOUT       300000       // 5 mn
 
-// pilot wire modes
+// fil pilote modes
 enum PilotWireModes { PILOTWIRE_DISABLED, PILOTWIRE_OFF, PILOTWIRE_COMFORT, PILOTWIRE_ECO, PILOTWIRE_FROST, PILOTWIRE_THERMOSTAT, PILOTWIRE_OFFLOAD };
 
-// pilot wire commands
+// fil pilote commands
 enum PilotWireCommands { CMND_PILOTWIRE_MODE, CMND_PILOTWIRE_OFFLOAD, CMND_PILOTWIRE_TARGET, CMND_PILOTWIRE_DRIFT };
 const char kPilotWireCommands[] PROGMEM = D_CMND_PILOTWIRE_MODE "|" D_CMND_PILOTWIRE_OFFLOAD "|" D_CMND_PILOTWIRE_TARGET "|" D_CMND_PILOTWIRE_DRIFT;
 
@@ -275,57 +276,6 @@ float PilotWireGetDrift ()
   return drift;
 }
 
-// update pilot wire relay states according to current status
-void PilotWireEvery250MSecond ()
-{
-  float   actual_temperature;
-  float   target_temperature;
-  uint8_t target_mode;
-  uint8_t heater_state;
-  uint8_t target_state;
-  ulong   time_now;
-
-  // check if offload should be removed
-  time_now = millis ();
-  if (time_now - offload_start > PILOTWIRE_OFFLOAD_TIMEOUT) offload_start = 0;
-
-  // get target mode
-  target_mode = PilotWireGetMode ();
-
-  // if offload mode, target state is off
-  if (offload_start != 0) target_state = PILOTWIRE_OFF;
- 
-  // else if thermostat mode
-  else if (target_mode == PILOTWIRE_THERMOSTAT)
-  {
-    // get current and target temperature
-    actual_temperature = PilotWireGetTemperatureWithDrift ();
-    target_temperature = PilotWireGetTargetTemperature ();
-
-    // if temperature is too low, target state is on
-    // else, if too high, target state is off
-    target_state = target_mode;
-    if (actual_temperature < (target_temperature - 0.5)) target_state = PILOTWIRE_COMFORT;
-    else if (actual_temperature > (target_temperature + 0.5)) target_state = PILOTWIRE_OFF;
-  }
-
-  // else if not disabled, set mode if needed
-  else if (target_mode != PILOTWIRE_DISABLED) target_state = target_mode;
-
-  // get heater status
-  heater_state = PilotWireGetRelayState ();
-
-  // if heater state different than target state, change state
-  if (heater_state != target_state)
-  {
-    // set relays
-    PilotWireSetRelayState (target_state);
-
-    // publish new state
-    PilotWireShowJSON (false);
-  }
-}
-
 // Show JSON status (for MQTT)
 void PilotWireShowJSON (bool append)
 {
@@ -417,6 +367,61 @@ bool PilotWireCommand ()
   if (served == false) PilotWireShowJSON (false);
   
   return served;
+}
+
+// update pilot wire relay states according to current status
+void PilotWireEvery250MSecond ()
+{
+  float   actual_temperature;
+  float   target_temperature;
+  uint8_t target_mode;
+  uint8_t heater_state;
+  uint8_t target_state;
+  ulong   time_now;
+
+  // get target mode
+  target_mode = PilotWireGetMode ();
+
+  // if pilotwire mode is enabled
+  if (target_mode != PILOTWIRE_DISABLED)
+  {
+    // check if offload should be removed
+    time_now = millis ();
+    if (time_now - offload_start > PILOTWIRE_OFFLOAD_TIMEOUT) offload_start = 0;
+
+    // if offload mode, target state is off
+    if (offload_start != 0) target_state = PILOTWIRE_OFF;
+ 
+    // else if thermostat mode
+    else if (target_mode == PILOTWIRE_THERMOSTAT)
+    {
+      // get current and target temperature
+      actual_temperature = PilotWireGetTemperatureWithDrift ();
+      target_temperature = PilotWireGetTargetTemperature ();
+
+      // if temperature is too low, target state is on
+      // else, if too high, target state is off
+      target_state = target_mode;
+      if (actual_temperature < (target_temperature - 0.5)) target_state = PILOTWIRE_COMFORT;
+      else if (actual_temperature > (target_temperature + 0.5)) target_state = PILOTWIRE_OFF;
+    }
+
+    // else set mode if needed
+    else target_state = target_mode;
+
+    // get heater status
+    heater_state = PilotWireGetRelayState ();
+
+    // if heater state different than target state, change state
+    if (heater_state != target_state)
+    {
+      // set relays
+      PilotWireSetRelayState (target_state);
+
+      // publish new state
+      PilotWireShowJSON (false);
+    }
+  }
 }
 
 #ifdef USE_WEBSERVER
@@ -664,6 +669,7 @@ bool Xsns99 (byte callback_id)
     case FUNC_JSON_APPEND:
       PilotWireShowJSON (true);
       break;
+
 #ifdef USE_WEBSERVER
     case FUNC_WEB_ADD_HANDLER:
       WebServer->on ("/" D_PAGE_PILOTWIRE, PilotWireWebPage);
@@ -678,6 +684,7 @@ bool Xsns99 (byte callback_id)
       PilotWireWebButton ();
       break;
 #endif  // USE_WEBSERVER
+
   }
   return false;
 }
