@@ -5,7 +5,7 @@
   Copyright (C) 2019 Nicolas Bernaerts
 
   Settings are stored using weighting scale parameters :
-    - Settings.weight_reference   = Fil pilote mode
+    - Settings.weight_reference   = pilotwire mode
     - Settings.weight_max         = Target temperature x10 (192 = 19.2°C)
     - Settings.weight_calibration = Temperature correction (0 = -5°C, 50 = 0°C, 100 = +5°C) 
     
