@@ -6,7 +6,7 @@
 
   Configuration has been optimised for Pilotwire
   All un-needed modules have been removed
-  Default temperature sensor is DS18x20
+  Default temperature sensor is DS18B20
   It uses user_config_override.h
 
   This program is free software: you can redistribute it and/or modify
@@ -42,7 +42,7 @@
  * Users are advised to use the user_config_override.h file for most changes.
 \*********************************************************************************************/
 
-#define USE_CONFIG_OVERRIDE                      // Uncomment to use user_config_override.h file. See README.md
+//#define USE_CONFIG_OVERRIDE                      // Uncomment to use user_config_override.h file. See README.md
 
 /*********************************************************************************************\
  * SECTION 1
@@ -457,18 +457,18 @@
 #undef USE_HOME_ASSISTANT                     // Disable Home Assistant
 #undef USE_MQTT_TLS                           // Disable TLS support won't work as the MQTTHost is not set
 #undef USE_KNX                                // Disable KNX IP Protocol Support
-//#undef USE_WEBSERVER                          // Disable Webserver
+//#undef USE_WEBSERVER                        // Disable Webserver
 #undef USE_EMULATION                          // Disable Wemo or Hue emulation
 #undef USE_CUSTOM                             // Disable Custom features
 #undef USE_DISCOVERY                          // Disable Discovery services for both MQTT and web server
-//#undef USE_TIMERS                             // Disable support for up to 16 timers
-//#undef USE_TIMERS_WEB                         // Disable support for timer webpage
-//#undef USE_SUNRISE                            // Disable support for Sunrise and sunset tools
-//#undef USE_RULES                              // Disable support for rules
+//#undef USE_TIMERS                           // Disable support for up to 16 timers
+//#undef USE_TIMERS_WEB                       // Disable support for timer webpage
+//#undef USE_SUNRISE                          // Disable support for Sunrise and sunset tools
+//#undef USE_RULES                            // Disable support for rules
 #undef USE_DHT                                // Disable internal DHT sensor
 #undef USE_DS18x20                            // Disable DS18x20 sensor
 #undef USE_DS18x20_LEGACY                     // Disable DS18x20 sensor
-//#undef USE_DS18B20                            // Disable internal DS18B20 sensor
+#define DS18B20_INTERNAL_PULLUP               // Use INPUT_PULLUP internal pullup resistors for single DS18B20
 #undef USE_I2C                                // Disable all I2C sensors and devices
 #undef USE_SPI                                // Disable all SPI devices
 #undef USE_DISPLAY                            // Disable Display support
