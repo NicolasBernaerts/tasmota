@@ -5,6 +5,7 @@
 
     05/05/2019 - v1.0 - Creation
     16/05/2019 - v1.1 - Add Tempo and EJP contracts
+    08/06/2019 - v1.2 - Handle active and apparent power
     
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -159,10 +160,18 @@ void TeleinfoEvery200ms ()
           if (teleinfo_counter++ > 0) snprintf_P (teleinfo_message_temp, TELEINFO_MESSAGE_JSON_SIZE, PSTR("%s,"), teleinfo_message_temp);
           snprintf_P (teleinfo_message_temp, TELEINFO_MESSAGE_JSON_SIZE, PSTR("%s\"%s\":\"%s\""), teleinfo_message_temp, etiquette, donnee);
 
-          // instant current
-          if (token == NULL) { token = strstr (etiquette, "IINST"); if (token != NULL) energy_current = atof (donnee); }
+          // instant current and active power
+          if (token == NULL)
+          { 
+            token = strstr (etiquette, "IINST"); 
+            if (token != NULL)
+            {
+              energy_current      = atof (donnee);
+              energy_active_power = energy_current * energy_voltage;
+            }
+          }
 
-          // active power
+          // apparent power
           if (token == NULL) { token = strstr (etiquette, "PAPP"); if (token != NULL) energy_apparent_power = atof (donnee); }
           
           // maximum power outage (ADPS)
