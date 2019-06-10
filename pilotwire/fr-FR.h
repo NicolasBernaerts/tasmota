@@ -1,6 +1,10 @@
 /*
-  fr-FR.h - localization for French - France for Sonoff-Tasmota
+  en-GB.h - localization for English - United Kingdom for Sonoff-Tasmota
   Copyright (C) 2019  Olivier Francais
+                2019  Nicolas Bernaerts
+
+  Integrates Pilotwire strings (xsns_99_pilotwire.ino)
+
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
