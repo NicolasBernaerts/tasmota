@@ -6,7 +6,7 @@
 
   Configuration has been optimised for Pilotwire
   All un-needed modules have been removed
-  Default temperature sensor is DS18B20
+  Default temperature sensor is DS18x20
   It uses user_config_override.h
 
   This program is free software: you can redistribute it and/or modify
@@ -42,7 +42,7 @@
  * Users are advised to use the user_config_override.h file for most changes.
 \*********************************************************************************************/
 
-//#define USE_CONFIG_OVERRIDE                      // Uncomment to use user_config_override.h file. See README.md
+#define USE_CONFIG_OVERRIDE                      // Uncomment to use user_config_override.h file. See README.md
 
 /*********************************************************************************************\
  * SECTION 1
