@@ -577,6 +577,7 @@
 #define D_SENSOR_RXD           "Serial Rx"
 #define D_SENSOR_ROTARY        "Rotary"     // Suffix "1A"
 // Teleinfo
+#define D_SENSOR_TELEINFO_TX   "Teleinfo Tx"
 #define D_SENSOR_TELEINFO_1200 "Teleinfo 1200"
 #define D_SENSOR_TELEINFO_9600 "Teleinfo 9600"
 
