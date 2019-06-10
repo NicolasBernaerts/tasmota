@@ -1,5 +1,5 @@
 /*
-  en-GB.h - localization for English - United Kingdom for Sonoff-Tasmota
+  fr-FR.h - localization for French - France for Sonoff-Tasmota
   Copyright (C) 2019  Olivier Francais
                 2019  Nicolas Bernaerts
 
