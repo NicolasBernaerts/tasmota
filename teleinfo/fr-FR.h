@@ -1,6 +1,10 @@
 /*
   fr-FR.h - localization for French - France for Sonoff-Tasmota
   Copyright (C) 2019  Olivier Francais
+                2019  Nicolas Bernaerts
+
+  Integrates Teleinfo strings (xnrg_16_teleinfo.ino)
+
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
@@ -572,7 +576,8 @@
 #define D_SENSOR_TXD           "Serial Tx"
 #define D_SENSOR_RXD           "Serial Rx"
 #define D_SENSOR_ROTARY        "Rotary"     // Suffix "1A"
-#define D_SENSOR_TELEINFO_TX   "Teleinfo Tx"
+
+// Teleinfo
 #define D_SENSOR_TELEINFO_1200 "Teleinfo 1200"
 #define D_SENSOR_TELEINFO_9600 "Teleinfo 9600"
 
