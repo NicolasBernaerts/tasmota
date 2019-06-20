@@ -5,7 +5,7 @@
   Copyright (C) 2019 Nicolas Bernaerts
 
   Settings are stored using weighting scale parameters :
-    - Settings.weight_reference   = pilotwire mode
+    - Settings.weight_reference   = Fil pilote mode
     - Settings.weight_max         = Target temperature x10 (192 = 19.2°C)
     - Settings.weight_calibration = Temperature correction (0 = -5°C, 50 = 0°C, 100 = +5°C) 
     
@@ -218,7 +218,12 @@ float PilotWireGetTemperature ()
 
   // if global temperature not defined and ds18b20 sensor present, read it 
 #ifdef USE_DS18B20
-  if (temperature == 0) temperature = ds18b20_temperature;
+  if ((temperature == 0) && (ds18b20_temperature != 0)) temperature = ds18b20_temperature;
+#endif
+
+  // if global temperature not defined and dht sensor present, read it 
+#ifdef USE_DHT
+  if ((temperature == 0) && (Dht[0].t != 0)) temperature = Dht[0].t;
 #endif
 
   return temperature;
