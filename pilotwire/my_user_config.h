@@ -444,7 +444,7 @@
  * Pilotwire firmware configuration
 \*********************************************************************************************/
 
-#define USE_PILOTWIRE                         // Add support for French Fil Pilote on Sonoff Basic or Dual (+4k3)
+#define USE_PILOTWIRE                         // Add support for France Pilotwire protocol for electrical heaters (+1k1 code)
 
 #undef APP_SLEEP
 #define APP_SLEEP 1                           // Default to sleep = 1
@@ -465,12 +465,16 @@
 //#undef USE_TIMERS_WEB                       // Disable support for timer webpage
 //#undef USE_SUNRISE                          // Disable support for Sunrise and sunset tools
 //#undef USE_RULES                            // Disable support for rules
-#undef USE_DHT                                // Disable internal DHT sensor
+//#undef USE_I2C                                // Disable all I2C sensors and devices
+//#undef USE_DHT                                // Disable internal DHT sensor
 #undef USE_DS18x20                            // Disable DS18x20 sensor
-#undef USE_DS18x20_LEGACY                     // Disable DS18x20 sensor
 #define DS18B20_INTERNAL_PULLUP               // Use INPUT_PULLUP internal pullup resistors for single DS18B20
-#undef USE_I2C                                // Disable all I2C sensors and devices
 #undef USE_SPI                                // Disable all SPI devices
+#undef USE_BH1750                             // Enable BH1750 sensor
+#undef USE_BMP                                // Enable BMP085/BMP180/BMP280/BME280 sensors
+#undef USE_SHT3X                              // Enable SHT3x
+#undef USE_SGP30                              // Enable SGP30 sensor
+#undef USE_LM75AD                             // Enable LM75AD sensor
 #undef USE_DISPLAY                            // Disable Display support
 #undef USE_MHZ19                              // Disable support for MH-Z19 CO2 sensor
 #undef USE_SENSEAIR                           // Disable support for SenseAir K30, K70 and S8 CO2 sensor
@@ -502,6 +506,9 @@
 #undef USE_RF_SENSOR                          // Disable support for RF sensor receiver (434MHz or 868MHz) (+0k8 code)
 #undef DEBUG_THEO                             // Disable debug code
 #undef USE_DEBUG_DRIVER                       // Disable debug code
+
+#undef D_AUTHOR
+#define D_AUTHOR           "Theo Arends<br />release for Pilotwire v2.2 by Nicolas Bernaerts"
 
 /*********************************************************************************************\
  * No user configurable items below

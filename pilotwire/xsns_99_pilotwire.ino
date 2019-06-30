@@ -154,7 +154,15 @@ void PilotWireSetRelayState (uint8_t new_state)
 // get pilot actual mode
 uint8_t PilotWireGetMode ()
 {
-  return (uint8_t) Settings.weight_reference;
+  uint8_t actual_mode;
+
+  // read actual VMC mode
+  actual_mode = (uint8_t) Settings.weight_reference;
+
+  // if outvalue, set to disabled
+  if (actual_mode > PILOTWIRE_OFFLOAD) actual_mode = PILOTWIRE_DISABLED;
+
+  return actual_mode;
 }
 
 // set pilot wire mode
@@ -170,8 +178,8 @@ void PilotWireSetMode (uint8_t new_mode)
     else if (new_mode == PILOTWIRE_FROST) new_mode = PILOTWIRE_OFF;
   }
 
-  // set mode
-  Settings.weight_reference = (unsigned long) new_mode;
+  // if within range, set mode
+  if (new_mode <= PILOTWIRE_OFFLOAD) Settings.weight_reference = (unsigned long) new_mode;
 }
 
 // set pilot wire offload mode
@@ -244,7 +252,7 @@ float PilotWireGetTemperatureWithDrift ()
 void PilotWireSetThermostat (float new_thermostat)
 {
   // save target temperature
-  Settings.weight_max = (uint16_t) (new_thermostat * 10);
+  if ((new_thermostat > 0) && (new_thermostat <= 30)) Settings.weight_max = (uint16_t) (new_thermostat * 10);
 }
 
 // get target temperature
@@ -256,6 +264,10 @@ float PilotWireGetTargetTemperature ()
   temperature = (float) Settings.weight_max;
   temperature = temperature / 10;
   
+  // check if within range
+  if (temperature < 0)  temperature = 0;
+  if (temperature > 30) temperature = 30;
+
   return temperature;
 }
 
@@ -263,10 +275,8 @@ float PilotWireGetTargetTemperature ()
 // set pilot wire drift temperature
 void PilotWireSetDrift (float new_drift)
 {
-  float temperature;
-
-  // save target temperature
-  Settings.weight_calibration = (unsigned long) (50 + (new_drift * 10));
+  // if within range, save temperature correction
+  if ((new_drift >= -5) && (new_drift <= 5)) Settings.weight_calibration = (unsigned long) (50 + (new_drift * 10));
 }
 
 // get pilot wire drift temperature
@@ -278,6 +288,10 @@ float PilotWireGetDrift ()
   drift = (float) Settings.weight_calibration;
   drift = ((drift - 50) / 10);
   
+  // check if within range
+  if (drift < -5) drift = -5;
+  if (drift > 5)  drift = 5;
+
   return drift;
 }
 
@@ -342,7 +356,7 @@ void PilotWireShowJSON (bool append)
 // Handle pilot wire MQTT commands
 bool PilotWireCommand ()
 {
-  bool served = false;
+  bool serviced = true;
   int  command_code;
   char command [CMDSZ];
 
@@ -365,13 +379,13 @@ bool PilotWireCommand ()
       PilotWireSetDrift (atof (XdrvMailbox.data));
       break;
     default:
-      served = true;
+      serviced = false;
   }
 
   // send MQTT status
-  if (served == false) PilotWireShowJSON (false);
+  if (serviced == true) PilotWireShowJSON (false);
   
-  return served;
+  return serviced;
 }
 
 // update pilot wire relay states according to current status
@@ -430,6 +444,18 @@ void PilotWireEvery250MSecond ()
 }
 
 #ifdef USE_WEBSERVER
+
+// Pilot Wire icon
+void PilotWireWebDisplayIcon (uint8_t height)
+{
+  WSContentSend_P ("<img height=%d src='data:image/png;base64,", height);
+
+  WSContentSend_P ("iVBORw0KGgoAAAANSUhEUgAAACUAAAAgCAQAAAA/Wnk7AAAC3npUWHRSYXcgcHJvZmlsZSB0eXBlIGV4aWYAAHja7ZdBkhshDEX3nCJHQBJC4jh0A1W5QY6fD83Y8YwzVZlkkYWhDLRafEAP6HLoP76P8A2JPHJIap5LzhEplVS4ouHxSldNMa1yJdb9jh7tgbc9MkyCWq7H3Ld/hV3vHSxt+/FoD3ZuHd9C+8WboMyR52jbz7eQ8GWn/RzK7lfTL8vZv2FrzEjb6f1zMgSjKfSEA3chiSh9jiKYgRSpqDNKkek0bbNdVunPYxduzXfBa+157GLdHvIYihDzdsjvYrTtpM9jtyL064zorcmPL4bEN9AfYzeaj9Gv1dWUEakc9qLillgtOB4IpaxuGdnwU7Rt5YLsWOIJYg00D+QzUCFGtAclalRpUF/1SSemmLizoWY+WZbNxbjwuQCkmWmwAUML4mB1gprAzLe50Bq3rPFOHIEWG8GTCWKEHh9yeGb8Sr4JjTG3LtEMJtDTBZjnnsY0JrlZwgtAaOyY6orvyuGG9Z5o7cIEtxlmxwJrPC6JQ+m+t2RxnnQ1phCvo0HWtgBChLEVkyEBgZhJlDJFYzYixNHBp2LmLIkPECBVbhQG2IhkwHGeY6OP0fJl5cuMqwUgFIfGgAYHBbBSUuwfS449VFU0BVXNaupatGbJKWvO2fK8o6qJJVPLZuZWrLp4cvXs5u7Fa+EiuMK05GK");
+  WSContentSend_P ("heCmlVgxaIV3Ru8Kj1oMPOdKhRz7s8KMc9cT2OdOpZz7t9LOctXGThuPfcrPQvJVWO3VspZ669tytey+9Duy1ISMNHXnY8FFGvVHbVB+p0Ttyn1OjTW0SS8vP7tRgNnuToHmd6GQGYpwIxG0SwIbmySw6pcST3GQWC+NQKIMa6YTTaBIDwdSJddCN3Z3cp9yCpj/ixr8jFya6f0EuTHSb3EduT6i1ur4osgDNUzhjGmXgYoND98pe5zfpy3X4W4GX0EvoJfQSegm9hP4XoTFGaPjLFH4CjgdTc9MWax8AAAACYktHRAD/h4/MvwAAAAlwSFlzAAAX3AAAF9wBGQRXVgAAAAd0SU1FB+MGHRcnJmCWOwMAAAF8SURBVEjH7dYxSFRxHAfwj8+TQ0RDKaihpXKwzRBzC4ISbMtZqCUEHcNBAhHMhiaX0IaWHCTMzUFxiUMiMPAw4sAhsKEWtUHJojyHe955ouD9741+3/D+/z/vffi99/68/59Crnnri5zPevDcmpxVfRiQlZM1gD6rcta8dsUpabUlHx8jWInbk5iJ2zOYLF614fJxJAXGNassVz0z6IYpTfHIuwJ1X+W5g0fuFvu3ItAQQNWj7kg/iiSWlIe6hYCXTLldTk2rDyqiyZPygcgbm0HUvm175dSgi/4HUN+0mCinqsm8nWJ7LlUVldGYVFWSe8Bz6pw6jXovrzbgzuvytszqKFH3qiikWa9P+g+pB17IBzC/vD");
+  WSContentSend_P ("Tnr8irwi8wkjFsP4DaNKRXpx01nibx2rNm0ZXMF/yKC6UltZpMu2mpRO0W19iz53d8/uHx0Sm6GFDNh5Nn+7DtCqHvxk7efqzrMKpdyq4VLEirs2cZGW3S/shgWZe0fz4a8fM4dQDPsF31pJ5WwwAAAABJRU5ErkJggg==");
+
+  WSContentSend_P ("'/>");
+}
 
 // Pilot Wire web page
 void PilotWireWebSelectMode (bool autosubmit)
@@ -491,22 +517,40 @@ void PilotWireWebSelectMode (bool autosubmit)
 // Pilot Wire configuration button
 void PilotWireWebButton ()
 {
-  // display button
-  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>"), D_PAGE_PILOTWIRE, D_PILOTWIRE_CONFIGURE);
+  // beginning
+  WSContentSend_P (PSTR ("<table style='width:100%%;'><tr>"));
+
+  // vmc icon
+  WSContentSend_P (PSTR ("<td align='center'>"));
+  PilotWireWebDisplayIcon (32);
+  WSContentSend_P (PSTR ("</td>"));
+
+  // button
+  WSContentSend_P (PSTR ("<td><form action='%s' method='get'><button>%s</button></form></td>"), D_PAGE_PILOTWIRE, D_PILOTWIRE_CONFIGURE);
+
+  // end
+  WSContentSend_P (PSTR ("</tr></table>"));
 }
 
 
 // append pilot wire buttons to main page
 void PilotWireWebMainButton ()
 {
-  // selection : beginning
-  WSContentSend_P (PSTR ("<br /><p><form action='%s' method='get'>"), D_PAGE_PILOTWIRE);
+  // beginning
+  WSContentSend_P (PSTR ("<table style='width:100%%;padding:5px 10px;'><tr>"));
+
+  // vmc icon
+  WSContentSend_P (PSTR ("<td>"));
+  PilotWireWebDisplayIcon (32);
+  WSContentSend_P (PSTR ("</td>"));
 
   // select mode
+  WSContentSend_P (PSTR ("<td><form action='%s' method='get'>"), D_PAGE_PILOTWIRE);
   PilotWireWebSelectMode (true);
+  WSContentSend_P (PSTR ("</form></td>"));
 
-  // selection : end
-  WSContentSend_P (PSTR ("</form></p>"));
+  // end
+  WSContentSend_P (PSTR ("</tr></table>"));
 }
 
 // Pilot Wire web page
@@ -662,11 +706,13 @@ bool PilotWireWebState ()
 
 bool Xsns99 (byte callback_id)
 {
+  bool result = false;
+
   // main callback switch
   switch (callback_id)
   {
     case FUNC_COMMAND:
-      PilotWireCommand ();
+      result = PilotWireCommand ();
       break;
     case FUNC_EVERY_250_MSECOND:
       PilotWireEvery250MSecond ();
@@ -691,7 +737,7 @@ bool Xsns99 (byte callback_id)
 #endif  // USE_WEBSERVER
 
   }
-  return false;
+  return result;
 }
 
 #endif // USE_PILOTWIRE
