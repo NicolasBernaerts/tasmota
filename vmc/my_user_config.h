@@ -508,7 +508,7 @@
 #undef USE_DEBUG_DRIVER                       // Disable debug code
 
 #undef D_AUTHOR
-#define D_AUTHOR           "Theo Arends<br />release for VMC v1.1 by Nicolas Bernaerts"
+#define D_AUTHOR           "Theo Arends<br />VMC release v1.1 by Nicolas Bernaerts"
 
 /*********************************************************************************************\
  * No user configurable items below

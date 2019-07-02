@@ -357,7 +357,7 @@ void VmcWebDisplayIcon (uint8_t height)
   WSContentSend_P ("'/>");
 }
 
-// VMC web page
+// VMC mode select combo
 void VmcWebSelectMode (bool autosubmit)
 {
   uint8_t actual_mode;
@@ -401,7 +401,7 @@ void VmcWebSelectMode (bool autosubmit)
 }
 
 // VMC configuration button
-void VmcWebButton ()
+void VmcWebConfigButton ()
 {
   // beginning
   WSContentSend_P (PSTR ("<table style='width:100%%;'><tr>"));
@@ -604,7 +604,7 @@ bool Xsns98 (byte callback_id)
       VmcWebMainButton ();
       break;
     case FUNC_WEB_ADD_BUTTON:
-      VmcWebButton ();
+      VmcWebConfigButton ();
       break;
 #endif  // USE_WEBSERVER
 
