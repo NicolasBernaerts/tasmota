@@ -1,10 +1,6 @@
 /*
   fr-FR.h - localization for French - France for Sonoff-Tasmota
   Copyright (C) 2019  Olivier Francais
-                2019  Nicolas Bernaerts
-
-  Integrates Pilotwire strings (xsns_99_pilotwire.ino)
-
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
@@ -504,8 +500,8 @@
 #define D_PILOTWIRE_OFFLOAD     "Délestage"
 #define D_PILOTWIRE_PARAMETERS  "Paramètres Fil Pilote"
 #define D_PILOTWIRE_CORRECTED   "Temperature corrigée"
-#define D_PILOTWIRE_TARGET      "Température Cible"
-#define D_PILOTWIRE_DRIFT       "Correction de Température"
+#define D_PILOTWIRE_TARGET      "Température cible"
+#define D_PILOTWIRE_DRIFT       "Correction de température"
 #define D_PILOTWIRE_CONFIGURE   "Configuration Fil Pilote"
 
 // sonoff_template.h - keep them as short as possible to be able to fit them in GUI drop down box
