@@ -435,6 +435,11 @@
 #define D_KNX_TX_SLOT "KNX TX"
 #define D_KNX_RX_SLOT "KNX RX"
 
+// xnrg_16_teleinfo.ino
+#define D_TELEINFO_DISABLED  "Teleinfo désactivée"
+#define D_TELEINFO_1200      "Teleinfo 1200"
+#define D_TELEINFO_9600      "Teleinfo 9600 (Linky)"
+
 // xsns_03_energy.ino
 #define D_ENERGY_TODAY "Énergie aujourd'hui"
 #define D_ENERGY_YESTERDAY "Énergie hier"

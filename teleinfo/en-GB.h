@@ -440,6 +440,11 @@
 #define D_ENERGY_YESTERDAY "Energy Yesterday"
 #define D_ENERGY_TOTAL "Energy Total"
 
+// xnrg_16_teleinfo.ino
+#define D_TELEINFO_DISABLED  "Teleinfo disabled"
+#define D_TELEINFO_1200      "Teleinfo 1200"
+#define D_TELEINFO_9600      "Teleinfo 9600 (Linky)"
+
 // xsns_05_ds18b20.ino
 #define D_SENSOR_BUSY "Sensor busy"
 #define D_SENSOR_CRC_ERROR "Sensor CRC error"
