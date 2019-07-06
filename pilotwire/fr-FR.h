@@ -1,10 +1,6 @@
 /*
   fr-FR.h - localization for French - France for Sonoff-Tasmota
   Copyright (C) 2019  Olivier Francais
-                2019  Nicolas Bernaerts
-
-  Integrates Teleinfo strings (xnrg_16_teleinfo.ino)
-
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
@@ -435,11 +431,6 @@
 #define D_KNX_TX_SLOT "KNX TX"
 #define D_KNX_RX_SLOT "KNX RX"
 
-// xnrg_16_teleinfo.ino
-#define D_TELEINFO_DISABLED  "Teleinfo désactivée"
-#define D_TELEINFO_1200      "Teleinfo 1200"
-#define D_TELEINFO_9600      "Teleinfo 9600 (Linky)"
-
 // xsns_03_energy.ino
 #define D_ENERGY_TODAY "Énergie aujourd'hui"
 #define D_ENERGY_YESTERDAY "Énergie hier"
@@ -496,6 +487,22 @@
 #define D_TX20_EAST "E"
 #define D_TX20_SOUTH "S"
 #define D_TX20_WEST "O"
+
+// xsns_99_pilotwire.ino
+#define D_PILOTWIRE_MODE        "Mode Fil Pilote"
+#define D_PILOTWIRE_STATE       "Etat Fil Pilote"
+#define D_PILOTWIRE_DISABLED    "Désactivé"
+#define D_PILOTWIRE_OFF         "Arrêt"
+#define D_PILOTWIRE_COMFORT     "Confort"
+#define D_PILOTWIRE_ECO         "Economie"
+#define D_PILOTWIRE_FROST       "Hors gel"
+#define D_PILOTWIRE_THERMOSTAT  "Thermostat"
+#define D_PILOTWIRE_OFFLOAD     "Délestage"
+#define D_PILOTWIRE_PARAMETERS  "Paramètres Fil Pilote"
+#define D_PILOTWIRE_CORRECTED   "Temperature corrigée"
+#define D_PILOTWIRE_TARGET      "Température cible"
+#define D_PILOTWIRE_DRIFT       "Correction de température"
+#define D_PILOTWIRE_CONFIGURE   "Configuration Fil Pilote"
 
 // sonoff_template.h - keep them as short as possible to be able to fit them in GUI drop down box
 #define D_SENSOR_NONE          "Aucun"
@@ -581,11 +588,6 @@
 #define D_SENSOR_TXD           "Serial Tx"
 #define D_SENSOR_RXD           "Serial Rx"
 #define D_SENSOR_ROTARY        "Rotary"     // Suffix "1A"
-
-// Teleinfo
-#define D_SENSOR_TELEINFO_TX   "Teleinfo Tx"
-#define D_SENSOR_TELEINFO_1200 "Teleinfo 1200"
-#define D_SENSOR_TELEINFO_9600 "Teleinfo 9600"
 
 // Units
 #define D_UNIT_AMPERE "A"

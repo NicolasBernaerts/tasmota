@@ -2,7 +2,13 @@
   xsns_99_pilotwire.ino - French Pilot Wire (Fil Pilote) support 
   for Sonoff Basic or Sonoff Dual R2
   
-  Copyright (C) 2019 Nicolas Bernaerts
+  Copyright (C) 2019  Nicolas Bernaerts
+
+    05/04/2019 - v1.0 - Creation
+    12/04/2019 - v1.1 - Save settings in weight... variables
+    10/06/2019 - v2.0 - Complete rewrite to add web management
+    25/06/2019 - v2.1 - Add DHT temperature sensor and settings validity control
+    05/07/2019 - v2.2 - Add embeded icon
 
   Settings are stored using weighting scale parameters :
     - Settings.weight_reference   = Fil pilote mode
@@ -50,6 +56,18 @@
 #define PILOTWIRE_MESSAGE_BUFFER_SIZE   64
 #define PILOTWIRE_OFFLOAD_TIMEOUT       300000       // 5 mn
 
+#define PILOTWIRE_TEMP_MIN              5
+#define PILOTWIRE_TEMP_MAX              30
+#define PILOTWIRE_DRIFT_MIN             -5
+#define PILOTWIRE_DRIFT_MAX             5
+#define PILOTWIRE_THRESHOLD             0.5
+
+// icon coded in base64
+const char strIcon0[] PROGMEM = "iVBORw0KGgoAAAANSUhEUgAAACUAAAAgCAQAAAA/Wnk7AAAC3npUWHRSYXcgcHJvZmlsZSB0eXBlIGV4aWYAAHja7ZdBkhshDEX3nCJHQBJC4jh0A1W5QY6fD83Y8YwzVZlkkYWhDLRafEAP6HLoP76P8A2JPHJIap5LzhEplVS4ouHxSldNMa1yJdb9jh7tgbc9MkyCWq7H3Ld/hV3vHSxt+/FoD3ZuHd9C+8WboMyR52jbz7eQ8GWn/RzK7lfTL8vZv2FrzEjb6f1zMgSjKfSEA3chiSh9jiKYgRSpqDNKkek0bbNdVunPYxduzXfBa+157GLdHvIYihDzdsjvYrTtpM9jtyL064zorcmPL4bEN9AfYzeaj9Gv1dWUEakc9qLillgtOB4IpaxuGdnwU7Rt5YLsWOIJYg00D+QzUCFGtAclalRpUF/1SSemmLizoWY+WZbNxbjwuQCkmWmwAUML4mB1gprAzLe50Bq3rPFOHIEWG8GTCWKEHh9yeGb8Sr4JjTG3LtEMJtDTBZjnnsY0JrlZwgtAaOyY6orvyuGG9Z5o7cIEtxlmxwJrPC6JQ+m+t2RxnnQ1phCvo0HWtgBChLEVkyEBgZhJlDJFYzYixNHBp2LmLIkPECBVbhQG2IhkwHGeY6OP0fJl5cuMqwUgFIfGgAYHBbBSUuwfS449VFU0BVXNaupatGbJKWvO2fK8o6qJJVPLZuZWrLp4cvXs5u7Fa+EiuMK05GK";
+const char strIcon1[] PROGMEM = "heCmlVgxaIV3Ru8Kj1oMPOdKhRz7s8KMc9cT2OdOpZz7t9LOctXGThuPfcrPQvJVWO3VspZ669tytey+9Duy1ISMNHXnY8FFGvVHbVB+p0Ttyn1OjTW0SS8vP7tRgNnuToHmd6GQGYpwIxG0SwIbmySw6pcST3GQWC+NQKIMa6YTTaBIDwdSJddCN3Z3cp9yCpj/ixr8jFya6f0EuTHSb3EduT6i1ur4osgDNUzhjGmXgYoND98pe5zfpy3X4W4GX0EvoJfQSegm9hP4XoTFGaPjLFH4CjgdTc9MWax8AAAACYktHRAD/h4/MvwAAAAlwSFlzAAAX3AAAF9wBGQRXVgAAAAd0SU1FB+MGHRcnJmCWOwMAAAF8SURBVEjH7dYxSFRxHAfwj8+TQ0RDKaihpXKwzRBzC4ISbMtZqCUEHcNBAhHMhiaX0IaWHCTMzUFxiUMiMPAw4sAhsKEWtUHJojyHe955ouD9741+3/D+/z/vffi99/68/59Crnnri5zPevDcmpxVfRiQlZM1gD6rcta8dsUpabUlHx8jWInbk5iJ2zOYLF614fJxJAXGNassVz0z6IYpTfHIuwJ1X+W5g0fuFvu3ItAQQNWj7kg/iiSWlIe6hYCXTLldTk2rDyqiyZPygcgbm0HUvm175dSgi/4HUN+0mCinqsm8nWJ7LlUVldGYVFWSe8Bz6pw6jXovrzbgzuvytszqKFH3qiikWa9P+g+pB17IBzC/vD";
+const char strIcon2[] PROGMEM = "Tnr8irwi8wkjFsP4DaNKRXpx01nibx2rNm0ZXMF/yKC6UltZpMu2mpRO0W19iz53d8/uHx0Sm6GFDNh5Nn+7DtCqHvxk7efqzrMKpdyq4VLEirs2cZGW3S/shgWZe0fz4a8fM4dQDPsF31pJ5WwwAAAABJRU5ErkJggg==";
+const char *const arrIconBase64[] PROGMEM = {strIcon0, strIcon1, strIcon2};
+
 // fil pilote modes
 enum PilotWireModes { PILOTWIRE_DISABLED, PILOTWIRE_OFF, PILOTWIRE_COMFORT, PILOTWIRE_ECO, PILOTWIRE_FROST, PILOTWIRE_THERMOSTAT, PILOTWIRE_OFFLOAD };
 
@@ -59,12 +77,6 @@ const char kPilotWireCommands[] PROGMEM = D_CMND_PILOTWIRE_MODE "|" D_CMND_PILOT
 
 // variables
 ulong offload_start = 0;            // time of last offload command
-
-// icon coded in base64
-const char icon_0[] PROGMEM = "iVBORw0KGgoAAAANSUhEUgAAACUAAAAgCAQAAAA/Wnk7AAAC3npUWHRSYXcgcHJvZmlsZSB0eXBlIGV4aWYAAHja7ZdBkhshDEX3nCJHQBJC4jh0A1W5QY6fD83Y8YwzVZlkkYWhDLRafEAP6HLoP76P8A2JPHJIap5LzhEplVS4ouHxSldNMa1yJdb9jh7tgbc9MkyCWq7H3Ld/hV3vHSxt+/FoD3ZuHd9C+8WboMyR52jbz7eQ8GWn/RzK7lfTL8vZv2FrzEjb6f1zMgSjKfSEA3chiSh9jiKYgRSpqDNKkek0bbNdVunPYxduzXfBa+157GLdHvIYihDzdsjvYrTtpM9jtyL064zorcmPL4bEN9AfYzeaj9Gv1dWUEakc9qLillgtOB4IpaxuGdnwU7Rt5YLsWOIJYg00D+QzUCFGtAclalRpUF/1SSemmLizoWY+WZbNxbjwuQCkmWmwAUML4mB1gprAzLe50Bq3rPFOHIEWG8GTCWKEHh9yeGb8Sr4JjTG3LtEMJtDTBZjnnsY0JrlZwgtAaOyY6orvyuGG9Z5o7cIEtxlmxwJrPC6JQ+m+t2RxnnQ1phCvo0HWtgBChLEVkyEBgZhJlDJFYzYixNHBp2LmLIkPECBVbhQG2IhkwHGeY6OP0fJl5cuMqwUgFIfGgAYHBbBSUuwfS449VFU0BVXNaupatGbJKWvO2fK8o6qJJVPLZuZWrLp4cvXs5u7Fa+EiuMK05GK";
-const char icon_1[] PROGMEM = "heCmlVgxaIV3Ru8Kj1oMPOdKhRz7s8KMc9cT2OdOpZz7t9LOctXGThuPfcrPQvJVWO3VspZ669tytey+9Duy1ISMNHXnY8FFGvVHbVB+p0Ttyn1OjTW0SS8vP7tRgNnuToHmd6GQGYpwIxG0SwIbmySw6pcST3GQWC+NQKIMa6YTTaBIDwdSJddCN3Z3cp9yCpj/ixr8jFya6f0EuTHSb3EduT6i1ur4osgDNUzhjGmXgYoND98pe5zfpy3X4W4GX0EvoJfQSegm9hP4XoTFGaPjLFH4CjgdTc9MWax8AAAACYktHRAD/h4/MvwAAAAlwSFlzAAAX3AAAF9wBGQRXVgAAAAd0SU1FB+MGHRcnJmCWOwMAAAF8SURBVEjH7dYxSFRxHAfwj8+TQ0RDKaihpXKwzRBzC4ISbMtZqCUEHcNBAhHMhiaX0IaWHCTMzUFxiUMiMPAw4sAhsKEWtUHJojyHe955ouD9741+3/D+/z/vffi99/68/59Crnnri5zPevDcmpxVfRiQlZM1gD6rcta8dsUpabUlHx8jWInbk5iJ2zOYLF614fJxJAXGNassVz0z6IYpTfHIuwJ1X+W5g0fuFvu3ItAQQNWj7kg/iiSWlIe6hYCXTLldTk2rDyqiyZPygcgbm0HUvm175dSgi/4HUN+0mCinqsm8nWJ7LlUVldGYVFWSe8Bz6pw6jXovrzbgzuvytszqKFH3qiikWa9P+g+pB17IBzC/vD";
-const char icon_2[] PROGMEM = "Tnr8irwi8wkjFsP4DaNKRXpx01nibx2rNm0ZXMF/yKC6UltZpMu2mpRO0W19iz53d8/uHx0Sm6GFDNh5Nn+7DtCqHvxk7efqzrMKpdyq4VLEirs2cZGW3S/shgWZe0fz4a8fM4dQDPsF31pJ5WwwAAAABJRU5ErkJggg==";
-const char *const arrIconBase64[] PROGMEM = {icon_0, icon_1, icon_2};
 
 /*********************************************************************************************/
 
@@ -258,7 +270,7 @@ float PilotWireGetTemperatureWithDrift ()
 void PilotWireSetThermostat (float new_thermostat)
 {
   // save target temperature
-  if ((new_thermostat > 0) && (new_thermostat <= 30)) Settings.weight_max = (uint16_t) (new_thermostat * 10);
+  if ((new_thermostat >= PILOTWIRE_TEMP_MIN) && (new_thermostat <= PILOTWIRE_TEMP_MAX)) Settings.weight_max = (uint16_t) (new_thermostat * 10);
 }
 
 // get target temperature
@@ -271,8 +283,8 @@ float PilotWireGetTargetTemperature ()
   temperature = temperature / 10;
   
   // check if within range
-  if (temperature < 0)  temperature = 0;
-  if (temperature > 30) temperature = 30;
+  if (temperature < PILOTWIRE_TEMP_MIN) temperature = PILOTWIRE_TEMP_MIN;
+  if (temperature > PILOTWIRE_TEMP_MAX) temperature = PILOTWIRE_TEMP_MAX;
 
   return temperature;
 }
@@ -282,7 +294,7 @@ float PilotWireGetTargetTemperature ()
 void PilotWireSetDrift (float new_drift)
 {
   // if within range, save temperature correction
-  if ((new_drift >= -5) && (new_drift <= 5)) Settings.weight_calibration = (unsigned long) (50 + (new_drift * 10));
+  if ((new_drift >= PILOTWIRE_DRIFT_MIN) && (new_drift <= PILOTWIRE_DRIFT_MAX)) Settings.weight_calibration = (unsigned long) (50 + (new_drift * 10));
 }
 
 // get pilot wire drift temperature
@@ -295,8 +307,8 @@ float PilotWireGetDrift ()
   drift = ((drift - 50) / 10);
   
   // check if within range
-  if (drift < -5) drift = -5;
-  if (drift > 5)  drift = 5;
+  if (drift < PILOTWIRE_DRIFT_MIN) drift = PILOTWIRE_DRIFT_MIN;
+  if (drift > PILOTWIRE_DRIFT_MAX) drift = PILOTWIRE_DRIFT_MAX;
 
   return drift;
 }
@@ -427,8 +439,8 @@ void PilotWireEvery250MSecond ()
       // if temperature is too low, target state is on
       // else, if too high, target state is off
       target_state = target_mode;
-      if (actual_temperature < (target_temperature - 0.5)) target_state = PILOTWIRE_COMFORT;
-      else if (actual_temperature > (target_temperature + 0.5)) target_state = PILOTWIRE_OFF;
+      if (actual_temperature < (target_temperature - PILOTWIRE_THRESHOLD)) target_state = PILOTWIRE_COMFORT;
+      else if (actual_temperature > (target_temperature + PILOTWIRE_THRESHOLD)) target_state = PILOTWIRE_OFF;
     }
 
     // else set mode if needed
@@ -454,11 +466,15 @@ void PilotWireEvery250MSecond ()
 // Pilot Wire icon
 void PilotWireWebDisplayIcon (uint8_t height)
 {
+  uint8_t nbrItem, index;
+
+  // display img according to height
   WSContentSend_P ("<img height=%d src='data:image/png;base64,", height);
-  
-  length = sizeof (arrIconBase64 / sizeof(char*));
-  for (i=0; i<length; i++) { WSContentSend_P (arrIconBase64[i]); }
-  
+
+  // loop to display base64 segments
+  nbrItem = sizeof (arrIconBase64) / sizeof (char*);
+  for (index=0; index<nbrItem; index++) { WSContentSend_P (arrIconBase64[index]); }
+
   WSContentSend_P ("'/>");
 }
 
@@ -630,10 +646,10 @@ void PilotWireWebPage ()
     drift_temperature  = PilotWireGetDrift ();
 
     // target temperature label and input
-    WSContentSend_P (PSTR ("<p><b>%s</b><br/><input type='number' name='%s' min='5' max='30' step='0.5' value='%.2f'></p>"), D_PILOTWIRE_TARGET, D_CMND_PILOTWIRE_TARGET, target_temperature);
+    WSContentSend_P (PSTR ("<p><b>%s</b><br/><input type='number' name='%s' min='%d' max='%d' step='0.5' value='%.2f'></p>"), D_PILOTWIRE_TARGET, D_CMND_PILOTWIRE_TARGET, PILOTWIRE_TEMP_MIN, PILOTWIRE_TEMP_MAX, target_temperature);
 
     // temperature correction label and input
-    WSContentSend_P (PSTR ("<p><b>%s</b><br/><input type='number' name='%s' min='-5' max='5' step='0.1' value='%.2f'></p>"), D_PILOTWIRE_DRIFT, D_CMND_PILOTWIRE_DRIFT, drift_temperature);
+    WSContentSend_P (PSTR ("<p><b>%s</b><br/><input type='number' name='%s' min='%d' max='%d' step='0.1' value='%.2f'></p>"), D_PILOTWIRE_DRIFT, D_CMND_PILOTWIRE_DRIFT, PILOTWIRE_DRIFT_MIN, PILOTWIRE_DRIFT_MAX, drift_temperature);
   }
 
   // end of form
