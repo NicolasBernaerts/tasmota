@@ -17,8 +17,8 @@ This Tasmota firmware is based on sonoff original version **v6.5.0** modified wi
 Between your Energy meter and your Tasmota device, you'll need an adapter like the one described in https://hallard.me/demystifier-la-teleinfo/. You need to connect your adapter **output** to your Tasmota **Rx** port.
 
 Then, you need to declare in Tasmota :
-  * **Serial Out** to **Teleinfo Tx** (unused)
-  * **Serial In** to **Teleinfo 1200** or **Teleinfo 9600**
+  * **Serial Out** to **Serial Tx** (unused)
+  * **Serial In** to **Serial RX**
 
 Teleinfo protocol is described in this document : https://www.enedis.fr/sites/default/files/Enedis-NOI-CPT_54E.pdf
 
