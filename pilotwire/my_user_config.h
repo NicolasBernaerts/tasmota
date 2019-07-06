@@ -508,7 +508,7 @@
 #undef USE_DEBUG_DRIVER                       // Disable debug code
 
 #undef D_AUTHOR
-#define D_AUTHOR           "Theo Arends<br />release for Pilotwire v2.2 by Nicolas Bernaerts"
+#define D_AUTHOR           "Theo Arends<br />Pilotwire release v2.2 by Nicolas Bernaerts"
 
 /*********************************************************************************************\
  * No user configurable items below
