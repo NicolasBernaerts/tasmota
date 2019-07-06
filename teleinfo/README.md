@@ -20,6 +20,10 @@ Then, you need to declare in Tasmota :
   * **Serial Out** to **Serial Tx** (unused)
   * **Serial In** to **Serial RX**
 
+Finaly, you need to select your Teleinfo adapter baud rate :
+  * **Teleinfo 1200**
+  * **Teleinfo 9600 (Linky)**
+
 Teleinfo protocol is described in this document : https://www.enedis.fr/sites/default/files/Enedis-NOI-CPT_54E.pdf
 
 Pre-compiled version is available under **tasmota-teleinfo.bin**
