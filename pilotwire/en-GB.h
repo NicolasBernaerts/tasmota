@@ -1,6 +1,10 @@
 /*
   en-GB.h - localization for English - United Kingdom for Sonoff-Tasmota
   Copyright (C) 2019  Theo Arends
+                2019  Nicolas Bernaerts
+
+  Integrates Teleinfo strings (xnrg_16_teleinfo.ino)
+
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
@@ -436,6 +440,11 @@
 #define D_ENERGY_YESTERDAY "Energy Yesterday"
 #define D_ENERGY_TOTAL "Energy Total"
 
+// xnrg_16_teleinfo.ino
+#define D_TELEINFO_DISABLED  "Teleinfo disabled"
+#define D_TELEINFO_1200      "Teleinfo 1200"
+#define D_TELEINFO_9600      "Teleinfo 9600 (Linky)"
+
 // xsns_05_ds18b20.ino
 #define D_SENSOR_BUSY "Sensor busy"
 #define D_SENSOR_CRC_ERROR "Sensor CRC error"
@@ -487,22 +496,6 @@
 #define D_TX20_EAST "E"
 #define D_TX20_SOUTH "S"
 #define D_TX20_WEST "W"
-
-// xsns_99_pilotwire.ino
-#define D_PILOTWIRE_MODE        "Pilotwire Mode"
-#define D_PILOTWIRE_STATE       "Pilotwire State"
-#define D_PILOTWIRE_DISABLED    "Disabled"
-#define D_PILOTWIRE_OFF         "Off"
-#define D_PILOTWIRE_COMFORT     "Comfort"
-#define D_PILOTWIRE_ECO         "Economy"
-#define D_PILOTWIRE_FROST       "No Frost"
-#define D_PILOTWIRE_THERMOSTAT  "Thermostat"
-#define D_PILOTWIRE_OFFLOAD     "Offloaded"
-#define D_PILOTWIRE_PARAMETERS  "Pilotwire Parameters"
-#define D_PILOTWIRE_CORRECTED   "Corrected Temperature"
-#define D_PILOTWIRE_TARGET      "Target Temperature"
-#define D_PILOTWIRE_DRIFT       "Temperature Correction"
-#define D_PILOTWIRE_CONFIGURE   "Configure Pilotwire"
 
 // sonoff_template.h - keep them as short as possible to be able to fit them in GUI drop down box
 #define D_SENSOR_NONE          "None"
@@ -588,6 +581,10 @@
 #define D_SENSOR_TXD           "Serial Tx"
 #define D_SENSOR_RXD           "Serial Rx"
 #define D_SENSOR_ROTARY        "Rotary"     // Suffix "1A"
+// Teleinfo
+#define D_SENSOR_TELEINFO_TX   "Teleinfo Tx"
+#define D_SENSOR_TELEINFO_1200 "Teleinfo 1200"
+#define D_SENSOR_TELEINFO_9600 "Teleinfo 9600"
 
 // Units
 #define D_UNIT_AMPERE "A"
@@ -657,4 +654,3 @@
 #define D_UNIT_ANGLE      "Deg"
 
 #endif // _LANGUAGE_EN_GB_H_
-
