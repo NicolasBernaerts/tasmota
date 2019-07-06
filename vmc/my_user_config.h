@@ -1,13 +1,13 @@
 /*
   my_user_config.h - user specific configuration for Sonoff-Tasmota
 
-  Copyright (C) 2019  Theo Arends
-                      Nicolas Bernaerts
+  Copyright (C) 2019  Nicolas Bernaerts
+    12/04/2019 - v1.0 - Creation
+    16/05/2019 - v1.1 - Save settings in weight... variables
 
-  Configuration has been optimised for Pilotwire
+  Configuration has been optimised for VMC control
   All un-needed modules have been removed
-  Default temperature sensor is DS18x20
-  It uses user_config_override.h
+  Default humidity sensor is DHT based
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -42,7 +42,7 @@
  * Users are advised to use the user_config_override.h file for most changes.
 \*********************************************************************************************/
 
-#define USE_CONFIG_OVERRIDE                      // Uncomment to use user_config_override.h file. See README.md
+//#define USE_CONFIG_OVERRIDE                      // Uncomment to use user_config_override.h file. See README.md
 
 /*********************************************************************************************\
  * SECTION 1
@@ -441,7 +441,7 @@
 //#define FIRMWARE_MINIMAL                         // Create sonoff-minimal as intermediate firmware for OTA-MAGIC
 
 /*********************************************************************************************\
- * Pilotwire firmware configuration
+ * VMC control firmware configuration
 \*********************************************************************************************/
 
 #define USE_VMC                               // Add support for Ventilation Motor Controled according to humidity level (+??k code)
