@@ -7,10 +7,9 @@
     08/07/2019 - v1.0 - Creation
 
   Settings are stored using some unused display parameters :
-   - Settings.display_model     = Push button enabled
-   - Settings.display_mode      = Motion detector enabled
-   - Settings.display_refresh   = Debounce duration (sec)
-   - Settings.display_size      = Switch duration (sec)
+   - Settings.display_model  = Push button enabled
+   - Settings.display_mode   = Motion detector enabled
+   - Settings.display_size   = Switch duration (sec)
     
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -91,9 +90,9 @@ struct timeslot {
 };
 
 // variables
-ulong start_switch   = 0;            // time of latest switch command
-ulong start_debounce = 0;            // time of latest debounced command
-bool  motion_used = false;
+ulong remoteswitch_button_last   = 0;          // time of last button press
+ulong remoteswitch_motion_last   = 0;          // time of last motion detection
+bool  remoteswitch_motion_active = false;      // set to true is motion detection is active
 
 /*********************************************************************************************/
 
@@ -175,67 +174,79 @@ struct timeslot RemoteSwitchMotionGetSlot (uint8_t slot_number)
   return slot_result;
 }
 
-// update motion detector usage according to current time slots
-bool RemoteSwitchMotionUpdateUsage ()
-{
-  uint8_t  index;
-  uint8_t  current_hour, current_minute;
-  timeslot current_slot;
-
-  // get current time
-  current_hour = RtcTime.hour;
-  current_minute = RtcTime.minute;
-
-  // loop thru both time slots
-  for (index = 0; index < 2; index ++)
-  {
-    // get current slot
-    current_slot = RemoteSwitchMotionGetSlot (index);
-
-    // update motion collect state
-    if ((current_hour == current_slot.start_hour) && (current_minute == current_slot.start_minute)) motion_used = false;
-    else if ((current_hour == current_slot.stop_hour) && (current_minute == current_slot.stop_minute)) motion_used = true;
-  }
-  
-  return motion_used;
-}
-
-// get push button enable status
-bool RemoteSwitchButtonIsEnabled ()
-{
-  return (Settings.display_model == 1);
-}
-
-// set push button status
-void RemoteSwitchButtonEnable (uint8_t status)
+// set push button allowed status
+void RemoteSwitchSetButtonAllowed (uint8_t status)
 {
   if (status > 1) status = 1;
   Settings.display_model = status;
 }
 
-// get motion detection enable status
-bool RemoteSwitchMotionIsEnabled ()
+// is push button allowed ?
+bool RemoteSwitchIsButtonAllowed ()
+{
+  return (Settings.display_model == 1);
+}
+
+// is push button actually pressed
+void RemoteSwitchIsButtonPressed ()
+{
+  return (lastbutton[0] > 0);
+}
+
+// is motion detection allowed ?
+bool RemoteSwitchIsMotionAllowed ()
 {
   return (Settings.display_mode == 1);
 }
 
-// set motion detection status
-void RemoteSwitchMotionEnable (uint8_t status)
+// set motion detection allowed status
+void RemoteSwitchSetMotionAllowed (uint8_t status)
 {
   if (status > 1) status = 1;
   Settings.display_mode = status;
 }
 
-// get remote switch debounce delay (sec)
-uint8_t RemoteSwitchGetDebounce ()
+// is motion detection actually detected
+void RemoteSwitchIsMotionDetected (uint8_t status)
 {
-  return Settings.display_refresh;
+  return (SwitchLastState (0) > 0);
 }
 
-// set remote switch debounce delay (sec)
-void RemoteSwitchSetDebounce (uint8_t debounce)
+// update motion detector usage according to allowed status and time slots
+void RemoteSwitchUpdateMotionActive ()
 {
-  Settings.display_refresh = debounce;
+  bool     motion_enabled;
+  uint8_t  index;
+  uint8_t  current_hour, current_minute;
+  timeslot current_slot;
+  
+  // check is motion detection is enabled
+  motion_enabled = RemoteSwitchMotionIsEnabled ();
+  
+  // if motion detector should be deactivated
+  if ((motion_enabled == false) && (remoteswitch_motion_active == true))
+  {
+    remoteswitch_motion_active = false; 
+  }
+  
+  // else if motion detector is enabled, check activation slots
+  else if (motion_enabled == true)
+  {
+    // get current time
+    current_hour = RtcTime.hour;
+    current_minute = RtcTime.minute;
+
+    // loop thru both time slots
+    for (index = 0; index < 2; index ++)
+    {
+      // get current slot
+      current_slot = RemoteSwitchMotionGetSlot (index);
+
+      // update motion collect state
+      if ((current_hour == current_slot.start_hour) && (current_minute == current_slot.start_minute)) remoteswitch_motion_active = false;
+      else if ((current_hour == current_slot.stop_hour) && (current_minute == current_slot.stop_minute)) remoteswitch_motion_active = true;
+    }
+  }
 }
 
 // get remote switch standard duration (sec)
@@ -260,14 +271,13 @@ void RemoteSwitchShowJSON (bool append)
   timeslot slot_0, slot_1;
 
   // collect data
-  button_enabled = RemoteSwitchButtonIsEnabled ();
-  button_state = 1;
-  motion_enabled = RemoteSwitchMotionIsEnabled ();
-  motion_state = 0;
-  debounce = RemoteSwitchGetDebounce ();
+  button_enabled  = RemoteSwitchIsButtonEnabled ();
+  button_pressed  = RemoteSwitchIsButtonPressed ();
+  motion_enabled  = RemoteSwitchIsMotionEnabled ();
+  motion_detected = RemoteSwitchIsMotionDetected ();
   duration = RemoteSwitchGetDuration ();
-  slot_0 = RemoteSwitchMotionGetSlot (0);
-  slot_1 = RemoteSwitchMotionGetSlot (1);
+  slot_0   = RemoteSwitchMotionGetSlot (0);
+  slot_1   = RemoteSwitchMotionGetSlot (1);
   
   // read relay state
   relay_state = bitRead (power, 0);
@@ -283,10 +293,10 @@ void RemoteSwitchShowJSON (bool append)
   snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH_RELAY "\":{\"" D_JSON_REMOTESWITCH_STATE "\":%d,\"" D_JSON_REMOTESWITCH_DURATION "\":%d},"), mqtt_data, relay_state, relay_duration);
 
   // "PushButton":{"Enabled":1,"State":0},
-  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH_BUTTON "\":{\"" D_JSON_REMOTESWITCH_ENABLED "\":%d,\"" D_JSON_REMOTESWITCH_STATE "\":%d},"), mqtt_data, button_enabled, button_state);
+  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH_BUTTON "\":{\"" D_JSON_REMOTESWITCH_ENABLED "\":%d,\"" D_JSON_REMOTESWITCH_STATE "\":%d},"), mqtt_data, button_enabled, button_pressed);
 
   // "MotionDetector":{"Enabled":1,"State":1,"Slot1":"01:00-12:00","Slot2":"00:00-00:00"}}
-  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH_MOTION "\":{\"" D_JSON_REMOTESWITCH_ENABLED "\":%d,\"" D_JSON_REMOTESWITCH_STATE "\":%d}}"), mqtt_data, motion_enabled, motion_state);
+  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH_MOTION "\":{\"" D_JSON_REMOTESWITCH_ENABLED "\":%d,\"" D_JSON_REMOTESWITCH_STATE "\":%d}}"), mqtt_data, motion_enabled, motion_detected);
   snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH_SLOT "1\":\"%2d:%2d-%2d:%2d\","), mqtt_data, slot_0.start_hour, slot_0.start_minute, slot_0.stop_hour, slot_0.stop_minute);
   snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH_SLOT "2\":\"%2d:%2d-%2d:%2d\"},"), mqtt_data, slot_1.start_hour, slot_1.start_minute, slot_1.stop_hour, slot_1.stop_minute);
 
@@ -346,6 +356,7 @@ bool RemoteSwitchCommand ()
 // update pilot wire relay states according to current status
 void RemoteSwitchEvery250MSecond ()
 {
+  
 }
 
 #ifdef USE_WEBSERVER
@@ -371,7 +382,7 @@ void RemoteSwitchWebConfigButton ()
   // beginning
   WSContentSend_P (PSTR ("<table style='width:100%%;'><tr>"));
 
-  // vmc icon
+  // remote switch icon
   WSContentSend_P (PSTR ("<td align='center'>"));
   RemoteSwitchWebDisplayIcon (32);
   WSContentSend_P (PSTR ("</td>"));
@@ -409,14 +420,6 @@ void RemoteSwitchWebPage ()
   {
     WebGetArg (D_CMND_REMOTESWITCH_MOTION, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
     RemoteSwitchMotionEnable ((uint8_t) atoi (argument)); 
-    updated = true;
-  }
-
-  // get remote switch debounced delay according to 'debounce' parameter
-  if (WebServer->hasArg(D_CMND_REMOTESWITCH_DEBOUNCE))
-  {
-    WebGetArg (D_CMND_REMOTESWITCH_DEBOUNCE, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
-    RemoteSwitchSetDebounce ((uint8_t) atoi (argument)); 
     updated = true;
   }
 
@@ -486,9 +489,6 @@ void RemoteSwitchWebPage ()
 
   // duration
   WSContentSend_P (PSTR ("<p><b>%s</b><br/><input type='number' name='%s' min='0' step='1' value='%d'></p>"), D_REMOTESWITCH_DURATION, D_CMND_REMOTESWITCH_DURATION, duration);
-
-  // debounce
-  WSContentSend_P (PSTR ("<p><b>%s</b><br/><input type='number' name='%s' min='0' step='1' value='%d'></p>"), D_REMOTESWITCH_DEBOUNCE, D_CMND_REMOTESWITCH_DEBOUNCE, debounce);
 
   // push button input
   WSContentSend_P (PSTR ("<p><b>%s</b>"), D_REMOTESWITCH_BUTTON);
