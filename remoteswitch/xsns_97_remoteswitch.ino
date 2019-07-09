@@ -6,7 +6,7 @@
 
     08/07/2019 - v1.0 - Creation
 
-  Settings are stored using display parameters :
+  Settings are stored using some unused display parameters :
    - Settings.display_model     = Push button enabled
    - Settings.display_mode      = Motion detector enabled
    - Settings.display_refresh   = Debounce duration (sec)
@@ -37,16 +37,16 @@
 #define D_CMND_REMOTESWITCH_MOTION            "motion"
 #define D_CMND_REMOTESWITCH_DEBOUNCE          "debounce"
 #define D_CMND_REMOTESWITCH_DURATION          "duration"
-#define D_CMND_REMOTESWITCH_SLOT0             "slot0"
-#define D_CMND_REMOTESWITCH_SLOT0_START_HOUR  "slot0starthour"
-#define D_CMND_REMOTESWITCH_SLOT0_START_MIN   "slot0startmin"
-#define D_CMND_REMOTESWITCH_SLOT0_STOP_HOUR   "slot0stophour"
-#define D_CMND_REMOTESWITCH_SLOT0_STOP_MIN    "slot0stopmin"
-#define D_CMND_REMOTESWITCH_SLOT1             "slot1"
-#define D_CMND_REMOTESWITCH_SLOT1_START_HOUR  "slot1starthour"
-#define D_CMND_REMOTESWITCH_SLOT1_START_MIN   "slot1startmin"
-#define D_CMND_REMOTESWITCH_SLOT1_STOP_HOUR   "slot1stophour"
-#define D_CMND_REMOTESWITCH_SLOT1_STOP_MIN    "slot1stopmin"
+#define D_CMND_REMOTESWITCH_SLOT0             "s0"
+#define D_CMND_REMOTESWITCH_SLOT0_START_HOUR  "s0srthr"
+#define D_CMND_REMOTESWITCH_SLOT0_START_MIN   "s0srtmn"
+#define D_CMND_REMOTESWITCH_SLOT0_STOP_HOUR   "s0stphr"
+#define D_CMND_REMOTESWITCH_SLOT0_STOP_MIN    "s0stpmn"
+#define D_CMND_REMOTESWITCH_SLOT1             "s1"
+#define D_CMND_REMOTESWITCH_SLOT1_START_HOUR  "s1srthr"
+#define D_CMND_REMOTESWITCH_SLOT1_START_MIN   "s1srtmn"
+#define D_CMND_REMOTESWITCH_SLOT1_STOP_HOUR   "s1stphr"
+#define D_CMND_REMOTESWITCH_SLOT1_STOP_MIN    "s1stpmn"
 
 #define D_JSON_REMOTESWITCH                   "RemoteSwitch"
 #define D_JSON_REMOTESWITCH_ENABLED           "Enabled"
