@@ -58,7 +58,6 @@
 #define D_JSON_REMOTESWITCH_DURATION          "Duration"
 #define D_JSON_REMOTESWITCH_SLOT              "Slot"
 
-
 #define REMOTESWITCH_LABEL_BUFFER_SIZE        16
 #define REMOTESWITCH_MESSAGE_BUFFER_SIZE      64
 
