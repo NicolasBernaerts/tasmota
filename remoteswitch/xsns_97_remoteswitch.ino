@@ -536,16 +536,17 @@ bool RemoteSwitchWebState ()
 {
   float   corrected_temperature;
   float   target_temperature;
-  uint8_t actual_mode;
-  uint8_t actual_state;
+  uint8_t state;
   char*   actual_label;
   char    argument[REMOTESWITCH_LABEL_BUFFER_SIZE];
 
   // add push button state
-  snprintf_P (mqtt_data, sizeof(mqtt_data), "%s<tr><th>%s</th><td>%s</td></tr>", mqtt_data, D_REMOTESWITCH_BUTTON, D_REMOTESWITCH_ON);
+  state = lastbutton[0];
+  snprintf_P (mqtt_data, sizeof(mqtt_data), "%s<tr><th>%s</th><td>%d</td></tr>", mqtt_data, D_REMOTESWITCH_BUTTON, state);
 
   // add motion detector state
-  snprintf_P (mqtt_data, sizeof(mqtt_data), "%s<tr><th>%s</th><td>%s</td></tr>", mqtt_data, D_REMOTESWITCH_MOTION, D_REMOTESWITCH_OFF);
+  state = SwitchLastState (0);
+  snprintf_P (mqtt_data, sizeof(mqtt_data), "%s<tr><th>%s</th><td>%d</td></tr>", mqtt_data, D_REMOTESWITCH_MOTION, state);
 
   // add times
   snprintf_P (mqtt_data, sizeof(mqtt_data), "%s<tr><th>%s</th><td>%d</td></tr>", mqtt_data, D_REMOTESWITCH_TIME_ON, 12);
