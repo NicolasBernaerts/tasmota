@@ -11,8 +11,8 @@
    - Switch1 = Motion detector
 
   Settings are stored using some unused display parameters :
-   - Settings.display_model   = Push button enabled
-   - Settings.display_mode    = Motion detector enabled
+   - Settings.display_model   = Push button allowed
+   - Settings.display_mode    = Motion detector allowed
    - Settings.display_refresh = Push button timeout (sec)
    - Settings.display_size    = Motion detection duration (sec)
 
