@@ -58,6 +58,7 @@
 #define D_JSON_REMOTESWITCH_DURATION          "Duration"
 #define D_JSON_REMOTESWITCH_SLOT              "Slot"
 
+#define REMOTESWITCH_COLOR_BUFFER_SIZE        8
 #define REMOTESWITCH_LABEL_BUFFER_SIZE        16
 #define REMOTESWITCH_MESSAGE_BUFFER_SIZE      64
 
@@ -665,11 +666,20 @@ void RemoteSwitchWebPage ()
 // append pilot wire state to main page
 bool RemoteSwitchWebState ()
 {
-  float   corrected_temperature;
-  float   target_temperature;
-  uint8_t state;
-  char*   actual_label;
-  char    argument[REMOTESWITCH_LABEL_BUFFER_SIZE];
+  bool button_allowed  = false;
+  bool button_pressed  = false;
+  bool motion_detected = false;
+  char color[REMOTESWITCH_COLOR_BUFFER_SIZE];
+  char label[REMOTESWITCH_LABEL_BUFFER_SIZE];
+
+  // update button status
+  button_allowed = RemoteSwitchIsButtonAllowed ();
+  if (button_allowed == true) button_pressed = RemoteSwitchIsButtonPressed ();
+  if ((button_pressed == true) && (remoteswitch_button_pressed == false)) button_trigger = true;
+  remoteswitch_button_pressed = button_pressed;
+  
+  // update motion detector status
+  if (remoteswitch_motion_active == true) motion_detected = RemoteSwitchIsMotionDetected ();
 
   // add push button state
   state = lastbutton[0];
