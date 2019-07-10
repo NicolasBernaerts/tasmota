@@ -7,9 +7,10 @@
     08/07/2019 - v1.0 - Creation
 
   Settings are stored using some unused display parameters :
-   - Settings.display_model  = Push button enabled
-   - Settings.display_mode   = Motion detector enabled
-   - Settings.display_size   = Switch duration (sec)
+   - Settings.display_model   = Push button enabled
+   - Settings.display_mode    = Motion detector enabled
+   - Settings.display_refresh = Push button timeout (sec)
+   - Settings.display_size    = Motion detection duration (sec)
     
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -34,7 +35,7 @@
 #define D_PAGE_REMOTESWITCH                   "switch"
 #define D_CMND_REMOTESWITCH_BUTTON            "button"
 #define D_CMND_REMOTESWITCH_MOTION            "motion"
-#define D_CMND_REMOTESWITCH_DEBOUNCE          "debounce"
+#define D_CMND_REMOTESWITCH_TIMEOUT           "timeout"
 #define D_CMND_REMOTESWITCH_DURATION          "duration"
 #define D_CMND_REMOTESWITCH_SLOT0             "s0"
 #define D_CMND_REMOTESWITCH_SLOT0_START_HOUR  "s0srthr"
@@ -53,15 +54,12 @@
 #define D_JSON_REMOTESWITCH_RELAY             "Relay"
 #define D_JSON_REMOTESWITCH_BUTTON            "PushButton"
 #define D_JSON_REMOTESWITCH_MOTION            "MotionDetector"
-#define D_JSON_REMOTESWITCH_DEBOUNCE          "Debounce"
+#define D_JSON_REMOTESWITCH_TIMEOUT           "Timeout"
 #define D_JSON_REMOTESWITCH_DURATION          "Duration"
 #define D_JSON_REMOTESWITCH_SLOT              "Slot"
 
 #define REMOTESWITCH_LABEL_BUFFER_SIZE        16
 #define REMOTESWITCH_MESSAGE_BUFFER_SIZE      64
-
-#define REMOTESWITCH_DEFAULT_DURATION         30         // 30 seconds
-#define REMOTESWITCH_DEFAULT_DEBOUNCE         2          // 2 seconds
 
 // remote switch icon coded in base64
 const char strIcon0[] PROGMEM = "iVBORw0KGgoAAAANSUhEUgAAAFMAAAAgCAMAAABZ2rRdAAAKu3pUWHRSYXcgcHJvZmlsZSB0eXBlIGV4aWYAAHjarZhrkuwqroX/M4oegnnDcACJiDuDHn5/wq6s566z+0ZnVqUzbQxCS1pastN//992/+IVfUou5dpKL+XilXrqYfClXffrPvornc/zyvG55j+fd+E5fwVO2aBnYNFn/OB8fr+hpuf8/Hze1fXM056JngtvE0Zb2VZ7xrVnohju8/757fpz30gftvP89/qce659/Z0qzpDMfDG4oNHHi8+zSsSC2OPgWM9nZ9B1zoSYz2f92Xfu9fWL80r42XfXeEbEz65wV3kGlC8+es77/LPvjoc+WuTfvobPF3DyvD6+Pvhub2l76727kQqeKu7Z1PVMcb4xkElSPLcV3pX/zPd63p13Y4sLxAQ0J+/lfPcBb2+fvPjht9dzXH5hYgoaKscQVojnXIs19LAOKMnefocKGOJiA4kFapHT4WWLP+v2s97yjZXFMzJ4JvPc8e3tfjr5/3m/JtrbQtd7c2YJx1fYFSwIMMOQs09GAYjfj0/z8e95uxes7y8DNoJgPm5ubHBc855iZv8eW/HgHBmXr+SecPdVnglwEWtnjPHQg7+Kj9kXf9UQqvf4sYHPwPIQU5gg4HMO4t0GmxgL4LRga3NP9WdsyOE+DbUARI6FtGmWLoCVUiZ+amrE0MgxJ5dzLrnmlnseJZZUcimlFuOo";
@@ -77,8 +75,8 @@ const char *const arrIconBase64[] PROGMEM = {strIcon0, strIcon1, strIcon2, strIc
 enum RemoteSwitchSlot { SLOT_START_HOUR, SLOT_START_MINUTE, SLOT_STOP_HOUR, SLOT_STOP_MINUTE };
 
 // remote switch commands
-enum RemoteSwitchCommands { CMND_REMOTESWITCH_BUTTON, CMND_REMOTESWITCH_MOTION, CMND_REMOTESWITCH_DEBOUNCE, CMND_REMOTESWITCH_DURATION, CMND_REMOTESWITCH_SLOT0, CMND_REMOTESWITCH_SLOT0_START_HOUR, CMND_REMOTESWITCH_SLOT0_START_MIN, CMND_REMOTESWITCH_SLOT0_STOP_HOUR, CMND_REMOTESWITCH_SLOT0_STOP_MIN, CMND_REMOTESWITCH_SLOT1, CMND_REMOTESWITCH_SLOT1_START_HOUR, CMND_REMOTESWITCH_SLOT1_START_MIN, CMND_REMOTESWITCH_SLOT1_STOP_HOUR, CMND_REMOTESWITCH_SLOT1_STOP_MIN };
-const char kRemoteSwitchCommands[] PROGMEM = D_CMND_REMOTESWITCH_BUTTON "|" D_CMND_REMOTESWITCH_MOTION "|" D_CMND_REMOTESWITCH_DEBOUNCE "|" D_CMND_REMOTESWITCH_DURATION "|" D_CMND_REMOTESWITCH_SLOT0 "|" D_CMND_REMOTESWITCH_SLOT0_START_HOUR "|" D_CMND_REMOTESWITCH_SLOT0_START_MIN "|" D_CMND_REMOTESWITCH_SLOT0_STOP_HOUR "|" D_CMND_REMOTESWITCH_SLOT0_STOP_MIN "|" D_CMND_REMOTESWITCH_SLOT1 "|" D_CMND_REMOTESWITCH_SLOT1_START_HOUR "|" D_CMND_REMOTESWITCH_SLOT1_START_MIN "|" D_CMND_REMOTESWITCH_SLOT1_STOP_HOUR "|" D_CMND_REMOTESWITCH_SLOT1_STOP_MIN;
+enum RemoteSwitchCommands { CMND_REMOTESWITCH_BUTTON, CMND_REMOTESWITCH_MOTION, CMND_REMOTESWITCH_TIMEOUT, CMND_REMOTESWITCH_DURATION, CMND_REMOTESWITCH_SLOT0, CMND_REMOTESWITCH_SLOT0_START_HOUR, CMND_REMOTESWITCH_SLOT0_START_MIN, CMND_REMOTESWITCH_SLOT0_STOP_HOUR, CMND_REMOTESWITCH_SLOT0_STOP_MIN, CMND_REMOTESWITCH_SLOT1, CMND_REMOTESWITCH_SLOT1_START_HOUR, CMND_REMOTESWITCH_SLOT1_START_MIN, CMND_REMOTESWITCH_SLOT1_STOP_HOUR, CMND_REMOTESWITCH_SLOT1_STOP_MIN };
+const char kRemoteSwitchCommands[] PROGMEM = D_CMND_REMOTESWITCH_BUTTON "|" D_CMND_REMOTESWITCH_MOTION "|" D_CMND_REMOTESWITCH_TIMEOUT "|" D_CMND_REMOTESWITCH_DURATION "|" D_CMND_REMOTESWITCH_SLOT0 "|" D_CMND_REMOTESWITCH_SLOT0_START_HOUR "|" D_CMND_REMOTESWITCH_SLOT0_START_MIN "|" D_CMND_REMOTESWITCH_SLOT0_STOP_HOUR "|" D_CMND_REMOTESWITCH_SLOT0_STOP_MIN "|" D_CMND_REMOTESWITCH_SLOT1 "|" D_CMND_REMOTESWITCH_SLOT1_START_HOUR "|" D_CMND_REMOTESWITCH_SLOT1_START_MIN "|" D_CMND_REMOTESWITCH_SLOT1_STOP_HOUR "|" D_CMND_REMOTESWITCH_SLOT1_STOP_MIN;
 
 // time slot structure
 struct timeslot {
@@ -90,9 +88,11 @@ struct timeslot {
 };
 
 // variables
-ulong remoteswitch_button_last   = 0;          // time of last button press
-ulong remoteswitch_motion_last   = 0;          // time of last motion detection
-bool  remoteswitch_motion_active = false;      // set to true is motion detection is active
+bool  remoteswitch_button_pressed  = false;      // set to true is motion detection is active
+bool  remoteswitch_motion_detected = false;      // set to true is motion detection is active
+bool  remoteswitch_motion_active   = false;      // set to true is motion detection is active
+ulong remoteswitch_tempo_start     = 0;          // timestamp when relay was switched on
+ulong remoteswitch_tempo_motion    = 0;          // timestamp when last motion was detected
 
 /*********************************************************************************************/
 
@@ -215,22 +215,22 @@ void RemoteSwitchIsMotionDetected (uint8_t status)
 // update motion detector usage according to allowed status and time slots
 void RemoteSwitchUpdateMotionActive ()
 {
-  bool     motion_enabled;
+  bool     motion_allowed;
   uint8_t  index;
   uint8_t  current_hour, current_minute;
   timeslot current_slot;
   
-  // check is motion detection is enabled
-  motion_enabled = RemoteSwitchMotionIsEnabled ();
+  // check is motion detection is allowed
+  motion_allowed = RemoteSwitchIsMotionAllowed ();
   
   // if motion detector should be deactivated
-  if ((motion_enabled == false) && (remoteswitch_motion_active == true))
+  if ((motion_allowed == false) && (remoteswitch_motion_active == true))
   {
     remoteswitch_motion_active = false; 
   }
   
-  // else if motion detector is enabled, check activation slots
-  else if (motion_enabled == true)
+  // else if motion detector is allowed, check activation slots
+  else if (motion_allowed == true)
   {
     // get current time
     current_hour = RtcTime.hour;
@@ -261,21 +261,33 @@ void RemoteSwitchSetDuration (uint8_t duration)
   Settings.display_size = duration;
 }
 
+// get remote switch timeout (mn)
+uint8_t RemoteSwitchGetTimeout ()
+{
+  return Settings.display_refresh;
+}
+
+// set remote switch timeout (mn)
+void RemoteSwitchSetTimeout (uint8_t timeout)
+{
+  Settings.display_refresh = timeout;
+}
+
 // Show JSON status (for MQTT)
 void RemoteSwitchShowJSON (bool append)
 {
   bool     button_enabled, button_state;
   bool     motion_enabled, motion_state;
-  uint8_t  relay_state, relay_duration;
-  uint8_t  debounce, duration;
+  uint8_t  relay_state, relay_duration, relay_timeout;
   timeslot slot_0, slot_1;
 
   // collect data
-  button_enabled  = RemoteSwitchIsButtonEnabled ();
+  button_allowed  = RemoteSwitchIsButtonAllowed ();
   button_pressed  = RemoteSwitchIsButtonPressed ();
-  motion_enabled  = RemoteSwitchIsMotionEnabled ();
+  motion_allowed  = RemoteSwitchIsMotionAllowed ();
   motion_detected = RemoteSwitchIsMotionDetected ();
-  duration = RemoteSwitchGetDuration ();
+  relay_duration  = RemoteSwitchGetDuration ();
+  relay_timeout   = RemoteSwitchGetTimeout ();
   slot_0   = RemoteSwitchMotionGetSlot (0);
   slot_1   = RemoteSwitchMotionGetSlot (1);
   
@@ -289,14 +301,14 @@ void RemoteSwitchShowJSON (bool append)
   // "RemoteSwitch":{"Debounce":2,"Duration":35,
   snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH "\":{\"" D_JSON_REMOTESWITCH_DEBOUNCE "\":%d,\"" D_JSON_REMOTESWITCH_DURATION "\":%d,"), mqtt_data, debounce, duration);
   
-  // "Relay":{"State":1,"Duration":35},
-  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH_RELAY "\":{\"" D_JSON_REMOTESWITCH_STATE "\":%d,\"" D_JSON_REMOTESWITCH_DURATION "\":%d},"), mqtt_data, relay_state, relay_duration);
+  // "Relay":{"State":1,"Duration":35,"Timeout":5},
+  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH_RELAY "\":{\"" D_JSON_REMOTESWITCH_STATE "\":%d,\"" D_JSON_REMOTESWITCH_DURATION "\":%d,\"" D_JSON_REMOTESWITCH_TIMEOUT "\":%d},"), mqtt_data, relay_state, relay_duration, relay_timeout);
 
   // "PushButton":{"Enabled":1,"State":0},
-  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH_BUTTON "\":{\"" D_JSON_REMOTESWITCH_ENABLED "\":%d,\"" D_JSON_REMOTESWITCH_STATE "\":%d},"), mqtt_data, button_enabled, button_pressed);
+  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH_BUTTON "\":{\"" D_JSON_REMOTESWITCH_ENABLED "\":%d,\"" D_JSON_REMOTESWITCH_STATE "\":%d},"), mqtt_data, button_allowed, button_pressed);
 
   // "MotionDetector":{"Enabled":1,"State":1,"Slot1":"01:00-12:00","Slot2":"00:00-00:00"}}
-  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH_MOTION "\":{\"" D_JSON_REMOTESWITCH_ENABLED "\":%d,\"" D_JSON_REMOTESWITCH_STATE "\":%d}}"), mqtt_data, motion_enabled, motion_detected);
+  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH_MOTION "\":{\"" D_JSON_REMOTESWITCH_ENABLED "\":%d,\"" D_JSON_REMOTESWITCH_STATE "\":%d}}"), mqtt_data, motion_allowed, motion_detected);
   snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH_SLOT "1\":\"%2d:%2d-%2d:%2d\","), mqtt_data, slot_0.start_hour, slot_0.start_minute, slot_0.stop_hour, slot_0.stop_minute);
   snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH_SLOT "2\":\"%2d:%2d-%2d:%2d\"},"), mqtt_data, slot_1.start_hour, slot_1.start_minute, slot_1.stop_hour, slot_1.stop_minute);
 
@@ -331,11 +343,11 @@ bool RemoteSwitchCommand ()
     case CMND_REMOTESWITCH_MOTION:     // enable/disable motion detector
       RemoteSwitchMotionEnable(XdrvMailbox.payload);
       break;
-    case CMND_REMOTESWITCH_DEBOUNCE:  // set debounce delay
-      RemoteSwitchSetDebounce (XdrvMailbox.payload);
-      break;
     case CMND_REMOTESWITCH_DURATION:  // set switch minimum duration
       RemoteSwitchSetDuration (XdrvMailbox.payload);
+      break;
+    case CMND_REMOTESWITCH_TIMEOUT:  // set switch timeout
+      RemoteSwitchSetTimeout (XdrvMailbox.payload);
       break;
     case CMND_REMOTESWITCH_SLOT0:     // set motion detector first disable slot
       RemoteSwitchMotionSetSlot (0, XdrvMailbox.data);
@@ -353,10 +365,121 @@ bool RemoteSwitchCommand ()
   return serviced;
 }
 
-// update pilot wire relay states according to current status
+// update remote switch relay states according to button and motion detector
 void RemoteSwitchEvery250MSecond ()
 {
+  bool button_allowed  = false;
+  bool button_pressed  = false;
+  bool motion_detected = false;
+  bool button_trigger  = false;
+  bool motion_trigger  = false;
+  bool relay_active    = false;
+  bool relay_trigger   = false;
+  ulong tempo_now;
+  ulong tempo_duration;
+  ulong tempo_target;
+
+  // update current time
+  tempo_now = millis ();
+
+  // update button status
+  button_allowed = RemoteSwitchIsButtonAllowed ();
+  if (button_allowed == true) button_pressed = RemoteSwitchIsButtonPressed ();
+  if ((button_pressed == true) && (remoteswitch_button_pressed == false)) button_trigger = true;
+  remoteswitch_button_pressed = button_pressed;
   
+  // update motion detector status
+  if (remoteswitch_motion_active == true) motion_detected = RemoteSwitchIsMotionDetected ();
+  if ((motion_detected == true) && (remoteswitch_motion_detected == false)) motion_trigger = true;
+  remoteswitch_motion_detected = motion_detected;
+
+  // read relay status
+  if (bitRead (power, 0) == 1) relay_active = true;
+  
+  // if relay is off and button has been triggered, switch relay on without tempo
+  if ((relay_active == false) && (button_trigger == true))
+  {
+    // relay state should change
+    relay_trigger = true;
+    
+    // no tempo
+    remoteswitch_tempo_start  = tempo_now;
+    remoteswitch_tempo_motion = 0;
+  }
+
+  // else, if relay is off and motion has been triggered, switch relay on with tempo
+  else if ((relay_active == false) && (motion_trigger == true))
+  {
+    // relay state should change
+    relay_trigger = true;
+    
+    // no tempo
+    remoteswitch_tempo_start  = tempo_now;
+    remoteswitch_tempo_motion = tempo_now;    
+  }
+
+  // else if relay on and button pressed, switch relay off
+  else if ((relay_active == true) && (button_trigger == true))
+  {
+    // relay state should change
+    relay_trigger = true;
+    
+    // no tempo
+    remoteswitch_tempo_start  = 0;
+    remoteswitch_tempo_motion = 0;        
+  }
+
+  // else if relay on and new motion triggered, set new tempo trigger
+  else if ((relay_active == true) && (motion_trigger == true) && (remoteswitch_tempo_motion != 0))
+  {
+    // update tempo trigger
+    remoteswitch_tempo_motion = tempo_now;        
+  }
+
+  // else, if relay on and motion detector tempo started, check if tempo is over
+  else if ((relay_active == true) && (remoteswitch_tempo_motion != 0))
+  {
+    // get tempo target and calculate current tempo
+    tempo_target = 1000 * RemoteSwitchGetDuration ();
+    tempo_duration = tempo_now - remoteswitch_tempo_trigger;
+    
+    // if tempo target has been reached, switch relay off
+    if (tempo_duration >= tempo_target)
+    {
+      // relay state should change
+      relay_trigger = true;
+    
+      // no tempo
+      remoteswitch_tempo_start  = 0;
+      remoteswitch_tempo_motion = 0;        
+    }
+  }
+
+  // else, if relay on, check if timeout is over
+  else if (relay_active == true)
+  {
+    // get timeout target (mn) and calculate current tempo
+    tempo_target = 60000 * RemoteSwitchGetTimeout ();
+    tempo_duration = tempo_now - remoteswitch_tempo_start;
+    
+    // if tempo target has been reached, switch relay off
+    if (tempo_duration >= tempo_target)
+    {
+      // relay state should change
+      relay_trigger = true;
+    
+      // no tempo
+      remoteswitch_tempo_start  = 0;
+      remoteswitch_tempo_motion = 0;        
+    }
+  }
+
+  // if relay should change
+  if (relay_trigger == true)
+  {
+    if (relay_active == true) ExecuteCommandPower (1, POWER_OFF, SRC_IGNORE);
+    else ExecuteCommandPower (1, POWER_ON, SRC_IGNORE);
+  }
 }
 
 #ifdef USE_WEBSERVER
@@ -431,6 +554,14 @@ void RemoteSwitchWebPage ()
     updated = true;
   }
 
+  // get remote switch timeout according to 'timeout' parameter
+  if (WebServer->hasArg(D_CMND_REMOTESWITCH_TIMEOUT))
+  {
+    WebGetArg (D_CMND_REMOTESWITCH_TIMEOUT, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    RemoteSwitchSetTimeout ((uint8_t) atoi (argument)); 
+    updated = true;
+  }
+
   // get remote switch first motion detector slot according to 'slot0' parameters
   if (WebServer->hasArg(D_CMND_REMOTESWITCH_SLOT0_START_HOUR))
   {
@@ -478,7 +609,7 @@ void RemoteSwitchWebPage ()
   button_enabled = RemoteSwitchButtonIsEnabled ();
   motion_enabled = RemoteSwitchMotionIsEnabled ();
   duration = RemoteSwitchGetDuration ();
-  debounce = RemoteSwitchGetDebounce ();
+  timeout  = RemoteSwitchGetTimeout ();
   
   // beginning of form
   WSContentStart_P (D_REMOTESWITCH_CONFIGURE);
@@ -489,6 +620,9 @@ void RemoteSwitchWebPage ()
 
   // duration
   WSContentSend_P (PSTR ("<p><b>%s</b><br/><input type='number' name='%s' min='0' step='1' value='%d'></p>"), D_REMOTESWITCH_DURATION, D_CMND_REMOTESWITCH_DURATION, duration);
+
+  // timeout
+  WSContentSend_P (PSTR ("<p><b>%s</b><br/><input type='number' name='%s' min='0' step='1' value='%d'></p>"), D_REMOTESWITCH_TIMEOUT, D_CMND_REMOTESWITCH_TIMEOUT, timeout);
 
   // push button input
   WSContentSend_P (PSTR ("<p><b>%s</b>"), D_REMOTESWITCH_BUTTON);
