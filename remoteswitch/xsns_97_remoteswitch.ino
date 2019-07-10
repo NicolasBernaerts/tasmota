@@ -89,8 +89,8 @@ struct timeslot {
 };
 
 // variables
-bool  remoteswitch_button_pressed  = false;      // set to true is motion detection is active
-bool  remoteswitch_motion_detected = false;      // set to true is motion detection is active
+bool  remoteswitch_button_pressed  = false;      // set to true if push button has been pressed
+bool  remoteswitch_motion_detected = false;      // set to true if motion detection has been detected
 bool  remoteswitch_motion_active   = false;      // set to true is motion detection is active
 ulong remoteswitch_tempo_start     = 0;          // timestamp when relay was switched on
 ulong remoteswitch_tempo_motion    = 0;          // timestamp when last motion was detected
@@ -370,8 +370,8 @@ void RemoteSwitchEvery250MSecond ()
   bool button_allowed  = false;
   bool button_pressed  = false;
   bool motion_detected = false;
-  bool button_trigger  = false;
-  bool motion_trigger  = false;
+  bool button_toggle   = false;
+  bool motion_toggle   = false;
   bool relay_active    = false;
   bool relay_toggle    = false;
   ulong tempo_now;
@@ -384,19 +384,19 @@ void RemoteSwitchEvery250MSecond ()
   // update button status
   button_allowed = RemoteSwitchIsButtonAllowed ();
   if (button_allowed == true) button_pressed = RemoteSwitchIsButtonPressed ();
-  if ((button_pressed == true) && (remoteswitch_button_pressed == false)) button_trigger = true;
+  if ((button_pressed == true) && (remoteswitch_button_pressed == false)) button_toggle = true;
   remoteswitch_button_pressed = button_pressed;
   
   // update motion detector status
   if (remoteswitch_motion_active == true) motion_detected = RemoteSwitchIsMotionDetected ();
-  if ((motion_detected == true) && (remoteswitch_motion_detected == false)) motion_trigger = true;
+  if ((motion_detected == true) && (remoteswitch_motion_detected == false)) motion_toggle = true;
   remoteswitch_motion_detected = motion_detected;
 
   // read relay status
   if (bitRead (power, 0) == 1) relay_active = true;
   
   // if relay is off and button has been triggered, switch relay on with timeout
-  if ((relay_active == false) && (button_trigger == true))
+  if ((relay_active == false) && (button_toggle == true))
   {
     // relay state should change with timeout reset
     relay_toggle = true;
@@ -405,7 +405,7 @@ void RemoteSwitchEvery250MSecond ()
   }
 
   // else, if relay is off and motion has been triggered, switch relay on with tempo
-  else if ((relay_active == false) && (motion_trigger == true))
+  else if ((relay_active == false) && (motion_toggle == true))
   {
     // relay state should change, with tempo reset
     relay_toggle = true;
@@ -414,7 +414,7 @@ void RemoteSwitchEvery250MSecond ()
   }
 
   // else if relay on and button pressed, switch relay off
-  else if ((relay_active == true) && (button_trigger == true))
+  else if ((relay_active == true) && (button_toggle == true))
   {
     // relay state should change, with no tempo
     relay_toggle = true;
@@ -423,7 +423,7 @@ void RemoteSwitchEvery250MSecond ()
   }
 
   // else if relay on and new motion triggered, set new tempo trigger
-  else if ((relay_active == true) && (motion_trigger == true) && (remoteswitch_tempo_motion != 0))
+  else if ((relay_active == true) && (motion_toggle == true) && (remoteswitch_tempo_motion != 0))
   {
     // update tempo trigger
     remoteswitch_tempo_motion = tempo_now;        
