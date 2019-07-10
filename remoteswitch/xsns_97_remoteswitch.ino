@@ -373,7 +373,7 @@ void RemoteSwitchEvery250MSecond ()
   bool button_trigger  = false;
   bool motion_trigger  = false;
   bool relay_active    = false;
-  bool relay_trigger   = false;
+  bool relay_toggle    = false;
   ulong tempo_now;
   ulong tempo_duration;
   ulong tempo_target;
@@ -395,13 +395,11 @@ void RemoteSwitchEvery250MSecond ()
   // read relay status
   if (bitRead (power, 0) == 1) relay_active = true;
   
-  // if relay is off and button has been triggered, switch relay on without tempo
+  // if relay is off and button has been triggered, switch relay on with timeout
   if ((relay_active == false) && (button_trigger == true))
   {
-    // relay state should change
-    relay_trigger = true;
-    
-    // no tempo
+    // relay state should change with timeout reset
+    relay_toggle = true;
     remoteswitch_tempo_start  = tempo_now;
     remoteswitch_tempo_motion = 0;
   }
@@ -409,10 +407,8 @@ void RemoteSwitchEvery250MSecond ()
   // else, if relay is off and motion has been triggered, switch relay on with tempo
   else if ((relay_active == false) && (motion_trigger == true))
   {
-    // relay state should change
-    relay_trigger = true;
-    
-    // no tempo
+    // relay state should change, with tempo reset
+    relay_toggle = true;
     remoteswitch_tempo_start  = tempo_now;
     remoteswitch_tempo_motion = tempo_now;    
   }
@@ -420,10 +416,8 @@ void RemoteSwitchEvery250MSecond ()
   // else if relay on and button pressed, switch relay off
   else if ((relay_active == true) && (button_trigger == true))
   {
-    // relay state should change
-    relay_trigger = true;
-    
-    // no tempo
+    // relay state should change, with no tempo
+    relay_toggle = true;
     remoteswitch_tempo_start  = 0;
     remoteswitch_tempo_motion = 0;        
   }
@@ -445,10 +439,8 @@ void RemoteSwitchEvery250MSecond ()
     // if tempo target has been reached, switch relay off
     if (tempo_duration >= tempo_target)
     {
-      // relay state should change
-      relay_trigger = true;
-    
-      // no tempo
+      // relay state should change, with no tempo
+      relay_toggle = true;
       remoteswitch_tempo_start  = 0;
       remoteswitch_tempo_motion = 0;        
     }
@@ -464,24 +456,15 @@ void RemoteSwitchEvery250MSecond ()
     // if tempo target has been reached, switch relay off
     if (tempo_duration >= tempo_target)
     {
-      // relay state should change
-      relay_trigger = true;
-    
-      // no tempo
+      // relay state should change, with no tempo
+      relay_toggle = true;
       remoteswitch_tempo_start  = 0;
       remoteswitch_tempo_motion = 0;        
     }
   }
 
   // if relay should change
-  if (relay_trigger == true)
-  {
-    // if relay on, switch off
-    if (relay_active == true) ExecuteCommandPower (1, POWER_OFF, SRC_IGNORE);
-    
-    // else if relay off, switch on
-    else ExecuteCommandPower (1, POWER_ON, SRC_IGNORE);
-  }
+  if (relay_toggle == true) ExecuteCommandPower (1, POWER_TOGGLE, SRC_IGNORE);
 }
 
 #ifdef USE_WEBSERVER
