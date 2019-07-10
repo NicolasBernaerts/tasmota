@@ -175,39 +175,37 @@ struct timeslot RemoteSwitchMotionGetSlot (uint8_t slot_number)
 }
 
 // set push button allowed status
-void RemoteSwitchSetButtonAllowed (uint8_t status)
+void RemoteSwitchSetButtonAllowed (bool allowed)
 {
-  if (status > 1) status = 1;
-  Settings.display_model = status;
+  Settings.display_model = (uint8_t) allowed;
 }
 
 // is push button allowed ?
 bool RemoteSwitchIsButtonAllowed ()
 {
-  return (Settings.display_model == 1);
+  return (Settings.display_model >= 1);
 }
 
 // is push button actually pressed
-void RemoteSwitchIsButtonPressed ()
+bool RemoteSwitchIsButtonPressed ()
 {
   return (lastbutton[0] > 0);
+}
+
+// set motion detection allowed status
+void RemoteSwitchSetMotionAllowed (bool allowed)
+{
+  Settings.display_mode = (uint8_t) allowed;
 }
 
 // is motion detection allowed ?
 bool RemoteSwitchIsMotionAllowed ()
 {
-  return (Settings.display_mode == 1);
-}
-
-// set motion detection allowed status
-void RemoteSwitchSetMotionAllowed (uint8_t status)
-{
-  if (status > 1) status = 1;
-  Settings.display_mode = status;
+  return (Settings.display_mode >= 1);
 }
 
 // is motion detection actually detected
-void RemoteSwitchIsMotionDetected (uint8_t status)
+bool RemoteSwitchIsMotionDetected ()
 {
   return (SwitchLastState (0) > 0);
 }
@@ -276,30 +274,30 @@ void RemoteSwitchSetTimeout (uint8_t timeout)
 // Show JSON status (for MQTT)
 void RemoteSwitchShowJSON (bool append)
 {
-  bool     button_enabled, button_state;
-  bool     motion_enabled, motion_state;
+  bool     button_allowed, button_pressed;
+  bool     motion_allowed, motion_detected;
   uint8_t  relay_state, relay_duration, relay_timeout;
   timeslot slot_0, slot_1;
 
+  // read relay state
+  relay_state = bitRead (power, 0);
+
   // collect data
+  relay_duration  = RemoteSwitchGetDuration ();
+  relay_timeout   = RemoteSwitchGetTimeout ();
   button_allowed  = RemoteSwitchIsButtonAllowed ();
   button_pressed  = RemoteSwitchIsButtonPressed ();
   motion_allowed  = RemoteSwitchIsMotionAllowed ();
   motion_detected = RemoteSwitchIsMotionDetected ();
-  relay_duration  = RemoteSwitchGetDuration ();
-  relay_timeout   = RemoteSwitchGetTimeout ();
   slot_0   = RemoteSwitchMotionGetSlot (0);
   slot_1   = RemoteSwitchMotionGetSlot (1);
   
-  // read relay state
-  relay_state = bitRead (power, 0);
-
   // start message  -->  {  or  ,
   if (append == false) snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("{"));
   else snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,"), mqtt_data);
 
-  // "RemoteSwitch":{"Debounce":2,"Duration":35,
-  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH "\":{\"" D_JSON_REMOTESWITCH_DEBOUNCE "\":%d,\"" D_JSON_REMOTESWITCH_DURATION "\":%d,"), mqtt_data, debounce, duration);
+  // "RemoteSwitch":{
+  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH "\":{"), mqtt_data);
   
   // "Relay":{"State":1,"Duration":35,"Timeout":5},
   snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH_RELAY "\":{\"" D_JSON_REMOTESWITCH_STATE "\":%d,\"" D_JSON_REMOTESWITCH_DURATION "\":%d,\"" D_JSON_REMOTESWITCH_TIMEOUT "\":%d},"), mqtt_data, relay_state, relay_duration, relay_timeout);
@@ -338,10 +336,10 @@ bool RemoteSwitchCommand ()
   switch (command_code)
   {
     case CMND_REMOTESWITCH_BUTTON:       // enable/disable push button
-      RemoteSwitchButtonEnable(XdrvMailbox.payload);
+      RemoteSwitchSetButtonAllowed((bool) (XdrvMailbox.payload >= 1));
       break;
     case CMND_REMOTESWITCH_MOTION:     // enable/disable motion detector
-      RemoteSwitchMotionEnable(XdrvMailbox.payload);
+      RemoteSwitchSetMotionAllowed((bool) (XdrvMailbox.payload >= 1));
       break;
     case CMND_REMOTESWITCH_DURATION:  // set switch minimum duration
       RemoteSwitchSetDuration (XdrvMailbox.payload);
@@ -477,7 +475,10 @@ void RemoteSwitchEvery250MSecond ()
   // if relay should change
   if (relay_trigger == true)
   {
+    // if relay on, switch off
     if (relay_active == true) ExecuteCommandPower (1, POWER_OFF, SRC_IGNORE);
+    
+    // else if relay off, switch on
     else ExecuteCommandPower (1, POWER_ON, SRC_IGNORE);
   }
 }
@@ -521,11 +522,11 @@ void RemoteSwitchWebConfigButton ()
 void RemoteSwitchWebPage ()
 {
   bool     updated = false;
-  bool     button_enabled, motion_enabled;
-  uint8_t  duration, debounce;
+  bool     button, motion;
+  uint8_t  duration, timeout;
   timeslot slot_0, slot_1;
-  char     argument[REMOTESWITCH_LABEL_BUFFER_SIZE];
-  char     slot[REMOTESWITCH_LABEL_BUFFER_SIZE];
+  char     string1[REMOTESWITCH_LABEL_BUFFER_SIZE];
+  char     string2[REMOTESWITCH_LABEL_BUFFER_SIZE];
 
   // if access not allowed, close
   if (!HttpCheckPriviledgedAccess()) return;
@@ -533,66 +534,66 @@ void RemoteSwitchWebPage ()
   // get remote switch button enabled according to 'button' parameter
   if (WebServer->hasArg(D_CMND_REMOTESWITCH_BUTTON))
   {
-    WebGetArg (D_CMND_REMOTESWITCH_BUTTON, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
-    RemoteSwitchButtonEnable ((uint8_t) atoi (argument)); 
+    WebGetArg (D_CMND_REMOTESWITCH_BUTTON, string1, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    RemoteSwitchSetButtonAllowed ((bool) (atoi (string1) >= 1)); 
     updated = true;
   }
 
   // get remote switch motion detector enabled according to 'motion' parameter
   if (WebServer->hasArg(D_CMND_REMOTESWITCH_MOTION))
   {
-    WebGetArg (D_CMND_REMOTESWITCH_MOTION, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
-    RemoteSwitchMotionEnable ((uint8_t) atoi (argument)); 
+    WebGetArg (D_CMND_REMOTESWITCH_MOTION, string1, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    RemoteSwitchSetMotionAllowed ((bool) (atoi (string1) >= 1)); 
     updated = true;
   }
 
   // get remote switch duration according to 'duration' parameter
   if (WebServer->hasArg(D_CMND_REMOTESWITCH_DURATION))
   {
-    WebGetArg (D_CMND_REMOTESWITCH_DURATION, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
-    RemoteSwitchSetDuration ((uint8_t) atoi (argument)); 
+    WebGetArg (D_CMND_REMOTESWITCH_DURATION, string1, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    RemoteSwitchSetDuration ((uint8_t) atoi (string1)); 
     updated = true;
   }
 
   // get remote switch timeout according to 'timeout' parameter
   if (WebServer->hasArg(D_CMND_REMOTESWITCH_TIMEOUT))
   {
-    WebGetArg (D_CMND_REMOTESWITCH_TIMEOUT, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
-    RemoteSwitchSetTimeout ((uint8_t) atoi (argument)); 
+    WebGetArg (D_CMND_REMOTESWITCH_TIMEOUT, string1, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    RemoteSwitchSetTimeout ((uint8_t) atoi (string1)); 
     updated = true;
   }
 
   // get remote switch first motion detector slot according to 'slot0' parameters
   if (WebServer->hasArg(D_CMND_REMOTESWITCH_SLOT0_START_HOUR))
   {
-    WebGetArg (D_CMND_REMOTESWITCH_SLOT0_START_HOUR, slot, REMOTESWITCH_LABEL_BUFFER_SIZE);
-    WebGetArg (D_CMND_REMOTESWITCH_SLOT0_START_MIN, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
-    strcat (slot, ":");
-    strcat (slot, argument);
-    WebGetArg (D_CMND_REMOTESWITCH_SLOT0_STOP_HOUR, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
-    strcat (slot, "-");
-    strcat (slot, argument);
-    WebGetArg (D_CMND_REMOTESWITCH_SLOT0_STOP_MIN, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
-    strcat (slot, ":");
-    strcat (slot, argument);
-    RemoteSwitchMotionSetSlot (0, slot); 
+    WebGetArg (D_CMND_REMOTESWITCH_SLOT0_START_HOUR, string1, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    WebGetArg (D_CMND_REMOTESWITCH_SLOT0_START_MIN, string2, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    strcat (string1, ":");
+    strcat (string1, string2);
+    WebGetArg (D_CMND_REMOTESWITCH_SLOT0_STOP_HOUR, string2, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    strcat (string1, "-");
+    strcat (string1, string2);
+    WebGetArg (D_CMND_REMOTESWITCH_SLOT0_STOP_MIN, string2, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    strcat (string1, ":");
+    strcat (string1, string2);
+    RemoteSwitchMotionSetSlot (0, string1); 
     updated = true;
   }
 
   // get remote switch second motion detector slot according to 'slot1' parameters
   if (WebServer->hasArg(D_CMND_REMOTESWITCH_SLOT1_START_HOUR))
   {
-    WebGetArg (D_CMND_REMOTESWITCH_SLOT1_START_HOUR, slot, REMOTESWITCH_LABEL_BUFFER_SIZE);
-    WebGetArg (D_CMND_REMOTESWITCH_SLOT1_START_MIN, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
-    strcat (slot, ":");
-    strcat (slot, argument);
-    WebGetArg (D_CMND_REMOTESWITCH_SLOT1_STOP_HOUR, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
-    strcat (slot, "-");
-    strcat (slot, argument);
-    WebGetArg (D_CMND_REMOTESWITCH_SLOT1_STOP_MIN, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
-    strcat (slot, ":");
-    strcat (slot, argument);
-    RemoteSwitchMotionSetSlot (1, slot); 
+    WebGetArg (D_CMND_REMOTESWITCH_SLOT1_START_HOUR, string1, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    WebGetArg (D_CMND_REMOTESWITCH_SLOT1_START_MIN, string2, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    strcat (string1, ":");
+    strcat (string1, string2);
+    WebGetArg (D_CMND_REMOTESWITCH_SLOT1_STOP_HOUR, string2, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    strcat (string1, "-");
+    strcat (string1, string2);
+    WebGetArg (D_CMND_REMOTESWITCH_SLOT1_STOP_MIN, string2, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    strcat (string1, ":");
+    strcat (string1, string2);
+    RemoteSwitchMotionSetSlot (1, string1); 
     updated = true;
   }
 
@@ -604,10 +605,10 @@ void RemoteSwitchWebPage ()
   }
   
   // read data
-  slot_0 = RemoteSwitchMotionGetSlot (0);
-  slot_1 = RemoteSwitchMotionGetSlot (1);
-  button_enabled = RemoteSwitchButtonIsEnabled ();
-  motion_enabled = RemoteSwitchMotionIsEnabled ();
+  slot_0   = RemoteSwitchMotionGetSlot (0);
+  slot_1   = RemoteSwitchMotionGetSlot (1);
+  button   = RemoteSwitchIsButtonAllowed ();
+  motion   = RemoteSwitchIsMotionAllowed ();
   duration = RemoteSwitchGetDuration ();
   timeout  = RemoteSwitchGetTimeout ();
   
@@ -625,23 +626,19 @@ void RemoteSwitchWebPage ()
   WSContentSend_P (PSTR ("<p><b>%s</b><br/><input type='number' name='%s' min='0' step='1' value='%d'></p>"), D_REMOTESWITCH_TIMEOUT, D_CMND_REMOTESWITCH_TIMEOUT, timeout);
 
   // push button input
+  if (button == true) { strcpy (string1, ""); strcpy (string2, "checked"); }
+  else { strcpy (string1, "checked"); strcpy (string2, ""); }
   WSContentSend_P (PSTR ("<p><b>%s</b>"), D_REMOTESWITCH_BUTTON);
-  if (button_enabled == true) strcpy (argument, "checked");
-  else strcpy (argument, "");
-  WSContentSend_P (PSTR ("<br/><input type='radio' name='%s' value='1' %s>%s"), D_CMND_REMOTESWITCH_BUTTON, argument, D_REMOTESWITCH_ENABLE);
-  if (button_enabled == true) strcpy (argument, "");
-  else strcpy (argument, "checked");
-  WSContentSend_P (PSTR ("<br/><input type='radio' name='%s' value='0' %s>%s"), D_CMND_REMOTESWITCH_BUTTON, argument, D_REMOTESWITCH_DISABLE);
+  WSContentSend_P (PSTR ("<br/><input type='radio' name='%s' value='0' %s>%s"), D_CMND_REMOTESWITCH_BUTTON, string1, D_REMOTESWITCH_DISABLE);
+  WSContentSend_P (PSTR ("<br/><input type='radio' name='%s' value='1' %s>%s"), D_CMND_REMOTESWITCH_BUTTON, string2, D_REMOTESWITCH_ENABLE);
   WSContentSend_P (PSTR ("</p>"));
 
   // motion detector input
+  if (motion == true) { strcpy (string1, ""); strcpy (string2, "checked"); }
+  else { strcpy (string1, "checked"); strcpy (string2, ""); }
   WSContentSend_P (PSTR ("<p><b>%s</b>"), D_REMOTESWITCH_MOTION);
-  if (motion_enabled == true) strcpy (argument, "checked");
-  else strcpy (argument, "");
-  WSContentSend_P (PSTR ("<br/><input type='radio' name='%s' value='1' %s>%s"), D_CMND_REMOTESWITCH_MOTION, argument, D_REMOTESWITCH_ENABLE);
-  if (motion_enabled == true) strcpy (argument, "");
-  else strcpy (argument, "checked");
-  WSContentSend_P (PSTR ("<br/><input type='radio' name='%s' value='0' %s>%s"), D_CMND_REMOTESWITCH_MOTION, argument, D_REMOTESWITCH_ENABLE);
+  WSContentSend_P (PSTR ("<br/><input type='radio' name='%s' value='0' %s>%s"), D_CMND_REMOTESWITCH_MOTION, string1, D_REMOTESWITCH_DISABLE);
+  WSContentSend_P (PSTR ("<br/><input type='radio' name='%s' value='1' %s>%s"), D_CMND_REMOTESWITCH_MOTION, string2, D_REMOTESWITCH_ENABLE);
 
   WSContentSend_P (PSTR ("<br />%s "), D_REMOTESWITCH_FROM);
   WSContentSend_P (PSTR ("<input type='number' name='%s' style='width:10%%;' min='0' max='23' step='1' value='%d'> h "), D_CMND_REMOTESWITCH_SLOT0_START_HOUR, slot_0.start_hour);
