@@ -6,12 +6,16 @@
 
     08/07/2019 - v1.0 - Creation
 
+  Input devices should be configured as followed :
+   - Switch0 = Push button
+   - Switch1 = Motion detector
+
   Settings are stored using some unused display parameters :
    - Settings.display_model   = Push button enabled
    - Settings.display_mode    = Motion detector enabled
    - Settings.display_refresh = Push button timeout (sec)
    - Settings.display_size    = Motion detection duration (sec)
-    
+
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
@@ -74,6 +78,7 @@ const char *const arrIconBase64[] PROGMEM = {strIcon0, strIcon1, strIcon2, strIc
 
 // remote switch enumerations
 enum RemoteSwitchSlot { SLOT_START_HOUR, SLOT_START_MINUTE, SLOT_STOP_HOUR, SLOT_STOP_MINUTE };
+enum RemoteSwitchINPUT { INPUT_PUSH_BUTTON, INPUT_MOTION_DETECTOR };
 
 // remote switch commands
 enum RemoteSwitchCommands { CMND_REMOTESWITCH_BUTTON, CMND_REMOTESWITCH_MOTION, CMND_REMOTESWITCH_TIMEOUT, CMND_REMOTESWITCH_DURATION, CMND_REMOTESWITCH_SLOT0, CMND_REMOTESWITCH_SLOT0_START_HOUR, CMND_REMOTESWITCH_SLOT0_START_MIN, CMND_REMOTESWITCH_SLOT0_STOP_HOUR, CMND_REMOTESWITCH_SLOT0_STOP_MIN, CMND_REMOTESWITCH_SLOT1, CMND_REMOTESWITCH_SLOT1_START_HOUR, CMND_REMOTESWITCH_SLOT1_START_MIN, CMND_REMOTESWITCH_SLOT1_STOP_HOUR, CMND_REMOTESWITCH_SLOT1_STOP_MIN };
@@ -190,7 +195,7 @@ bool RemoteSwitchIsButtonAllowed ()
 // is push button actually pressed
 bool RemoteSwitchIsButtonPressed ()
 {
-  return (lastbutton[0] > 0);
+  return (SwitchLastState(INPUT_PUSH_BUTTON) == PRESSED);
 }
 
 // set motion detection allowed status
@@ -208,7 +213,7 @@ bool RemoteSwitchIsMotionAllowed ()
 // is motion detection actually detected
 bool RemoteSwitchIsMotionDetected ()
 {
-  return (SwitchLastState (0) > 0);
+  return (SwitchLastState(INPUT_MOTION_DETECTOR) == PRESSED);
 }
 
 // update motion detector usage according to allowed status and time slots
