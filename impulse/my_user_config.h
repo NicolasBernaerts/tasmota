@@ -444,7 +444,7 @@
  * VMC control firmware configuration
 \*********************************************************************************************/
 
-#define USE_REMOTESWITCH                               // Add support for Ventilation Motor Controled according to humidity level (+??k code)
+#define USE_IMPULSE                           // Add support for Impulse switch (+??k code)
 
 #undef APP_SLEEP
 #define APP_SLEEP 1                           // Default to sleep = 1
@@ -461,14 +461,14 @@
 #undef USE_EMULATION                          // Disable Wemo or Hue emulation
 #undef USE_CUSTOM                             // Disable Custom features
 #undef USE_DISCOVERY                          // Disable Discovery services for both MQTT and web server
-#undef USE_TIMERS                           // Disable support for up to 16 timers
-#undef USE_TIMERS_WEB                       // Disable support for timer webpage
-#undef USE_SUNRISE                          // Disable support for Sunrise and sunset tools
-#undef USE_RULES                            // Disable support for rules
+#undef USE_TIMERS                             // Disable support for up to 16 timers
+#undef USE_TIMERS_WEB                         // Disable support for timer webpage
+#undef USE_SUNRISE                            // Disable support for Sunrise and sunset tools
+#undef USE_RULES                              // Disable support for rules
 #undef USE_I2C                                // Disable all I2C sensors and devices
 #undef USE_DHT                                // Disable internal DHT sensor
 #undef USE_DS18x20                            // Disable DS18x20 sensor
-//#define DS18B20_INTERNAL_PULLUP               // Use INPUT_PULLUP internal pullup resistors for single DS18B20
+//#define DS18B20_INTERNAL_PULLUP             // Use INPUT_PULLUP internal pullup resistors for single DS18B20
 #undef USE_SPI                                // Disable all SPI devices
 #undef USE_BH1750                             // Enable BH1750 sensor
 #undef USE_BMP                                // Enable BMP085/BMP180/BMP280/BME280 sensors
@@ -508,7 +508,7 @@
 #undef USE_DEBUG_DRIVER                       // Disable debug code
 
 #undef D_AUTHOR
-#define D_AUTHOR           "Theo Arends<br />Remote switch release v1.0 by Nicolas Bernaerts"
+#define D_AUTHOR           "Theo Arends<br />Impulse switch release v1.0 by Nicolas Bernaerts"
 
 /*********************************************************************************************\
  * No user configurable items below
