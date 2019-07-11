@@ -79,6 +79,8 @@ const char *const arrIconBase64[] PROGMEM = {strIcon0, strIcon1, strIcon2, strIc
 // remote switch enumerations
 enum RemoteSwitchSlot { SLOT_START_HOUR, SLOT_START_MINUTE, SLOT_STOP_HOUR, SLOT_STOP_MINUTE };
 enum RemoteSwitchInput { INPUT_RELAY, INPUT_PUSH_BUTTON, INPUT_MOTION_DETECTOR };
+enum RemoteSwitchButton { BUTTON_DISABLED, BUTTON_ENABLED, BUTTON_NOT_PRESSED, BUTTON_PRESSED };
+enum RemoteSwitchMotion { MOTION_DISABLED, MOTION_ENABLED, MOTION_INACTIVE, MOTION_NOT_DETECTED, MOTION_DETECTED };
 
 // remote switch commands
 enum RemoteSwitchCommands { CMND_REMOTESWITCH_BUTTON, CMND_REMOTESWITCH_MOTION, CMND_REMOTESWITCH_TIMEOUT, CMND_REMOTESWITCH_DURATION, CMND_REMOTESWITCH_SLOT0, CMND_REMOTESWITCH_SLOT0_START_HOUR, CMND_REMOTESWITCH_SLOT0_START_MIN, CMND_REMOTESWITCH_SLOT0_STOP_HOUR, CMND_REMOTESWITCH_SLOT0_STOP_MIN, CMND_REMOTESWITCH_SLOT1, CMND_REMOTESWITCH_SLOT1_START_HOUR, CMND_REMOTESWITCH_SLOT1_START_MIN, CMND_REMOTESWITCH_SLOT1_STOP_HOUR, CMND_REMOTESWITCH_SLOT1_STOP_MIN };
@@ -94,9 +96,7 @@ struct timeslot {
 };
 
 // variables
-bool  remoteswitch_button_pressed  = false;      // set to true if push button has been pressed
-bool  remoteswitch_motion_detected = false;      // set to true if motion detection has been detected
-bool  remoteswitch_motion_active   = false;      // set to true is motion detection is active
+bool  remoteswitch_motion_inactive = false;      // set to true is motion detection is in an inactive slot
 ulong remoteswitch_tempo_start     = 0;          // timestamp when relay was switched on
 ulong remoteswitch_tempo_motion    = 0;          // timestamp when last motion was detected
 
@@ -180,77 +180,85 @@ struct timeslot RemoteSwitchMotionGetSlot (uint8_t slot_number)
   return slot_result;
 }
 
-// set push button allowed status
-void RemoteSwitchSetButtonAllowed (bool allowed)
+// set push button enabled status
+void RemoteSwitchButtonEnable (bool enabled)
 {
-  Settings.display_model = (uint8_t) allowed;
+  if (enabled == true) Settings.display_model = BUTTON_ENABLED;
+  else Settings.display_model = BUTTON_DISABLED;
 }
 
-// is push button allowed ?
-bool RemoteSwitchIsButtonAllowed ()
+// get push button status
+uint8_t RemoteSwitchButtonStatus ()
 {
-  return (Settings.display_model >= 1);
+  uint8_t status;
+  
+  // check if push button enabled
+  status = Settings.display_model;
+  if (status == BUTTON_ENABLED)
+  {
+    // check if push button pressed
+    status = SwitchGetVirtual(INPUT_PUSH_BUTTON);
+    if (status == PRESSED) status = BUTTON_PRESSED;
+    else status = BUTTON_NOT_PRESSED;
+  }
+  
+  return status;
 }
 
-// is push button actually pressed
-bool RemoteSwitchIsButtonPressed ()
+// set motion detection enabled status
+void RemoteSwitchMotionEnable (bool enabled)
 {
-  return (SwitchGetVirtual(INPUT_PUSH_BUTTON) == PRESSED);
+  if ((enabled == true) && (remoteswitch_motion_inactive == true)) Settings.display_mode = MOTION_INACTIVE;
+  else if (enabled == true) Settings.display_mode = MOTION_ENABLED;
+  else Settings.display_mode = MOTION_DISABLED;
 }
 
-// set motion detection allowed status
-void RemoteSwitchSetMotionAllowed (bool allowed)
+// get motion detector status
+uint8_t RemoteSwitchMotionStatus ()
 {
-  Settings.display_mode = (uint8_t) allowed;
+  uint8_t status;
+  
+  // check if motion detector enabled
+  status = Settings.display_mode;
+  if (status == MOTION_ENABLED)
+  {
+    // check if motion detector pressed
+    status = SwitchGetVirtual(INPUT_MOTION_DETECTOR);
+    if (status == PRESSED) status = MOTION_DETECTED;
+    else status = MOTION_NOT_DETECTED;
+  }
+  
+  return status;
 }
 
-// is motion detection allowed ?
-bool RemoteSwitchIsMotionAllowed ()
+// update motion detector usage according to status and time slots
+void RemoteSwitchMotionUpdateActivity ()
 {
-  return (Settings.display_mode >= 1);
-}
-
-// is motion detection actually detected
-bool RemoteSwitchIsMotionDetected ()
-{
-  return (SwitchGetVirtual(INPUT_MOTION_DETECTOR) == PRESSED);
-}
-
-// update motion detector usage according to allowed status and time slots
-void RemoteSwitchUpdateMotionActive ()
-{
-  bool     motion_allowed;
   uint8_t  index;
   uint8_t  current_hour, current_minute;
   timeslot current_slot;
-  
-  // check is motion detection is allowed
-  motion_allowed = RemoteSwitchIsMotionAllowed ();
-  
-  // if motion detector should be deactivated
-  if ((motion_allowed == false) && (remoteswitch_motion_active == true))
+
+  // just after startup, synchronise inactive status
+  if (Settings.display_mode == MOTION_INACTIVE) remoteswitch_motion_inactive = true;
+
+  // get current time
+  current_hour = RtcTime.hour;
+  current_minute = RtcTime.minute;
+
+  // loop thru both time slots
+  for (index = 0; index < 2; index ++)
   {
-    remoteswitch_motion_active = false; 
+    // get current slot
+    current_slot = RemoteSwitchMotionGetSlot (index);
+
+    // update motion collect state
+    if ((current_hour == current_slot.start_hour) && (current_minute == current_slot.start_minute)) remoteswitch_motion_inactive = true;
+    else if ((current_hour == current_slot.stop_hour) && (current_minute == current_slot.stop_minute)) remoteswitch_motion_inactive = false;
   }
   
-  // else if motion detector is allowed, check activation slots
-  else if (motion_allowed == true)
-  {
-    // get current time
-    current_hour = RtcTime.hour;
-    current_minute = RtcTime.minute;
-
-    // loop thru both time slots
-    for (index = 0; index < 2; index ++)
-    {
-      // get current slot
-      current_slot = RemoteSwitchMotionGetSlot (index);
-
-      // update motion collect state
-      if ((current_hour == current_slot.start_hour) && (current_minute == current_slot.start_minute)) remoteswitch_motion_active = false;
-      else if ((current_hour == current_slot.stop_hour) && (current_minute == current_slot.stop_minute)) remoteswitch_motion_active = true;
-    }
-  }
+  // if inactive status has changed, synchronise general status
+  if ((remoteswitch_motion_inactive == true) && (Settings.display_mode == MOTION_ENABLED)) Settings.display_mode = MOTION_INACTIVE;
+  else if ((remoteswitch_motion_inactive == false) && (Settings.display_mode == MOTION_INACTIVE)) Settings.display_mode = MOTION_ENABLED;
 }
 
 // get remote switch standard duration (sec)
@@ -280,21 +288,17 @@ void RemoteSwitchSetTimeout (uint8_t timeout)
 // Show JSON status (for MQTT)
 void RemoteSwitchShowJSON (bool append)
 {
-  bool     button_allowed, button_pressed;
-  bool     motion_allowed, motion_detected;
-  uint8_t  relay_state, relay_duration, relay_timeout;
+  uint8_t  relay, button, motion, duration, timeout;
   timeslot slot_0, slot_1;
 
   // read relay state
-  relay_state = bitRead (power, 0);
+  relay = bitRead (power, 0);
 
   // collect data
-  relay_duration  = RemoteSwitchGetDuration ();
-  relay_timeout   = RemoteSwitchGetTimeout ();
-  button_allowed  = RemoteSwitchIsButtonAllowed ();
-  button_pressed  = RemoteSwitchIsButtonPressed ();
-  motion_allowed  = RemoteSwitchIsMotionAllowed ();
-  motion_detected = RemoteSwitchIsMotionDetected ();
+  duration = RemoteSwitchGetDuration ();
+  timeout  = RemoteSwitchGetTimeout ();
+  button   = RemoteSwitchButtonStatus ();
+  motion   = RemoteSwitchMotionStatus ();
   slot_0   = RemoteSwitchMotionGetSlot (0);
   slot_1   = RemoteSwitchMotionGetSlot (1);
   
@@ -305,16 +309,16 @@ void RemoteSwitchShowJSON (bool append)
   // "RemoteSwitch":{
   snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH "\":{"), mqtt_data);
   
-  // "Relay":{"State":1,"Duration":35,"Timeout":5},
-  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH_RELAY "\":{\"" D_JSON_REMOTESWITCH_STATE "\":%d,\"" D_JSON_REMOTESWITCH_DURATION "\":%d,\"" D_JSON_REMOTESWITCH_TIMEOUT "\":%d},"), mqtt_data, relay_state, relay_duration, relay_timeout);
+  // "Relay":1,"Duration":35,"Timeout":5,
+  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH_RELAY "\":%d,\"" D_JSON_REMOTESWITCH_DURATION "\":%d,\"" D_JSON_REMOTESWITCH_TIMEOUT "\":%d,"), mqtt_data, relay, duration, timeout);
 
-  // "PushButton":{"Enabled":1,"State":0},
-  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH_BUTTON "\":{\"" D_JSON_REMOTESWITCH_ENABLED "\":%d,\"" D_JSON_REMOTESWITCH_STATE "\":%d},"), mqtt_data, button_allowed, button_pressed);
+  // "PushButton":1,
+  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH_BUTTON "\":%d,"), mqtt_data, button);
 
-  // "MotionDetector":{"Enabled":1,"State":1,"Slot1":"01:00-12:00","Slot2":"00:00-00:00"}}
-  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH_MOTION "\":{\"" D_JSON_REMOTESWITCH_ENABLED "\":%d,\"" D_JSON_REMOTESWITCH_STATE "\":%d}}"), mqtt_data, motion_allowed, motion_detected);
+  // "MotionDetector":3,"Slot1":"01:00-12:00","Slot2":"00:00-00:00"}
+  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH_MOTION "\":%d,"), mqtt_data, motion);
   snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH_SLOT "1\":\"%2d:%2d-%2d:%2d\","), mqtt_data, slot_0.start_hour, slot_0.start_minute, slot_0.stop_hour, slot_0.stop_minute);
-  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH_SLOT "2\":\"%2d:%2d-%2d:%2d\"},"), mqtt_data, slot_1.start_hour, slot_1.start_minute, slot_1.stop_hour, slot_1.stop_minute);
+  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH_SLOT "2\":\"%2d:%2d-%2d:%2d\"}"), mqtt_data, slot_1.start_hour, slot_1.start_minute, slot_1.stop_hour, slot_1.stop_minute);
 
   // if not in append mode, publish message 
   if (append == false)
@@ -342,10 +346,10 @@ bool RemoteSwitchCommand ()
   switch (command_code)
   {
     case CMND_REMOTESWITCH_BUTTON:       // enable/disable push button
-      RemoteSwitchSetButtonAllowed((bool) (XdrvMailbox.payload >= 1));
+      RemoteSwitchButtonEnable((bool) (XdrvMailbox.payload >= 1));
       break;
     case CMND_REMOTESWITCH_MOTION:     // enable/disable motion detector
-      RemoteSwitchSetMotionAllowed((bool) (XdrvMailbox.payload >= 1));
+      RemoteSwitchMotionEnable((bool) (XdrvMailbox.payload >= 1));
       break;
     case CMND_REMOTESWITCH_DURATION:  // set switch minimum duration
       RemoteSwitchSetDuration (XdrvMailbox.payload);
@@ -660,7 +664,6 @@ bool RemoteSwitchWebState ()
   button_allowed = RemoteSwitchIsButtonAllowed ();
   if (button_allowed == true) button_pressed = RemoteSwitchIsButtonPressed ();
   if ((button_pressed == true) && (remoteswitch_button_pressed == false)) button_trigger = true;
-  remoteswitch_button_pressed = button_pressed;
   
   // update motion detector status
   if (remoteswitch_motion_active == true) motion_detected = RemoteSwitchIsMotionDetected ();
