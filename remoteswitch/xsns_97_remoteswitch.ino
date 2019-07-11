@@ -96,9 +96,11 @@ struct timeslot {
 };
 
 // variables
-bool  remoteswitch_motion_inactive = false;      // set to true is motion detection is in an inactive slot
-ulong remoteswitch_tempo_start     = 0;          // timestamp when relay was switched on
-ulong remoteswitch_tempo_motion    = 0;          // timestamp when last motion was detected
+uint8_t remoteswitch_button = 0;          // current state of push button
+uint8_t remoteswitch_motion = 0;          // current state of motion detector
+uint8_t remoteswitch_slot  = 0;          // current slot condition of motion detector
+ulong remoteswitch_tempo_start    = 0;          // timestamp when relay was switched on
+ulong remoteswitch_tempo_motion   = 0;          // timestamp when last motion was detected
 
 /*********************************************************************************************/
 
@@ -208,7 +210,7 @@ uint8_t RemoteSwitchButtonStatus ()
 // set motion detection enabled status
 void RemoteSwitchMotionEnable (bool enabled)
 {
-  if ((enabled == true) && (remoteswitch_motion_inactive == true)) Settings.display_mode = MOTION_INACTIVE;
+  if ((enabled == true) && (remoteswitch_motion_slot == MOTION_INACTIVE)) Settings.display_mode = MOTION_INACTIVE;
   else if (enabled == true) Settings.display_mode = MOTION_ENABLED;
   else Settings.display_mode = MOTION_DISABLED;
 }
@@ -239,7 +241,7 @@ void RemoteSwitchMotionUpdateActivity ()
   timeslot current_slot;
 
   // just after startup, synchronise inactive status
-  if (Settings.display_mode == MOTION_INACTIVE) remoteswitch_motion_inactive = true;
+  if (Settings.display_mode == MOTION_INACTIVE) remoteswitch_slot = MOTION_INACTIVE;
 
   // get current time
   current_hour = RtcTime.hour;
@@ -252,13 +254,12 @@ void RemoteSwitchMotionUpdateActivity ()
     current_slot = RemoteSwitchMotionGetSlot (index);
 
     // update motion collect state
-    if ((current_hour == current_slot.start_hour) && (current_minute == current_slot.start_minute)) remoteswitch_motion_inactive = true;
-    else if ((current_hour == current_slot.stop_hour) && (current_minute == current_slot.stop_minute)) remoteswitch_motion_inactive = false;
+    if ((current_hour == current_slot.start_hour) && (current_minute == current_slot.start_minute)) remoteswitch_slot = MOTION_INACTIVE;
+    else if ((current_hour == current_slot.stop_hour) && (current_minute == current_slot.stop_minute)) remoteswitch_slot = MOTION_ENABLED;
   }
   
   // if inactive status has changed, synchronise general status
-  if ((remoteswitch_motion_inactive == true) && (Settings.display_mode == MOTION_ENABLED)) Settings.display_mode = MOTION_INACTIVE;
-  else if ((remoteswitch_motion_inactive == false) && (Settings.display_mode == MOTION_INACTIVE)) Settings.display_mode = MOTION_ENABLED;
+  if ((Settings.display_mode != MOTION_DISABLED) && (Settings.display_mode != remoteswitch_slot)) Settings.display_mode = remoteswitch_slot;
 }
 
 // get remote switch standard duration (sec)
@@ -376,13 +377,13 @@ bool RemoteSwitchCommand ()
 // update remote switch relay states according to button and motion detector
 void RemoteSwitchEvery250MSecond ()
 {
-  bool button_allowed  = false;
-  bool button_pressed  = false;
-  bool motion_detected = false;
+  uint8_t new_button, new_motion;
+  bool    relay;
+
   bool button_toggle   = false;
   bool motion_toggle   = false;
-  bool relay_active    = false;
   bool relay_toggle    = false;
+  
   ulong tempo_now;
   ulong tempo_duration;
   ulong tempo_target;
@@ -390,7 +391,11 @@ void RemoteSwitchEvery250MSecond ()
   // update current time
   tempo_now = millis ();
 
-  // update button status
+  // read relay, button and motion detector status
+  relay  = (bitRead (power, 0) == 1);
+  button = RemoteSwitchButtonStatus ();
+  motion = RemoteSwitchMotionStatus ();
+  
   button_allowed = RemoteSwitchIsButtonAllowed ();
   if (button_allowed == true) button_pressed = RemoteSwitchIsButtonPressed ();
   if ((button_pressed == true) && (remoteswitch_button_pressed == false)) button_toggle = true;
@@ -401,45 +406,53 @@ void RemoteSwitchEvery250MSecond ()
   if ((motion_detected == true) && (remoteswitch_motion_detected == false)) motion_toggle = true;
   remoteswitch_motion_detected = motion_detected;
 
-  // read relay status
-  if (bitRead (power, 0) == 1) relay_active = true;
   
   // if relay is off and button has been triggered, switch relay on with timeout
-  if ((relay_active == false) && (button_toggle == true))
+  if ((relay == false) && (new_button == BUTTON_PRESSED) && (remoteswitch_button == BUTTON_NOT_PRESSED))
   {
-    // relay state should change with timeout reset
-    relay_toggle = true;
+    // update status
+    remoteswitch_button       = new_button;
     remoteswitch_tempo_start  = tempo_now;
     remoteswitch_tempo_motion = 0;
+    
+    // switch on relay
+    ExecuteCommandPower (1, POWER_ON, SRC_IGNORE);
   }
 
   // else, if relay is off and motion has been triggered, switch relay on with tempo
-  else if ((relay_active == false) && (motion_toggle == true))
+  else if ((relay == false) && (new_motion == MOTION_DETECTED) && (remoteswitch_motion == MOTION_NOT_DETECTED))
   {
-    // relay state should change, with tempo reset
-    relay_toggle = true;
+    // motion detector state should change, with tempo reset
+    remoteswitch_motion       = new_motion;
     remoteswitch_tempo_start  = tempo_now;
     remoteswitch_tempo_motion = tempo_now;    
+    
+    // switch on relay
+    ExecuteCommandPower (1, POWER_ON, SRC_IGNORE);
   }
 
   // else if relay on and button pressed, switch relay off
-  else if ((relay_active == true) && (button_toggle == true))
+  else if ((relay == true) && (new_button == BUTTON_PRESSED) && (remoteswitch_button == BUTTON_NOT_PRESSED))
   {
     // relay state should change, with no tempo
-    relay_toggle = true;
+    remoteswitch_button       = new_button;
     remoteswitch_tempo_start  = 0;
     remoteswitch_tempo_motion = 0;        
+    
+    // switch on relay
+    ExecuteCommandPower (1, POWER_OFF, SRC_IGNORE);
   }
 
   // else if relay on and new motion triggered, set new tempo trigger
-  else if ((relay_active == true) && (motion_toggle == true) && (remoteswitch_tempo_motion != 0))
+  else if ((relay == true) && (new_motion == MOTION_DETECTED) && (remoteswitch_motion == MOTION_NOT_DETECTED))
   {
     // update tempo trigger
+    remoteswitch_motion       = new_motion;
     remoteswitch_tempo_motion = tempo_now;        
   }
 
   // else, if relay on and motion detector tempo started, check if tempo is over
-  else if ((relay_active == true) && (remoteswitch_tempo_motion != 0))
+  else if ((relay == true) && (remoteswitch_tempo_motion != 0))
   {
     // get tempo target and calculate current tempo
     tempo_target = 1000 * RemoteSwitchGetDuration ();
@@ -448,15 +461,17 @@ void RemoteSwitchEvery250MSecond ()
     // if tempo target has been reached, switch relay off
     if (tempo_duration >= tempo_target)
     {
-      // relay state should change, with no tempo
-      relay_toggle = true;
+      // reset tempo
       remoteswitch_tempo_start  = 0;
       remoteswitch_tempo_motion = 0;        
+    
+      // switch off relay
+      ExecuteCommandPower (1, POWER_OFF, SRC_IGNORE);
     }
   }
 
   // else, if relay on, check if timeout is over
-  else if (relay_active == true)
+  else if (relay == true)
   {
     // get timeout target (mn) and calculate current tempo
     tempo_target = 60000 * RemoteSwitchGetTimeout ();
@@ -465,15 +480,14 @@ void RemoteSwitchEvery250MSecond ()
     // if tempo target has been reached, switch relay off
     if (tempo_duration >= tempo_target)
     {
-      // relay state should change, with no tempo
-      relay_toggle = true;
+      // reset tempo
       remoteswitch_tempo_start  = 0;
       remoteswitch_tempo_motion = 0;        
+    
+      // switch off relay
+      ExecuteCommandPower (1, POWER_OFF, SRC_IGNORE);
     }
   }
-
-  // if relay should change
-  if (relay_toggle == true) ExecuteCommandPower (1, POWER_TOGGLE, SRC_IGNORE);
 }
 
 #ifdef USE_WEBSERVER
