@@ -11,10 +11,10 @@
    - Switch2 = Motion detector
 
   Settings are stored using some unused display parameters :
-   - Settings.display_model   = Push button allowed
-   - Settings.display_mode    = Motion detector allowed
-   - Settings.display_refresh = Push button timeout (sec)
-   - Settings.display_size    = Motion detection duration (sec)
+   - Settings.display_model   = Push button configuration (disabled, enabled)
+   - Settings.display_mode    = Motion detector configuration (disabled, enabled or inactive)
+   - Settings.display_refresh = Timeout when impulse comes from push button (mn)
+   - Settings.display_size    = Duration when impulse comes from motion detector (sec)
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -36,37 +36,36 @@
 
 #define XSNS_97                               97
 
-#define D_PAGE_REMOTESWITCH                   "switch"
-#define D_CMND_REMOTESWITCH_BUTTON            "button"
-#define D_CMND_REMOTESWITCH_MOTION            "motion"
-#define D_CMND_REMOTESWITCH_TIMEOUT           "timeout"
-#define D_CMND_REMOTESWITCH_DURATION          "duration"
-#define D_CMND_REMOTESWITCH_SLOT0             "s0"
-#define D_CMND_REMOTESWITCH_SLOT0_START_HOUR  "s0srthr"
-#define D_CMND_REMOTESWITCH_SLOT0_START_MIN   "s0srtmn"
-#define D_CMND_REMOTESWITCH_SLOT0_STOP_HOUR   "s0stphr"
-#define D_CMND_REMOTESWITCH_SLOT0_STOP_MIN    "s0stpmn"
-#define D_CMND_REMOTESWITCH_SLOT1             "s1"
-#define D_CMND_REMOTESWITCH_SLOT1_START_HOUR  "s1srthr"
-#define D_CMND_REMOTESWITCH_SLOT1_START_MIN   "s1srtmn"
-#define D_CMND_REMOTESWITCH_SLOT1_STOP_HOUR   "s1stphr"
-#define D_CMND_REMOTESWITCH_SLOT1_STOP_MIN    "s1stpmn"
+#define D_PAGE_IMPULSE                   "pulse"
+#define D_CMND_IMPULSE_BUTTON            "button"
+#define D_CMND_IMPULSE_MOTION            "motion"
+#define D_CMND_IMPULSE_TIMEOUT           "timeout"
+#define D_CMND_IMPULSE_DURATION          "duration"
+#define D_CMND_IMPULSE_SLOT0             "s0"
+#define D_CMND_IMPULSE_SLOT0_START_HOUR  "s0srthr"
+#define D_CMND_IMPULSE_SLOT0_START_MIN   "s0srtmn"
+#define D_CMND_IMPULSE_SLOT0_STOP_HOUR   "s0stphr"
+#define D_CMND_IMPULSE_SLOT0_STOP_MIN    "s0stpmn"
+#define D_CMND_IMPULSE_SLOT1             "s1"
+#define D_CMND_IMPULSE_SLOT1_START_HOUR  "s1srthr"
+#define D_CMND_IMPULSE_SLOT1_START_MIN   "s1srtmn"
+#define D_CMND_IMPULSE_SLOT1_STOP_HOUR   "s1stphr"
+#define D_CMND_IMPULSE_SLOT1_STOP_MIN    "s1stpmn"
 
-#define D_JSON_REMOTESWITCH                   "RemoteSwitch"
-#define D_JSON_REMOTESWITCH_ENABLED           "Enabled"
-#define D_JSON_REMOTESWITCH_STATE             "State"
-#define D_JSON_REMOTESWITCH_RELAY             "Relay"
-#define D_JSON_REMOTESWITCH_BUTTON            "PushButton"
-#define D_JSON_REMOTESWITCH_MOTION            "MotionDetector"
-#define D_JSON_REMOTESWITCH_TIMEOUT           "Timeout"
-#define D_JSON_REMOTESWITCH_DURATION          "Duration"
-#define D_JSON_REMOTESWITCH_SLOT              "Slot"
+#define D_JSON_IMPULSE                   "Impulse"
+#define D_JSON_IMPULSE_ENABLED           "Enabled"
+#define D_JSON_IMPULSE_STATE             "State"
+#define D_JSON_IMPULSE_RELAY             "Relay"
+#define D_JSON_IMPULSE_BUTTON            "PushButton"
+#define D_JSON_IMPULSE_MOTION            "MotionDetector"
+#define D_JSON_IMPULSE_TIMEOUT           "Timeout"
+#define D_JSON_IMPULSE_DURATION          "Duration"
+#define D_JSON_IMPULSE_SLOT              "Slot"
 
-#define REMOTESWITCH_COLOR_BUFFER_SIZE        8
-#define REMOTESWITCH_LABEL_BUFFER_SIZE        16
-#define REMOTESWITCH_MESSAGE_BUFFER_SIZE      64
+#define IMPULSE_LABEL_BUFFER_SIZE        16
+#define IMPULSE_MESSAGE_BUFFER_SIZE      64
 
-// remote switch icon coded in base64
+// impulse icon coded in base64
 const char strIcon0[] PROGMEM = "iVBORw0KGgoAAAANSUhEUgAAAFMAAAAgCAMAAABZ2rRdAAAKu3pUWHRSYXcgcHJvZmlsZSB0eXBlIGV4aWYAAHjarZhrkuwqroX/M4oegnnDcACJiDuDHn5/wq6s566z+0ZnVqUzbQxCS1pastN//992/+IVfUou5dpKL+XilXrqYfClXffrPvornc/zyvG55j+fd+E5fwVO2aBnYNFn/OB8fr+hpuf8/Hze1fXM056JngtvE0Zb2VZ7xrVnohju8/757fpz30gftvP89/qce659/Z0qzpDMfDG4oNHHi8+zSsSC2OPgWM9nZ9B1zoSYz2f92Xfu9fWL80r42XfXeEbEz65wV3kGlC8+es77/LPvjoc+WuTfvobPF3DyvD6+Pvhub2l76727kQqeKu7Z1PVMcb4xkElSPLcV3pX/zPd63p13Y4sLxAQ0J+/lfPcBb2+fvPjht9dzXH5hYgoaKscQVojnXIs19LAOKMnefocKGOJiA4kFapHT4WWLP+v2s97yjZXFMzJ4JvPc8e3tfjr5/3m/JtrbQtd7c2YJx1fYFSwIMMOQs09GAYjfj0/z8e95uxes7y8DNoJgPm5ubHBc855iZv8eW/HgHBmXr+SecPdVnglwEWtnjPHQg7+Kj9kXf9UQqvf4sYHPwPIQU5gg4HMO4t0GmxgL4LRga3NP9WdsyOE+DbUARI6FtGmWLoCVUiZ+amrE0MgxJ5dzLrnmlnseJZZUcimlFuOo";
 const char strIcon1[] PROGMEM = "UWNNNddSa22119FiSy230mprrbfRQ49QWO6lV9db730MFh1MPbh7MGKMGWacaeZZZp1t9jkW4bPSyqusutrqa0iQKKS/FKlOmnQZ6pVQ0qRZi1Zt2nVsYm3HnXbeZdfddt/jhdqD6mfU/BfkfkfNP6gZYumMq++ocbrWtym80Uk2zEAsJA/i1RAgoINhdjW4PhhyhtnVA0mRA6j5bOCIN8RAMKkPefsXdu/I/Yqby+m/wi38CTln0P0vkHMG3YPcd9x+QE3GqSjxAGRZaD694obYGKBthDasJv183OnaDeBI1hBLtvlqG5X7Vg9zbZ3irqjBBuyFWYXBWUPfm3qRBvb8Mvvno/t+QQmZeq/OlC1GFlzJfmubbUxYVu2XDcKAZ5B7Rr3G/JUF2iBVSHlxTHsASHG5+jFSHbBEugrssVojgoKnMojmXveUjg/GUJ1dr7an75ObrjIiJsHHVUSrA7LgZWsq0c9ayyr8KcCW6ncFMttsIhwEz7WU6krTtpTCLkPsWyMN6nabalD3IvqVgN7D15mL8S6BdoZ1ZlplhFlAyXvqzAFHLqycnEJGsMRySSDiq7XdusGZVfJZ0WTFcXAo7YpA/Tv807UNy06bZuWK23I1exvpIWVqxjLPpkrpfsdWSuxLl9+iW8IkDl82uu9GJqGOwNN5xn+09Wz+OM5x7c1vt9e4hNsu3yTlsva7+5jgcaDlyHEhDnwzyllx/WwSw15GFQW5KbCGwCVb";
 const char strIcon2[] PROGMEM = "AbRImgo5dPUliTSdbTUVx9675PQXgfh7xLsTzrtkqZNNyDi7jnWFAhusZXwAD1TzOSuKX1U14uhWJMbluQMnEqxup7gJ1LZksvGyo/GM6p6EpIisA+KFp3Hb6uJTNvmZvx3d+eInLqPkT/AfyQLr6hD/HcGETZJNnkBinhFNakqrT+guD0VlxtGpa1i5YDuDJXhLLZznDQA4RXLcpQIHpMbWt+yZtsLvyO2pDR21yCO1nKNkHzg9P6adZ1zjIyrpF8mzOI7F3dSelJM0cdmNX+9zn29kywDPnkqU1u4terOI6GhClJWUOb32dTMSObHK9KDn0to1W2qMilpcHZ2xEjfK8gVUFDLnVRsau2QuLah0sUmLUIsJpp1elxHbB5PgATOl3ku+LdjVCAQ1tjNbBNAziYX0tdqWckBxU8VYxDI8sOPc+tcN+Tf3HOdY5cc9fjQqnoRcE6V8kP27ZXIJsbdz7OTlsIDZFrYorzIvGaKlafBJZu9BZ1xoWNyjM9N9EGATLClH20K1EXVZAlvoq1JG8o8x93bMQnGi4AX2SPRR/mRQIFkgpNKBmIxviHKjayRFbZrYPyagCUZWv8FmUlMDOdC6YE4I1BMogrqdHAE3UtNxWcKPUA1c0gsRICXN0TWICu7zCBBFOOwwrJHwnZ3GdXnorw4YwRHkSfdVxHKPJEjRQ5x1Wimg3g9KtO62PA0icGq2SJZIl+fJ3SW164lYaET7pEChFqAGOrKF";
@@ -76,15 +75,15 @@ const char strIcon5[] PROGMEM = "A6MAAAJbUExURXAQfP////7+/v39/fPz8+Hh4fLy8uLi4vz
 const char strIcon6[] PROGMEM = "/4nQ/1C5/0a1/1i8/3zK/1a7/4vR//f8/+j2/+n2//L6//r9//D5/+b1/+/5//n8//b7/+34/1gr3N8AAAABdFJOUwBA5thmAAAAAWJLR0QAiAUdSAAAAAlwSFlzAAAOvwAADr8BOAVTJAAAAAd0SU1FB+MHCQcZHBlis8QAAADFSURBVEjHY2DAChISGIgEoypHVQ5ZlQl4AU5tQXjMTRARQwLNzcg8MfsEstyaUMTHgQsw2yWQ5f2EImZGBGCCm8cE4lHDTKYcOVMosGMiZGZCggAxZjLX2zWWQEAYEWYyEGVmqg4HMwQg+R2RAiAsQ0KJCc3MRCbk0MVuJgMVzCQ5zdPMTGgYMnOTYmYQXjP5PFMhoL5Ynzru5GBkEjKCAiEUI8k2M4clFAGMjEKRQTOZZmYgF0NaqKVScMJo6T2qcrioBADiRnaLCHmwugAAAABJRU5ErkJggg==";
 const char *const arrIconBase64[] PROGMEM = {strIcon0, strIcon1, strIcon2, strIcon3, strIcon4, strIcon5, strIcon6};
 
-// remote switch enumerations
-enum RemoteSwitchSlot { SLOT_START_HOUR, SLOT_START_MINUTE, SLOT_STOP_HOUR, SLOT_STOP_MINUTE };
-enum RemoteSwitchInput { INPUT_RELAY, INPUT_PUSH_BUTTON, INPUT_MOTION_DETECTOR };
-enum RemoteSwitchButton { BUTTON_DISABLED, BUTTON_ENABLED, BUTTON_NOT_PRESSED, BUTTON_PRESSED };
-enum RemoteSwitchMotion { MOTION_DISABLED, MOTION_ENABLED, MOTION_INACTIVE, MOTION_NOT_DETECTED, MOTION_DETECTED };
+// impulse enumerations
+enum ImpulseSlot { SLOT_START_HOUR, SLOT_START_MINUTE, SLOT_STOP_HOUR, SLOT_STOP_MINUTE };
+enum ImpulseInput { INPUT_RELAY, INPUT_PUSH_BUTTON, INPUT_MOTION_DETECTOR };
+enum ImpulseButton { BUTTON_DISABLED, BUTTON_ENABLED, BUTTON_NOT_PRESSED, BUTTON_PRESSED };
+enum ImpulseMotion { MOTION_DISABLED, MOTION_ENABLED, MOTION_INACTIVE, MOTION_NOT_DETECTED, MOTION_DETECTED };
 
-// remote switch commands
-enum RemoteSwitchCommands { CMND_REMOTESWITCH_BUTTON, CMND_REMOTESWITCH_MOTION, CMND_REMOTESWITCH_TIMEOUT, CMND_REMOTESWITCH_DURATION, CMND_REMOTESWITCH_SLOT0, CMND_REMOTESWITCH_SLOT0_START_HOUR, CMND_REMOTESWITCH_SLOT0_START_MIN, CMND_REMOTESWITCH_SLOT0_STOP_HOUR, CMND_REMOTESWITCH_SLOT0_STOP_MIN, CMND_REMOTESWITCH_SLOT1, CMND_REMOTESWITCH_SLOT1_START_HOUR, CMND_REMOTESWITCH_SLOT1_START_MIN, CMND_REMOTESWITCH_SLOT1_STOP_HOUR, CMND_REMOTESWITCH_SLOT1_STOP_MIN };
-const char kRemoteSwitchCommands[] PROGMEM = D_CMND_REMOTESWITCH_BUTTON "|" D_CMND_REMOTESWITCH_MOTION "|" D_CMND_REMOTESWITCH_TIMEOUT "|" D_CMND_REMOTESWITCH_DURATION "|" D_CMND_REMOTESWITCH_SLOT0 "|" D_CMND_REMOTESWITCH_SLOT0_START_HOUR "|" D_CMND_REMOTESWITCH_SLOT0_START_MIN "|" D_CMND_REMOTESWITCH_SLOT0_STOP_HOUR "|" D_CMND_REMOTESWITCH_SLOT0_STOP_MIN "|" D_CMND_REMOTESWITCH_SLOT1 "|" D_CMND_REMOTESWITCH_SLOT1_START_HOUR "|" D_CMND_REMOTESWITCH_SLOT1_START_MIN "|" D_CMND_REMOTESWITCH_SLOT1_STOP_HOUR "|" D_CMND_REMOTESWITCH_SLOT1_STOP_MIN;
+// impulse commands
+enum ImpulseCommands { CMND_REMOTESWITCH_BUTTON, CMND_REMOTESWITCH_MOTION, CMND_REMOTESWITCH_TIMEOUT, CMND_REMOTESWITCH_DURATION, CMND_REMOTESWITCH_SLOT0, CMND_REMOTESWITCH_SLOT0_START_HOUR, CMND_REMOTESWITCH_SLOT0_START_MIN, CMND_REMOTESWITCH_SLOT0_STOP_HOUR, CMND_REMOTESWITCH_SLOT0_STOP_MIN, CMND_REMOTESWITCH_SLOT1, CMND_REMOTESWITCH_SLOT1_START_HOUR, CMND_REMOTESWITCH_SLOT1_START_MIN, CMND_REMOTESWITCH_SLOT1_STOP_HOUR, CMND_REMOTESWITCH_SLOT1_STOP_MIN };
+const char kImpulseCommands[] PROGMEM = D_CMND_REMOTESWITCH_BUTTON "|" D_CMND_REMOTESWITCH_MOTION "|" D_CMND_REMOTESWITCH_TIMEOUT "|" D_CMND_REMOTESWITCH_DURATION "|" D_CMND_REMOTESWITCH_SLOT0 "|" D_CMND_REMOTESWITCH_SLOT0_START_HOUR "|" D_CMND_REMOTESWITCH_SLOT0_START_MIN "|" D_CMND_REMOTESWITCH_SLOT0_STOP_HOUR "|" D_CMND_REMOTESWITCH_SLOT0_STOP_MIN "|" D_CMND_REMOTESWITCH_SLOT1 "|" D_CMND_REMOTESWITCH_SLOT1_START_HOUR "|" D_CMND_REMOTESWITCH_SLOT1_START_MIN "|" D_CMND_REMOTESWITCH_SLOT1_STOP_HOUR "|" D_CMND_REMOTESWITCH_SLOT1_STOP_MIN;
 
 // time slot structure
 struct timeslot {
@@ -96,15 +95,15 @@ struct timeslot {
 };
 
 // variables
-uint8_t remoteswitch_button = 0;          // current state of push button
-uint8_t remoteswitch_motion = 0;          // current state of motion detector
-uint8_t remoteswitch_slot  = 0;          // current slot condition of motion detector
-ulong remoteswitch_tempo_start    = 0;          // timestamp when relay was switched on
-ulong remoteswitch_tempo_motion   = 0;          // timestamp when last motion was detected
+uint8_t impulse_button       = 0;          // current state of push button
+uint8_t impulse_motion       = 0;          // current state of motion detector
+uint8_t impulse_slot         = 0;          // current slot condition of motion detector
+ulong   impulse_tempo_start  = 0;          // timestamp when relay was switched on
+ulong   impulse_tempo_motion = 0;          // timestamp when last motion was detected
 
 /*********************************************************************************************/
 
-// save motion time slot (format is HH:HH-HH:MM)
+// save motion time slot (format is HH:MM-HH:MM)
 void RemoteSwitchMotionSetSlot (uint8_t slot_number, char* strSlot)
 {
   uint8_t index = 0;
