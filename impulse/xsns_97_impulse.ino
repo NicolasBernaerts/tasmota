@@ -1,5 +1,5 @@
 /*
-  xsns_97_remoteswitch.ino - Remote switch support for Sonoff
+  xsns_97_impulse.ino - Impulse switch support for Sonoff
   Allow operation thru push buttons and motion detectors
   
   Copyright (C) 2019  Nicolas Bernaerts
@@ -28,7 +28,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifdef USE_REMOTESWITCH
+#ifdef USE_IMPULSE
 
 /*********************************************************************************************\
  * Universal Remote switch
@@ -736,4 +736,4 @@ bool Xsns97 (byte callback_id)
   return result;
 }
 
-#endif // USE_REMOTESWITCH
+#endif // USE_IMPULSE
