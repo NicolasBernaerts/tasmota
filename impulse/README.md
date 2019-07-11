@@ -1,4 +1,4 @@
-Tasmota firmware modified for Remote Switch
+Tasmota firmware modified as Impulse Switch
 =============
 
 To be completed ...
