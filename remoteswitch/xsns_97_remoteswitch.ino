@@ -514,8 +514,8 @@ void RemoteSwitchWebPage ()
   bool     button, motion;
   uint8_t  duration, timeout;
   timeslot slot_0, slot_1;
-  char     string1[REMOTESWITCH_LABEL_BUFFER_SIZE];
-  char     string2[REMOTESWITCH_LABEL_BUFFER_SIZE];
+  String   result;
+  char     argument[REMOTESWITCH_LABEL_BUFFER_SIZE];
 
   // if access not allowed, close
   if (!HttpCheckPriviledgedAccess()) return;
@@ -523,66 +523,62 @@ void RemoteSwitchWebPage ()
   // get remote switch button enabled according to 'button' parameter
   if (WebServer->hasArg(D_CMND_REMOTESWITCH_BUTTON))
   {
-    WebGetArg (D_CMND_REMOTESWITCH_BUTTON, string1, REMOTESWITCH_LABEL_BUFFER_SIZE);
-    RemoteSwitchSetButtonAllowed ((bool) (atoi (string1) >= 1)); 
+    WebGetArg (D_CMND_REMOTESWITCH_BUTTON, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    RemoteSwitchSetButtonAllowed ((bool) (atoi (argument) >= 1)); 
     updated = true;
   }
 
   // get remote switch motion detector enabled according to 'motion' parameter
   if (WebServer->hasArg(D_CMND_REMOTESWITCH_MOTION))
   {
-    WebGetArg (D_CMND_REMOTESWITCH_MOTION, string1, REMOTESWITCH_LABEL_BUFFER_SIZE);
-    RemoteSwitchSetMotionAllowed ((bool) (atoi (string1) >= 1)); 
+    WebGetArg (D_CMND_REMOTESWITCH_MOTION, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    RemoteSwitchSetMotionAllowed ((bool) (atoi (argument) >= 1)); 
     updated = true;
   }
 
   // get remote switch duration according to 'duration' parameter
   if (WebServer->hasArg(D_CMND_REMOTESWITCH_DURATION))
   {
-    WebGetArg (D_CMND_REMOTESWITCH_DURATION, string1, REMOTESWITCH_LABEL_BUFFER_SIZE);
-    RemoteSwitchSetDuration ((uint8_t) atoi (string1)); 
+    WebGetArg (D_CMND_REMOTESWITCH_DURATION, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    RemoteSwitchSetDuration ((uint8_t) atoi (argument)); 
     updated = true;
   }
 
   // get remote switch timeout according to 'timeout' parameter
   if (WebServer->hasArg(D_CMND_REMOTESWITCH_TIMEOUT))
   {
-    WebGetArg (D_CMND_REMOTESWITCH_TIMEOUT, string1, REMOTESWITCH_LABEL_BUFFER_SIZE);
-    RemoteSwitchSetTimeout ((uint8_t) atoi (string1)); 
+    WebGetArg (D_CMND_REMOTESWITCH_TIMEOUT, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    RemoteSwitchSetTimeout ((uint8_t) atoi (argument)); 
     updated = true;
   }
 
   // get remote switch first motion detector slot according to 'slot0' parameters
   if (WebServer->hasArg(D_CMND_REMOTESWITCH_SLOT0_START_HOUR))
   {
-    WebGetArg (D_CMND_REMOTESWITCH_SLOT0_START_HOUR, string1, REMOTESWITCH_LABEL_BUFFER_SIZE);
-    WebGetArg (D_CMND_REMOTESWITCH_SLOT0_START_MIN, string2, REMOTESWITCH_LABEL_BUFFER_SIZE);
-    strcat (string1, ":");
-    strcat (string1, string2);
-    WebGetArg (D_CMND_REMOTESWITCH_SLOT0_STOP_HOUR, string2, REMOTESWITCH_LABEL_BUFFER_SIZE);
-    strcat (string1, "-");
-    strcat (string1, string2);
-    WebGetArg (D_CMND_REMOTESWITCH_SLOT0_STOP_MIN, string2, REMOTESWITCH_LABEL_BUFFER_SIZE);
-    strcat (string1, ":");
-    strcat (string1, string2);
-    RemoteSwitchMotionSetSlot (0, string1); 
+    WebGetArg (D_CMND_REMOTESWITCH_SLOT0_START_HOUR, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    result = argument;
+    WebGetArg (D_CMND_REMOTESWITCH_SLOT0_START_MIN, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    result += ":" + argument;
+    WebGetArg (D_CMND_REMOTESWITCH_SLOT0_STOP_HOUR, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    result += "-" + argument;
+    WebGetArg (D_CMND_REMOTESWITCH_SLOT0_STOP_MIN, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    result += ":" + argument;
+    RemoteSwitchMotionSetSlot (0, result); 
     updated = true;
   }
 
   // get remote switch second motion detector slot according to 'slot1' parameters
   if (WebServer->hasArg(D_CMND_REMOTESWITCH_SLOT1_START_HOUR))
   {
-    WebGetArg (D_CMND_REMOTESWITCH_SLOT1_START_HOUR, string1, REMOTESWITCH_LABEL_BUFFER_SIZE);
-    WebGetArg (D_CMND_REMOTESWITCH_SLOT1_START_MIN, string2, REMOTESWITCH_LABEL_BUFFER_SIZE);
-    strcat (string1, ":");
-    strcat (string1, string2);
-    WebGetArg (D_CMND_REMOTESWITCH_SLOT1_STOP_HOUR, string2, REMOTESWITCH_LABEL_BUFFER_SIZE);
-    strcat (string1, "-");
-    strcat (string1, string2);
-    WebGetArg (D_CMND_REMOTESWITCH_SLOT1_STOP_MIN, string2, REMOTESWITCH_LABEL_BUFFER_SIZE);
-    strcat (string1, ":");
-    strcat (string1, string2);
-    RemoteSwitchMotionSetSlot (1, string1); 
+    WebGetArg (D_CMND_REMOTESWITCH_SLOT1_START_HOUR, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    result = argument;
+    WebGetArg (D_CMND_REMOTESWITCH_SLOT1_START_MIN, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    result += ":" + argument;
+    WebGetArg (D_CMND_REMOTESWITCH_SLOT1_STOP_HOUR, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    result += "-" + argument;
+    WebGetArg (D_CMND_REMOTESWITCH_SLOT1_STOP_MIN, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    result += ":" + argument;
+    RemoteSwitchMotionSetSlot (1, result); 
     updated = true;
   }
 
@@ -657,8 +653,8 @@ bool RemoteSwitchWebState ()
   bool button_allowed  = false;
   bool button_pressed  = false;
   bool motion_detected = false;
-  char color[REMOTESWITCH_COLOR_BUFFER_SIZE];
-  char label[REMOTESWITCH_LABEL_BUFFER_SIZE];
+  String color;
+  String label;
 
   // update button status
   button_allowed = RemoteSwitchIsButtonAllowed ();
