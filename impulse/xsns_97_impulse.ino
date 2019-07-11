@@ -31,7 +31,7 @@
 #ifdef USE_IMPULSE
 
 /*********************************************************************************************\
- * Universal Remote switch
+ * Universal Impulse switch with push buttons and motion detector as input
 \*********************************************************************************************/
 
 #define XSNS_97                               97
@@ -82,8 +82,8 @@ enum ImpulseButton { BUTTON_DISABLED, BUTTON_ENABLED, BUTTON_NOT_PRESSED, BUTTON
 enum ImpulseMotion { MOTION_DISABLED, MOTION_ENABLED, MOTION_INACTIVE, MOTION_NOT_DETECTED, MOTION_DETECTED };
 
 // impulse commands
-enum ImpulseCommands { CMND_REMOTESWITCH_BUTTON, CMND_REMOTESWITCH_MOTION, CMND_REMOTESWITCH_TIMEOUT, CMND_REMOTESWITCH_DURATION, CMND_REMOTESWITCH_SLOT0, CMND_REMOTESWITCH_SLOT0_START_HOUR, CMND_REMOTESWITCH_SLOT0_START_MIN, CMND_REMOTESWITCH_SLOT0_STOP_HOUR, CMND_REMOTESWITCH_SLOT0_STOP_MIN, CMND_REMOTESWITCH_SLOT1, CMND_REMOTESWITCH_SLOT1_START_HOUR, CMND_REMOTESWITCH_SLOT1_START_MIN, CMND_REMOTESWITCH_SLOT1_STOP_HOUR, CMND_REMOTESWITCH_SLOT1_STOP_MIN };
-const char kImpulseCommands[] PROGMEM = D_CMND_REMOTESWITCH_BUTTON "|" D_CMND_REMOTESWITCH_MOTION "|" D_CMND_REMOTESWITCH_TIMEOUT "|" D_CMND_REMOTESWITCH_DURATION "|" D_CMND_REMOTESWITCH_SLOT0 "|" D_CMND_REMOTESWITCH_SLOT0_START_HOUR "|" D_CMND_REMOTESWITCH_SLOT0_START_MIN "|" D_CMND_REMOTESWITCH_SLOT0_STOP_HOUR "|" D_CMND_REMOTESWITCH_SLOT0_STOP_MIN "|" D_CMND_REMOTESWITCH_SLOT1 "|" D_CMND_REMOTESWITCH_SLOT1_START_HOUR "|" D_CMND_REMOTESWITCH_SLOT1_START_MIN "|" D_CMND_REMOTESWITCH_SLOT1_STOP_HOUR "|" D_CMND_REMOTESWITCH_SLOT1_STOP_MIN;
+enum ImpulseCommands { CMND_IMPULSE_BUTTON, CMND_IMPULSE_MOTION, CMND_IMPULSE_TIMEOUT, CMND_IMPULSE_DURATION, CMND_IMPULSE_SLOT0, CMND_IMPULSE_SLOT0_START_HOUR, CMND_IMPULSE_SLOT0_START_MIN, CMND_IMPULSE_SLOT0_STOP_HOUR, CMND_IMPULSE_SLOT0_STOP_MIN, CMND_IMPULSE_SLOT1, CMND_IMPULSE_SLOT1_START_HOUR, CMND_IMPULSE_SLOT1_START_MIN, CMND_IMPULSE_SLOT1_STOP_HOUR, CMND_IMPULSE_SLOT1_STOP_MIN };
+const char kImpulseCommands[] PROGMEM = D_CMND_IMPULSE_BUTTON "|" D_CMND_IMPULSE_MOTION "|" D_CMND_IMPULSE_TIMEOUT "|" D_CMND_IMPULSE_DURATION "|" D_CMND_IMPULSE_SLOT0 "|" D_CMND_IMPULSE_SLOT0_START_HOUR "|" D_CMND_IMPULSE_SLOT0_START_MIN "|" D_CMND_IMPULSE_SLOT0_STOP_HOUR "|" D_CMND_IMPULSE_SLOT0_STOP_MIN "|" D_CMND_IMPULSE_SLOT1 "|" D_CMND_IMPULSE_SLOT1_START_HOUR "|" D_CMND_IMPULSE_SLOT1_START_MIN "|" D_CMND_IMPULSE_SLOT1_STOP_HOUR "|" D_CMND_IMPULSE_SLOT1_STOP_MIN;
 
 // time slot structure
 struct timeslot {
@@ -104,7 +104,7 @@ ulong   impulse_tempo_motion = 0;          // timestamp when last motion was det
 /*********************************************************************************************/
 
 // save motion time slot (format is HH:MM-HH:MM)
-void RemoteSwitchMotionSetSlot (uint8_t slot_number, char* strSlot)
+void ImpulseMotionSetSlot (uint8_t slot_number, char* strSlot)
 {
   uint8_t index = 0;
   char* token;
@@ -148,7 +148,7 @@ void RemoteSwitchMotionSetSlot (uint8_t slot_number, char* strSlot)
 }
 
 // get motion time slot data
-struct timeslot RemoteSwitchMotionGetSlot (uint8_t slot_number)
+struct timeslot ImpulseMotionGetSlot (uint8_t slot_number)
 {
   div_t    div_result;
   uint32_t slot_value = 0;
@@ -182,14 +182,14 @@ struct timeslot RemoteSwitchMotionGetSlot (uint8_t slot_number)
 }
 
 // set push button enabled status
-void RemoteSwitchButtonEnable (bool enabled)
+void ImpulseButtonEnable (bool enabled)
 {
   if (enabled == true) Settings.display_model = BUTTON_ENABLED;
   else Settings.display_model = BUTTON_DISABLED;
 }
 
 // get push button status
-uint8_t RemoteSwitchButtonStatus ()
+uint8_t ImpulseButtonStatus ()
 {
   uint8_t status;
   
@@ -207,7 +207,7 @@ uint8_t RemoteSwitchButtonStatus ()
 }
 
 // set motion detection enabled status
-void RemoteSwitchMotionEnable (bool enabled)
+void ImpulseMotionEnable (bool enabled)
 {
   if ((enabled == true) && (remoteswitch_motion_slot == MOTION_INACTIVE)) Settings.display_mode = MOTION_INACTIVE;
   else if (enabled == true) Settings.display_mode = MOTION_ENABLED;
@@ -215,7 +215,7 @@ void RemoteSwitchMotionEnable (bool enabled)
 }
 
 // get motion detector status
-uint8_t RemoteSwitchMotionStatus ()
+uint8_t ImpulseMotionStatus ()
 {
   uint8_t status;
   
@@ -233,7 +233,7 @@ uint8_t RemoteSwitchMotionStatus ()
 }
 
 // update motion detector usage according to status and time slots
-void RemoteSwitchMotionUpdateActivity ()
+void ImpulseMotionUpdateActivity ()
 {
   uint8_t  index;
   uint8_t  current_hour, current_minute;
@@ -250,7 +250,7 @@ void RemoteSwitchMotionUpdateActivity ()
   for (index = 0; index < 2; index ++)
   {
     // get current slot
-    current_slot = RemoteSwitchMotionGetSlot (index);
+    current_slot = ImpulseMotionGetSlot (index);
 
     // update motion collect state
     if ((current_hour == current_slot.start_hour) && (current_minute == current_slot.start_minute)) remoteswitch_slot = MOTION_INACTIVE;
@@ -261,32 +261,32 @@ void RemoteSwitchMotionUpdateActivity ()
   if ((Settings.display_mode != MOTION_DISABLED) && (Settings.display_mode != remoteswitch_slot)) Settings.display_mode = remoteswitch_slot;
 }
 
-// get remote switch standard duration (sec)
-uint8_t RemoteSwitchGetDuration ()
+// get impulse switch standard duration (sec)
+uint8_t ImpulseGetDuration ()
 {
   return Settings.display_size;
 }
 
-// set remote switch standard duration
-void RemoteSwitchSetDuration (uint8_t duration)
+// set impulse switch standard duration
+void ImpulseSetDuration (uint8_t duration)
 {
   Settings.display_size = duration;
 }
 
-// get remote switch timeout (mn)
-uint8_t RemoteSwitchGetTimeout ()
+// get impulse switch timeout (mn)
+uint8_t ImpulseGetTimeout ()
 {
   return Settings.display_refresh;
 }
 
-// set remote switch timeout (mn)
-void RemoteSwitchSetTimeout (uint8_t timeout)
+// set impulse switch timeout (mn)
+void ImpulseSetTimeout (uint8_t timeout)
 {
   Settings.display_refresh = timeout;
 }
 
 // Show JSON status (for MQTT)
-void RemoteSwitchShowJSON (bool append)
+void ImpulseShowJSON (bool append)
 {
   uint8_t  relay, button, motion, duration, timeout;
   timeslot slot_0, slot_1;
@@ -295,30 +295,30 @@ void RemoteSwitchShowJSON (bool append)
   relay = bitRead (power, 0);
 
   // collect data
-  duration = RemoteSwitchGetDuration ();
-  timeout  = RemoteSwitchGetTimeout ();
-  button   = RemoteSwitchButtonStatus ();
-  motion   = RemoteSwitchMotionStatus ();
-  slot_0   = RemoteSwitchMotionGetSlot (0);
-  slot_1   = RemoteSwitchMotionGetSlot (1);
+  duration = ImpulseGetDuration ();
+  timeout  = ImpulseGetTimeout ();
+  button   = ImpulseButtonStatus ();
+  motion   = ImpulseMotionStatus ();
+  slot_0   = ImpulseMotionGetSlot (0);
+  slot_1   = ImpulseMotionGetSlot (1);
   
   // start message  -->  {  or  ,
   if (append == false) snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("{"));
   else snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,"), mqtt_data);
 
-  // "RemoteSwitch":{
-  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH "\":{"), mqtt_data);
+  // "Impulse":{
+  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_IMPULSE "\":{"), mqtt_data);
   
   // "Relay":1,"Duration":35,"Timeout":5,
-  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH_RELAY "\":%d,\"" D_JSON_REMOTESWITCH_DURATION "\":%d,\"" D_JSON_REMOTESWITCH_TIMEOUT "\":%d,"), mqtt_data, relay, duration, timeout);
+  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_IMPULSE_RELAY "\":%d,\"" D_JSON_IMPULSE_DURATION "\":%d,\"" D_JSON_IMPULSE_TIMEOUT "\":%d,"), mqtt_data, relay, duration, timeout);
 
   // "PushButton":1,
-  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH_BUTTON "\":%d,"), mqtt_data, button);
+  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_IMPULSE_BUTTON "\":%d,"), mqtt_data, button);
 
   // "MotionDetector":3,"Slot1":"01:00-12:00","Slot2":"00:00-00:00"}
-  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH_MOTION "\":%d,"), mqtt_data, motion);
-  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH_SLOT "1\":\"%2d:%2d-%2d:%2d\","), mqtt_data, slot_0.start_hour, slot_0.start_minute, slot_0.stop_hour, slot_0.stop_minute);
-  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_REMOTESWITCH_SLOT "2\":\"%2d:%2d-%2d:%2d\"}"), mqtt_data, slot_1.start_hour, slot_1.start_minute, slot_1.stop_hour, slot_1.stop_minute);
+  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_IMPULSE_MOTION "\":%d,"), mqtt_data, motion);
+  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_IMPULSE_SLOT "1\":\"%2d:%2d-%2d:%2d\","), mqtt_data, slot_0.start_hour, slot_0.start_minute, slot_0.stop_hour, slot_0.stop_minute);
+  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_IMPULSE_SLOT "2\":\"%2d:%2d-%2d:%2d\"}"), mqtt_data, slot_1.start_hour, slot_1.start_minute, slot_1.stop_hour, slot_1.stop_minute);
 
   // if not in append mode, publish message 
   if (append == false)
@@ -331,8 +331,8 @@ void RemoteSwitchShowJSON (bool append)
   }
 }
 
-// Handle remote switch MQTT commands
-bool RemoteSwitchCommand ()
+// Handle impulse switch MQTT commands
+bool ImpulseCommand ()
 {
   bool serviced = true;
   timeslot time_slot;
@@ -340,41 +340,41 @@ bool RemoteSwitchCommand ()
   char command [CMDSZ];
 
   // check MQTT command
-  command_code = GetCommandCode (command, sizeof(command), XdrvMailbox.topic, kRemoteSwitchCommands);
+  command_code = GetCommandCode (command, sizeof(command), XdrvMailbox.topic, kImpulseCommands);
 
   // handle command
   switch (command_code)
   {
-    case CMND_REMOTESWITCH_BUTTON:       // enable/disable push button
-      RemoteSwitchButtonEnable((bool) (XdrvMailbox.payload >= 1));
+    case CMND_IMPULSE_BUTTON:       // enable/disable push button
+      ImpulseButtonEnable((bool) (XdrvMailbox.payload >= 1));
       break;
-    case CMND_REMOTESWITCH_MOTION:     // enable/disable motion detector
-      RemoteSwitchMotionEnable((bool) (XdrvMailbox.payload >= 1));
+    case CMND_IMPULSE_MOTION:     // enable/disable motion detector
+      ImpulseMotionEnable((bool) (XdrvMailbox.payload >= 1));
       break;
-    case CMND_REMOTESWITCH_DURATION:  // set switch minimum duration
-      RemoteSwitchSetDuration (XdrvMailbox.payload);
+    case CMND_IMPULSE_DURATION:  // set switch minimum duration
+      ImpulseSetDuration (XdrvMailbox.payload);
       break;
-    case CMND_REMOTESWITCH_TIMEOUT:  // set switch timeout
-      RemoteSwitchSetTimeout (XdrvMailbox.payload);
+    case CMND_IMPULSE_TIMEOUT:  // set switch timeout
+      ImpulseSetTimeout (XdrvMailbox.payload);
       break;
-    case CMND_REMOTESWITCH_SLOT0:     // set motion detector first disable slot
-      RemoteSwitchMotionSetSlot (0, XdrvMailbox.data);
+    case CMND_IMPULSE_SLOT0:     // set motion detector first disable slot
+      ImpulseMotionSetSlot (0, XdrvMailbox.data);
       break;
-    case CMND_REMOTESWITCH_SLOT1:     // set motion detector second disable slot
-      RemoteSwitchMotionSetSlot (1, XdrvMailbox.data);
+    case CMND_IMPULSE_SLOT1:     // set motion detector second disable slot
+      ImpulseMotionSetSlot (1, XdrvMailbox.data);
       break;
     default:
       serviced = false;
   }
 
   // send MQTT status
-  if (serviced == true) RemoteSwitchShowJSON (false);
+  if (serviced == true) ImpulseShowJSON (false);
   
   return serviced;
 }
 
-// update remote switch relay states according to button and motion detector
-void RemoteSwitchEvery250MSecond ()
+// update impulse switch relay states according to button and motion detector
+void ImpulseEvery250MSecond ()
 {
   uint8_t new_button, new_motion;
   bool    relay;
@@ -392,16 +392,16 @@ void RemoteSwitchEvery250MSecond ()
 
   // read relay, button and motion detector status
   relay  = (bitRead (power, 0) == 1);
-  button = RemoteSwitchButtonStatus ();
-  motion = RemoteSwitchMotionStatus ();
+  button = ImpulseButtonStatus ();
+  motion = ImpulseMotionStatus ();
   
-  button_allowed = RemoteSwitchIsButtonAllowed ();
-  if (button_allowed == true) button_pressed = RemoteSwitchIsButtonPressed ();
+  button_allowed = ImpulseIsButtonAllowed ();
+  if (button_allowed == true) button_pressed = ImpulseIsButtonPressed ();
   if ((button_pressed == true) && (remoteswitch_button_pressed == false)) button_toggle = true;
   remoteswitch_button_pressed = button_pressed;
   
   // update motion detector status
-  if (remoteswitch_motion_active == true) motion_detected = RemoteSwitchIsMotionDetected ();
+  if (remoteswitch_motion_active == true) motion_detected = ImpulseIsMotionDetected ();
   if ((motion_detected == true) && (remoteswitch_motion_detected == false)) motion_toggle = true;
   remoteswitch_motion_detected = motion_detected;
 
@@ -454,7 +454,7 @@ void RemoteSwitchEvery250MSecond ()
   else if ((relay == true) && (remoteswitch_tempo_motion != 0))
   {
     // get tempo target and calculate current tempo
-    tempo_target = 1000 * RemoteSwitchGetDuration ();
+    tempo_target = 1000 * ImpulseGetDuration ();
     tempo_duration = tempo_now - remoteswitch_tempo_trigger;
     
     // if tempo target has been reached, switch relay off
@@ -473,7 +473,7 @@ void RemoteSwitchEvery250MSecond ()
   else if (relay == true)
   {
     // get timeout target (mn) and calculate current tempo
-    tempo_target = 60000 * RemoteSwitchGetTimeout ();
+    tempo_target = 60000 * ImpulseGetTimeout ();
     tempo_duration = tempo_now - remoteswitch_tempo_start;
     
     // if tempo target has been reached, switch relay off
@@ -492,7 +492,7 @@ void RemoteSwitchEvery250MSecond ()
 #ifdef USE_WEBSERVER
 
 // Pilot Wire icon
-void RemoteSwitchWebDisplayIcon (uint8_t height)
+void ImpulseWebDisplayIcon (uint8_t height)
 {
   uint8_t nbrItem, index;
 
@@ -506,96 +506,96 @@ void RemoteSwitchWebDisplayIcon (uint8_t height)
   WSContentSend_P ("'/>");
 }
 
-// remote switch configuration button
-void RemoteSwitchWebConfigButton ()
+// impulse switch configuration button
+void ImpulseWebConfigButton ()
 {
   // beginning
   WSContentSend_P (PSTR ("<table style='width:100%%;'><tr>"));
 
-  // remote switch icon
+  // impulse switch icon
   WSContentSend_P (PSTR ("<td align='center'>"));
-  RemoteSwitchWebDisplayIcon (32);
+  ImpulseWebDisplayIcon (32);
   WSContentSend_P (PSTR ("</td>"));
 
   // button
-  WSContentSend_P (PSTR ("<td><form action='%s' method='get'><button>%s</button></form></td>"), D_PAGE_REMOTESWITCH, D_REMOTESWITCH_CONFIGURE);
+  WSContentSend_P (PSTR ("<td><form action='%s' method='get'><button>%s</button></form></td>"), D_PAGE_IMPULSE, D_IMPULSE_CONFIGURE);
 
   // end
   WSContentSend_P (PSTR ("</tr></table>"));
 }
 
-// remote switch web configuration page
-void RemoteSwitchWebPage ()
+// impulse switch web configuration page
+void ImpulseWebPage ()
 {
   bool     updated = false;
   bool     button, motion;
   uint8_t  duration, timeout;
   timeslot slot_0, slot_1;
   String   result;
-  char     argument[REMOTESWITCH_LABEL_BUFFER_SIZE];
+  char     argument[IMPULSE_LABEL_BUFFER_SIZE];
 
   // if access not allowed, close
   if (!HttpCheckPriviledgedAccess()) return;
 
-  // get remote switch button enabled according to 'button' parameter
-  if (WebServer->hasArg(D_CMND_REMOTESWITCH_BUTTON))
+  // get impulse switch button enabled according to 'button' parameter
+  if (WebServer->hasArg(D_CMND_IMPULSE_BUTTON))
   {
-    WebGetArg (D_CMND_REMOTESWITCH_BUTTON, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
-    RemoteSwitchSetButtonAllowed ((bool) (atoi (argument) >= 1)); 
+    WebGetArg (D_CMND_IMPULSE_BUTTON, argument, IMPULSE_LABEL_BUFFER_SIZE);
+    ImpulseSetButtonAllowed ((bool) (atoi (argument) >= 1)); 
     updated = true;
   }
 
-  // get remote switch motion detector enabled according to 'motion' parameter
-  if (WebServer->hasArg(D_CMND_REMOTESWITCH_MOTION))
+  // get impulse switch motion detector enabled according to 'motion' parameter
+  if (WebServer->hasArg(D_CMND_IMPULSE_MOTION))
   {
-    WebGetArg (D_CMND_REMOTESWITCH_MOTION, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
-    RemoteSwitchSetMotionAllowed ((bool) (atoi (argument) >= 1)); 
+    WebGetArg (D_CMND_IMPULSE_MOTION, argument, IMPULSE_LABEL_BUFFER_SIZE);
+    ImpulseSetMotionAllowed ((bool) (atoi (argument) >= 1)); 
     updated = true;
   }
 
-  // get remote switch duration according to 'duration' parameter
-  if (WebServer->hasArg(D_CMND_REMOTESWITCH_DURATION))
+  // get impulse switch duration according to 'duration' parameter
+  if (WebServer->hasArg(D_CMND_IMPULSE_DURATION))
   {
-    WebGetArg (D_CMND_REMOTESWITCH_DURATION, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
-    RemoteSwitchSetDuration ((uint8_t) atoi (argument)); 
+    WebGetArg (D_CMND_IMPULSE_DURATION, argument, IMPULSE_LABEL_BUFFER_SIZE);
+    ImpulseSetDuration ((uint8_t) atoi (argument)); 
     updated = true;
   }
 
-  // get remote switch timeout according to 'timeout' parameter
-  if (WebServer->hasArg(D_CMND_REMOTESWITCH_TIMEOUT))
+  // get impulse switch timeout according to 'timeout' parameter
+  if (WebServer->hasArg(D_CMND_IMPULSE_TIMEOUT))
   {
-    WebGetArg (D_CMND_REMOTESWITCH_TIMEOUT, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
-    RemoteSwitchSetTimeout ((uint8_t) atoi (argument)); 
+    WebGetArg (D_CMND_IMPULSE_TIMEOUT, argument, IMPULSE_LABEL_BUFFER_SIZE);
+    ImpulseSetTimeout ((uint8_t) atoi (argument)); 
     updated = true;
   }
 
-  // get remote switch first motion detector slot according to 'slot0' parameters
-  if (WebServer->hasArg(D_CMND_REMOTESWITCH_SLOT0_START_HOUR))
+  // get impulse switch first motion detector slot according to 'slot0' parameters
+  if (WebServer->hasArg(D_CMND_IMPULSE_SLOT0_START_HOUR))
   {
-    WebGetArg (D_CMND_REMOTESWITCH_SLOT0_START_HOUR, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    WebGetArg (D_CMND_IMPULSE_SLOT0_START_HOUR, argument, IMPULSE_LABEL_BUFFER_SIZE);
     result = argument;
-    WebGetArg (D_CMND_REMOTESWITCH_SLOT0_START_MIN, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    WebGetArg (D_CMND_IMPULSE_SLOT0_START_MIN, argument, IMPULSE_LABEL_BUFFER_SIZE);
     result += ":" + argument;
-    WebGetArg (D_CMND_REMOTESWITCH_SLOT0_STOP_HOUR, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    WebGetArg (D_CMND_IMPULSE_SLOT0_STOP_HOUR, argument, IMPULSE_LABEL_BUFFER_SIZE);
     result += "-" + argument;
-    WebGetArg (D_CMND_REMOTESWITCH_SLOT0_STOP_MIN, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    WebGetArg (D_CMND_IMPULSE_SLOT0_STOP_MIN, argument, IMPULSE_LABEL_BUFFER_SIZE);
     result += ":" + argument;
-    RemoteSwitchMotionSetSlot (0, result); 
+    ImpulseMotionSetSlot (0, result); 
     updated = true;
   }
 
-  // get remote switch second motion detector slot according to 'slot1' parameters
-  if (WebServer->hasArg(D_CMND_REMOTESWITCH_SLOT1_START_HOUR))
+  // get impulse switch second motion detector slot according to 'slot1' parameters
+  if (WebServer->hasArg(D_CMND_IMPULSE_SLOT1_START_HOUR))
   {
-    WebGetArg (D_CMND_REMOTESWITCH_SLOT1_START_HOUR, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    WebGetArg (D_CMND_IMPULSE_SLOT1_START_HOUR, argument, IMPULSE_LABEL_BUFFER_SIZE);
     result = argument;
-    WebGetArg (D_CMND_REMOTESWITCH_SLOT1_START_MIN, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    WebGetArg (D_CMND_IMPULSE_SLOT1_START_MIN, argument, IMPULSE_LABEL_BUFFER_SIZE);
     result += ":" + argument;
-    WebGetArg (D_CMND_REMOTESWITCH_SLOT1_STOP_HOUR, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    WebGetArg (D_CMND_IMPULSE_SLOT1_STOP_HOUR, argument, IMPULSE_LABEL_BUFFER_SIZE);
     result += "-" + argument;
-    WebGetArg (D_CMND_REMOTESWITCH_SLOT1_STOP_MIN, argument, REMOTESWITCH_LABEL_BUFFER_SIZE);
+    WebGetArg (D_CMND_IMPULSE_SLOT1_STOP_MIN, argument, IMPULSE_LABEL_BUFFER_SIZE);
     result += ":" + argument;
-    RemoteSwitchMotionSetSlot (1, result); 
+    ImpulseMotionSetSlot (1, result); 
     updated = true;
   }
 
@@ -607,54 +607,54 @@ void RemoteSwitchWebPage ()
   }
   
   // read data
-  slot_0   = RemoteSwitchMotionGetSlot (0);
-  slot_1   = RemoteSwitchMotionGetSlot (1);
-  button   = RemoteSwitchIsButtonAllowed ();
-  motion   = RemoteSwitchIsMotionAllowed ();
-  duration = RemoteSwitchGetDuration ();
-  timeout  = RemoteSwitchGetTimeout ();
+  slot_0   = ImpulseMotionGetSlot (0);
+  slot_1   = ImpulseMotionGetSlot (1);
+  button   = ImpulseIsButtonAllowed ();
+  motion   = ImpulseIsMotionAllowed ();
+  duration = ImpulseGetDuration ();
+  timeout  = ImpulseGetTimeout ();
   
   // beginning of form
-  WSContentStart_P (D_REMOTESWITCH_CONFIGURE);
+  WSContentStart_P (D_IMPULSE_CONFIGURE);
   WSContentSendStyle ();
 
   // form
-  WSContentSend_P (PSTR ("<fieldset><legend><b>&nbsp;%s&nbsp;</b></legend><form method='get' action='%s'>"), D_REMOTESWITCH_PARAMETERS, D_PAGE_REMOTESWITCH);
+  WSContentSend_P (PSTR ("<fieldset><legend><b>&nbsp;%s&nbsp;</b></legend><form method='get' action='%s'>"), D_IMPULSE_PARAMETERS, D_PAGE_IMPULSE);
 
   // duration
-  WSContentSend_P (PSTR ("<p><b>%s</b><br/><input type='number' name='%s' min='0' step='1' value='%d'></p>"), D_REMOTESWITCH_DURATION, D_CMND_REMOTESWITCH_DURATION, duration);
+  WSContentSend_P (PSTR ("<p><b>%s</b><br/><input type='number' name='%s' min='0' step='1' value='%d'></p>"), D_IMPULSE_DURATION, D_CMND_IMPULSE_DURATION, duration);
 
   // timeout
-  WSContentSend_P (PSTR ("<p><b>%s</b><br/><input type='number' name='%s' min='0' step='1' value='%d'></p>"), D_REMOTESWITCH_TIMEOUT, D_CMND_REMOTESWITCH_TIMEOUT, timeout);
+  WSContentSend_P (PSTR ("<p><b>%s</b><br/><input type='number' name='%s' min='0' step='1' value='%d'></p>"), D_IMPULSE_TIMEOUT, D_CMND_IMPULSE_TIMEOUT, timeout);
 
   // push button input
   if (button == true) { strcpy (string1, ""); strcpy (string2, "checked"); }
   else { strcpy (string1, "checked"); strcpy (string2, ""); }
-  WSContentSend_P (PSTR ("<p><b>%s</b>"), D_REMOTESWITCH_BUTTON);
-  WSContentSend_P (PSTR ("<br/><input type='radio' name='%s' value='0' %s>%s"), D_CMND_REMOTESWITCH_BUTTON, string1, D_REMOTESWITCH_DISABLE);
-  WSContentSend_P (PSTR ("<br/><input type='radio' name='%s' value='1' %s>%s"), D_CMND_REMOTESWITCH_BUTTON, string2, D_REMOTESWITCH_ENABLE);
+  WSContentSend_P (PSTR ("<p><b>%s</b>"), D_IMPULSE_BUTTON);
+  WSContentSend_P (PSTR ("<br/><input type='radio' name='%s' value='0' %s>%s"), D_CMND_IMPULSE_BUTTON, string1, D_IMPULSE_DISABLE);
+  WSContentSend_P (PSTR ("<br/><input type='radio' name='%s' value='1' %s>%s"), D_CMND_IMPULSE_BUTTON, string2, D_IMPULSE_ENABLE);
   WSContentSend_P (PSTR ("</p>"));
 
   // motion detector input
   if (motion == true) { strcpy (string1, ""); strcpy (string2, "checked"); }
   else { strcpy (string1, "checked"); strcpy (string2, ""); }
-  WSContentSend_P (PSTR ("<p><b>%s</b>"), D_REMOTESWITCH_MOTION);
-  WSContentSend_P (PSTR ("<br/><input type='radio' name='%s' value='0' %s>%s"), D_CMND_REMOTESWITCH_MOTION, string1, D_REMOTESWITCH_DISABLE);
-  WSContentSend_P (PSTR ("<br/><input type='radio' name='%s' value='1' %s>%s"), D_CMND_REMOTESWITCH_MOTION, string2, D_REMOTESWITCH_ENABLE);
+  WSContentSend_P (PSTR ("<p><b>%s</b>"), D_IMPULSE_MOTION);
+  WSContentSend_P (PSTR ("<br/><input type='radio' name='%s' value='0' %s>%s"), D_CMND_IMPULSE_MOTION, string1, D_IMPULSE_DISABLE);
+  WSContentSend_P (PSTR ("<br/><input type='radio' name='%s' value='1' %s>%s"), D_CMND_IMPULSE_MOTION, string2, D_IMPULSE_ENABLE);
 
-  WSContentSend_P (PSTR ("<br />%s "), D_REMOTESWITCH_FROM);
-  WSContentSend_P (PSTR ("<input type='number' name='%s' style='width:10%%;' min='0' max='23' step='1' value='%d'> h "), D_CMND_REMOTESWITCH_SLOT0_START_HOUR, slot_0.start_hour);
-  WSContentSend_P (PSTR ("<input type='number' name='%s' style='width:10%%;' min='0' max='59' step='1' value='%d'>"), D_CMND_REMOTESWITCH_SLOT0_START_MIN, slot_0.start_minute);
-  WSContentSend_P (PSTR (" %s "), D_REMOTESWITCH_UNTIL);
-  WSContentSend_P (PSTR ("<input type='number' name='%s' style='width:10%%;' min='0' max='23' step='1' value='%d'> h "), D_CMND_REMOTESWITCH_SLOT0_STOP_HOUR, slot_0.stop_hour);
-  WSContentSend_P (PSTR ("<input type='number' name='%s' style='width:10%%;' min='0' max='59' step='1' value='%d'>"), D_CMND_REMOTESWITCH_SLOT0_STOP_MIN, slot_0.stop_minute);
+  WSContentSend_P (PSTR ("<br />%s "), D_IMPULSE_FROM);
+  WSContentSend_P (PSTR ("<input type='number' name='%s' style='width:10%%;' min='0' max='23' step='1' value='%d'> h "), D_CMND_IMPULSE_SLOT0_START_HOUR, slot_0.start_hour);
+  WSContentSend_P (PSTR ("<input type='number' name='%s' style='width:10%%;' min='0' max='59' step='1' value='%d'>"), D_CMND_IMPULSE_SLOT0_START_MIN, slot_0.start_minute);
+  WSContentSend_P (PSTR (" %s "), D_IMPULSE_UNTIL);
+  WSContentSend_P (PSTR ("<input type='number' name='%s' style='width:10%%;' min='0' max='23' step='1' value='%d'> h "), D_CMND_IMPULSE_SLOT0_STOP_HOUR, slot_0.stop_hour);
+  WSContentSend_P (PSTR ("<input type='number' name='%s' style='width:10%%;' min='0' max='59' step='1' value='%d'>"), D_CMND_IMPULSE_SLOT0_STOP_MIN, slot_0.stop_minute);
 
-  WSContentSend_P (PSTR ("<br />%s "), D_REMOTESWITCH_FROM);
-  WSContentSend_P (PSTR ("<input type='number' name='%s' style='width:10%%;' min='0' max='23' step='1' value='%d'> h "), D_CMND_REMOTESWITCH_SLOT1_START_HOUR, slot_1.start_hour);
-  WSContentSend_P (PSTR ("<input type='number' name='%s' style='width:10%%;' min='0' max='59' step='1' value='%d'>"), D_CMND_REMOTESWITCH_SLOT1_START_MIN, slot_1.start_minute);
-  WSContentSend_P (PSTR (" %s "), D_REMOTESWITCH_UNTIL);
-  WSContentSend_P (PSTR ("<input type='number' name='%s' style='width:10%%;' min='0' max='23' step='1' value='%d'> h "), D_CMND_REMOTESWITCH_SLOT1_STOP_HOUR, slot_1.stop_hour);
-  WSContentSend_P (PSTR ("<input type='number' name='%s' style='width:10%%;' min='0' max='59' step='1' value='%d'>"), D_CMND_REMOTESWITCH_SLOT1_STOP_MIN, slot_1.stop_minute);
+  WSContentSend_P (PSTR ("<br />%s "), D_IMPULSE_FROM);
+  WSContentSend_P (PSTR ("<input type='number' name='%s' style='width:10%%;' min='0' max='23' step='1' value='%d'> h "), D_CMND_IMPULSE_SLOT1_START_HOUR, slot_1.start_hour);
+  WSContentSend_P (PSTR ("<input type='number' name='%s' style='width:10%%;' min='0' max='59' step='1' value='%d'>"), D_CMND_IMPULSE_SLOT1_START_MIN, slot_1.start_minute);
+  WSContentSend_P (PSTR (" %s "), D_IMPULSE_UNTIL);
+  WSContentSend_P (PSTR ("<input type='number' name='%s' style='width:10%%;' min='0' max='23' step='1' value='%d'> h "), D_CMND_IMPULSE_SLOT1_STOP_HOUR, slot_1.stop_hour);
+  WSContentSend_P (PSTR ("<input type='number' name='%s' style='width:10%%;' min='0' max='59' step='1' value='%d'>"), D_CMND_IMPULSE_SLOT1_STOP_MIN, slot_1.stop_minute);
   
   WSContentSend_P (PSTR ("</p>"));
 
@@ -665,7 +665,7 @@ void RemoteSwitchWebPage ()
 }
 
 // append pilot wire state to main page
-bool RemoteSwitchWebState ()
+bool ImpulseWebState ()
 {
   bool button_allowed  = false;
   bool button_pressed  = false;
@@ -674,24 +674,24 @@ bool RemoteSwitchWebState ()
   String label;
 
   // update button status
-  button_allowed = RemoteSwitchIsButtonAllowed ();
-  if (button_allowed == true) button_pressed = RemoteSwitchIsButtonPressed ();
+  button_allowed = ImpulseIsButtonAllowed ();
+  if (button_allowed == true) button_pressed = ImpulseIsButtonPressed ();
   if ((button_pressed == true) && (remoteswitch_button_pressed == false)) button_trigger = true;
   
   // update motion detector status
-  if (remoteswitch_motion_active == true) motion_detected = RemoteSwitchIsMotionDetected ();
+  if (remoteswitch_motion_active == true) motion_detected = ImpulseIsMotionDetected ();
 
   // add push button state
   state = lastbutton[0];
-  snprintf_P (mqtt_data, sizeof(mqtt_data), "%s<tr><th>%s</th><td>%d</td></tr>", mqtt_data, D_REMOTESWITCH_BUTTON, state);
+  snprintf_P (mqtt_data, sizeof(mqtt_data), "%s<tr><th>%s</th><td>%d</td></tr>", mqtt_data, D_IMPULSE_BUTTON, state);
 
   // add motion detector state
   state = SwitchLastState (0);
-  snprintf_P (mqtt_data, sizeof(mqtt_data), "%s<tr><th>%s</th><td>%d</td></tr>", mqtt_data, D_REMOTESWITCH_MOTION, state);
+  snprintf_P (mqtt_data, sizeof(mqtt_data), "%s<tr><th>%s</th><td>%d</td></tr>", mqtt_data, D_IMPULSE_MOTION, state);
 
   // add times
-  snprintf_P (mqtt_data, sizeof(mqtt_data), "%s<tr><th>%s</th><td>%d</td></tr>", mqtt_data, D_REMOTESWITCH_TIME_ON, 12);
-  snprintf_P (mqtt_data, sizeof(mqtt_data), "%s<tr><th>%s</th><td>%d</td></tr>", mqtt_data, D_REMOTESWITCH_TIME_REMAIN, 12);
+  snprintf_P (mqtt_data, sizeof(mqtt_data), "%s<tr><th>%s</th><td>%d</td></tr>", mqtt_data, D_IMPULSE_TIME_ON, 12);
+  snprintf_P (mqtt_data, sizeof(mqtt_data), "%s<tr><th>%s</th><td>%d</td></tr>", mqtt_data, D_IMPULSE_TIME_REMAIN, 12);
 }
 
 #endif  // USE_WEBSERVER
@@ -708,25 +708,25 @@ bool Xsns97 (byte callback_id)
   switch (callback_id)
   {
     case FUNC_COMMAND:
-      result = RemoteSwitchCommand ();
+      result = ImpulseCommand ();
       break;
     case FUNC_EVERY_250_MSECOND:
-      RemoteSwitchEvery250MSecond ();
+      ImpulseEvery250MSecond ();
       break;
     case FUNC_JSON_APPEND:
-      RemoteSwitchShowJSON (true);
+      ImpulseShowJSON (true);
       break;
 
 #ifdef USE_WEBSERVER
 
     case FUNC_WEB_ADD_HANDLER:
-      WebServer->on ("/" D_PAGE_REMOTESWITCH, RemoteSwitchWebPage);
+      WebServer->on ("/" D_PAGE_IMPULSE, ImpulseWebPage);
       break;
     case FUNC_WEB_APPEND:
-      RemoteSwitchWebState ();
+      ImpulseWebState ();
       break;
     case FUNC_WEB_ADD_BUTTON:
-      RemoteSwitchWebConfigButton ();
+      ImpulseWebConfigButton ();
       break;
 
 #endif  // USE_WEBSERVER
