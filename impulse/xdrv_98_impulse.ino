@@ -84,8 +84,8 @@ const char *const arrIconBase64[] PROGMEM = {strIcon0, strIcon1, strIcon2, strIc
 enum ImpulseState { IMPULSE_DISABLE, IMPULSE_ENABLE, IMPULSE_WINDOW, IMPULSE_OFF, IMPULSE_ON };
 
 // impulse commands
-enum ImpulseCommands { CMND_IMPULSE_BUTTON, CMND_IMPULSE_MOTION, CMND_IMPULSE_WINDOW, CMND_IMPULSE_BUTTON_TEMPO, CMND_IMPULSE_MOTION_TEMPO, CMND_IMPULSE_TIMEZONE, CMND_IMPULSE_START_HOUR, CMND_IMPULSE_START_MIN, CMND_IMPULSE_STOP_HOUR, CMND_IMPULSE_STOP_MIN };
-const char kImpulseCommands[] PROGMEM = D_CMND_IMPULSE_BUTTON "|" D_CMND_IMPULSE_MOTION "|" D_CMND_IMPULSE_WINDOW "|" D_CMND_IMPULSE_BUTTON_TEMPO "|" D_CMND_IMPULSE_MOTION_TEMPO "|" D_CMND_IMPULSE_TIMEZONE "|" D_CMND_IMPULSE_START_HOUR "|" D_CMND_IMPULSE_START_MIN "|" D_CMND_IMPULSE_STOP_HOUR "|" D_CMND_IMPULSE_STOP_MIN;
+enum ImpulseCommands { CMND_IMPULSE_BUTTON, CMND_IMPULSE_MOTION, CMND_IMPULSE_WINDOW, CMND_IMPULSE_BUTTON_TEMPO, CMND_IMPULSE_MOTION_TEMPO, CMND_IMPULSE_START_HOUR, CMND_IMPULSE_START_MIN, CMND_IMPULSE_STOP_HOUR, CMND_IMPULSE_STOP_MIN };
+const char kImpulseCommands[] PROGMEM = D_CMND_IMPULSE_BUTTON "|" D_CMND_IMPULSE_MOTION "|" D_CMND_IMPULSE_WINDOW "|" D_CMND_IMPULSE_BUTTON_TEMPO "|" D_CMND_IMPULSE_MOTION_TEMPO "|" D_CMND_IMPULSE_START_HOUR "|" D_CMND_IMPULSE_START_MIN "|" D_CMND_IMPULSE_STOP_HOUR "|" D_CMND_IMPULSE_STOP_MIN;
 
 // time slot structure
 struct timeslot {
@@ -266,6 +266,7 @@ bool ImpulseMotionIsEnabled ()
   timeslot slot_window;
   uint8_t  motion_mode;
   uint32_t current_minute, start_minute, stop_minute;
+  TIME_T   current_dst;
 
   // get motion detector mode
   motion_mode = ImpulseMotionGetMode ();
@@ -274,8 +275,9 @@ bool ImpulseMotionIsEnabled ()
   result = (motion_mode == IMPULSE_ENABLE);
   if (motion_mode == IMPULSE_WINDOW)
   {
-    // get minutes till last midnight
-    current_minute = MinutesPastMidnight();
+    // get current DST time
+    BreakTime (daylight_saving_time, &current_dst);
+    current_minute = (current_dst.hour * 60) + current_dst.minute;
 
     // get current window start and stop
     slot_window  = ImpulseMotionGetWindow ();
@@ -325,18 +327,6 @@ uint32_t ImpulseMotionGetTempo (bool inMs)
   if (inMs == true) tempo = tempo * 1000;
 
   return tempo;
-}
-
-// set timezone
-void ImpulseSetTimezone (int timezone)
-{
-  Settings.xxxx = timezone;
-}
-
-// get timezone
-int ImpulseGetTimezone ()
-{
-  return Settings.xxxx;
 }
 
 // Show JSON status (for MQTT)
@@ -429,9 +419,6 @@ bool ImpulseCommand ()
       break;
     case CMND_IMPULSE_WINDOW:     // set motion detector active window
       ImpulseMotionSetWindow (XdrvMailbox.data);
-      break;
-    case CMND_IMPULSE_BUTTON_TIMEZONE:  // set timezone
-      ImpulseSetTimezone (XdrvMailbox.payload);
       break;
     default:
       serviced = false;
@@ -602,7 +589,6 @@ void ImpulseWebPage ()
   bool     updated = false;
   bool     bpressed, mdetected;
   uint8_t  bmode, mmode, btempo, mtempo;
-  int      timezone;
   timeslot window;
   char     argument[IMPULSE_LABEL_BUFFER_SIZE];
 
@@ -641,14 +627,6 @@ void ImpulseWebPage ()
     updated = true;
   }
 
-  // get timezone according to 'tz' parameter
-  if (WebServer->hasArg(D_CMND_IMPULSE_TIMEZONE))
-  {
-    WebGetArg (D_CMND_IMPULSE_TIMEZONE, argument, IMPULSE_LABEL_BUFFER_SIZE);
-    ImpulseSetTempo ((int) atoi (argument)); 
-    updated = true;
-  }
-
   // get motion detector active window according to 'window' parameters
   if (WebServer->hasArg(D_CMND_IMPULSE_START_HOUR))
   {
@@ -682,7 +660,6 @@ void ImpulseWebPage ()
   mtempo    = ImpulseMotionGetTempo (false);
   mdetected = ImpulseMotionIsDetected ();
   mwindow   = ImpulseMotionGetWindow ();
-  timezone  = ImpulseGetTimezone ();
   
   // beginning of form
   WSContentStart_P (D_IMPULSE_CONFIGURE);
@@ -690,9 +667,6 @@ void ImpulseWebPage ()
 
   // form
   WSContentSend_P (PSTR ("<fieldset><legend><b>&nbsp;%s&nbsp;</b></legend><form method='get' action='%s'>"), D_IMPULSE_PARAMETERS, D_PAGE_IMPULSE);
-
-  // timezone
-  WSContentSend_P (PSTR ("<p><b>%s</b><br/><input type='number' name='%s' min='-12' max='12' step='1' value='%d'></p>"), D_IMPULSE_TIMEZONE, D_CMND_IMPULSE_TIMEZONE, timezone);
 
   // push button mode
   WSContentSend_P (PSTR ("<p><b>%s</b>"), D_IMPULSE_BUTTON);
@@ -740,7 +714,7 @@ void ImpulseWebPage ()
 bool ImpulseWebState ()
 {
   time_t timestamp = time( NULL );
-  struct tm * pTime = localtime( & timestamp );
+  TIME_T current_dst;
   char   color[IMPULSE_LABEL_BUFFER_SIZE];
   char   state[IMPULSE_LABEL_BUFFER_SIZE];
 
@@ -811,9 +785,9 @@ bool ImpulseWebState ()
   // add push button state
   snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR ("%s<tr><th>%s</th><td style='font-weight:bold; color:%s;'>%s</td></tr>"), mqtt_data, D_IMPULSE_MOTION, color, state);
 
-  // dislay current time
-  strftime (state, IMPULSE_LABEL_BUFFER_SIZE, "%H:%M:%S", pTime);
-  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR ("%s<tr><th>%s</th><td>%s</td></tr>"), mqtt_data, D_IMPULSE_TIME, state);
+  // dislay current DST time
+  BreakTime (daylight_saving_time, &current_dst);
+  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR ("%s<tr><th>%s</th><td>%d:%d:%d</td></tr>"), mqtt_data, D_IMPULSE_TIME, current_dst.hour, current_dst.minute, current_dst.second);
 }
 
 #endif  // USE_WEBSERVER
