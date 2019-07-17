@@ -84,8 +84,8 @@ const char *const arrIconBase64[] PROGMEM = {strIcon0, strIcon1, strIcon2, strIc
 enum ImpulseState { IMPULSE_DISABLE, IMPULSE_ENABLE, IMPULSE_WINDOW, IMPULSE_OFF, IMPULSE_ON };
 
 // impulse commands
-enum ImpulseCommands { CMND_IMPULSE_BUTTON, CMND_IMPULSE_MOTION, CMND_IMPULSE_WINDOW, CMND_IMPULSE_BUTTON_TEMPO, CMND_IMPULSE_MOTION_TEMPO, CMND_IMPULSE_START_HOUR, CMND_IMPULSE_START_MIN, CMND_IMPULSE_STOP_HOUR, CMND_IMPULSE_STOP_MIN };
-const char kImpulseCommands[] PROGMEM = D_CMND_IMPULSE_BUTTON "|" D_CMND_IMPULSE_MOTION "|" D_CMND_IMPULSE_WINDOW "|" D_CMND_IMPULSE_BUTTON_TEMPO "|" D_CMND_IMPULSE_MOTION_TEMPO "|" D_CMND_IMPULSE_START_HOUR "|" D_CMND_IMPULSE_START_MIN "|" D_CMND_IMPULSE_STOP_HOUR "|" D_CMND_IMPULSE_STOP_MIN;
+enum ImpulseCommands { CMND_IMPULSE_BUTTON, CMND_IMPULSE_MOTION, CMND_IMPULSE_WINDOW, CMND_IMPULSE_BUTTON_TEMPO, CMND_IMPULSE_MOTION_TEMPO, CMND_IMPULSE_TIMEZONE, CMND_IMPULSE_START_HOUR, CMND_IMPULSE_START_MIN, CMND_IMPULSE_STOP_HOUR, CMND_IMPULSE_STOP_MIN };
+const char kImpulseCommands[] PROGMEM = D_CMND_IMPULSE_BUTTON "|" D_CMND_IMPULSE_MOTION "|" D_CMND_IMPULSE_WINDOW "|" D_CMND_IMPULSE_BUTTON_TEMPO "|" D_CMND_IMPULSE_MOTION_TEMPO "|" D_CMND_IMPULSE_TIMEZONE "|" D_CMND_IMPULSE_START_HOUR "|" D_CMND_IMPULSE_START_MIN "|" D_CMND_IMPULSE_STOP_HOUR "|" D_CMND_IMPULSE_STOP_MIN;
 
 // time slot structure
 struct timeslot {
@@ -327,6 +327,18 @@ uint32_t ImpulseMotionGetTempo (bool inMs)
   return tempo;
 }
 
+// set timezone
+void ImpulseSetTimezone (int timezone)
+{
+  Settings.xxxx = timezone;
+}
+
+// get timezone
+int ImpulseGetTimezone ()
+{
+  return Settings.xxxx;
+}
+
 // Show JSON status (for MQTT)
 void ImpulseShowJSON (bool append)
 {
@@ -417,6 +429,9 @@ bool ImpulseCommand ()
       break;
     case CMND_IMPULSE_WINDOW:     // set motion detector active window
       ImpulseMotionSetWindow (XdrvMailbox.data);
+      break;
+    case CMND_IMPULSE_BUTTON_TIMEZONE:  // set timezone
+      ImpulseSetTimezone (XdrvMailbox.payload);
       break;
     default:
       serviced = false;
@@ -585,8 +600,9 @@ void ImpulseWebConfigButton ()
 void ImpulseWebPage ()
 {
   bool     updated = false;
-  uint8_t  bmode, mmode, btempo, mtempo;
   bool     bpressed, mdetected;
+  uint8_t  bmode, mmode, btempo, mtempo;
+  int      timezone;
   timeslot window;
   char     argument[IMPULSE_LABEL_BUFFER_SIZE];
 
@@ -625,6 +641,14 @@ void ImpulseWebPage ()
     updated = true;
   }
 
+  // get timezone according to 'tz' parameter
+  if (WebServer->hasArg(D_CMND_IMPULSE_TIMEZONE))
+  {
+    WebGetArg (D_CMND_IMPULSE_TIMEZONE, argument, IMPULSE_LABEL_BUFFER_SIZE);
+    ImpulseSetTempo ((int) atoi (argument)); 
+    updated = true;
+  }
+
   // get motion detector active window according to 'window' parameters
   if (WebServer->hasArg(D_CMND_IMPULSE_START_HOUR))
   {
@@ -658,6 +682,7 @@ void ImpulseWebPage ()
   mtempo    = ImpulseMotionGetTempo (false);
   mdetected = ImpulseMotionIsDetected ();
   mwindow   = ImpulseMotionGetWindow ();
+  timezone  = ImpulseGetTimezone ();
   
   // beginning of form
   WSContentStart_P (D_IMPULSE_CONFIGURE);
@@ -666,8 +691,8 @@ void ImpulseWebPage ()
   // form
   WSContentSend_P (PSTR ("<fieldset><legend><b>&nbsp;%s&nbsp;</b></legend><form method='get' action='%s'>"), D_IMPULSE_PARAMETERS, D_PAGE_IMPULSE);
 
-  // duration
-  WSContentSend_P (PSTR ("<p><b>%s</b><br/><input type='number' name='%s' min='0' step='1' value='%d'></p>"), D_IMPULSE_DURATION, D_CMND_IMPULSE_DURATION, duration);
+  // timezone
+  WSContentSend_P (PSTR ("<p><b>%s</b><br/><input type='number' name='%s' min='-12' max='12' step='1' value='%d'></p>"), D_IMPULSE_TIMEZONE, D_CMND_IMPULSE_TIMEZONE, timezone);
 
   // push button mode
   WSContentSend_P (PSTR ("<p><b>%s</b>"), D_IMPULSE_BUTTON);
@@ -700,8 +725,10 @@ void ImpulseWebPage ()
   WSContentSend_P (PSTR (" %s "), D_IMPULSE_UNTIL);
   WSContentSend_P (PSTR ("<input type='number' name='%s' style='width:10%%;' min='0' max='%d' step='1' value='%d'> h "), D_CMND_IMPULSE_STOP_HOUR, 23, mwindow.stop_hour);
   WSContentSend_P (PSTR ("<input type='number' name='%s' style='width:10%%;' min='0' max='%d' step='1' value='%d'>"), D_CMND_IMPULSE_STOP_MIN, 59, mwindow.stop_minute);
-  
   WSContentSend_P (PSTR ("</p>"));
+
+  // motion detector tempo
+  WSContentSend_P (PSTR ("<p><b>%s</b><br/><input type='number' name='%s' min='0' step='1' value='%d'></p>"), D_IMPULSE_MOTION_TEMPO, D_CMND_IMPULSE_MOTION_TEMPO, mtempo);
 
   // end of form
   WSContentSend_P(HTTP_FORM_END);
