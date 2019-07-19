@@ -67,13 +67,13 @@
 #define IMPULSE_MESSAGE_BUFFER_SIZE      64
 
 // impulse icon coded in base64
-const char strIcon0[] PROGMEM = "iVBORw0KGgoAAAANSUhEUgAAAFMAAAAgCAMAAABZ2rRdAAAKu3pUWHRSYXcgcHJvZmlsZSB0eXBlIGV4aWYAAHjarZhrkuwqroX/M4oegnnDcACJiDuDHn5/wq6s566z+0ZnVqUzbQxCS1pastN//992/+IVfUou5dpKL+XilXrqYfClXffrPvornc/zyvG55j+fd+E5fwVO2aBnYNFn/OB8fr+hpuf8/Hze1fXM056JngtvE0Zb2VZ7xrVnohju8/757fpz30gftvP89/qce659/Z0qzpDMfDG4oNHHi8+zSsSC2OPgWM9nZ9B1zoSYz2f92Xfu9fWL80r42XfXeEbEz65wV3kGlC8+es77/LPvjoc+WuTfvobPF3DyvD6+Pvhub2l76727kQqeKu7Z1PVMcb4xkElSPLcV3pX/zPd63p13Y4sLxAQ0J+/lfPcBb2+fvPjht9dzXH5hYgoaKscQVojnXIs19LAOKMnefocKGOJiA4kFapHT4WWLP+v2s97yjZXFMzJ4JvPc8e3tfjr5/3m/JtrbQtd7c2YJx1fYFSwIMMOQs09GAYjfj0/z8e95uxes7y8DNoJgPm5ubHBc855iZv8eW/HgHBmXr+SecPdVnglwEWtnjPHQg7+Kj9kXf9UQqvf4sYHPwPIQU5gg4HMO4t0GmxgL4LRga3NP9WdsyOE+DbUARI6FtGmWLoCVUiZ+amrE0MgxJ5dzLrnmlnseJZZUcimlFuOo";
-const char strIcon1[] PROGMEM = "UWNNNddSa22119FiSy230mprrbfRQ49QWO6lV9db730MFh1MPbh7MGKMGWacaeZZZp1t9jkW4bPSyqusutrqa0iQKKS/FKlOmnQZ6pVQ0qRZi1Zt2nVsYm3HnXbeZdfddt/jhdqD6mfU/BfkfkfNP6gZYumMq++ocbrWtym80Uk2zEAsJA/i1RAgoINhdjW4PhhyhtnVA0mRA6j5bOCIN8RAMKkPefsXdu/I/Yqby+m/wi38CTln0P0vkHMG3YPcd9x+QE3GqSjxAGRZaD694obYGKBthDasJv183OnaDeBI1hBLtvlqG5X7Vg9zbZ3irqjBBuyFWYXBWUPfm3qRBvb8Mvvno/t+QQmZeq/OlC1GFlzJfmubbUxYVu2XDcKAZ5B7Rr3G/JUF2iBVSHlxTHsASHG5+jFSHbBEugrssVojgoKnMojmXveUjg/GUJ1dr7an75ObrjIiJsHHVUSrA7LgZWsq0c9ayyr8KcCW6ncFMttsIhwEz7WU6krTtpTCLkPsWyMN6nabalD3IvqVgN7D15mL8S6BdoZ1ZlplhFlAyXvqzAFHLqycnEJGsMRySSDiq7XdusGZVfJZ0WTFcXAo7YpA/Tv807UNy06bZuWK23I1exvpIWVqxjLPpkrpfsdWSuxLl9+iW8IkDl82uu9GJqGOwNN5xn+09Wz+OM5x7c1vt9e4hNsu3yTlsva7+5jgcaDlyHEhDnwzyllx/WwSw15GFQW5KbCGwCVb";
-const char strIcon2[] PROGMEM = "AbRImgo5dPUliTSdbTUVx9675PQXgfh7xLsTzrtkqZNNyDi7jnWFAhusZXwAD1TzOSuKX1U14uhWJMbluQMnEqxup7gJ1LZksvGyo/GM6p6EpIisA+KFp3Hb6uJTNvmZvx3d+eInLqPkT/AfyQLr6hD/HcGETZJNnkBinhFNakqrT+guD0VlxtGpa1i5YDuDJXhLLZznDQA4RXLcpQIHpMbWt+yZtsLvyO2pDR21yCO1nKNkHzg9P6adZ1zjIyrpF8mzOI7F3dSelJM0cdmNX+9zn29kywDPnkqU1u4terOI6GhClJWUOb32dTMSObHK9KDn0to1W2qMilpcHZ2xEjfK8gVUFDLnVRsau2QuLah0sUmLUIsJpp1elxHbB5PgATOl3ku+LdjVCAQ1tjNbBNAziYX0tdqWckBxU8VYxDI8sOPc+tcN+Tf3HOdY5cc9fjQqnoRcE6V8kP27ZXIJsbdz7OTlsIDZFrYorzIvGaKlafBJZu9BZ1xoWNyjM9N9EGATLClH20K1EXVZAlvoq1JG8o8x93bMQnGi4AX2SPRR/mRQIFkgpNKBmIxviHKjayRFbZrYPyagCUZWv8FmUlMDOdC6YE4I1BMogrqdHAE3UtNxWcKPUA1c0gsRICXN0TWICu7zCBBFOOwwrJHwnZ3GdXnorw4YwRHkSfdVxHKPJEjRQ5x1Wimg3g9KtO62PA0icGq2SJZIl+fJ3SW164lYaET7pEChFqAGOrKF";
-const char strIcon3[] PROGMEM = "yqBi5UhFmfyhkPoUVNHVW8NOZdO6KVA4e6FiBjUazdtcXEjAPk0v6bpIKZJtIFO0yp897qeoETVabh36zctdVmWRLjr6npGkJYOph8SdUCYiqbvGXjfVfsxq4/qPeQ35/5Da5PXJ1t4Xa154FWnj/SwXpSYao4VxuNJn84+FhFtqgV2o2ScNN4xD9qjnJ863PIjceQi1NmHnso8yzWQ3CcptMDZp6O4d2gaXxSRLs8m4IdW8Ih6tRUavkObKBRNz6kg/4tYMIRVIxdmoneKsAs1hXf82P2br5O9jXU/0H8K4w59FTwKA4Z0Cf5MiaZNqIS9kJSFAGtP5ECRzd3infS40c7gIYUAkRKUUonJNQiwgzCXmvRQVWdKyCSrSrlDCKyVgr0FtGIcyjLp1FlCLtc2wfYH/2sxEI/CgklApzYQAbVTrVypq4hypTPRrDGK1J9nwUeCnKsPhzNmoElqKhRCFAIKGgykQlNPb7LQvdDbynPXQztQVP1udCfK9Sk9JNHVXSaGSMTkfjWFSYYHyJLlCI0kqDV5DqKFU95XJ+6xYU1GqHe2uc+MTiuRFl02rDicP0zV7UFtxpLRrkvCCQo8KadZKiq0laBo56yVbTz+i7N7hfsGeomImwl2y5px8p0UO9RRz8wv24i5EkfaolgLw1hhOThGNuCzOxvJzKjKntzyJCmI6UEDhG1U6AyOZkMmksAKik+7Bz05sQEi0ojV56Gv2ga0DAgKYKDP0";
-const char strIcon4[] PROGMEM = "i0y9KH7DHmOgDVQilcvow0g9TegWNXvk9mp1uSOL8i2+ocF11AhRdJdAmOFE9u40dP7WTrnSyiDN5pE0yCSyUi83qGi59PdiY49O/CauyWWF7G59b8rCpuk4gLwMgc+39Y5CIrLPvPeCn5c7i2GfXq/V3ir/s1pjJ8jBdS1xCEoiehCPxArhHqswq4IKvwq0PcwCb52fiVjwOIaP+0Bk01xN+iBHjEXCHD42bC9o2Ro9yJ+S1M5TI9NgqDXawkYW+bUn06QcLDwQmjAloWbP2JAJln56cx4bNyzoAYDldACz3WI4tN+uOwagywOZl8dLPMCd3/3E3Uf7/rxNd/aZ/sEWlor/sJR71qKEIntwmgRrwSLhbylQ0Tmkd5nWPTDbKPSwjbrCkuTGRYHMkjcJ7QLQo5vJDXo0GvGFOyH2v9Hda66CEDUoanOV0rIvcgjFB/oJ8K3ZKIwjSkgJpEcacklGGlu2isUsYUn5KtagXTT3Y6uDLPOs1lqaAuvBN+ChdZyo9xDt0Rg5uGj6yU2qKDVz2GMBeCemPWmrMMqeZDu16PDmipokJtqvQPIXyk5PZCFlL3Lvpqm0vs2ecdjOMPrL0f3pwnNEnJ1+3vLs6eetDwgnXV49/U6X+70z/PMKX4/umwnzFpy3DYOsg1kGNYXPoEg0wmuaYL8fOjwDbGtnjM1zj/p7Gz4f3bsb/vxY4y+eaLC1X/q8r48tvj61+H0ivCNIRPcfmGaIROpz";
-const char strIcon5[] PROGMEM = "A6MAAAJbUExURXAQfP////7+/v39/fPz8+Hh4fLy8uLi4vz8/Kurqzc3N/v7+6mpqTg4OPr6+vj4+KioqDY2Nvf39zs7O6ysrDo6OsXFxYmJiYqKioeHh5OTk1xcXB4eHpSUlJ6ensrKyoWFhT09PV5eXltbW09PT1BQUFFRUVdXV2BgYFJSUkxMTA4ODunp6bOzsw8PD+vr61NTU4uLi/b29iEhIebm5pubm0JCQoaGhvHx8R0dHeXl5TExMXl5eQ0NDc3NzaCgoGlpaUZGRoSEhHx8fH5+fnJycq+vrygoKLe3t7W1tQoKCmVlZVpaWuPj4xISEszMzK2trTMzM4CAgCcnJ8LCwvX19e/v7xQUFO3t7SsrKxkZGRcXFxsbGyAgILi4uBAQEAAAAOrq6ujo6La2tsvLy6SkpKqqqmdnZ0hISCYmJrm5ubKystnZ2QwMDC8vL4iIiPn5+fT09Nzc3Hh4eN7e3uTk5Ofn59ra2mJiYiIiIh8fHxYWFgsLC+zs7C0tLaampjU1Nd3d3Tk5OcfHx319ff7///v9//3+//X7//7+//j8//n9/+z3//z+/4jP/yip/+Lz/2/G//T6/9jv/+74/2nD/8Xo/063/8zq/8Hn/5bU/061/6bc/8fp/0Cz/8rp/128/7zl/6vd/3jH/9zx/4LN/5fV/2fC/xWb/zqv/2LB/2K8/wGT/wyd/1u9/1i7/wCS/3PE/6fc/wic/4PN/5LT/0S0";
-const char strIcon6[] PROGMEM = "/4nQ/1C5/0a1/1i8/3zK/1a7/4vR//f8/+j2/+n2//L6//r9//D5/+b1/+/5//n8//b7/+34/1gr3N8AAAABdFJOUwBA5thmAAAAAWJLR0QAiAUdSAAAAAlwSFlzAAAOvwAADr8BOAVTJAAAAAd0SU1FB+MHCQcZHBlis8QAAADFSURBVEjHY2DAChISGIgEoypHVQ5ZlQl4AU5tQXjMTRARQwLNzcg8MfsEstyaUMTHgQsw2yWQ5f2EImZGBGCCm8cE4lHDTKYcOVMosGMiZGZCggAxZjLX2zWWQEAYEWYyEGVmqg4HMwQg+R2RAiAsQ0KJCc3MRCbk0MVuJgMVzCQ5zdPMTGgYMnOTYmYQXjP5PFMhoL5Ynzru5GBkEjKCAiEUI8k2M4clFAGMjEKRQTOZZmYgF0NaqKVScMJo6T2qcrioBADiRnaLCHmwugAAAABJRU5ErkJggg==";
+const char strIcon0[] PROGMEM = "iVBORw0KGgoAAAANSUhEUgAAAEAAAAAgCAMAAACVQ462AAAK4XpUWHRSYXcgcHJvZmlsZSB0eXBlIGV4aWYAAHjarZlpdjM5b4X/cxVZQnEml8PxnOwgy88DsCTLtuSv0ydSv64SySIB3Iup2qz/+e9t/ouPTzWYEHNJNaWLT6ihusZNuc7nXO0V9K9+wj3F72/jxj0mHEOeqz8/07rXN8bj1wP53sn27+Mmj3ufcm90Tzw29HKynHavK/dG3p1xe/829X6uhRd17n81X9/0+fk7ZIwxI/t5Z9zy1l/8LXKKRwJffeOa+cs9iy5fuHc6br17bzvzvP1hvPLBdle7V/jvpjBXuhekHza6x218bzu10KtE9nHrvk/Ecs3r9fNiu71n2Xsd7VpIWCqZW6nr3kLvWNgxpdfHEt/Mv8h91m/lW1BxgNgEzc53GFutw9rbBjtts9suvQ47EDG45TJX54bzOlZ8dtUNBSXI126XgWEaEHF+gJpn2D1lsXpu1fOGFTWnZaWzbAZyv7/m3eC/+T432luoa60YsxxbIZcT1iCGICd/WQUgdt82jWpf/ZonrF8fAdaDYFQzFxRsVz9b9Gi/uOUVZ8+6eAVz093meW+AiTg7Ioz1IHAl66NN9srOZWuxYwGfhuTOB9dBwMbopjUbbLxPgFOcnM0z2epaF90ZJrQARPQJtyniKIAVQoQ/ORQ41KKPwcQYU8yxxBpb8imkmFLKSWJUyz6HHHPK";
+const char strIcon1[] PROGMEM = "OZdccyu+hBJLKrmUUkurrnpCWKypZlNLrbU1Dm1s3Xi6saK17rrvoceeeu6l194G9BlhxJFGHmXU0aabfuL+M81sZpl1tmUXVFphxZVWXmXV1TZc236HHXfaeZddd3uidqP6HTX7A7m/UbM3aoJY0HX5CzWGc35sYSWcRMEMxFywIJ4FAQjtBLOr2BCcICeYXdXhFNGBmo0CzrSCGAiGZV3c9ondF3J/4mZi+D/h5j4hZwS6/w/kjEB3I/cbtzeozaYZxStA4oVi08tvAtvOqbnSXIf+l97htM/rvgIPx7xXioTFntnsuiYWWzvHddXdg7DCjI5LJ05luodEiCrZzuF3SvoIShNV58ys6jF37orLa0x9AsAkhLESidbkkdzBbFg3h4rS0hvh/ryaXxN+WMSpHFhr8gizupydyrS7e3QcY2wdkYkeW1HVzS/dwy23Ss2IyC1CizFinui+lgrdCOl6I/m+mcfNufanOGKdp0CI87TOdCqhdyNjHWy3SBZhm2QH3rFnbR3hUlaj5yg4zy9g3qnURbTYr9AzZjHIUkt5kfFfXfdlPrDkk6U+KG63+ZKafdNBCLkbxrBQOggx5NxW6mEn8+XerNWg6/GtbRDoBvANd9tueK+tCLanyxMZYt341GqxExH8YItl5WHDkJMHB9upKdtz7kzphEjbGmzfu4QMLPXI7qzOxVWMivo1JzOMxFXjrFE2QZ59dDmaiB4q8TngoaZ51VPU7LOy";
+const char strIcon2[] PROGMEM = "qbWLB4+So8CJmVVQGcY2MqHDbJibW8NXE+1SYJRn0VU0iuGwKcZMfLCuLyeAEIr2GqwqVU0O53DwMRVD0tH2OS8IyaJGPdn93A1zhioLrkIkInKxfeC41Se+6Gc5D7/KZUQwN4haSUxMqlB1Ssyg03Qz6zhkXsCZxRwEuxXTEAtwfBorZ6aCaWv3P1DyZDzl2OgPsQg8fdqf8pojsCXhkBIKzwwvQk2CN4Ek6gNritnOBGroFKrJJFNxiZ3MOzvI098HjxSc9pEQ5jcj/h0hzG9G/EmIY5s7Jr1Mdsqa3L2wxDMXThKol5q78cuPPXBloqxuQepe8GWdVJH3BWHKFohMKr1fsuskqUZL3q21yFXanv9wtQu22d6HJ4zsqz7O2i0Rk9F0y2Gju7m7kCcvzkWb3JVpPv5imk94/wvViFNPqrUn1WBaIiARegnKk1B9xRe/6eP4Daip61AUTGSEEJQC2/UkG8qSlDEeARIzA8eL183wzesMbncyan54nbLm1e+KVc8pyo6uQHSNYWzrxUt3wkZeAFw4MQbZbE0FUqg1dl6dJFJVDHvYo2rME2xrzw8tmmiRzK2GkN0/1XBhrZFmrHZc+30m29RmiLVig5V7JgN2+VNKlNpJOc7DbNjx6QzfOy6uTHH2iygQsvNBI5y8+py45BFJIyvkQcllxQBilYQtYASNARNZ0kQtWVyRsxDfFAnnytRFdalynYDOubP0AE+F83AIhvnblXrE";
+const char strIcon3[] PROGMEM = "xmwcpj5hj/dL2Lt0tXTkU0II2m7nT1bxQk6KXvzumsdl9SDKPFzhuaF57HiHKx1HfDlKhvUUylM45cbuiVpnS8b3ScwZ26J9ZDzjtJlKMlD4nTq/DwitJUWXEr/xYKe0lGTc9bjEIqn2ULXiLN5jMMJhNVVS2lyKDuCh5HSKRKRADlbewbjP0fEZOKf5GVLbEq4PTflaLX2K5yxIdQ700VrG/LWYCHHhXKdG+6OAkDiq8L9NyOTsC1ErxVaQJoMwOmjOcYqdDiARZEcVWCjaDe2Br5COZE/IYGkcNn/5qFTaQCDOoB7aIKjEyOOgjZDj1UGnqQM2JqkZ1qQrmP80Rf/M0OaECodrYH0pIounQBbZK2GsS05iKTLHfUIHzgElOs4kHpkINnnjuWxE3HDYqUvEwOyIjKHFIGhPW0HVv0RAnq1KxAMFOuEFTLreURjUrgCIf3Qc0BdjDdwLVSXMpbeBxfyOLE0eHhkna1Lyeh9Koi8MdGLcS3bD2wriyiq2QHpMaWiRV+p4vG04DdZ8TpFupqNkpElG4bRaiydnnJ8/uhEjN68+88NlSHcudUDQfk3VkaKgj+MJ8tZyt3C3EFMiw4O3p7lqEpOFtxpWelLaytSZ0GGpvpOW/y0myhqFXP1SKu6pAaTeoW5KAtAEjHkvQC/x01rzXHxNOE08lt5DGH23drTWAoTEvZ604NEJHRZWnYDYk9G2x4ZGSUL9/+j6vFCrakZ9UEu3xXfy";
+const char strIcon4[] PROGMEM = "g1xJSEGgV3INjZApfrFL8s9rhgfGlwx/ysAu3nxSfJKMKineNFpv/K5Dc6km3yamdO1xLcTT8ueYmXMLjlO2190l+BMDUpoTjHO3gw1hAKGpTVEBFp6WpnxuUXOnuTcC5iP/LcL9ab5/9N70gFuSGYeHrSEF8vo+RBbiQ5rkNa9BNtBnNdLQHNMJctsJwqMOSiJyAotWpSaQWODujJOrKilBQ5hg3gbz/Ls8LimLzYezWiJKBNAiUepH7deWPWmvKZMp144xcY6avu/693HmnEc5qDsVpdnUzUjr9q6VWps7lwv69HXzadAWjLsnuMiFxmvOwGca9dppJvzvfII3OE+iPK3hFlezQchI6NYqb5s5q+RWcC47iC+nUag/KD0Jz5KNYyCm+flq2B+KKl0NxXf9WXxHTbiXvHkYhwLvV1kt66uW9eZbXf/j+ceit7X/j43N8/wq0W1rdBMXecY3yKy54K1acVwkQfqcYsR9pAXXcsWKk9NRVM2enUod15HClT6BDNukkJo5v9YY/Cf/cySax83b69dble+V6JvXVEbeU9n3HlY+vHrx0gnA5xPJoo0hFJXobdvy+RWPFDS/86B5vFSp5Oyylv38iue8W/r05s0Qbq+a1rGKt9c/7LB+Xc2z9Xq+CPxnlgo/FDc/gKinqj1Siw9GMQaVzqh3YoKS7g3KN/xfbybxqHG3nSIUIn3Z5108Bzv60Q4h37+5ekLz6d1bcLO42O9mZATz";
+const char strIcon5[] PROGMEM = "iYv/9PqgifnNk4/Wsp+UFzzMU3KVWzj1lrpV3qiY/wXNfgLLEqQDdQAAAltQTFRFIW4C/////v7+/f398/Pz4eHh8vLy4uLi/Pz8q6urNzc3+/v7qampODg4+vr6+Pj4qKioNjY29/f3Ozs7rKysOjo6xcXFiYmJioqKh4eHk5OTXFxcHh4elJSUnp6eysrKhYWFPT09Xl5eW1tbT09PUFBQUVFRV1dXYGBgUlJSTExMDg4O6enps7OzDw8P6+vrU1NTi4uL9vb2ISEh5ubmm5ubQkJChoaG8fHxHR0d5eXlMTExeXl5DQ0Nzc3NoKCgaWlpRkZGhISEfHx8fn5+cnJyr6+vKCgot7e3tbW1CgoKZWVlWlpa4+PjEhISzMzMra2tMzMzgICAJycnwsLC9fX17+/vFBQU7e3tKysrGRkZFxcXGxsbICAguLi4EBAQAAAA6urq6Ojotra2y8vLpKSkqqqqZ2dnSEhIJiYmubm5srKy2dnZDAwMLy8viIiI+fn59PT03NzceHh43t7e5OTk5+fn2traYmJiIiIiHx8fFhYWCwsL7OzsLS0tpqamNTU13d3dOTk5x8fHfX19/v//+/3//f7/9fv//v7/+Pz/+f3/7Pf//P7/iM//KKn/4vP/b8b/9Pr/2O//7vj/acP/xej/Trf/zOr/wef/ltT/TrX/ptz/x+n/QLP/yun/Xbz/vOX/q93/eMf/3PH/gs3/l9X/Z8L/FZv/Oq//";
+const char strIcon6[] PROGMEM = "YsH/Yrz/AZP/DJ3/W73/WLv/AJL/c8T/p9z/CJz/g83/ktP/RLT/idD/ULn/RrX/WLz/fMr/Vrv/i9H/9/z/6Pb/6fb/8vr/+v3/8Pn/5vX/7/n/+fz/9vv/7fj/UfUfIQAAAAF0Uk5TAEDm2GYAAAABYktHRACIBR1IAAAACXBIWXMAAA6/AAAOvwE4BVMkAAAAB3RJTUUH4wcTBh0MXt+7aAAAAMJJREFUSMdjYEAFCQkMRAIcKkcNGLEGJOAFOA0IghmSICKGBJqbkXli9gmEXZFQxMeBCzDbJRD2RUIRMyMCMME1M4F4JBvAlCNnCgV2TIQMSEgQwDCAud6usQQCwogwgAHTgFQdDmYIQPICIj4gLEOUeEQzIJEJOUSwG8BAqgH4ExJ1DID6m5mbFAOCEAbweaZCQH2xPhku4GBkEjKCAiEU/cQZkMMSigBGRqHIoJkYAzKQM58Wal4MThgt0kYNIMYAAFqRdovyYmCAAAAAAElFTkSuQmCC";
 const char *const arrIconBase64[] PROGMEM = {strIcon0, strIcon1, strIcon2, strIcon3, strIcon4, strIcon5, strIcon6};
 
 // impulse enumerations
@@ -108,8 +108,6 @@ void ImpulseMotionSetWindow (char* strWindow)
   char* arr_token[4];
   uint32_t time_setting;
   timeslot time_slot;
-
-  AddLog_P(LOG_LEVEL_INFO, "ImpulseMotionSetWindow : ", strWindow);
 
   // split string into array of values
   token = strtok (strWindow, ":");
@@ -173,8 +171,6 @@ struct timeslot ImpulseMotionGetWindow ()
   // read start minute
   div_result = div (slot_value, 100);
   slot_result.stop_minute = div_result.rem;
-
-  AddLog_P(LOG_LEVEL_INFO, "ImpulseMotionGetWindow : ");
 
   return slot_result;
 }
@@ -365,7 +361,7 @@ void ImpulseShowJSON (bool append)
   snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_IMPULSE_MODE "\":%d,"), mqtt_data, mmode);
   snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_IMPULSE_TEMPO "\":%d,"), mqtt_data, mtempo);
   snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_IMPULSE_DETECTED "\":%d,"), mqtt_data, mdetected);
-  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_IMPULSE_WINDOW "\":\"%2d:%2d-%2d:%2d\"}}"), mqtt_data, mwindow.start_hour, mwindow.start_minute, mwindow.stop_hour, mwindow.stop_minute);
+  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_IMPULSE_WINDOW "\":\"%02d:%02d-%02d:%02d\"}}"), mqtt_data, mwindow.start_hour, mwindow.start_minute, mwindow.stop_hour, mwindow.stop_minute);
 
   // if not in append mode, publish message 
   if (append == false)
@@ -556,7 +552,6 @@ void ImpulseWebConfigButton ()
 // impulse switch web configuration page
 void ImpulseWebPage ()
 {
-  bool     updated = false;
   bool     bpressed, mdetected;
   uint8_t  bmode, mmode, btempo, mtempo;
   timeslot mwindow;
@@ -571,23 +566,20 @@ void ImpulseWebPage ()
   {
     WebGetArg (D_CMND_IMPULSE_BUTTON, argument, IMPULSE_LABEL_BUFFER_SIZE);
     ImpulseButtonSetMode (atoi (argument)); 
-    updated = true;
-  }
+   }
 
   // get motion detector mode according to 'motion' parameter
   if (WebServer->hasArg(D_CMND_IMPULSE_MOTION))
   {
     WebGetArg (D_CMND_IMPULSE_MOTION, argument, IMPULSE_LABEL_BUFFER_SIZE);
     ImpulseMotionSetMode (atoi (argument)); 
-    updated = true;
-  }
+   }
 
   // get motion detector tempo according to 'mtempo' parameter
   if (WebServer->hasArg(D_CMND_IMPULSE_MOTION_TEMPO))
   {
     WebGetArg (D_CMND_IMPULSE_MOTION_TEMPO, argument, IMPULSE_LABEL_BUFFER_SIZE);
     ImpulseMotionSetTempo ((uint8_t) atoi (argument)); 
-    updated = true;
   }
 
   // get push button tempo according to 'btempo' parameter
@@ -595,8 +587,7 @@ void ImpulseWebPage ()
   {
     WebGetArg (D_CMND_IMPULSE_BUTTON_TEMPO, argument, IMPULSE_LABEL_BUFFER_SIZE);
     ImpulseButtonSetTempo ((uint8_t) atoi (argument)); 
-    updated = true;
-  }
+   }
 
   // get motion detector active window according to 'window' parameters
   if (WebServer->hasArg(D_CMND_IMPULSE_START))
@@ -606,24 +597,16 @@ void ImpulseWebPage ()
     strcat (window, "-");
     WebGetArg (D_CMND_IMPULSE_STOP, argument, IMPULSE_LABEL_BUFFER_SIZE);
     strcat (window, argument);
-   
+    AddLog_P(LOG_LEVEL_INFO, window);
     ImpulseMotionSetWindow (window); 
-    updated = true;
-  }
+   }
 
-  // if parameters updated, back to main page
-  if (updated == true)
-  {
-    WebServer->sendHeader ("Location", "/", true);
-    WebServer->send ( 302, "text/plain", "");
-  }
-  
   // collect data
   bmode     = ImpulseButtonGetMode ();
-  btempo    = ImpulseButtonGetTempo (false);
-  bpressed  = ImpulseButtonIsPressed ();
   mmode     = ImpulseMotionGetMode ();
+  btempo    = ImpulseButtonGetTempo (false);
   mtempo    = ImpulseMotionGetTempo (false);
+  bpressed  = ImpulseButtonIsPressed ();
   mdetected = ImpulseMotionIsDetected ();
   mwindow   = ImpulseMotionGetWindow ();
   
@@ -632,7 +615,7 @@ void ImpulseWebPage ()
   WSContentSendStyle ();
 
   // form
-  WSContentSend_P (PSTR ("<fieldset><legend><b>&nbsp;%s&nbsp;</b></legend><form method='get' action='%s'>"), D_IMPULSE_BUTTON, D_PAGE_IMPULSE);
+  WSContentSend_P (PSTR ("<fieldset><legend><b>&nbsp;%s&nbsp;</b></legend><form method='get' action='%s'>"), D_IMPULSE_PARAMETERS, D_PAGE_IMPULSE);
 
   // push button mode
   WSContentSend_P (PSTR ("<p><b>%s</b></p>"), D_IMPULSE_BUTTON);
@@ -645,7 +628,7 @@ void ImpulseWebPage ()
 
   // push button tempo
   WSContentSend_P (PSTR ("<p>%s <i>(mn)</i></p>"), D_IMPULSE_BUTTON_TEMPO);
-  WSContentSend_P (PSTR ("<p><input type='number' name='%s' min='0' max='255' step='1' value='%d'></p>"), D_CMND_IMPULSE_BUTTON_TEMPO, btempo);
+  WSContentSend_P (PSTR ("<p><input type='number' name='%s' style='width:100px;' min='0' max='255' step='1' value='%d'></p>"), D_CMND_IMPULSE_BUTTON_TEMPO, btempo);
 
   // motion detector input
   WSContentSend_P (PSTR ("<p><b>%s</b></p>"), D_IMPULSE_MOTION);
@@ -665,7 +648,7 @@ void ImpulseWebPage ()
 
   // motion detector tempo
   WSContentSend_P (PSTR ("<p>%s <i>(sec)</i></p>"), D_IMPULSE_MOTION_TEMPO);
-  WSContentSend_P (PSTR ("<p><input type='number' name='%s' min='0' max='255' step='1' value='%d'></p>"),  D_CMND_IMPULSE_MOTION_TEMPO, mtempo);
+  WSContentSend_P (PSTR ("<p><input type='number' name='%s' style='width:100px;' min='0' max='255' step='1' value='%d'></p>"),  D_CMND_IMPULSE_MOTION_TEMPO, mtempo);
 
   // end of form
   WSContentSend_P(HTTP_FORM_END);
