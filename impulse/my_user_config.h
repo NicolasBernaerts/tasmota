@@ -2,12 +2,10 @@
   my_user_config.h - user specific configuration for Sonoff-Tasmota
 
   Copyright (C) 2019  Nicolas Bernaerts
-    12/04/2019 - v1.0 - Creation
-    16/05/2019 - v1.1 - Save settings in weight... variables
+    09/07/2019 - v1.0 - Creation
 
-  Configuration has been optimised for VMC control
+  Configuration has been optimised for Impulse switch control
   All un-needed modules have been removed
-  Default humidity sensor is DHT based
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -171,7 +169,7 @@
 #define LONGITUDE              2.294442          // [Longitude] Your location to be used with sunrise and sunset
 
 // -- Application ---------------------------------
-#define APP_TIMEZONE           99                // [Timezone] +1 hour (Amsterdam) (-13 .. 14 = hours from UTC, 99 = use TIME_DST/TIME_STD)
+#define APP_TIMEZONE           99                 // [Timezone] +1 hour (Amsterdam) (-13 .. 14 = hours from UTC, 99 = use TIME_DST/TIME_STD)
 #define APP_LEDSTATE           LED_POWER         // [LedState] Function of led
                                                  //   (LED_OFF, LED_POWER, LED_MQTTSUB, LED_POWER_MQTTSUB, LED_MQTTPUB, LED_POWER_MQTTPUB, LED_MQTT, LED_POWER_MQTT)
 #define APP_PULSETIME          0                 // [PulseTime] Time in 0.1 Sec to turn off power for relay 1 (0 = disabled)
@@ -461,9 +459,9 @@
 #undef USE_EMULATION                          // Disable Wemo or Hue emulation
 #undef USE_CUSTOM                             // Disable Custom features
 #undef USE_DISCOVERY                          // Disable Discovery services for both MQTT and web server
-#undef USE_TIMERS                             // Disable support for up to 16 timers
-#undef USE_TIMERS_WEB                         // Disable support for timer webpage
-#undef USE_SUNRISE                            // Disable support for Sunrise and sunset tools
+//#undef USE_TIMERS                             // Disable support for up to 16 timers
+//#undef USE_TIMERS_WEB                         // Disable support for timer webpage
+//#undef USE_SUNRISE                            // Disable support for Sunrise and sunset tools
 #undef USE_RULES                              // Disable support for rules
 #undef USE_I2C                                // Disable all I2C sensors and devices
 #undef USE_DHT                                // Disable internal DHT sensor
@@ -508,7 +506,7 @@
 #undef USE_DEBUG_DRIVER                       // Disable debug code
 
 #undef D_AUTHOR
-#define D_AUTHOR           "Theo Arends<br />Impulse switch release v1.0 by Nicolas Bernaerts"
+#define D_AUTHOR           "Theo Arends<br />Impulse switch release v1.1 by Nicolas Bernaerts"
 
 /*********************************************************************************************\
  * No user configurable items below
