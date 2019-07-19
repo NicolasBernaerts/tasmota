@@ -46,13 +46,11 @@
 #define D_CMND_IMPULSE_WINDOW            "window"
 #define D_CMND_IMPULSE_BUTTON_TEMPO      "btempo"
 #define D_CMND_IMPULSE_MOTION_TEMPO      "mtempo"
-#define D_CMND_IMPULSE_START_HOUR        "starthour"
-#define D_CMND_IMPULSE_START_MIN         "startmin"
-#define D_CMND_IMPULSE_STOP_HOUR         "stophour"
-#define D_CMND_IMPULSE_STOP_MIN          "stopmin"
+#define D_CMND_IMPULSE_START             "start"
+#define D_CMND_IMPULSE_STOP              "stop"
 
 #define D_JSON_IMPULSE                   "Impulse"
-#define D_JSON_IMPULSE_ENABLED           "Enabled"
+#define D_JSON_IMPULSE_MODE              "Mode"
 #define D_JSON_IMPULSE_STATE             "State"
 #define D_JSON_IMPULSE_RELAY             "Relay"
 #define D_JSON_IMPULSE_BUTTON            "Button"
@@ -62,10 +60,8 @@
 #define D_JSON_IMPULSE_TEMPO             "Tempo"
 #define D_JSON_IMPULSE_WINDOW            "Window"
 
-#define D_COLOR_GREY                     "grey"
 #define D_COLOR_GREEN                    "green"
 #define D_COLOR_RED                      "red"
-#define D_COLOR_BLACK                    "black"
 
 #define IMPULSE_LABEL_BUFFER_SIZE        16
 #define IMPULSE_MESSAGE_BUFFER_SIZE      64
@@ -84,8 +80,8 @@ const char *const arrIconBase64[] PROGMEM = {strIcon0, strIcon1, strIcon2, strIc
 enum ImpulseState { IMPULSE_DISABLE, IMPULSE_ENABLE, IMPULSE_WINDOW, IMPULSE_OFF, IMPULSE_ON };
 
 // impulse commands
-enum ImpulseCommands { CMND_IMPULSE_BUTTON, CMND_IMPULSE_MOTION, CMND_IMPULSE_WINDOW, CMND_IMPULSE_BUTTON_TEMPO, CMND_IMPULSE_MOTION_TEMPO, CMND_IMPULSE_START_HOUR, CMND_IMPULSE_START_MIN, CMND_IMPULSE_STOP_HOUR, CMND_IMPULSE_STOP_MIN };
-const char kImpulseCommands[] PROGMEM = D_CMND_IMPULSE_BUTTON "|" D_CMND_IMPULSE_MOTION "|" D_CMND_IMPULSE_WINDOW "|" D_CMND_IMPULSE_BUTTON_TEMPO "|" D_CMND_IMPULSE_MOTION_TEMPO "|" D_CMND_IMPULSE_START_HOUR "|" D_CMND_IMPULSE_START_MIN "|" D_CMND_IMPULSE_STOP_HOUR "|" D_CMND_IMPULSE_STOP_MIN;
+enum ImpulseCommands { CMND_IMPULSE_BUTTON, CMND_IMPULSE_MOTION, CMND_IMPULSE_WINDOW, CMND_IMPULSE_BUTTON_TEMPO, CMND_IMPULSE_MOTION_TEMPO, CMND_IMPULSE_START, CMND_IMPULSE_STOP };
+const char kImpulseCommands[] PROGMEM = D_CMND_IMPULSE_BUTTON "|" D_CMND_IMPULSE_MOTION "|" D_CMND_IMPULSE_WINDOW "|" D_CMND_IMPULSE_BUTTON_TEMPO "|" D_CMND_IMPULSE_MOTION_TEMPO "|" D_CMND_IMPULSE_START "|" D_CMND_IMPULSE_STOP;
 
 // time slot structure
 struct timeslot {
@@ -97,10 +93,10 @@ struct timeslot {
 };
 
 // variables
-uint8_t  impulse_button_status = IMPULSE_OFF;          // current state of push button
-uint8_t  impulse_motion_status = IMPULSE_OFF;          // current state of motion detector
-ulong    impulse_tempo_start = 0;                      // timestamp when tempo started
-ulong    impulse_tempo_delay = 0;                      // tempo delay (in ms)
+bool  impulse_button_pressed  = false;               // current state of push button
+bool  impulse_motion_detected = false;               // current state of motion detector
+ulong impulse_tempo_start     = 0;                   // timestamp when tempo started
+ulong impulse_tempo_delay     = 0;                   // tempo delay (in ms)
 
 /*********************************************************************************************/
 
@@ -112,7 +108,9 @@ void ImpulseMotionSetWindow (char* strWindow)
   char* arr_token[4];
   uint32_t time_setting;
   timeslot time_slot;
-  
+
+  AddLog_P(LOG_LEVEL_INFO, "ImpulseMotionSetWindow : ", strWindow);
+
   // split string into array of values
   token = strtok (strWindow, ":");
   if (token != NULL)
@@ -151,12 +149,9 @@ void ImpulseMotionSetWindow (char* strWindow)
 // get motion time slot data
 struct timeslot ImpulseMotionGetWindow ()
 {
+  uint32_t slot_value;
   div_t    div_result;
-  uint32_t slot_value = 0;
   timeslot slot_result;
-
-  // set time slot number
-  slot_result.number = slot_number;
 
   // read time slot raw data
   slot_value = Settings.timer[0].data;
@@ -178,6 +173,8 @@ struct timeslot ImpulseMotionGetWindow ()
   // read start minute
   div_result = div (slot_value, 100);
   slot_result.stop_minute = div_result.rem;
+
+  AddLog_P(LOG_LEVEL_INFO, "ImpulseMotionGetWindow : ");
 
   return slot_result;
 }
@@ -265,7 +262,7 @@ bool ImpulseMotionIsEnabled ()
   bool     result = false;
   timeslot slot_window;
   uint8_t  motion_mode;
-  uint32_t current_minute, start_minute, stop_minute;
+  uint32_t current_time, current_minute, start_minute, stop_minute;
   TIME_T   current_dst;
 
   // get motion detector mode
@@ -276,7 +273,8 @@ bool ImpulseMotionIsEnabled ()
   if (motion_mode == IMPULSE_WINDOW)
   {
     // get current DST time
-    BreakTime (daylight_saving_time, &current_dst);
+    current_time = LocalTime();
+    BreakTime (current_time, current_dst);
     current_minute = (current_dst.hour * 60) + current_dst.minute;
 
     // get current window start and stop
@@ -334,7 +332,7 @@ void ImpulseShowJSON (bool append)
 {
   uint8_t  relay, bmode, mmode, btempo, mtempo;
   bool     bpressed, mdetected;
-  timeslot window;
+  timeslot mwindow;
 
   // read relay state
   relay = bitRead (power, 0);
@@ -433,119 +431,91 @@ bool ImpulseCommand ()
 // update impulse switch relay states according to button and motion detector
 void ImpulseEvery250MSecond ()
 {
-  uint8_t new_button, new_motion;
-  bool    relay;
-  ulong tempo_now;
-  ulong tempo_duration;
-  ulong tempo_target;
+  bool  button_pressed, motion_detected, relay_on;
+  ulong tempo_now, tempo_left, tempo_delay;
 
-  // update current time
-  tempo_now = millis ();
+  // update temporisation
+  tempo_now  = millis ();
+  tempo_left = impulse_tempo_start + impulse_tempo_delay - tempo_now;
 
   // read relay, button and motion detector status
-  relay  = (bool) (bitRead (power, 0) == 1);
-  new_button = ImpulseButtonStatus ();
-  new_motion = ImpulseMotionStatus ();
+  relay_on        = (bool) (bitRead (power, 0) == 1);
+  button_pressed  = ImpulseButtonIsPressed ();
+  motion_detected = ImpulseMotionIsDetected ();
   
   // if relay is off and button has been triggered, switch relay on with timeout
-  if ((relay == false) && (new_button == BUTTON_PRESSED) && (impulse_button == BUTTON_NOT_PRESSED))
+  if ((relay_on == false) && (button_pressed == true) && (impulse_button_pressed == false))
   {
     // update status
-    impulse_button       = new_button;
-    impulse_tempo_start  = tempo_now;
-    impulse_tempo_motion = 0;
+    impulse_button_pressed = true;
+    impulse_tempo_start    = tempo_now;
+    impulse_tempo_delay    = ImpulseButtonGetTempo (true);
     
     // switch on relay
     ExecuteCommandPower (1, POWER_ON, SRC_IGNORE);
- 
-    AddLog_P(LOG_LEVEL_INFO, "relay is off and button has been triggered, switch relay on with timeout");
+    AddLog_P(LOG_LEVEL_INFO, "relay is off and button pressed, switch relay on");
   }
 
   // else, if relay is off and motion has been triggered, switch relay on with tempo
-  else if ((relay == false) && (new_motion == MOTION_DETECTED) && (impulse_motion == MOTION_NOT_DETECTED))
+  else if ((relay_on == false) && (motion_detected == true) && (impulse_motion_detected == false))
   {
     // motion detector state should change, with tempo reset
-    impulse_motion       = new_motion;
-    impulse_tempo_start  = tempo_now;
-    impulse_tempo_motion = tempo_now;    
+    impulse_motion_detected = true;
+    impulse_tempo_start     = tempo_now;
+    impulse_tempo_delay     = ImpulseMotionGetTempo (true);  
     
     // switch on relay
     ExecuteCommandPower (1, POWER_ON, SRC_IGNORE);
-
-    AddLog_P(LOG_LEVEL_INFO, "relay is off and motion has been triggered, switch relay on with tempo");
+    AddLog_P(LOG_LEVEL_INFO, "relay is off and motion detected, switch relay on");
   }
 
   // else if relay on and button pressed, switch relay off
-  else if ((relay == true) && (new_button == BUTTON_PRESSED) && (impulse_button == BUTTON_NOT_PRESSED))
+  else if ((relay_on == true) && (button_pressed == true) && (impulse_button_pressed == false))
   {
     // relay state should change, with no tempo
-    impulse_button       = new_button;
-    impulse_tempo_start  = 0;
-    impulse_tempo_motion = 0;        
+    impulse_button_pressed  = true;
+    impulse_tempo_start     = 0;
+    impulse_tempo_delay     = 0;        
     
-    // switch on relay
+    // switch off relay
     ExecuteCommandPower (1, POWER_OFF, SRC_IGNORE);
-
     AddLog_P(LOG_LEVEL_INFO, "relay on and button pressed, switch relay off");
   }
 
-  // else if relay on and new motion triggered, set new tempo trigger
-  else if ((relay == true) && (new_motion == MOTION_DETECTED) && (impulse_motion == MOTION_NOT_DETECTED))
+  // else if relay on and motion is triggered, update delay
+  else if ((relay_on == true) && (motion_detected == true))
   {
-    // update tempo trigger
-    impulse_motion       = new_motion;
-    impulse_tempo_motion = tempo_now;        
+    // motion detected
+    impulse_motion_detected = true;
+    
+    // if tempo left is smaller that motion tempo, update
+    tempo_delay = ImpulseMotionGetTempo (true);
+    if (tempo_left < tempo_delay)
+    {
+      impulse_tempo_start = tempo_now;        
+      impulse_tempo_delay = tempo_delay;
+    }
 
-    AddLog_P(LOG_LEVEL_INFO, "relay on and new motion triggered, set new tempo trigger");
+    AddLog_P(LOG_LEVEL_INFO, "relay on and motion tempo updated");
   }
 
-  // else, if relay on and motion detector tempo started, check if tempo is over
-  else if ((relay == true) && (impulse_tempo_motion != 0))
+  // else, if relay on and tempo target has been reached, switch relay off
+  else if ((relay_on == true) && (impulse_tempo_start + impulse_tempo_delay < tempo_now))
   {
-    // get tempo target and calculate current tempo
-    tempo_target = 1000 * ImpulseGetDuration ();
-    tempo_duration = tempo_now - impulse_tempo_motion;
+    // reset tempo
+    impulse_tempo_start = 0;
+    impulse_tempo_delay = 0;        
     
-    // if tempo target has been reached, switch relay off
-    if (tempo_duration >= tempo_target)
-    {
-      // reset tempo
-      impulse_tempo_start  = 0;
-      impulse_tempo_motion = 0;        
-    
-      // switch off relay
-      ExecuteCommandPower (1, POWER_OFF, SRC_IGNORE);
-
-      AddLog_P(LOG_LEVEL_INFO, "relay on and motion detector tempo started, tempo is over");
-    }
-  }
-
-  // else, if relay on, check if timeout is over
-  else if (relay == true)
-  {
-    // get timeout target (mn) and calculate current tempo
-    tempo_target = 60000 * ImpulseGetTimeout ();
-    tempo_duration = tempo_now - impulse_tempo_start;
-    
-    // if tempo target has been reached, switch relay off
-    if (tempo_duration >= tempo_target)
-    {
-      // reset tempo
-      impulse_tempo_start  = 0;
-      impulse_tempo_motion = 0;        
-    
-      // switch off relay
-      ExecuteCommandPower (1, POWER_OFF, SRC_IGNORE);
-
-      AddLog_P(LOG_LEVEL_INFO, "relay on, timeout is over");
-    }
+    // switch off relay
+    ExecuteCommandPower (1, POWER_OFF, SRC_IGNORE);
+    AddLog_P(LOG_LEVEL_INFO, "relay on and tempo over, switch relay off");
   }
 
   // if button not pressed, update it
-  if (new_button == BUTTON_NOT_PRESSED) impulse_button = new_button;
+  if (button_pressed == false) impulse_button_pressed = false;
   
   // if motion not detected, update it
-  if (new_motion == MOTION_NOT_DETECTED) impulse_motion = new_motion;
+  if (motion_detected == false) impulse_motion_detected = false;
 }
 
 #ifdef USE_WEBSERVER
@@ -589,8 +559,9 @@ void ImpulseWebPage ()
   bool     updated = false;
   bool     bpressed, mdetected;
   uint8_t  bmode, mmode, btempo, mtempo;
-  timeslot window;
+  timeslot mwindow;
   char     argument[IMPULSE_LABEL_BUFFER_SIZE];
+  char     window[IMPULSE_LABEL_BUFFER_SIZE];
 
   // if access not allowed, close
   if (!HttpCheckPriviledgedAccess()) return;
@@ -628,20 +599,15 @@ void ImpulseWebPage ()
   }
 
   // get motion detector active window according to 'window' parameters
-  if (WebServer->hasArg(D_CMND_IMPULSE_START_HOUR))
+  if (WebServer->hasArg(D_CMND_IMPULSE_START))
   {
-    WebGetArg (D_CMND_IMPULSE_START_HOUR, argument, IMPULSE_LABEL_BUFFER_SIZE);
-    strcpy (result, argument);
-    WebGetArg (D_CMND_IMPULSE_START_MIN, argument, IMPULSE_LABEL_BUFFER_SIZE);
-    strcat (result, ":");
-    strcat (result, argument);
-    WebGetArg (D_CMND_IMPULSE_STOP_HOUR, argument, IMPULSE_LABEL_BUFFER_SIZE);
-    strcat (result, "-");
-    strcat (result, argument);
-    WebGetArg (D_CMND_IMPULSE_STOP_MIN, argument, IMPULSE_LABEL_BUFFER_SIZE);
-    strcat (result, ":");
-    strcat (result, argument);
-    ImpulseMotionSetWindow (result); 
+    WebGetArg (D_CMND_IMPULSE_START, argument, IMPULSE_LABEL_BUFFER_SIZE);
+    strcpy (window, argument);
+    strcat (window, "-");
+    WebGetArg (D_CMND_IMPULSE_STOP, argument, IMPULSE_LABEL_BUFFER_SIZE);
+    strcat (window, argument);
+   
+    ImpulseMotionSetWindow (window); 
     updated = true;
   }
 
@@ -666,43 +632,40 @@ void ImpulseWebPage ()
   WSContentSendStyle ();
 
   // form
-  WSContentSend_P (PSTR ("<fieldset><legend><b>&nbsp;%s&nbsp;</b></legend><form method='get' action='%s'>"), D_IMPULSE_PARAMETERS, D_PAGE_IMPULSE);
+  WSContentSend_P (PSTR ("<fieldset><legend><b>&nbsp;%s&nbsp;</b></legend><form method='get' action='%s'>"), D_IMPULSE_BUTTON, D_PAGE_IMPULSE);
 
   // push button mode
-  WSContentSend_P (PSTR ("<p><b>%s</b>"), D_IMPULSE_BUTTON);
+  WSContentSend_P (PSTR ("<p><b>%s</b></p>"), D_IMPULSE_BUTTON);
+  
   if (bmode == IMPULSE_DISABLE) { strcpy (argument, "checked"); } else { strcpy (argument, ""); }
-  WSContentSend_P (PSTR ("<br/><input type='radio' name='%s' value='%d' %s>%s"), D_CMND_IMPULSE_BUTTON, IMPULSE_DISABLE, argument, D_IMPULSE_DISABLE);
+  WSContentSend_P (PSTR ("<p><input type='radio' name='%s' value='%d' %s>%s</p>"), D_CMND_IMPULSE_BUTTON, IMPULSE_DISABLE, argument, D_IMPULSE_DISABLE);
   
   if (bmode == IMPULSE_ENABLE) { strcpy (argument, "checked"); } else { strcpy (argument, ""); }
-  WSContentSend_P (PSTR ("<br/><input type='radio' name='%s' value='%d' %s>%s"), D_CMND_IMPULSE_BUTTON, IMPULSE_ENABLE, argument, D_IMPULSE_ENABLE);
-  WSContentSend_P (PSTR ("</p>"));
+  WSContentSend_P (PSTR ("<p><input type='radio' name='%s' value='%d' %s>%s</p>"), D_CMND_IMPULSE_BUTTON, IMPULSE_ENABLE, argument, D_IMPULSE_ENABLE);
 
   // push button tempo
-  WSContentSend_P (PSTR ("<p><b>%s</b><br/><input type='number' name='%s' min='0' step='1' value='%d'></p>"), D_IMPULSE_BUTTON_TEMPO, D_CMND_IMPULSE_BUTTON_TEMPO, btempo);
+  WSContentSend_P (PSTR ("<p>%s <i>(mn)</i></p>"), D_IMPULSE_BUTTON_TEMPO);
+  WSContentSend_P (PSTR ("<p><input type='number' name='%s' min='0' max='255' step='1' value='%d'></p>"), D_CMND_IMPULSE_BUTTON_TEMPO, btempo);
 
   // motion detector input
-  if (motion == MOTION_DISABLED) { strcpy (result, "checked"); strcpy (argument, ""); }
-  else { strcpy (result, ""); strcpy (argument, "checked"); }
-  WSContentSend_P (PSTR ("<p><b>%s</b>"), D_IMPULSE_MOTION);
+  WSContentSend_P (PSTR ("<p><b>%s</b></p>"), D_IMPULSE_MOTION);
+  
   if (mmode == IMPULSE_DISABLE) { strcpy (argument, "checked"); } else { strcpy (argument, ""); }
-  WSContentSend_P (PSTR ("<br/><input type='radio' name='%s' value='%d' %s>%s"), D_CMND_IMPULSE_MOTION, IMPULSE_DISABLE, argument, D_IMPULSE_DISABLE);
+  WSContentSend_P (PSTR ("<p><input type='radio' name='%s' value='%d' %s>%s</p>"), D_CMND_IMPULSE_MOTION, IMPULSE_DISABLE, argument, D_IMPULSE_DISABLE);
   
   if (mmode == IMPULSE_ENABLE) { strcpy (argument, "checked"); } else { strcpy (argument, ""); }
-  WSContentSend_P (PSTR ("<br/><input type='radio' name='%s' value='%d' %s>%s"), D_CMND_IMPULSE_MOTION, IMPULSE_ENABLE, argument, D_IMPULSE_ENABLE);
+  WSContentSend_P (PSTR ("<p><input type='radio' name='%s' value='%d' %s>%s</p>"), D_CMND_IMPULSE_MOTION, IMPULSE_ENABLE, argument, D_IMPULSE_ENABLE);
 
   if (mmode == IMPULSE_WINDOW) { strcpy (argument, "checked"); } else { strcpy (argument, ""); }
-  WSContentSend_P (PSTR ("<br/><input type='radio' name='%s' style='width:10%%;' value='%d' %s>%s"), D_CMND_IMPULSE_MOTION, IMPULSE_WINDOW, argument, D_IMPULSE_WINDOW);
-
-  WSContentSend_P (PSTR ("%s "), D_IMPULSE_FROM);
-  WSContentSend_P (PSTR ("<input type='number' name='%s' style='width:10%%;' min='0' max='%d' step='1' value='%d'> h "), D_CMND_IMPULSE_START_HOUR, 23, mwindow.start_hour);
-  WSContentSend_P (PSTR ("<input type='number' name='%s' style='width:10%%;' min='0' max='%d' step='1' value='%d'>"), D_CMND_IMPULSE_START_MIN, 59, mwindow.start_minute);
-  WSContentSend_P (PSTR (" %s "), D_IMPULSE_UNTIL);
-  WSContentSend_P (PSTR ("<input type='number' name='%s' style='width:10%%;' min='0' max='%d' step='1' value='%d'> h "), D_CMND_IMPULSE_STOP_HOUR, 23, mwindow.stop_hour);
-  WSContentSend_P (PSTR ("<input type='number' name='%s' style='width:10%%;' min='0' max='%d' step='1' value='%d'>"), D_CMND_IMPULSE_STOP_MIN, 59, mwindow.stop_minute);
+  WSContentSend_P (PSTR ("<p><input type='radio' name='%s' value='%d' %s>%s "), D_CMND_IMPULSE_MOTION, IMPULSE_WINDOW, argument, D_IMPULSE_FROM);
+  WSContentSend_P (PSTR ("<input type='time' name='%s' style='width:120px;' min='00:00' max='23:59' value='%02u:%02u' required>"), D_CMND_IMPULSE_START, mwindow.start_hour, mwindow.start_minute);
+  WSContentSend_P (PSTR (" %s "), D_IMPULSE_TO);
+  WSContentSend_P (PSTR ("<input type='time' name='%s' style='width:120px;' min='00:00' max='23:59' value='%02u:%02u' required>"), D_CMND_IMPULSE_STOP, mwindow.stop_hour, mwindow.stop_minute);
   WSContentSend_P (PSTR ("</p>"));
 
   // motion detector tempo
-  WSContentSend_P (PSTR ("<p><b>%s</b><br/><input type='number' name='%s' min='0' step='1' value='%d'></p>"), D_IMPULSE_MOTION_TEMPO, D_CMND_IMPULSE_MOTION_TEMPO, mtempo);
+  WSContentSend_P (PSTR ("<p>%s <i>(sec)</i></p>"), D_IMPULSE_MOTION_TEMPO);
+  WSContentSend_P (PSTR ("<p><input type='number' name='%s' min='0' max='255' step='1' value='%d'></p>"),  D_CMND_IMPULSE_MOTION_TEMPO, mtempo);
 
   // end of form
   WSContentSend_P(HTTP_FORM_END);
@@ -715,79 +678,41 @@ bool ImpulseWebState ()
 {
   time_t timestamp = time( NULL );
   TIME_T current_dst;
-  char   color[IMPULSE_LABEL_BUFFER_SIZE];
   char   state[IMPULSE_LABEL_BUFFER_SIZE];
-
-  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR ("%s<tr><th>%s</th><td style='font-weight:bold;'>%d</td></tr>"), mqtt_data, "push", switch_virtual[IMPULSE_BUTTON]);
-  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR ("%s<tr><th>%s</th><td style='font-weight:bold;'>%d</td></tr>"), mqtt_data, "motion", switch_virtual[IMPULSE_MOTION]);
-
-  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR ("%s<tr><th>%s</th><td style='font-weight:bold;'>%d</td></tr>"), mqtt_data, "compteur", impulse_counter);
-
-  // set push button state aspect
-  switch (impulse_button)
-    {
-      // button disabled
-      case BUTTON_DISABLED:
-        strcpy (state, D_IMPULSE_DISABLE);
-        strcpy (color, D_COLOR_GREY);
-        break;
-          
-      // button pressed
-      case BUTTON_PRESSED:
-        strcpy (state, D_IMPULSE_PRESSED);
-        strcpy (color, D_COLOR_GREEN);
-        break;
-
-      // button not pressed
-      case BUTTON_NOT_PRESSED:
-        strcpy (state, D_IMPULSE_NOTPRESSED);
-        strcpy (color, D_COLOR_RED);
-        break;
-
-      // button not pressed
-      default:
-        itoa(impulse_button, state, IMPULSE_LABEL_BUFFER_SIZE);
-        strcpy (color, D_COLOR_RED);
-        break;
-    }
-
-  // add push button state
-  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR ("%s<tr><th>%s</th><td style='font-weight:bold; color:%s;'>%s</td></tr>"), mqtt_data, D_IMPULSE_BUTTON, color, state);
-
-  // set motion detector state aspect
-  switch (impulse_motion)
-    {
-      // motion disabled
-      case MOTION_DISABLED:
-        strcpy (state, D_IMPULSE_DISABLE);
-        strcpy (color, D_COLOR_GREY);
-        break;
-          
-      // motion inactive
-      case MOTION_INACTIVE:
-        strcpy (state, D_IMPULSE_INACTIVE);
-        strcpy (color, D_COLOR_GREY);
-        break;
-          
-      // motion detected
-      case MOTION_DETECTED:
-        strcpy (state, D_IMPULSE_MOTION);
-        strcpy (color, D_COLOR_GREEN);
-        break;
-
-      // motion not detected
-      case MOTION_NOT_DETECTED:
-        strcpy (state, D_IMPULSE_NOMOTION);
-        strcpy (color, D_COLOR_RED);
-        break;
-    }
-
-  // add push button state
-  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR ("%s<tr><th>%s</th><td style='font-weight:bold; color:%s;'>%s</td></tr>"), mqtt_data, D_IMPULSE_MOTION, color, state);
+  char   color[IMPULSE_LABEL_BUFFER_SIZE];
+  bool   button, motion;
+  uint32_t current_time;
+  ulong    tempo_now, tempo_left;
+  
+  // get push button and motion detector state
+  button = ImpulseButtonIsPressed ();
+  motion = ImpulseMotionIsDetected ();
 
   // dislay current DST time
-  BreakTime (daylight_saving_time, &current_dst);
-  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR ("%s<tr><th>%s</th><td>%d:%d:%d</td></tr>"), mqtt_data, D_IMPULSE_TIME, current_dst.hour, current_dst.minute, current_dst.second);
+  current_time = LocalTime();
+  BreakTime (current_time, current_dst);
+  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR ("%s<tr><th>%s</th><td style='font-weight:bold;'>%02d:%02d:%02d</td></tr>"), mqtt_data, D_IMPULSE_TIME, current_dst.hour, current_dst.minute, current_dst.second);
+
+  // calculate temporisation left
+  tempo_now  = millis ();
+  tempo_left = impulse_tempo_start + impulse_tempo_delay - tempo_now;
+
+  // set push button display
+  if (button == true) { strcpy (state, D_IMPULSE_ON); strcpy (color, D_COLOR_GREEN); }
+  else { strcpy (state, D_IMPULSE_OFF); strcpy (color, D_COLOR_RED); }
+  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR ("%s<tr><th>%s</th><td style='font-weight:bold; color:%s;'>%s</td></tr>"), mqtt_data, D_IMPULSE_BUTTON, color, state);
+
+  // set motion detector display
+  if (motion == true) { strcpy (state, D_IMPULSE_ON); strcpy (color, D_COLOR_GREEN); }
+  else { strcpy (state, D_IMPULSE_OFF); strcpy (color, D_COLOR_RED); }
+  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR ("%s<tr><th>%s</th><td style='font-weight:bold; color:%s;'>%s</td></tr>"), mqtt_data, D_IMPULSE_MOTION, color, state);
+
+  // if needed, display relay on time left
+  if (tempo_left < impulse_tempo_delay)
+  {
+    BreakTime ((uint32_t) tempo_left/1000, current_dst);
+    snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR ("%s<tr><th>%s</th><td style='font-weight:bold; color:green;'>%02d:%02d</td></tr>"), mqtt_data, D_IMPULSE_TEMPO, current_dst.minute, current_dst.second);
+  }
 }
 
 #endif  // USE_WEBSERVER
