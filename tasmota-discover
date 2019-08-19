@@ -8,6 +8,10 @@
 #   18/04/2019, V1.2 - Add MQTT topic
 # ---------------------------------------------------
 
+#   Check tools availability
+command -v fping >/dev/null 2>&1 || { echo "[error] Please install fping"; exit 1; }
+command -v wget >/dev/null 2>&1 || { echo "[error] Please install wget"; exit 1; }
+
 # get first adapter netmask
 NETMASK=$(ip addr | grep inet | grep brd | head -n 1 | xargs | cut -d' ' -f2)
 echo "Netmask is ${NETMASK}"
