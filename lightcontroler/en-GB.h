@@ -442,11 +442,11 @@
 #define D_LIGHTCTRL_TIMEOUT       "Timeout"
 #define D_LIGHTCTRL_TIME          "Local time"
 #define D_LIGHTCTRL_TEMPO         "Time left"
-#define D_LIGHTCTRL_FORCED        "Forced On"
+#define D_LIGHTCTRL_FORCED        "Forced ON"
 #define D_LIGHTCTRL_TIMEOUT       "Timeout"
 #define D_LIGHTCTRL_LIGHT         "Light"
-#define D_LIGHTCTRL_ON            "On"
-#define D_LIGHTCTRL_OFF           "Off"
+#define D_LIGHTCTRL_ON            "ON"
+#define D_LIGHTCTRL_OFF           "OFF"
 
 // xsns_05_ds18b20.ino
 #define D_SENSOR_BUSY "Sensor busy"
