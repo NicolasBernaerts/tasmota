@@ -440,9 +440,9 @@
 //#define FIRMWARE_DISPLAYS                        // Create sonoff-display with display drivers enabled
 //#define FIRMWARE_MINIMAL                         // Create sonoff-minimal as intermediate firmware for OTA-MAGIC
 
-/*********************************************************************************************\
- * Pilotwire firmware configuration
-\*********************************************************************************************/
+/********************************************\
+ *    Pilotwire firmware configuration
+\********************************************/
 
 #define USE_PILOTWIRE                         // Add support for France Pilotwire protocol for electrical heaters (+1k1 code)
 
@@ -507,8 +507,14 @@
 #undef DEBUG_THEO                             // Disable debug code
 #undef USE_DEBUG_DRIVER                       // Disable debug code
 
+// add support to MQTT events subscription
+#ifndef SUPPORT_MQTT_EVENT
+#define SUPPORT_MQTT_EVENT
+#endif
+
+// add release information
 #undef D_AUTHOR
-#define D_AUTHOR           "Theo Arends<br />Pilotwire release v2.2 by Nicolas Bernaerts"
+#define D_AUTHOR           "Theo Arends<br />Pilotwire release v3.0 by Nicolas Bernaerts"
 
 /*********************************************************************************************\
  * No user configurable items below
