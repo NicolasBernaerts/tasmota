@@ -6,6 +6,7 @@
 
   Configuration has been optimised for Pilotwire
   All un-needed modules have been removed
+  MQTT specific subscription has been enabled
   Default temperature sensor is DS18x20
   It uses user_config_override.h
 
