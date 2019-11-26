@@ -16,8 +16,7 @@
     - Settings.weight_reference       = Fil pilote mode
     - Settings.weight_max             = Target temperature x10 (192 = 19.2°C)
     - Settings.weight_calibration     = Temperature correction (0 = -5°C, 50 = 0°C, 100 = +5°C)
-    - Settings.energy_max_power       = Heater power (W) 
-    
+     
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
@@ -84,11 +83,6 @@ enum PilotWireModes { PILOTWIRE_DISABLED, PILOTWIRE_OFF, PILOTWIRE_COMFORT, PILO
 // fil pilote commands
 enum PilotWireCommands { CMND_PILOTWIRE_MODE, CMND_PILOTWIRE_OFFLOAD, CMND_PILOTWIRE_TARGET, CMND_PILOTWIRE_DRIFT, CMND_PILOTWIRE_POWER, CMND_PILOTWIRE_PRIORITY, CMND_PILOTWIRE_CONTRACT, CMND_PILOTWIRE_MQTTTOPIC, CMND_PILOTWIRE_JSONKEY };
 const char kPilotWireCommands[] PROGMEM = D_CMND_PILOTWIRE_MODE "|" D_CMND_PILOTWIRE_OFFLOAD "|" D_CMND_PILOTWIRE_TARGET "|" D_CMND_PILOTWIRE_DRIFT "|" D_CMND_PILOTWIRE_POWER "|" D_CMND_PILOTWIRE_PRIORITY "|" D_CMND_PILOTWIRE_CONTRACT "|" D_CMND_PILOTWIRE_MQTTTOPIC "|" D_CMND_PILOTWIRE_JSONKEY;
-
-// variables
-//ulong offload_start = 0;            // time of last offload command
-
-char mqtt_text[MQTT_MAX_PACKET_SIZE];
 
 /**************************************************\
  *                  Accessors
@@ -285,7 +279,6 @@ float PilotwireGetTargetTemperature ()
   return temperature;
 }
 
-
 // set pilot wire drift temperature
 void PilotwireSetDrift (float new_drift)
 {
@@ -307,21 +300,6 @@ float PilotwireGetDrift ()
   if (drift > PILOTWIRE_DRIFT_MAX) drift = PILOTWIRE_DRIFT_MAX;
 
   return drift;
-}
-
-// get power of heater
-uint16_t PilotwireGetHeaterPower ()
-{
-  // return Settings value
-  return Settings.energy_max_power;
-}
-
-
-// set power of heater
-void PilotwireSetHeaterPower (uint16_t new_power)
-{
-  // save the value
-  Settings.energy_max_power = new_power;
 }
 
 /******************************************************\
