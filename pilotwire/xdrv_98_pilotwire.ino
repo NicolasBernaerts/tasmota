@@ -160,7 +160,7 @@ void PilotwireMqttUpdateHousePower (uint16_t new_power)
   }
 }
 
-void PilotwireMqttEverySecond ()
+void PilotwireMqttCheckConnexion ()
 {
   bool  is_connected;
   char* power_topic;
@@ -257,11 +257,13 @@ bool Xdrv98 (uint8_t function)
   switch (function)
   { 
     case FUNC_MQTT_INIT:
-      AddLog_P2(LOG_LEVEL_INFO, PSTR("Xdrv98 - FUNC_MQTT_INIT"));
-      PilotwireMqttEverySecond ();
+      PilotwireMqttCheckConnexion ();
       break;
     case FUNC_MQTT_DATA:
       result = PilotwireMqttData ();
+      break;
+    case FUNC_EVERY_SECOND:
+      PilotwireMqttCheckConnexion ();
       break;
   }
   
