@@ -26,13 +26,12 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+/*************************************************\
+ *              Fil Pilote
+\*************************************************/
+
 #ifdef USE_PILOTWIRE
-
-/*********************************************************************************************\
- * Fil Pilote
-\*********************************************************************************************/
-
-#define XDRV_98    98
+#define XDRV_98               98
 
 /*************************************************\
  *               Variables
@@ -95,7 +94,7 @@ uint8_t PilotwireMqttGetPriority ()
 void PilotwireMqttSetPriority (uint8_t new_priority)
 {
   // if outvalue, set to 1
-  if (new_priority > 5) new_priority = 5;
+  if (new_priority > 5) new_priority = 0;
 
   // write to settings
   Settings.energy_max_power_limit_hold = (uint16_t)new_priority;
@@ -151,12 +150,14 @@ void PilotwireMqttUpdateHousePower (uint16_t new_power)
   // update instant power
   pilotwire_house_power = new_power;
 
-  // get house contract and heater power
+  // if house contract and heater power are defined
   house_contract = PilotwireMqttGetContract ();
   heater_power   = PilotwireGetHeaterPower ();
-
-  // if house contract and heater power are defined, heater is offloaded and instant power is low enought, increase meter update counter
-  if ((house_contract > 0) && (heater_power > 0) && (pilotwire_offloaded == true) && (pilotwire_house_power < house_contract - heater_power)) pilotwire_meter_count ++;
+  if ((house_contract > 0) && (heater_power > 0))
+  {
+    //  heater is offloaded and instant power is low enought, increase meter update counter (used by priority)
+    if ((pilotwire_offloaded == true) && (pilotwire_house_power < house_contract - heater_power)) pilotwire_meter_count ++;
+  }
 }
 
 void PilotwireMqttEverySecond ()
