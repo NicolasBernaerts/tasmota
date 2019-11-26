@@ -6,8 +6,8 @@
 
   Configuration has been optimised for Pilotwire
   All un-needed modules have been removed
-  MQTT specific subscription has been enabled
-  Default temperature sensor is DS18x20
+  MQTT specific subscription has been enabled (to collect house instant power)
+  Default temperature sensor is DS18x20 (cheap and easily available)
   It uses user_config_override.h
 
   This program is free software: you can redistribute it and/or modify
