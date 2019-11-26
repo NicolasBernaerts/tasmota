@@ -488,9 +488,15 @@
 #define D_TX20_SOUTH "S"
 #define D_TX20_WEST "W"
 
-// xsns_99_pilotwire.ino
-#define D_PILOTWIRE_MODE        "Pilotwire Mode"
-#define D_PILOTWIRE_STATE       "Pilotwire State"
+// xdrv_98_pilotwire.ino
+#define D_PILOTWIRE_TIME        "Local time"
+#define D_PILOTWIRE_BOTHTEMP    "Temp. (actual/target)"
+#define D_PILOTWIRE_WATT        "House (actual/max)"
+#define D_PILOTWIRE_STATE       "Heater"
+
+#define D_PILOTWIRE_CONFIGURE   "Configure Pilotwire"
+#define D_PILOTWIRE_PARAMETERS  "Pilotwire Parameters"
+
 #define D_PILOTWIRE_DISABLED    "Disabled"
 #define D_PILOTWIRE_OFF         "Off"
 #define D_PILOTWIRE_COMFORT     "Comfort"
@@ -498,11 +504,18 @@
 #define D_PILOTWIRE_FROST       "No Frost"
 #define D_PILOTWIRE_THERMOSTAT  "Thermostat"
 #define D_PILOTWIRE_OFFLOAD     "Offloaded"
-#define D_PILOTWIRE_PARAMETERS  "Pilotwire Parameters"
-#define D_PILOTWIRE_CORRECTED   "Corrected Temperature"
-#define D_PILOTWIRE_TARGET      "Target Temperature"
-#define D_PILOTWIRE_DRIFT       "Temperature Correction"
-#define D_PILOTWIRE_CONFIGURE   "Configure Pilotwire"
+
+#define D_PILOTWIRE_TEMPERATURE "Temperature"
+#define D_PILOTWIRE_HEATER      "Heater"
+#define D_PILOTWIRE_HOUSE       "House"
+#define D_PILOTWIRE_MODE        "Pilotwire mode"
+#define D_PILOTWIRE_TARGET      "Target (°C)"
+#define D_PILOTWIRE_DRIFT       "Correction (°C)"
+#define D_PILOTWIRE_POWER       "Power (W)"
+#define D_PILOTWIRE_CONTRACT    "Contract (W)"
+#define D_PILOTWIRE_PRIORITY    "Priority (1 = max, 5 = min)"
+#define D_PILOTWIRE_MQTTTOPIC   "Instant power MQTT Topic"
+#define D_PILOTWIRE_JSONKEY     "Instant power JSON Key"
 
 // sonoff_template.h - keep them as short as possible to be able to fit them in GUI drop down box
 #define D_SENSOR_NONE          "None"
@@ -657,4 +670,3 @@
 #define D_UNIT_ANGLE      "Deg"
 
 #endif // _LANGUAGE_EN_GB_H_
-
