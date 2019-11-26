@@ -9,10 +9,11 @@
                        
   Settings are stored using weighting scale parameters :
     - Settings.energy_max_power_limit       = Maximum power of the house contract (W) 
+    - Settings.energy_max_power             = Heater power (W) 
     - Settings.energy_max_power_limit_hold  = Priority of the heater in the house (1 .. 5)
     - Settings.free_1D5                     = Total power JSON key 
     - Settings.free_73D                     = Total power MQTT topic
-
+ 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
@@ -59,6 +60,21 @@ void PilotwireMqttSetContract (uint16_t new_power)
 {
   // save the value
   Settings.energy_max_power_limit = new_power;
+}
+
+// get power of heater
+uint16_t PilotwireGetHeaterPower ()
+{
+  // return Settings value
+  return Settings.energy_max_power;
+}
+
+
+// set power of heater
+void PilotwireSetHeaterPower (uint16_t new_power)
+{
+  // save the value
+  Settings.energy_max_power = new_power;
 }
 
 // get heater priority in the house
