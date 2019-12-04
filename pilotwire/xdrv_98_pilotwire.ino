@@ -3,7 +3,6 @@
   for Sonoff Basic or Sonoff Dual R2
   
   Copyright (C) 2019  Nicolas Bernaerts
-
     05/07/2019 - v3.0 - Add max power management with automatic offload
                         Save power settings in Settings.energy... variables
                        
@@ -143,23 +142,6 @@ void PilotwireMqttSetTopic (char* new_topic)
  *                  Functions
 \**************************************************/
 
-void PilotwireMqttUpdateHousePower (uint16_t new_power)
-{
-  uint16_t house_contract, heater_power;
-  
-  // update instant power
-  pilotwire_house_power = new_power;
-
-  // if house contract and heater power are defined
-  house_contract = PilotwireMqttGetContract ();
-  heater_power   = PilotwireGetHeaterPower ();
-  if ((house_contract > 0) && (heater_power > 0))
-  {
-    //  heater is offloaded and instant power is low enought, increase meter update counter (used by priority)
-    if ((pilotwire_offloaded == true) && (pilotwire_house_power < house_contract - heater_power)) pilotwire_meter_count ++;
-  }
-}
-
 void PilotwireMqttCheckConnexion ()
 {
   bool  is_connected;
@@ -190,6 +172,23 @@ void PilotwireMqttCheckConnexion ()
     }
   }
   else pilotwire_topic_subscribed = false;
+}
+
+void PilotwireMqttUpdateHousePower (uint16_t new_power)
+{
+  uint16_t house_contract, heater_power;
+  
+  // update instant power
+  pilotwire_house_power = new_power;
+
+  // if house contract and heater power are defined
+  house_contract = PilotwireMqttGetContract ();
+  heater_power   = PilotwireGetHeaterPower ();
+  if ((house_contract > 0) && (heater_power > 0))
+  {
+    //  heater is offloaded and instant power is low enought, increase meter update counter (used by priority)
+    if ((pilotwire_offloaded == true) && (pilotwire_house_power < house_contract - heater_power)) pilotwire_meter_count ++;
+  }
 }
 
 bool PilotwireMqttData ()
@@ -236,9 +235,6 @@ bool PilotwireMqttData ()
 
       // data from message has been handled
       data_handled = true;
-
-      // log
-      AddLog_P2(LOG_LEVEL_INFO, PSTR("Actual power : %d"), pilotwire_house_power);
     }
   }
 

@@ -490,27 +490,35 @@
 
 // xdrv_98_pilotwire.ino
 #define D_PILOTWIRE_TIME        "Local time"
-#define D_PILOTWIRE_BOTHTEMP    "Temp. (actual/target)"
-#define D_PILOTWIRE_WATT        "House (actual/max)"
+#define D_PILOTWIRE_BOTHTEMP    "Room temperature"
+#define D_PILOTWIRE_WATT        "House power"
 #define D_PILOTWIRE_STATE       "Heater"
 
-#define D_PILOTWIRE_CONFIGURE   "Configure Pilotwire"
-#define D_PILOTWIRE_PARAMETERS  "Pilotwire Parameters"
+#define D_PILOTWIRE_CONF_HEATER   "Configure Heater"
+#define D_PILOTWIRE_CONF_METER    "Configure Meter"
+#define D_PILOTWIRE_CONF_CONTROL  "Heater management"
+#define D_PILOTWIRE_PARAM_HEATER  "Heater Parameters"
+#define D_PILOTWIRE_PARAM_METER   "Meter Parameters"
+#define D_PILOTWIRE_PARAM_CONTROL "Heater Control"
 
 #define D_PILOTWIRE_DISABLED    "Disabled"
 #define D_PILOTWIRE_OFF         "Off"
 #define D_PILOTWIRE_COMFORT     "Comfort"
 #define D_PILOTWIRE_ECO         "Economy"
 #define D_PILOTWIRE_FROST       "No Frost"
-#define D_PILOTWIRE_THERMOSTAT  "Thermostat"
+#define D_PILOTWIRE_THERMOSTAT  "Thermostat (°C)"
 #define D_PILOTWIRE_OFFLOAD     "Offloaded"
+#define D_PILOTWIRE_TEMP_TITLE  "Please select target room temperature between %d and %d °C"
 
 #define D_PILOTWIRE_TEMPERATURE "Temperature"
 #define D_PILOTWIRE_HEATER      "Heater"
 #define D_PILOTWIRE_HOUSE       "House"
-#define D_PILOTWIRE_MODE        "Pilotwire mode"
-#define D_PILOTWIRE_TARGET      "Target (°C)"
+#define D_PILOTWIRE_MODE        "Mode"
+
 #define D_PILOTWIRE_DRIFT       "Correction (°C)"
+#define D_PILOTWIRE_MIN         "Minimum (°C)"
+#define D_PILOTWIRE_MAX         "Maximum (°C)"
+
 #define D_PILOTWIRE_POWER       "Power (W)"
 #define D_PILOTWIRE_CONTRACT    "Contract (W)"
 #define D_PILOTWIRE_PRIORITY    "Priority (1 = max, 5 = min)"
@@ -670,3 +678,4 @@
 #define D_UNIT_ANGLE      "Deg"
 
 #endif // _LANGUAGE_EN_GB_H_
+
