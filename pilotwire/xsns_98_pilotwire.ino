@@ -45,6 +45,9 @@
 #define D_PAGE_PILOTWIRE_METER          "meter"
 #define D_PAGE_PILOTWIRE_CONTROL        "control"
 
+#define D_CMND_PILOTWIRE_ON             "on"
+#define D_CMND_PILOTWIRE_OFF            "off"
+#define D_CMND_PILOTWIRE_SET            "set"
 #define D_CMND_PILOTWIRE_MODE           "mode"
 #define D_CMND_PILOTWIRE_OFFLOAD        "offload"
 #define D_CMND_PILOTWIRE_MIN            "min"
@@ -650,11 +653,8 @@ void PilotwireWebSelectMode (bool public_mode)
     max_temperature    = PilotwireGetMaxTemperature ();
     target_temperature = PilotwireGetTargetTemperature ();
 
-    // set temperature tooltip
-    sprintf (argument, D_PILOTWIRE_TEMP_TITLE, min_temperature, max_temperature);
-
     // selection : target temperature
-    WSContentSend_P (PSTR ("<input type='number' name='%s' min='%.2f' max='%.2f' step='%.2f' value='%.2f' title='%s'><br/>"), D_CMND_PILOTWIRE_TARGET, min_temperature, max_temperature, PILOTWIRE_TEMP_STEP, target_temperature, argument);
+    WSContentSend_P (PSTR ("<input type='number' name='%s' min='%.1f' max='%.1f' step='%.1f' value='%.1f' title='%s'><br/>"), D_CMND_PILOTWIRE_TARGET, min_temperature, max_temperature, PILOTWIRE_TEMP_STEP, target_temperature, "argument");
   }
 }
 
@@ -676,51 +676,91 @@ void PilotwireWebButton ()
 void PilotwireWebPageControl ()
 {
   float   target_temperature, actual_temperature, min_temperature, max_temperature;
-  uint8_t relay_state;
-  char*   relay_state_label;
+  uint8_t actual_mode;
   char    argument[PILOTWIRE_BUFFER_SIZE];
 
-  // page comes from save button on configuration page
-  if (WebServer->hasArg("save"))
-  {
-    // get pilot wire mode according to 'mode' parameter
-    WebGetArg (D_CMND_PILOTWIRE_MODE, argument, PILOTWIRE_BUFFER_SIZE);
-    if (strlen(argument) > 0) PilotwireSetMode ((uint8_t)atoi (argument)); 
+  // if heater has to be switched off, set in anti-frost mode
+  if (WebServer->hasArg(D_CMND_PILOTWIRE_OFF)) PilotwireSetMode (PILOTWIRE_FROST); 
 
+  // else, if heater has to be switched on, set in thermostat mode
+  else if (WebServer->hasArg(D_CMND_PILOTWIRE_ON)) PilotwireSetMode (PILOTWIRE_THERMOSTAT);
+
+  // else, if target temperature has been defined
+  else if (WebServer->hasArg(D_CMND_PILOTWIRE_TARGET))
+  {
     // get target temperature according to 'target' parameter
     WebGetArg (D_CMND_PILOTWIRE_TARGET, argument, PILOTWIRE_BUFFER_SIZE);
     if (strlen(argument) > 0) PilotwireSetThermostat (atof (argument));
   }
 
   // get current temperature
+  min_temperature = PilotwireGetMinTemperature ();
+  max_temperature = PilotwireGetMaxTemperature ();
+  target_temperature = PilotwireGetTargetTemperature ();
   actual_temperature = PilotwireGetTemperatureWithDrift ();
-  dtostrf(actual_temperature, PILOTWIRE_BUFFER_SIZE, 1, argument);
+  actual_mode = PilotwireGetMode ();
 
-  // actuel relay state
-  relay_state = PilotwireGetRelayState ();
-  relay_state_label = PilotwireGetStateLabel (relay_state);
+//  dtostrf(actual_temperature, PILOTWIRE_BUFFER_SIZE, 1, argument);
 
   // beginning of form without authentification
   WSContentStart_P (D_PILOTWIRE_PARAM_CONTROL, false);
 
+  WSContentSend_P(PSTR ("</script>"));
+  
+  WSContentSend_P(PSTR ("<meta http-equiv='refresh' content='30'/>"));
+  
+  WSContentSend_P(PSTR ("<style>"));
+
   // beginning of page
-  WSContentSend_P(HTTP_HEAD_STYLE1);
-  WSContentSend_P(HTTP_HEAD_STYLE2);
-  WSContentSend_P(PSTR ("</style></head>"));
-  
-  WSContentSend_P(PSTR ("<body>"));
-  WSContentSend_P(INPUT_HEAD_CONTROL, Settings.friendlyname[0], argument, relay_state_label);
-  
-  WSContentSend_P (INPUT_FORM_START, D_PAGE_PILOTWIRE_CONTROL);
+  WSContentSend_P(PSTR (".page {color:white;border-color:white;background-color:#303030;font-family:tahoma;font-size:20px;}"));
+  WSContentSend_P(PSTR (".white {color:grey;border-color:grey;background-color:white;}"));
+  WSContentSend_P(PSTR (".green {color:green;border-color:green;background-color:#D0FFD0;}"));
+  WSContentSend_P(PSTR (".red {color:red;border-color:red;background-color:#FFD0D0;}"));
+  WSContentSend_P(PSTR (".yellow {color:#FFFF33;}"));
+  WSContentSend_P(PSTR (".big {font-size:48px;font-weight:bold;}"));
+  WSContentSend_P(PSTR (".bold {font-weight:bold;}"));
+  WSContentSend_P(PSTR (".target {font-size:24px;}"));
  
-  // mode selection with only public choices
-  WSContentSend_P (INPUT_FIELDSET_START, D_PILOTWIRE_MODE);
-  PilotwireWebSelectMode (true);
+  WSContentSend_P(PSTR (".slider {width:100%;height:16px;border:none;border-radius:8px;-webkit-appearance:none;}"));
+  WSContentSend_P(PSTR (".slider::-webkit-slider-thumb {width:32px;height:32px;border-radius:16px;background-color:#808080;-webkit-appearance:none;appearance:none;}"));
+  WSContentSend_P(PSTR (".slider::-moz-range-thumb {width:32px;height:32px;border-radius:16px;background-color:#808080;}"));
+  
+  WSContentSend_P(PSTR ("div {width:80%;margin:auto;padding:10px;text-align:center;vertical-align:middle;}"));
+
+  WSContentSend_P(PSTR ("fieldset {border-radius:14px;margin-top:20px;}"));
+  WSContentSend_P(PSTR ("button {border:1px solid white;margin-top:14px;padding:14px 28px;border-radius:14px;font-size:20px;}"));
+
+  WSContentSend_P(PSTR ("</style></head>"));
+
+  WSContentSend_P(PSTR ("<body class='page'>"));
+  WSContentSend_P(PSTR ("<div class='big bold'>%s</div>"), Settings.friendlyname[0]);
+  
+  WSContentSend_P(PSTR ("<div><span class='big yellow'>%.1f °C</span></div>"), actual_temperature);
+  
+  WSContentSend_P(PSTR ("<form method='get' action='%s'>"), D_PAGE_PILOTWIRE_CONTROL);
+  
+  if (actual_mode == PILOTWIRE_THERMOSTAT)
+  {
+    WSContentSend_P(PSTR ("<div><button name='off' type='submit' class='red'>Eteindre le thermostat</button></div>"));
+    
+    WSContentSend_P(PSTR ("<div><fieldset class='grey'><legend>&nbsp; Température souhaitée &nbsp;</legend>"));
+    WSContentSend_P(PSTR ("<div class='big'><span id='val'></span> °C</div><br /><br />"));
+    WSContentSend_P(PSTR ("<input name='target' type='range' min='%.1f' max='%.1f' value='%.1f' step='0.2' class='slider' id='sld'><br /><br />"), min_temperature, max_temperature, target_temperature);
+    WSContentSend_P(PSTR ("<button name='temp' type='submit' class='white'>Définir</button><br />"));
+    WSContentSend_P(PSTR ("</fieldset></div>"));
+
+    WSContentSend_P(PSTR ("<script>"));
+    WSContentSend_P(PSTR ("var sld=document.getElementById('sld');"));
+    WSContentSend_P(PSTR ("var val=document.getElementById('val');"));
+    WSContentSend_P(PSTR ("val.innerHTML=sld.value;"));
+    WSContentSend_P(PSTR ("sld.oninput=function() {val.innerHTML=this.value;}"));
+    WSContentSend_P(PSTR ("</script><div>"));
+    }
+
+  else WSContentSend_P(PSTR ("<div><button name='on' type='submit' class='green'>Allumer le thermostat</button></div>"));
 
   // end of page
-  WSContentSend_P (INPUT_FIELDSET_STOP);
-  WSContentSend_P("<button name='save' type='submit' class='button bgrn'>%s</button>", D_SAVE);
-  WSContentSend_P(INPUT_FORM_STOP);
+  WSContentSend_P(PSTR ("</form>"));
   WSContentStop();
 }
 
