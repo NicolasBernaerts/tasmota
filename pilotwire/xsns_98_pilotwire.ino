@@ -10,6 +10,8 @@
     05/07/2019 - v2.2 - Add embeded icon
     05/07/2019 - v3.0 - Add max power management with automatic offload
                         Save power settings in Settings.energy... variables
+    12/12/2019 - v3.1 - Add public configuration page http://.../control
+    30/12/2019 - v4.0 - Functions rewrite for Tasmota 8.x compatibility
                        
   Settings are stored using weighting scale parameters :
     - Settings.weight_reference             = Fil pilote mode
@@ -18,7 +20,6 @@
     - Settings.weight_item                  = Minimum temperature (x10 -> 125 = 12.5°C)
     - Settings.energy_frequency_calibration = Maximum temperature (x10 -> 240 = 24.0°C)
 
-     
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
@@ -35,10 +36,15 @@
 
 #define XSNS_98                         98
 
+#include <Arduino.h>
+
 /*************************************************\
  *               Variables
 \*************************************************/
 
+#define PILOTWIRE_COLOR_BUFFER_SIZE     8
+#define PILOTWIRE_LABEL_BUFFER_SIZE     16
+#define PILOTWIRE_MESSAGE_BUFFER_SIZE   64
 #define PILOTWIRE_BUFFER_SIZE           128
 
 #define D_PAGE_PILOTWIRE_HEATER         "heater"
@@ -49,16 +55,21 @@
 #define D_CMND_PILOTWIRE_OFF            "off"
 #define D_CMND_PILOTWIRE_SET            "set"
 #define D_CMND_PILOTWIRE_MODE           "mode"
+#define D_CMND_PILOTWIRE_LANG           "lang"
 #define D_CMND_PILOTWIRE_OFFLOAD        "offload"
 #define D_CMND_PILOTWIRE_MIN            "min"
 #define D_CMND_PILOTWIRE_MAX            "max"
 #define D_CMND_PILOTWIRE_TARGET         "target"
 #define D_CMND_PILOTWIRE_DRIFT          "drift"
+#define D_CMND_PILOTWIRE_PULLUP         "pullup"
 #define D_CMND_PILOTWIRE_POWER          "power"
 #define D_CMND_PILOTWIRE_PRIORITY       "priority"
 #define D_CMND_PILOTWIRE_CONTRACT       "contract"
 #define D_CMND_PILOTWIRE_MQTTTOPIC      "topic"
 #define D_CMND_PILOTWIRE_JSONKEY        "key"
+
+#define D_PILOTWIRE_ENGLISH             "en"
+#define D_PILOTWIRE_FRENCH              "fr"
 
 #define D_JSON_PILOTWIRE                "Pilotwire"
 #define D_JSON_PILOTWIRE_MODE           "Mode"
@@ -72,40 +83,63 @@
 #define D_JSON_PILOTWIRE_RELAY          "Relay"
 #define D_JSON_PILOTWIRE_STATE          "State"
 
-#define PILOTWIRE_COLOR_BUFFER_SIZE     8
-#define PILOTWIRE_LABEL_BUFFER_SIZE     16
-#define PILOTWIRE_MESSAGE_BUFFER_SIZE   64
+#define D_WEB_PILOTWIRE_TEMP_MIN        "5"
+#define D_WEB_PILOTWIRE_TEMP_MAX        "30"
+#define D_WEB_PILOTWIRE_TEMP_STEP       "0.5"
+#define D_WEB_PILOTWIRE_DRIFT_MIN       "-5"
+#define D_WEB_PILOTWIRE_DRIFT_MAX       "5"
+#define D_WEB_PILOTWIRE_DRIFT_STEP      "0.1"
+#define D_WEB_PILOTWIRE_CHECKED         "checked"
 
-#define PILOTWIRE_TEMP_MIN              5
-#define PILOTWIRE_TEMP_MAX              30
-#define PILOTWIRE_TEMP_STEP             0.5
-#define PILOTWIRE_TEMP_THRESHOLD        0.2
-#define PILOTWIRE_DRIFT_MIN             -5
-#define PILOTWIRE_DRIFT_MAX             5
-#define PILOTWIRE_DRIFT_STEP            0.1
+#define PILOTWIRE_TEMP_THRESHOLD        0.4
+#define PILOTWIRE_TEMP_UNDEFINED        -50
 
-// icon coded in base64
-const char strIconHeater0[] PROGMEM = "iVBORw0KGgoAAAANSUhEUgAAACUAAAAgCAQAAAA/Wnk7AAAC3npUWHRSYXcgcHJvZmlsZSB0eXBlIGV4aWYAAHja7ZdBkhshDEX3nCJHQBJC4jh0A1W5QY6fD83Y8YwzVZlkkYWhDLRafEAP6HLoP76P8A2JPHJIap5LzhEplVS4ouHxSldNMa1yJdb9jh7tgbc9MkyCWq7H3Ld/hV3vHSxt+/FoD3ZuHd9C+8WboMyR52jbz7eQ8GWn/RzK7lfTL8vZv2FrzEjb6f1zMgSjKfSEA3chiSh9jiKYgRSpqDNKkek0bbNdVunPYxduzXfBa+157GLdHvIYihDzdsjvYrTtpM9jtyL064zorcmPL4bEN9AfYzeaj9Gv1dWUEakc9qLillgtOB4IpaxuGdnwU7Rt5YLsWOIJYg00D+QzUCFGtAclalRpUF/1SSemmLizoWY+WZbNxbjwuQCkmWmwAUML4mB1gprAzLe50Bq3rPFOHIEWG8GTCWKEHh9yeGb8Sr4JjTG3LtEMJtDTBZjnnsY0JrlZwgtAaOyY6orvyuGG9Z5o7cIEtxlmxwJrPC6JQ+m+t2RxnnQ1phCvo0HWtgBChLEVkyEBgZhJlDJFYzYixNHBp2LmLIkPECBVbhQG2IhkwHGeY6OP0fJl5cuMqwUgFIfGgAYHBbBSUuwfS449VFU0BVXNaupatGbJKWvO2fK8o6qJJVPLZuZWrLp4cvXs5u7Fa+EiuMK05GK";
-const char strIconHeater1[] PROGMEM = "heCmlVgxaIV3Ru8Kj1oMPOdKhRz7s8KMc9cT2OdOpZz7t9LOctXGThuPfcrPQvJVWO3VspZ669tytey+9Duy1ISMNHXnY8FFGvVHbVB+p0Ttyn1OjTW0SS8vP7tRgNnuToHmd6GQGYpwIxG0SwIbmySw6pcST3GQWC+NQKIMa6YTTaBIDwdSJddCN3Z3cp9yCpj/ixr8jFya6f0EuTHSb3EduT6i1ur4osgDNUzhjGmXgYoND98pe5zfpy3X4W4GX0EvoJfQSegm9hP4XoTFGaPjLFH4CjgdTc9MWax8AAAACYktHRAD/h4/MvwAAAAlwSFlzAAAX3AAAF9wBGQRXVgAAAAd0SU1FB+MGHRcnJmCWOwMAAAF8SURBVEjH7dYxSFRxHAfwj8+TQ0RDKaihpXKwzRBzC4ISbMtZqCUEHcNBAhHMhiaX0IaWHCTMzUFxiUMiMPAw4sAhsKEWtUHJojyHe955ouD9741+3/D+/z/vffi99/68/59Crnnri5zPevDcmpxVfRiQlZM1gD6rcta8dsUpabUlHx8jWInbk5iJ2zOYLF614fJxJAXGNassVz0z6IYpTfHIuwJ1X+W5g0fuFvu3ItAQQNWj7kg/iiSWlIe6hYCXTLldTk2rDyqiyZPygcgbm0HUvm175dSgi/4HUN+0mCinqsm8nWJ7LlUVldGYVFWSe8Bz6pw6jXovrzbgzuvytszqKFH3qiikWa9P+g+pB17IBzC/vD";
-const char strIconHeater2[] PROGMEM = "Tnr8irwi8wkjFsP4DaNKRXpx01nibx2rNm0ZXMF/yKC6UltZpMu2mpRO0W19iz53d8/uHx0Sm6GFDNh5Nn+7DtCqHvxk7efqzrMKpdyq4VLEirs2cZGW3S/shgWZe0fz4a8fM4dQDPsF31pJ5WwwAAAABJRU5ErkJggg==";
-const char *const arrIconHeaterBase64[] PROGMEM = {strIconHeater0, strIconHeater1, strIconHeater2};
+#define PILOTWIRE_LANGAGE_ENGLISH       0
+#define PILOTWIRE_LANGAGE_FRENCH        1
 
+// english flag coded in base64
+const char strFlagEn0[] PROGMEM = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgBAMAAACBVGfHAAAMtnpUWHRSYXcgcHJvZmlsZSB0eXBlIGV4aWYAAHjazZlbcuRIrkT/YxWzhHg/lhMvmN0dzPLnIMhkpjSq6uq2+zHKkpiimEGEO+BwsMz+9/+J+RdfoaVsYio1t5wtX7HF5jtvqr2+rqOz8fw8X/7+E79/OW+eP3hOBY7h+jXv+/rO+fT+QIn3+fH1vCnzXqfeCzn75dZB76zv1x3kvVDw13l3/27a/YGeP7Zzf/t5L/va1rffYwGMlVgveON3cMGen/66UyCK0ELXM+dn5UJ7v0/89OEH/MwD3Q8APu++4WdfkYU3HNdCr23lbzjd5136dj48t/FfInL+ubP/jCgNu+3n1wd+IquK7Gt3PZJHLeZ7U6+tnHdcOIAznI9lXoXvxPtyXo1Xtd1OWFtsdRg7+KU5D+LioluuO3H7HKebhBj99oWj99OHc66G4pufh5SoLye+GPhZocLEhLnAaf/E4s59m96Pm1XuvBxXesdiyuiXl/l+4p++viwkomnunK0PVsTlNb8IQ5nTn1wFIU5uTNPB15nrYL9/KbEBBtOBubLBbse1xEjunVvh8BxsMlwa7VUvrqx7ASDi3olgXIABm0lpl50t3hfnwLHCTydyH6IfMOCSSX4RpY8hZMihGrg3nynuXOuTv04jLxCRQg4FaiggyIoxxUy9VVKomxRSTCnlVFJNLfUccswp";
+const char strFlagEn1[] PROGMEM = "51yy6lQvocSSSi6l1NJKr6HGmmqupdbaam++BWQsmZZbabW11js37bGzVuf6zonhRxhxpJFHGXW00SfpM+NMM88y62yzL7/CQgLMyqusutrq221Saceddt5l1912F3JNgkRJkqVIlSb9Ye1m9Str35n7PWvuZs0fovS68maN06W8lnAqJ0k5gzEfHYwXZYCE9sqZrS5Gr8wpZ7b5YEJIniiTkrOcMgaDcTufxD3cvZn7JW8GdP8ub/4n5oxS9//BnFHqPpj7b95+YG31I7fhEKRVCKYoZKD8wKR2/kmYskq8ftEe9dNR4vB7jrFHm2tL6ivvZgpvdx7DSRhNdhGWXc3tKVLKlCllsysu3lFGTY7O3B2IpTxRspaGgNsQFpLp2DJ6mGWvLFwNIDKW7qBx43g+3Hapvszhrl8tW1xnWaTWSQrL6Pu0ZtmxXtedG7a9OMbiowCyrK0hJY3WRil9iONefpS9PdBtvo3kft/F7RxaKStKY7+DLcMG0c0lJawxawi0jVUkNwGguOMoSS8r4tMy9YVylO5tP7/Zv3EcCwiBxoB98amDbmmiN1jSmzRtKTkrTgGc1iQjNCcGsQL7GPbgk/amqivHalLaZfAmpRnqlBEkhCHkRB6A8gH3hErSyM9riemVzgsVzM4yUa7ripPm3Q7vhfVIjDUIR9qVnQBIsLKre30GE3ACW8MkZKikCJrFZ80YkRhI6JokwMfcGtqm3uiKLEsN0A3XFOcP";
+const char strFlagEn2[] PROGMEM = "ToBeSeHqzW9zmOPYVJ20DKriR+4R3gKbrlqgg+xI1Ewo21QKmw2vQlgk7Aq9Tei3QslGKu7KLY2ktlRWzihQAHChsinanXFLBJ7NItO2e0DRY6N3UyJz0rr/GHTzQv0fg65IIzuGjsft/erkRA6UCdcTBN82EYkf0+6xQx6rUNto2Ua4ED5HwjVZovVMHylmTs3rMvvum8/GLgSXPP3Dk1RaTWi+JzVxRq+aRXlXtHfJ3kf06IHS6Q7ox4gYzJdTRCwACDE06jRSZhXyWRtFzVrCuaMTA3ayCcqqhk/NEE1RYUNTWFuLb/bAmtlN2ZSIUCO8aCqoqsbHKYQ60n68GSHNTrLIbJQ7UaCvbecvSZHeScHhTopDhC7oG+tFI5oVV1I0usXJCdGUKIP2pKwIFGjK/FrU9K15iVpdLzlLGo2w5kRc7SZ/244rX3Tmb3Sy2YtOMpvekVyLBYYU4oUkatcI9pDpR6cD4YXYTOt8RFJFvumm+pb+conYNi6PvtsKbIWqmpumlm2/axL5BNuxNf1l3WobgbccCksJohSO1pdKLZkJ1FLs13r+dev5qfOY37ceoNZWSSs8lbC9kqjG26pSEiMsYBSwCeaQlJSkzSzplmYnWEpdRBNapieBLCVBSgI9KNI3UH3wAR0th520NMxUJIlQkYSNVBRJ0mmAY0R2gXqD4+gKO2Bq89j1gBleYHhfBet3gbFdoEBe7SGonJ2LRgU/WrqmPftjFO1P";
+const char strFlagEn3[] PROGMEM = "/dJgn/I17/qlfFUF64nX14ji5AwhsrLOGZPrIGGFeXgAQy7rZAoVwfaZRUjx6rU1HcpGsKtmygs1pDGi1s7VKhnHQurce+l1v95uHxh1xjCaPANeT5VlzZUscDpwN67JqXBQjrIIlgY4NKN0TyTFJWtaca15k7g71IZ490aodYPqRNxmSHRs2CIe7E7WrPLaW7lO6Stap5Y8DlS7EWpoW8zGuPwDKUuboLlLpXrIX3Crl2Vhce3P2HyPIDmsAEGwjdCpdRPVq2mvnnv3L8K03sI00u+EqQVCMHHFFFqa28+8rNo+crLdDgWKW/8rAbn0g+rXBVmZbGVnbebG1Euy7KCysqkqf/cdPCEKRy1pz/E7eQTldDtFxGicrhcaCfmyEbdaMSBaRVpHLHWIUZl8sKN8JTm1V1QZaiBhdaR22a4fhXLYmNr3lYTvHBzRw4YvsksJRRW0V+OQHNnAwGawD2jgyT5Vm0VJkAOPxbV/4XCfozlvSL+KVXeEFeJHK/Zv/6OdOHO/ejXjQM3eyV293sz8yd2s/Fzan0fzNy3jL4//4wt9l7M/JMwqWWYo5KTS/N5M57sWUIZcH/cEYal8EnYWM39CmCbtuHUk+KiZT1s91nVoxW3KyXRRQ17VWR4bu/opnXTl9NALTzHgjhBNLtIi0Yco4ZTEKQ/NYaNpzp+5NT3liJWewVW9ljsNbQ5GzjKsTh+0ZVyFdrXjPaj+pUaL+mU87jq2UC2xMmCi";
+const char strFlagEn4[] PROGMEM = "ATR4pKVSprH3VLFwNVvMxB1cn5eAMHnk25eaH6aBr76URTc9cx8jRZUkj3lfntuhQvwlqDux3ahdUNcx2ArASncLmcafINk0ITnjVkCzJ73talVT1arRbawOuqq12w/jHDJb2Rdie2n7oQcLR7O68cNBosBHZqDDukugVKuixs9VAzcCrm8yzvD8kM2iHimvDIt4mNOIhDAI0sKX5gCRYaewrNus+QyQ9Keq5rjRcLQ50RNvw6MDJCbZXgMknWWeAVIzFYGVkFa9E1IGMuqqvdyVergZ6XAo/dnzbjMgq+uMANqX1VNwZcOk0jrIBGcwi64u/nbalbaj5kvAQ8XSUlZ/Un90hL2mrOVVApfwCUP/4k6049F0WAPj0txJMf5N+aWofS9wc644/mflnuj4OpPNnEogRAhT9raGu2ObfpcFlkktStJRZB4sYWsyZRPk6U4kjwZLdIs8YGKku65aiJU+QbsvxNrUIH2Mb+0Z38yx6rvQztRIu+uhzKX/dP5wT9OYxIaVYW/M28J8qN54KGOM/FCNP/J26iTmqWIcX2AOI1Y10RC/Hqc78c/1MljrmsIqxaJ1u89DCn0SAZwT7OmaZxbGQhJoUDL21A8V0nrfJQ4G41XhbmZtSHTuqliaA+KeN4g6tYbPee7xg5RiJ+XdBNqoTVvNiU5CGhFFbxiFcCfU9TOJLB8FGz3DGW1mSm4yX+RTDe492jLmk23PaGt+KyE62r4mKZ1sddIJ";
+const char strFlagEn5[] PROGMEM = "OrQMXVMnHW4BQciracfm3LMZ9ndFjEvLZx4N5LvGqj5eT+h7j9HHozJJom5F57zLepnHe8XjbM9jgvRoU/hZmjRRn+c0+HfMrYFErNpZ9JpOpC0yseJMBuUmalp4YXXDa5Z55ZaP7PEWD9zIJz7p3ghix+xQdFQYy2/XdaTStBAVj/Nc603mOGSas3sPmT8U7+XsFPtTC0qlv8bUqxQOmbnpTElfe56oIeyvB0h5WuY8aYD5Hm3Zydi/dKbmizX9OtrqEV95dHFWAHaLLYJk/3xW0POZ3sw9vp2nGScpzjT8JSfYb/K0L8QR3vf3pNCkLLjahHg4DCYDA1iwFaZ8NiXprldUov+1pdPHPq9BuC8SkXaCST7lrwDtGOYZwZW2oc8cm87Co6ennC/EBoZ96pY/MC/29fwIk/zHoJsf54E/B/31GRLyg4Dz3C7pf5x5rcOlqfd6cod3obOqWdezXvTFdMtmtatd1o/YPSK6/5mFJPUZIINx2uORBqR6MR6CIW1PdYhvaRaUhyYpaqoDpE72Oq0zks/nwZw+5Esmz/Owgk5RlIfjxc5TaUfRn2njeibN8VTZGm88mYGYV/7UH93P7e751el923kgXYrOti/jYVSauDmGQbh1OrZE/8vvVtDyuy7E4elB5s+a0I/ZTGjY4v8AUAVtuWPsRrQAAAGFaUNDUElDQyBwcm9maWxlAAB4nH2RPUjDUBSFT1OLIhVBO4g4ZKhOFkRFHbUK";
+const char strFlagEn6[] PROGMEM = "RagQaoVWHUxe+gdNGpIUF0fBteDgz2LVwcVZVwdXQRD8AXFxdVJ0kRLvSwotYrzweB/n3XN47z5AqJeZZnWMAZpum6lEXMxkV8XOV4TRhwBCmJaZZcxJUhK+9XVPnVR3MZ7l3/dn9ag5iwEBkXiWGaZNvEE8tWkbnPeJI6woq8TnxKMmXZD4keuKx2+cCy4LPDNiplPzxBFisdDGShuzoqkRTxJHVU2nfCHjscp5i7NWrrLmPfkLwzl9ZZnrtIaQwCKWIEGEgipKKMNGjHadFAspOo/7+Addv0QuhVwlMHIsoAINsusH/4Pfs7XyE+NeUjgOhF4c52MY6NwFGjXH+T52nMYJEHwGrvSWv1IHZj5Jr7W06BHQuw1cXLc0ZQ+43AEGngzZlF0pSEvI54H3M/qmLNB/C3SveXNrnuP0AUjTrJI3wMEhMFKg7HWfd3e1z+3fnub8fgBK4XKXYFI09AAAABtQTFRFYQAA2QAmAFO2cobC3XN4prHT5bG16tbZ7+vp9gGK9QAAAAF0Uk5TAEDm2GYAAAABYktHRACIBR1IAAAACXBIWXMAAC4jAAAuIwF4pT92AAAAB3RJTUUH4wwSAQ8U/2QTHAAAANRJREFUKM+dkr0KAjEQhKMiWJomtUSuFw9fQVuJcKQNeHAPYGFpk7s8tjP5UTRWbpPsl8ntZvaEiBGkDOId8y3BfvPKdQK6EFNAk/KVL6BbR6CCSaBxA/OlG3wCnQpnAI31";
+const char strFlagEn7[] PROGMEM = "QnDAiSaA0hPgwGjWpISAAlQGgITgCAHAom3b7kRw99juREgBkCKDScp7BvIr/gHVR6uybMxOBLc+NsbWw5VgVCa/xY4qXnE9AZ6PHYGlhH5gkwyihBZiTRbihBYKKLPJwUXXZ30Zg338HlQ9ymrYH7/DE1YIbsUViqSPAAAAAElFTkSuQmCC";
+const char *const arrFlagEnBase64[] PROGMEM = {strFlagEn0, strFlagEn1, strFlagEn2, strFlagEn3, strFlagEn4, strFlagEn5, strFlagEn6, strFlagEn7};
 
-const char strIconMeter0[] PROGMEM = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAGc3pUWHRSYXcgcHJvZmlsZSB0eXBlIGV4aWYAAHjarVdZsuQoDPznFHMEJBDLcVgj5gZz/EkBdi2v3uvuibGjDJZZhDK1lBn//D3NX7iYXTBeYgo5BIvLZ5+5oJPsvnZL1q/nuvh8wvuL3NwfGCKH1u3XMM74Ark8JkR/5PVVbmI766SzENmXrZ3urP1+lDwLOd5yOu8mnwklPB3n/LidZa9jvb37CGN0wXqODQ9Hzq4n750ctHDZFTwJT+d0oN5lfVNJ+Go/c5vugwHv3pv97KWZe5hjL3QdK7zZ6chJ3uTu3oZfNCK+d+ZnjYq30T5fT/abs6c5xz5d8eBR9uEc6jrK6mFghTndmhZwR/wE/bjujDvZYhtQ6zhqNbbiJRPD4pM8dSo0aay2UYOKngdHtMyN3ZIlFzlzW6B4vWlyNMCnuwQ8GpBzEPOtC619s+6HzRJ27oSRTFgMGL/e5l3wX++XheZUmhPZdNsKerHyC2oocvrEKABC89hUln3J7Ma+X7RY6DFMzZxwwGLrXqIKPbjlFs7OisFQb7e/UOxnAZgIewuUAbs92UBOKJCNzJEIdkzAp0Bzdp4rECAxwh1asgfvAU5i3RtzIq2xLLzFCC8AQlxwEdDAgQCW9+ID/C2BQsWIEy8iQaIkyVKCCz5ICCEGjVMluuijxBBjTDHHklzySVJIMaWUU8mc";
-const char strIconMeter1[] PROGMEM = "HcKYmBxyzCnnXAo2Lb5grYLxBYLK1VVfpYYaa6q5lgb6NN+khRZbarmVzt11hADTQ4899dzLoAEqDT9khBFHGnmUCa5NN/2UGWacaeZZbtQOqq+ovSP3M2p0UOMFlI6LD9QgjvFagjSciGIGxNgTEI+KAAjNiplN5D0rcoqZzeyMc8LQUhScTooYEPSDWCbd2D2Q+xY3A+v+KW78CTmj0P0fyBmF7gm5r7h9QK2XFW7dAki9EDZFhHRwv2FHKgwVEBZZe7/RYqtaduMT0lESFoKRMpOvXjRPSQRObXZtcmvFk8rF27YWKZoF31vz3Ydfto1K6DIZOoXeg2FVSEJx8PBwdGpQIR/lwugBgRe+Devm3BETVFnuHmuMEWZXdcUa9/tG+dA2WwDy4NAMkNY1gzJjGQvRCPCDfc9zvhNQyFOgsLeGNKRLIqlTsgPB89ERuWrbWAuF71udCio243ta5oCZLp10BGzFL1N+JTBPkqoW1grIYVmYefYAtqbiD+qZktDB4LVFloJGOqYnpE2vvXA2QznkQipxje+wSVzbfSszH4SCJUGVjO7q4BnWvn1rALN8NZ+R5KR2pYY0i0NkPUb1yNTXQlJG4gonQ4OIIiiSMCpP3+DRHq6l37qZ8ObShhWf0lCXD9CoBiZMKnBaRCi4YukY50uvBWGjU5s4O6jcwZoMuIGcQQNtQsQugG8ZfnOqL5UxFj7npuBYITrO53T2JjJDD6c2cqHiDJW4";
-const char strIconMeter2[] PROGMEM = "79l5ecgbyPvD6XyUmO8G3ZS4Yd5f1EGpg4LH+WrdLETB/iCDLggySUUC2ML2BN7l+J8F5uMQ7agnfZEssqG/vE15hyp3G8tUVM/XSvDl0F3JiNAZx5p4U2JeoeITfe7W7I5EmPsKigoc6tNfuS68aBkgDKRA0mIUZLHgyWLiq35gTlNwu7iaoVze/oiadKTjAloX6njzMWQ1NQFyW6WE4BAa10KI8kUbcXTMUt2TF5snN3YFtkNO0rzGVSvZjGSldM5hNOfTtnhpqXzJJc3YUlEipL5jnjpZlEPmmgW5HqXzJnNOjyQC/tYw1MnWbBzZvPhEXsUGMjwCKHyHOLjD8hDkEYQ0WA0AIk9+blSH7d/YB2q6nH3aO6cvgYw0f2hkpb6wcpr2F5nIlGsFDqWhYjy58PkYO4JUhIIOu2HEUBMOJH1ZNc+aYYKXl8AJtXHYiCTHhyYrlqsiFakWdDg0Sa9J0zx5yFYtIVONxiENrUeUKnBRuwKoui0SpiaNlSIjk6DoGRp9DaKI0uGEHNiPsiR/BVXeYSeuIJzxBX8+BcUM15NxFk5KHVOUDJvXDTEB5dLrGj/m2ranluzwNysXB2vuGAwn2B6PcHnHIPD0eK9a6nI3XonmUSNoXtvDt30Y6I0hFxbP6P3cmi8flq8OxaSOiNgBH8iLxhT0CCkf/8gpLSrKSoXQSCoA6R11JynVwWgoMl0a7TfKq0dr/qi8url5fGwhB5/CP1lzWasq";
-const char strIconMeter3[] PROGMEM = "+j/mnZ9bA0eZqFOz+RdFnCrqNKRqzAAAAYRpQ0NQSUNDIHByb2ZpbGUAAHicfZE9SMNAHMVfU6WiFQcLiigEqU4WREUctQpFqBBqhVYdTK6f0KQhSXFxFFwLDn4sVh1cnHV1cBUEwQ8QF1cnRRcp8X9JoUWMB8f9eHfvcfcOEGolpppt44CqWUYiFhVT6VUx8IouDKEPAoZlZupzkhSH5/i6h4+vdxGe5X3uz9GdyZoM8InEs0w3LOIN4ulNS+e8TxxiBTlDfE48ZtAFiR+5rrj8xjnvsMAzQ0YyMU8cIhbzLay0MCsYKvEUcTijapQvpFzOcN7irJYqrHFP/sJgVltZ5jrNQcSwiCVIEKGggiJKsBChVSPFRIL2ox7+AccvkUshVxGMHAsoQ4Xs+MH/4He3Zm5ywk0KRoH2F9v+GAECu0C9atvfx7ZdPwH8z8CV1vSXa8DMJ+nVphY+Anq2gYvrpqbsAZc7QP+TLhuyI/lpCrkc8H5G35QGem+BzjW3t8Y+Th+AJHUVvwEODoHRPGWve7y7o7W3f880+vsBX1Vyn9LWiKcAAAAGYktHRAD/AP8A/6C9p5MAAAAJcEhZcwAALiMAAC4jAXilP3YAAAAHdElNRQfjCx0XFCSCY/uuAAAE+UlEQVRYw62XTWwUZRjH/887s2Dlo90tB0ktu/2yCQck0YOJRinZCGmCxnDwIoFAggeCxIvBEC+CmAAXhXiAEG8mHAwHJUZMIAHx";
-const char strIconMeter4[] PROGMEM = "oiYYG7/Y7ldpIKTM7BbiLnTn/XvYmeHd6WyXNbyX9um8fX/vPM//+RjJZjfZeLQIQCI2ACj/dwLAjaJzDuB2+k+l+R9fj2X6347b79vaP5umrbqFN20yAjfXY8ODh13BFxY8AFhlwtncsaLhaasLOAGIvQRczMPyM+6rnqf3gNhGYHULvLl7a2HGvQPgghI5PZJO/dQBrgBoidEAjAsxX3bHPa1PAthsuj0Et7EBXLYttX9oMPlXNxpogedKzk5P61+6hZMAiYmFhv45V3J2Gl6mEdZFGmiFF533SZ4F0NMt3LB7tObZXNE5EIEvUmzLZXIlZxfB42aM/wc8tDV5wvDEopRpUXt+xh0nefJJwUNb81Rhxh2PXsCOpprn6VMRt7sickgJ8gSgRBRJQpqMGFtIgkBGk0dFkCSb4Wh4+nMAW9oWjXzZfQ3AhPnmAjk2mk6dJrCSxKdjmf6LoqSsyU+eWm5NWZZc1+RhESk/N9R/ydP6CICVo5nUGaXkmA8PPLJ5uuy80lYDnta7o24nuBYALCW3AV4hCSW4LyJXSdQtSx4CuJKwVa2ZWvIjgFkAiuQzwTlB3dCae2FGJ5vdZAUVrnizMhcUmdYYynmAc49CKqBRgqK2n3FJANtNuL+qmYG+NYmEJQAYaqB8q7ohHg6QfMu0tbEhziaJ6JsHyU6g9+bt+eeHBpO/tWiAxPonona2/jQTj/4eT3N98KdQA+I3mCcBb3lu9IzQG8TT";
-const char strIconMeter5[] PROGMEM = "QWEK+oBi0wvN3LTU5PC65MWIWGNree3BgvQsT8Bssca+cE2XnazW/M73hATeV0YY7hsxHXgcOADM3rp3qBMcAKgxEHhCCf4N9oQaEMEfjxoJNzwOfLrk7NPknk5w/603BmEQwdQiDaQH+qYAVP1bTiolSw4T+bK7ydM8YYi8LdyyFAFO+hqoDq7t/T04M+wFtqU0gAt+GEZuFO5OtIOXZytDDU+fE4ENoDdXdI7fKDqH3GrNjrvAP4W5LIBhX2MXEglLB2eaGqASOROEQZNHG56ODcODBe8jERRAPIRglSb3KoXLyd6eRhTuaQ2teSQQuBI5HR1Iwl4wkk5dA3DZD8MLxZuVD+OGibFM/56xTP9LENwhQaVk18i61LW4t8+XKwdJvOh79lJ0VIvOA9q21H4ANRFAa36cKzk72g0TIKCU7BtNp87HwXMlZwfJw75ZW2ZbB6LetIaHM8p0SbK3Z86dr98i8YbviTfd+Xpj9arlV5VqLeputV4bzaTOLHK7pzFddg+S/CwUopJ9Q+uSP0R1ZQ0PZ+zorVJ9Pdfdan2ewOu+JiYq8/XJSrVeWJNaUQgqVqqv59eo2nOlu1mnWvuKxDthIVHywWg69UWMqBF0w1i150rOTpLhgOKnUR7AtyIyJcAMpFlkCGwEOGmoHQBqlpL3RtKpLyO1Qpvt2F5ibmdhxh33J5nNka7W0ukigwdEcClhWwcyz/b92Q5ufpjEwgFgaDD5N4At02Xn";
-const char strIconMeter6[] PROGMEM = "Za35LoBJAr1xcABVkY4fJiEcgLaXgpvLT7NrDxc8lGYr3wDYGoF/nxno22YWmU5wdNgYu5Y1J5n7MW6/1y08KEQS03jarfCjMhrzDs0rFg5A/gPDrRMdK7g0VQAAAABJRU5ErkJggg==";
-const char *const arrIconMeterBase64[] PROGMEM = {strIconMeter0, strIconMeter1, strIconMeter2, strIconMeter3, strIconMeter4, strIconMeter5, strIconMeter6};
+// french flag coded in base64
+const char strFlagFr0[] PROGMEM = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgBAMAAACBVGfHAAAHdXpUWHRSYXcgcHJvZmlsZSB0eXBlIGV4aWYAAHjarVdbkisrDvzXKmYJvIRgObwUcXcwy58UlN3dbrtP3zO2w1UYlwFlJkpE67//KP0Hr+hCpsRScs3Z4ZVqqqGhUdx5nbt3aV/3K1w/4fuXfrr/ENAVcY/na17X8w39/PEHSVd//9pPMq5xyjXQ9cNtwGgz22zzWuQ1UAyn31/fqV5LavlTONcnyonk9vDj9yQAYzI6Y6CwogdYdg1npohVxBqb9exrwYPuaidcOcbv+NEduicA3lsP+Llx9ccPOM5At7DyA05Xv+fn+G2UPq/Ih/vM4fOKenPNfX59wk91FtV1omsJOqopX0HdQtktPNgB50Ej4y34MNqy3xXvgmkGgJ8ItZPr+FJ9AOLqk5++efVr34cfWGIKKwjuIYwQd1+JEmoYm5Rkb69BCPzMWMDJAHMR3eG+Fr/nrTYfJiuYeXo8GTwGM0a/vOmx42/fXwZSNZl778odK6wrmL6wDGPOrngKhHi9MOWNr6dzc48vIzaCQd4wFwTYXD9DdPYf2oqb5+iY8GhyR/Je5jUAIMLcjMX4CAZc9pF99k5CEO+BYwE/DSsPMYUOBjwTh4lVhhRjBjnYDZgb/xG/nw0cTjfSC4jgmKOAGmwgkJUSp4z9ViChRhw5MXNm4cKVW445Zc45S7Y81SRKEpYsIkWq";
+const char strFlagFr1[] PROGMEM = "tBJLKlxykVJKLa2GGpHGmGquUkuttTVM2lLDWA3PN3T00GNPnXvu0kuvvQ3IZ6TBIw8ZZdTRZphxIgXQzFNmmXW25RektNLilZessupqCq1p1KSsWUWLVm131i5Wv7L2yNzPrPmLtbCJsufkgzV0i9yG8JZO2DgDYyF5MC7GAAQdjDNXfErBmDPOXA2RYuSAVbKRM70xBgbT8oHV37n7YO4lbwR0/y1v4RlzZNS9gzky6j4x9523J6zNttNt3ATZLgSmyJAR22+5VVooTVuPQ5w14U9P79hHcIKCdWubrdfouWB46hMLn2OGkuJsUxuXcMasC5nq1ZhYN3DoqzMeLKt3Wj0Lr7HmQkC6RHd6WGO0XvClp1hVpY4+el5VJp7JvfsyE+fOOU38mzEWyZRY+5wYes6sfeqokmMYS0PSNbpm0T4AWu6a7KmsUea4lp2KumRtKs3s2jp/ca+a2GwWF7t7D5LyZEw5abcWZIOpIyJryPvFa8evOtM1b3BLXzOwQaIFHexW6b5qTqB3+WRIARDVvGBec8Qz4gLIw4UeAE+zwHrQMeJqMgggA8AMzCeGSNrr8hBxDaIQZY86lwQNRudS6VLbGoDYYoO2hqw0dpzEdriwmJ/cLXuiEX0/PeEWDg4UW0Qr1dMYjcaUBamr2jkD4swdbLay4eQFx1yv59FoaMdqDZric0TkFbtggBZg3IHKNJRmL/mMOBz20I0sZ/IBSpioZtOQzKS0NTTx";
+const char strFlagFr2[] PROGMEM = "zwwpQUMq8NxLRPj9iAi0mogMTI08sVN3jH3hIDFq+a4jbHssFYmr3CafBxX/TDpflEP/h3S+KIc+SWcLx86zdv0mnkeVP4iJtpreICbaX/Jeb+a4ak1u3GbN8wBTbh0WT8+IB6vZDaRP1u6R+2gipQ2HpIfIVjsakeqQn+9kP95lDGFFHt2NwWVoD5ZGAKro6ICmixyUfD0jwgfzS+VbcEgrXLGqTBMLyV4ZGUclQ2fCGFI08NaIxj5qxIw6qy5F6sKmQLIH0H1MRVbunnm1QSwtCdwlAB0FTB8TxnyQSbcOmJJyR0C2BGvAf5odbjEFMiQOtbKmIBXy0UkfBct4mdz6yrZl5TRWGFlmjYu6Fo6KjSo4g3ZDqIsbZ8TitLvXqsRGmdmu2tIiv04Sq1vWWtKK+fTgsGhetiaM5dpa1WnJHzopn3RCvxbKH3RCvxbKF50YAGKJ+K4T+kkotzv7ExrMB7bcn8ZG/k2xkf+72L7tAXJvio3mm2Ij9u/hjeRNsVF+U2yU+D28Ef8uNiQx7LimyMpXfA3pZRz3so1Meyf/xtzv3m5l6nd3p39h79/cHdnp5u+TXtn74/3YvZ0ZZxCnBtTYmMtAMdiF0FGOKpDV8rxysB2UU1ze9TsQf7Bxeubjf2Pj9MzH/8bG6dHPz2nF7BwwbjdXNjev281xfq6KVA87PxMcQ58aaDv6PI4e1rjkahYVIJxshVOY7l4BvBQK/V4pPwuFfq+Un4VC";
+const char strFlagFr3[] PROGMEM = "u2HyaAxVsF7m3cy80zZvO+thx8M0bYcd7156vDsf78aBkdy30+Bn+CvAxxbj5vIfHJweLPyvHZweLPzRwX/ybzPrdAmlU91KASSfirFz7rNKBBltywSVNRu3hhymu8iTiXxXo3ttR9dd2znsfETyOn2SvunsR3/y9Fv6tAPeqRiA3i461y46wy46p1A+FUPs97Kzn7KTT9kZPsrOnqOG/GL70w8HqZ2GAEy6pV2rq3d5nrUNTNS5WHUOibJSmwOP5V9U6FfC8VDowl8qgkqWDo1IURo+9hggJIfYrFy/yO5tdgRoXJ8Ua4jtylzsZLcxsqIq7KJqKkm8QXQVVf0UVXyKKjslP1bmzxSuhG1d6X+N3icafyleCgAAAYVpQ0NQSUNDIHByb2ZpbGUAAHicfZE9SMNQFIVPU4siFUE7iDhkqE4WREUdtQpFqBBqhVYdTF76B00akhQXR8G14ODPYtXBxVlXB1dBEPwBcXF1UnSREu9LCi1ivPB4H+fdc3jvPkCol5lmdYwBmm6bqURczGRXxc5XhNGHAEKYlpllzElSEr71dU+dVHcxnuXf92f1qDmLAQGReJYZpk28QTy1aRuc94kjrCirxOfEoyZdkPiR64rHb5wLLgs8M2KmU/PEEWKx0MZKG7OiqRFPEkdVTad8IeOxynmLs1ausuY9+QvDOX1lmeu0hpDAIpYgQYSCKkoow0aMdp0UCyk6j/v4B12/RC6FXCUwciygAg2y";
+const char strFlagFr4[] PROGMEM = "6wf/g9+ztfIT415SOA6EXhznYxjo3AUaNcf5PnacxgkQfAau9Ja/UgdmPkmvtbToEdC7DVxctzRlD7jcAQaeDNmUXSlIS8jngfcz+qYs0H8LdK95c2ue4/QBSNOskjfAwSEwUqDsdZ93d7XP7d+e5vx+AErhcpdgUjT0AAAAG1BMVEVQW5geR5oRS5whSZwkS57vGSApTqHwHCj4+vdcwbDgAAAAAXRSTlMAQObYZgAAAAFiS0dEAIgFHUgAAAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElNRQfjDBIBDjdEGFMvAAAAXElEQVQoz2NgAIMOIGBAAGYNkEB7AJxvDBEIhYkYwwRCIXwWhABEiQtCAKyEBVkApCQFWSAUiwAbqkAAEQJpqAKhAyVAhtMJhwdmEGIEMmY0YEQUZlRiRDZKcgAALEaZ0815i7UAAAAASUVORK5CYII=";
+const char *const arrFlagFrBase64[] PROGMEM = {strFlagFr0, strFlagFr1, strFlagFr2, strFlagFr3, strFlagFr4};
+
+// control page texts
+const char strControlOffEn[] PROGMEM = "Switch off Heater";
+const char strControlOffFr[] PROGMEM = "Eteindre le Radiateur";
+const char *const arrControlOff[] PROGMEM = {strControlOffEn, strControlOffFr};
+const char strControlOnEn[] PROGMEM = "Switch on Heater";
+const char strControlOnFr[] PROGMEM = "Allumer le Radiateur";
+const char *const arrControlOn[] PROGMEM = {strControlOnEn, strControlOnFr};
+const char strControlTempEn[] PROGMEM = "Target";
+const char strControlTempFr[] PROGMEM = "Souhaité";
+const char *const arrControlTemp[] PROGMEM = {strControlTempEn, strControlTempFr};
+const char strControlSetEn[] PROGMEM = "Set target";
+const char strControlSetFr[] PROGMEM = "Définir";
+const char *const arrControlSet[] PROGMEM = {strControlSetEn, strControlSetFr};
+const char strControlVersionEn[] PROGMEM = "English version";
+const char strControlVersionFr[] PROGMEM = "version française";
+const char *const arrControlVersion[] PROGMEM = {strControlVersionEn, strControlVersionFr};
+int   controlLangage = PILOTWIRE_LANGAGE_ENGLISH;
 
 // fil pilote modes
 enum PilotWireModes { PILOTWIRE_DISABLED, PILOTWIRE_OFF, PILOTWIRE_COMFORT, PILOTWIRE_ECO, PILOTWIRE_FROST, PILOTWIRE_THERMOSTAT, PILOTWIRE_OFFLOAD };
 
 // fil pilote commands
-enum PilotWireCommands { CMND_PILOTWIRE_MODE, CMND_PILOTWIRE_OFFLOAD, CMND_PILOTWIRE_MIN, CMND_PILOTWIRE_MAX, CMND_PILOTWIRE_TARGET, CMND_PILOTWIRE_DRIFT, CMND_PILOTWIRE_POWER, CMND_PILOTWIRE_PRIORITY, CMND_PILOTWIRE_CONTRACT, CMND_PILOTWIRE_MQTTTOPIC, CMND_PILOTWIRE_JSONKEY };
-const char kPilotWireCommands[] PROGMEM = D_CMND_PILOTWIRE_MODE "|" D_CMND_PILOTWIRE_OFFLOAD "|" D_CMND_PILOTWIRE_MIN "|" D_CMND_PILOTWIRE_MAX "|" D_CMND_PILOTWIRE_TARGET "|" D_CMND_PILOTWIRE_DRIFT "|" D_CMND_PILOTWIRE_POWER "|" D_CMND_PILOTWIRE_PRIORITY "|" D_CMND_PILOTWIRE_CONTRACT "|" D_CMND_PILOTWIRE_MQTTTOPIC "|" D_CMND_PILOTWIRE_JSONKEY;
+enum PilotWireCommands { CMND_PILOTWIRE_MODE, CMND_PILOTWIRE_OFFLOAD, CMND_PILOTWIRE_MIN, CMND_PILOTWIRE_MAX, CMND_PILOTWIRE_TARGET, CMND_PILOTWIRE_DRIFT, CMND_PILOTWIRE_PULLUP, CMND_PILOTWIRE_POWER, CMND_PILOTWIRE_PRIORITY, CMND_PILOTWIRE_CONTRACT, CMND_PILOTWIRE_MQTTTOPIC, CMND_PILOTWIRE_JSONKEY };
+const char kPilotWireCommands[] PROGMEM = D_CMND_PILOTWIRE_MODE "|" D_CMND_PILOTWIRE_OFFLOAD "|" D_CMND_PILOTWIRE_MIN "|" D_CMND_PILOTWIRE_MAX "|" D_CMND_PILOTWIRE_TARGET "|" D_CMND_PILOTWIRE_DRIFT "|" D_CMND_PILOTWIRE_PULLUP "|" D_CMND_PILOTWIRE_POWER "|" D_CMND_PILOTWIRE_PRIORITY "|" D_CMND_PILOTWIRE_CONTRACT "|" D_CMND_PILOTWIRE_MQTTTOPIC "|" D_CMND_PILOTWIRE_JSONKEY;
 
 // header of publicly accessible control page
 const char INPUT_HEAD_CONTROL[] PROGMEM = "<div style='text-align:left;display:inline-block;min-width:340px;'><div style='text-align:center;'><noscript>" D_NOSCRIPT "<br/></noscript><h2>%s</h2><h2 style='color:blue;'>%s °C</h2><h2 style='color:green;'>%s</h2></div>";
@@ -119,38 +153,82 @@ const char INPUT_FIELDSET_STOP[] PROGMEM = "</fieldset><br />";
  *                  Accessors
 \**************************************************/
 
-// get label according to state
-char* PilotwireGetStateLabel (uint8_t state)
+// get DS18B20 internal pullup state
+bool PilotwireGetPullup ()
 {
-  char* label = NULL;
-    
+  bool flag_ds18b20 = bitRead (Settings.flag3.data, 24);
+
+  return flag_ds18b20;
+}
+
+// set DS18B20 internal pullup state
+void PilotwireSetPullup (bool new_state)
+{
+  bool actual_state = PilotwireGetPullup ();
+
+  // if not set, set pullup resistor for DS18B20 temperature sensor
+  if (actual_state != new_state)
+  {
+    // update DS18B20 pullup state
+    bitWrite (Settings.flag3.data, 24, new_state);
+
+    // ask for reboot
+    restart_flag = 2;
+  }
+}
+
+// get state label
+void PilotwireGetStateLabel (uint8_t state, String& str_label)
+{
   // get label
   switch (state)
   {
    case PILOTWIRE_DISABLED:         // Disabled
-     label = D_PILOTWIRE_DISABLED;
+     str_label = D_PILOTWIRE_DISABLED;
      break;
    case PILOTWIRE_OFF:              // Off
-     label = D_PILOTWIRE_OFF;
+     str_label = D_PILOTWIRE_OFF;
      break;
    case PILOTWIRE_COMFORT:          // Comfort
-     label = D_PILOTWIRE_COMFORT;
+     str_label = D_PILOTWIRE_COMFORT;
      break;
    case PILOTWIRE_ECO:              // Economy
-     label = D_PILOTWIRE_ECO;
+     str_label = D_PILOTWIRE_ECO;
      break;
    case PILOTWIRE_FROST:            // No frost
-     label = D_PILOTWIRE_FROST;
+     str_label = D_PILOTWIRE_FROST;
      break;
    case PILOTWIRE_THERMOSTAT:       // Thermostat
-     label = D_PILOTWIRE_THERMOSTAT;
+     str_label = D_PILOTWIRE_THERMOSTAT;
      break;
    case PILOTWIRE_OFFLOAD:          // Offloaded
-     label = D_PILOTWIRE_OFFLOAD;
+     str_label = D_PILOTWIRE_OFFLOAD;
      break;
   }
-  
-  return label;
+}
+
+// get state color
+void PilotwireGetStateColor (uint8_t state, String& str_color)
+{
+  // set color according to state
+  switch (state)
+  {
+    case PILOTWIRE_COMFORT:
+      str_color = "green";
+      break;
+    case PILOTWIRE_FROST:
+      str_color = "grey";
+      break;
+    case PILOTWIRE_ECO:
+      str_color = "blue";
+      break;
+    case PILOTWIRE_OFF:
+    case PILOTWIRE_OFFLOAD:
+      str_color = "red";
+      break;
+    default:
+      str_color = "white";
+  }
 }
 
 // get pilot wire state from relays state
@@ -258,22 +336,28 @@ void PilotwireSetOffload (char* offload)
 // set pilot wire minimum temperature
 void PilotwireSetMinTemperature (float new_temperature)
 {
+  float temp_min, temp_max;
+  temp_min = atof (D_WEB_PILOTWIRE_TEMP_MIN);
+  temp_max = atof (D_WEB_PILOTWIRE_TEMP_MAX);
+
   // if within range, save temperature correction
-  if ((new_temperature >= PILOTWIRE_TEMP_MIN) && (new_temperature <= PILOTWIRE_TEMP_MAX)) Settings.weight_item = (unsigned long) (new_temperature * 10);
+  if ((new_temperature >= temp_min) && (new_temperature <= temp_max)) Settings.weight_item = (unsigned long) (new_temperature * 10);
 }
 
 // get pilot wire minimum temperature
 float PilotwireGetMinTemperature ()
 {
-  float min_temperature;
+  float min_temperature, temp_min, temp_max;
+  temp_min = atof (D_WEB_PILOTWIRE_TEMP_MIN);
+  temp_max = atof (D_WEB_PILOTWIRE_TEMP_MAX);
 
   // get drift temperature (/10)
   min_temperature = (float) Settings.weight_item;
   min_temperature = min_temperature / 10;
   
   // check if within range
-  if (min_temperature < PILOTWIRE_TEMP_MIN) min_temperature = PILOTWIRE_TEMP_MIN;
-  if (min_temperature > PILOTWIRE_TEMP_MAX) min_temperature = PILOTWIRE_TEMP_MAX;
+  if (min_temperature < temp_min) min_temperature = temp_min;
+  if (min_temperature > temp_max) min_temperature = temp_max;
 
   return min_temperature;
 }
@@ -281,22 +365,28 @@ float PilotwireGetMinTemperature ()
 // set pilot wire maximum temperature
 void PilotwireSetMaxTemperature (float new_temperature)
 {
+  float temp_min, temp_max;
+  temp_min = atof (D_WEB_PILOTWIRE_TEMP_MIN);
+  temp_max = atof (D_WEB_PILOTWIRE_TEMP_MAX);
+
   // if within range, save temperature correction
-  if ((new_temperature >= PILOTWIRE_TEMP_MIN) && (new_temperature <= PILOTWIRE_TEMP_MAX)) Settings.energy_frequency_calibration = (unsigned long) (new_temperature * 10);
+  if ((new_temperature >= temp_min) && (new_temperature <= temp_max)) Settings.energy_frequency_calibration = (unsigned long) (new_temperature * 10);
 }
 
 // get pilot wire maximum temperature
 float PilotwireGetMaxTemperature ()
 {
-  float max_temperature;
+  float max_temperature, temp_min, temp_max;
+  temp_min = atof (D_WEB_PILOTWIRE_TEMP_MIN);
+  temp_max = atof (D_WEB_PILOTWIRE_TEMP_MAX);
 
   // get drift temperature (/10)
   max_temperature = (float) Settings.energy_frequency_calibration;
   max_temperature = max_temperature / 10;
   
   // check if within range
-  if (max_temperature < PILOTWIRE_TEMP_MIN) max_temperature = PILOTWIRE_TEMP_MIN;
-  if (max_temperature > PILOTWIRE_TEMP_MAX) max_temperature = PILOTWIRE_TEMP_MAX;
+  if (max_temperature < temp_min) max_temperature = temp_min;
+  if (max_temperature > temp_max) max_temperature = temp_max;
 
   return max_temperature;
 }
@@ -304,22 +394,28 @@ float PilotwireGetMaxTemperature ()
 // set pilot wire drift temperature
 void PilotwireSetDrift (float new_drift)
 {
+  float drift_min, drift_max;
+  drift_min = atof (D_WEB_PILOTWIRE_DRIFT_MIN);
+  drift_max = atof (D_WEB_PILOTWIRE_DRIFT_MAX);
+
   // if within range, save temperature correction
-  if ((new_drift >= PILOTWIRE_DRIFT_MIN) && (new_drift <= PILOTWIRE_DRIFT_MAX)) Settings.weight_calibration = (unsigned long) (50 + (new_drift * 10));
+  if ((new_drift >= drift_min) && (new_drift <= drift_max)) Settings.weight_calibration = (unsigned long) (50 + (new_drift * 10));
 }
 
 // get pilot wire drift temperature
 float PilotwireGetDrift ()
 {
-  float drift;
+  float drift, drift_min, drift_max;
+  drift_min = atof (D_WEB_PILOTWIRE_DRIFT_MIN);
+  drift_max = atof (D_WEB_PILOTWIRE_DRIFT_MAX);
 
   // get drift temperature (/10)
   drift = (float) Settings.weight_calibration;
   drift = ((drift - 50) / 10);
   
   // check if within range
-  if (drift < PILOTWIRE_DRIFT_MIN) drift = PILOTWIRE_DRIFT_MIN;
-  if (drift > PILOTWIRE_DRIFT_MAX) drift = PILOTWIRE_DRIFT_MAX;
+  if (drift < drift_min) drift = drift_min;
+  if (drift > drift_max) drift = drift_max;
 
   return drift;
 }
@@ -327,20 +423,12 @@ float PilotwireGetDrift ()
 // get current temperature
 float PilotwireGetTemperature ()
 {
-  float temperature;
-  
-  // get global temperature
-  temperature = global_temperature;
+  uint8_t index;
+  float   temperature;
 
-  // if global temperature not defined and ds18b20 sensor present, read it 
-#ifdef USE_DS18B20
-  if ((temperature == 0) && (ds18b20_temperature != 0)) temperature = ds18b20_temperature;
-#endif
-
-  // if global temperature not defined and dht sensor present, read it 
-#ifdef USE_DHT
-  if ((temperature == 0) && (Dht[0].t != 0)) temperature = Dht[0].t;
-#endif
+  index = ds18x20_sensor[0].index;
+  if (ds18x20_sensor[index].valid) temperature = ds18x20_sensor[index].temperature;
+  else temperature = PILOTWIRE_TEMP_UNDEFINED;
 
   return temperature;
 }
@@ -351,7 +439,8 @@ float PilotwireGetTemperatureWithDrift ()
   float temperature;
   
   // get current temperature adding drift correction
-  temperature = PilotwireGetTemperature () + PilotwireGetDrift ();
+  temperature = PilotwireGetTemperature ();
+  if (temperature != PILOTWIRE_TEMP_UNDEFINED) temperature += PilotwireGetDrift ();
 
   return temperature;
 }
@@ -359,22 +448,28 @@ float PilotwireGetTemperatureWithDrift ()
 // set pilot wire in thermostat mode
 void PilotwireSetThermostat (float new_thermostat)
 {
+  float temp_min, temp_max;
+  temp_min = atof (D_WEB_PILOTWIRE_TEMP_MIN);
+  temp_max = atof (D_WEB_PILOTWIRE_TEMP_MAX);
+
   // save target temperature
-  if ((new_thermostat >= PILOTWIRE_TEMP_MIN) && (new_thermostat <= PILOTWIRE_TEMP_MAX)) Settings.weight_max = (uint16_t) (new_thermostat * 10);
+  if ((new_thermostat >= temp_min) && (new_thermostat <= temp_max)) Settings.weight_max = (uint16_t) (new_thermostat * 10);
 }
 
 // get target temperature
 float PilotwireGetTargetTemperature ()
 {
-  float temperature;
+  float temperature, temp_min, temp_max;
+  temp_min = atof (D_WEB_PILOTWIRE_TEMP_MIN);
+  temp_max = atof (D_WEB_PILOTWIRE_TEMP_MAX);
 
   // get target temperature (/10)
   temperature = (float) Settings.weight_max;
   temperature = temperature / 10;
   
   // check if within range
-  if (temperature < PILOTWIRE_TEMP_MIN) temperature = PILOTWIRE_TEMP_MIN;
-  if (temperature > PILOTWIRE_TEMP_MAX) temperature = PILOTWIRE_TEMP_MAX;
+  if (temperature < temp_min) temperature = temp_min;
+  if (temperature > temp_max) temperature = temp_max;
 
   return temperature;
 }
@@ -386,50 +481,61 @@ float PilotwireGetTargetTemperature ()
 // Show JSON status (for MQTT)
 void PilotwireShowJSON (bool append)
 {
-  float   drift_temperature;
-  float   actual_temperature, target_temperature, min_temperature, max_temperature;
-  uint8_t actual_mode;
-  char*   actual_label;
+//  float   drift_temperature;
+  float       actual_temperature;
+  uint8_t     actual_mode;
+  String      str_temperature, str_label;
 
   // start message  -->  {  or  ,
   if (append == false) snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("{"));
   else snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,"), mqtt_data);
 
-  // get mode and temperature
-  actual_mode  = PilotwireGetMode ();
-  actual_label = PilotwireGetStateLabel (actual_mode);
-  drift_temperature  = PilotwireGetDrift ();
+  // get temperature and mode
   actual_temperature = PilotwireGetTemperatureWithDrift ();
-  target_temperature = PilotwireGetTargetTemperature ();
-  min_temperature = PilotwireGetMinTemperature ();
-  max_temperature = PilotwireGetMaxTemperature ();
-
+  actual_mode  = PilotwireGetMode ();
+  PilotwireGetStateLabel (actual_mode, str_label);
+ 
   // pilotwire mode  -->  "PilotWire":{"Relay":2,"Mode":5,"Label":"Thermostat",Offload:"ON","Temperature":20.5,"Target":21,"Min"=15,"Max"=25}
   snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_PILOTWIRE "\":{"), mqtt_data);
   snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_PILOTWIRE_RELAY "\":%d"), mqtt_data, devices_present);
   snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,\"" D_JSON_PILOTWIRE_MODE "\":%d"), mqtt_data, actual_mode);
-  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,\"" D_JSON_PILOTWIRE_LABEL "\":\"%s\""), mqtt_data, actual_label);
+  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,\"" D_JSON_PILOTWIRE_LABEL "\":\"%s\""), mqtt_data, str_label.c_str ());
+ 
   if (pilotwire_offloaded == true) snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,\"" D_JSON_PILOTWIRE_OFFLOAD "\":\"%s\""), mqtt_data, "ON");
   else snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,\"" D_JSON_PILOTWIRE_OFFLOAD "\":\"%s\""), mqtt_data, "OFF");
-  if (actual_temperature != 0) snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,\"" D_JSON_PILOTWIRE_TEMPERATURE "\":%.1f"), mqtt_data, actual_temperature);
+
+  if (actual_temperature != PILOTWIRE_TEMP_UNDEFINED)
+  {
+    str_temperature = String (PilotwireGetTemperatureWithDrift ());
+    snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,\"" D_JSON_PILOTWIRE_TEMPERATURE "\":%s"), mqtt_data, str_temperature.c_str ());
+  }
+
   if (actual_mode == PILOTWIRE_THERMOSTAT)
   {
-    snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,\"" D_JSON_PILOTWIRE_TARGET "\":%.1f"), mqtt_data, target_temperature);
-    snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,\"" D_JSON_PILOTWIRE_DRIFT "\":%.1f"), mqtt_data, drift_temperature);
-    snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,\"" D_JSON_PILOTWIRE_MIN "\":%.1f"), mqtt_data, min_temperature);
-    snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,\"" D_JSON_PILOTWIRE_MAX "\":%.1f"), mqtt_data, max_temperature);
+    str_temperature = String (PilotwireGetTargetTemperature ());
+    snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,\"" D_JSON_PILOTWIRE_TARGET "\":%s"), mqtt_data, str_temperature.c_str());
+
+    str_temperature = String (PilotwireGetDrift ());
+    snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,\"" D_JSON_PILOTWIRE_DRIFT "\":%s"), mqtt_data, str_temperature.c_str());
+
+    str_temperature = String (PilotwireGetMinTemperature ());
+    snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,\"" D_JSON_PILOTWIRE_MIN "\":%s"), mqtt_data, str_temperature.c_str());
+
+    str_temperature = String (PilotwireGetMaxTemperature ());
+    snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,\"" D_JSON_PILOTWIRE_MAX "\":%s"), mqtt_data, str_temperature.c_str());
   }
+
   snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s}"), mqtt_data);
 
   // if pilot wire mode is enabled
   if (actual_mode != PILOTWIRE_DISABLED)
   {
     // relay state  -->  ,"Relay":{"Mode":4,"Label":"Comfort","Number":number}
-    actual_mode  = PilotwireGetRelayState ();
-    actual_label = PilotwireGetStateLabel (actual_mode);
+    actual_mode = PilotwireGetRelayState ();
+    PilotwireGetStateLabel (actual_mode, str_label);
     snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,\"" D_JSON_PILOTWIRE_STATE "\":{"), mqtt_data);
     snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_PILOTWIRE_MODE "\":%d"), mqtt_data, actual_mode);
-    snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,\"" D_JSON_PILOTWIRE_LABEL "\":\"%s\""), mqtt_data, actual_label);
+    snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,\"" D_JSON_PILOTWIRE_LABEL "\":\"%s\""), mqtt_data, str_label.c_str ());
     snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s}"), mqtt_data);
   }
   
@@ -486,42 +592,19 @@ bool PilotwireCommand ()
 void PilotwireEvery250MSecond ()
 {
   float    actual_temperature, target_temperature;
-  uint8_t  target_mode, heater_state, target_state;
-  uint8_t  heater_priority;
-  uint16_t house_contract, heater_power;
-  ulong    time_now;
+  uint8_t  heater_mode, heater_state, target_state;
 
-  // get house contract heater power and heater priority
-  heater_priority = PilotwireMqttGetPriority ();
-  house_contract = PilotwireMqttGetContract ();
-  heater_power   = PilotwireGetHeaterPower ();
-
-  // if contract and heater power are defined
-  if ((house_contract > 0) && (heater_power > 0))
-  {
-    // if house power is too high, heater should be offloaded
-    if (pilotwire_house_power > house_contract)
-    {
-      // set offload status
-      pilotwire_offloaded   = true;
-      pilotwire_meter_count = 0;
-    }
-
-    // else if heater is candidate to remove offload
-    else if (pilotwire_meter_count >= heater_priority) pilotwire_offloaded = false;
-  }
-
-  // get target mode
-  target_mode = PilotwireGetMode ();
+  // get heater mode
+  heater_mode = PilotwireGetMode ();
 
   // if pilotwire mode is enabled
-  if (target_mode != PILOTWIRE_DISABLED)
+  if (heater_mode != PILOTWIRE_DISABLED)
   {
     // if offload mode, target state is off
     if (pilotwire_offloaded == true) target_state = PILOTWIRE_OFF;
  
     // else if thermostat mode
-    else if (target_mode == PILOTWIRE_THERMOSTAT)
+    else if (heater_mode == PILOTWIRE_THERMOSTAT)
     {
       // get current and target temperature
       actual_temperature = PilotwireGetTemperatureWithDrift ();
@@ -529,13 +612,13 @@ void PilotwireEvery250MSecond ()
 
       // if temperature is too low, target state is on
       // else, if too high, target state is off
-      target_state = target_mode;
+      target_state = heater_mode;
       if (actual_temperature < (target_temperature - PILOTWIRE_TEMP_THRESHOLD)) target_state = PILOTWIRE_COMFORT;
       else if (actual_temperature > (target_temperature + PILOTWIRE_TEMP_THRESHOLD)) target_state = PILOTWIRE_OFF;
     }
 
     // else set mode if needed
-    else target_state = target_mode;
+    else target_state = heater_mode;
 
     // get heater status
     heater_state = PilotwireGetRelayState ();
@@ -553,39 +636,33 @@ void PilotwireEvery250MSecond ()
 }
 
 /*******************************************************\
- *                      Web server
+ *                       Web
 \*******************************************************/
 
 #ifdef USE_WEBSERVER
 
-// Pilot Wire heater icon
-void PilotwireWebDisplayIconHeater (uint8_t height)
+// Pilot Wire langage flag
+void PilotwireWebDisplayFlag (uint8_t langage_code)
 {
   uint8_t nbrItem, index;
 
   // display img according to height
-  WSContentSend_P ("<img height=%d src='data:image/png;base64,", height);
+  WSContentSend_P (PSTR ("<img  title='%s' src='data:image/png;base64,"), arrControlVersion[controlLangage]);
 
-  // loop to display base64 segments
-  nbrItem = sizeof (arrIconHeaterBase64) / sizeof (char*);
-  for (index=0; index<nbrItem; index++) { WSContentSend_P (arrIconHeaterBase64[index]); }
 
-  WSContentSend_P ("'/>");
-}
-
-// Pilot Wire meter icon
-void PilotwireWebDisplayIconMeter (uint8_t height)
-{
-  uint8_t nbrItem, index;
-
-  // display img according to height
-  WSContentSend_P ("<img height=%d src='data:image/png;base64,", height);
-
-  // loop to display base64 segments
-  nbrItem = sizeof (arrIconMeterBase64) / sizeof (char*);
-  for (index=0; index<nbrItem; index++) { WSContentSend_P (arrIconMeterBase64[index]); }
-
-  WSContentSend_P ("'/>");
+  // display flag according to langage
+  switch (langage_code)
+  {
+    case PILOTWIRE_LANGAGE_ENGLISH:  // english flag
+      nbrItem = sizeof (arrFlagEnBase64) / sizeof (char*);
+      for (index=0; index<nbrItem; index++) { WSContentSend_P (arrFlagEnBase64[index]); }
+      break;
+    case PILOTWIRE_LANGAGE_FRENCH:  // french flag
+      nbrItem = sizeof (arrFlagFrBase64) / sizeof (char*);
+      for (index=0; index<nbrItem; index++) { WSContentSend_P (arrFlagFrBase64[index]); }
+      break;
+  }
+  WSContentSend_P (PSTR ("' />"));
 }
 
 // Pilot Wire mode selection 
@@ -593,185 +670,137 @@ void PilotwireWebSelectMode (bool public_mode)
 {
   uint8_t actual_mode;
   bool    temp_notavailable;
-  float   actual_temperature, min_temperature, max_temperature, target_temperature;
-  char    argument[PILOTWIRE_LABEL_BUFFER_SIZE];
-
+  float   actual_temperature;
+  String  str_argument, str_label, str_temp_min, str_temp_max, str_temp_target;
+ 
   // get mode and temperature
-  actual_mode  = PilotwireGetMode ();
+  actual_mode        = PilotwireGetMode ();
   actual_temperature = PilotwireGetTemperature ();
-  temp_notavailable = isnan (actual_temperature);
+  temp_notavailable  = isnan (actual_temperature);
 
   // selection : disabled
   if (public_mode == false)
   {
-    if (actual_mode == PILOTWIRE_DISABLED) strcpy (argument, "checked"); 
-    else strcpy (argument, "");
-    WSContentSend_P (INPUT_MODE_SELECT, D_CMND_PILOTWIRE_MODE, PILOTWIRE_DISABLED, PILOTWIRE_DISABLED, argument, D_PILOTWIRE_DISABLED);
+    str_argument = "";
+    if (actual_mode == PILOTWIRE_DISABLED) str_argument = D_WEB_PILOTWIRE_CHECKED; 
+    WSContentSend_P (INPUT_MODE_SELECT, D_CMND_PILOTWIRE_MODE, PILOTWIRE_DISABLED, PILOTWIRE_DISABLED, str_argument.c_str (), D_PILOTWIRE_DISABLED);
     WSContentSend_P (PSTR ("<br/>"));
   }
 
   // selection : off
-  if (actual_mode == PILOTWIRE_OFF) strcpy (argument, "checked");
-  else strcpy (argument, "");
-  WSContentSend_P (INPUT_MODE_SELECT, D_CMND_PILOTWIRE_MODE, PILOTWIRE_OFF, PILOTWIRE_OFF, argument, D_PILOTWIRE_OFF);
+  str_argument = "";
+  if (actual_mode == PILOTWIRE_OFF) str_argument = D_WEB_PILOTWIRE_CHECKED;
+  WSContentSend_P (INPUT_MODE_SELECT, D_CMND_PILOTWIRE_MODE, PILOTWIRE_OFF, PILOTWIRE_OFF, str_argument.c_str (), D_PILOTWIRE_OFF);
   WSContentSend_P (PSTR ("<br/>"));
 
   // if dual relay device
   if ((public_mode == false) && (devices_present > 1))
   {
     // selection : no frost
-    if (actual_mode == PILOTWIRE_FROST) strcpy (argument, "checked");
-    else strcpy (argument, "");
-    WSContentSend_P (INPUT_MODE_SELECT, D_CMND_PILOTWIRE_MODE, PILOTWIRE_FROST, PILOTWIRE_FROST, argument, D_PILOTWIRE_FROST);
+    str_argument = "";
+    if (actual_mode == PILOTWIRE_FROST) str_argument = D_WEB_PILOTWIRE_CHECKED;
+    WSContentSend_P (INPUT_MODE_SELECT, D_CMND_PILOTWIRE_MODE, PILOTWIRE_FROST, PILOTWIRE_FROST, str_argument.c_str (), D_PILOTWIRE_FROST);
     WSContentSend_P (PSTR ("<br/>"));
 
     // selection : eco
-    if (actual_mode == PILOTWIRE_ECO) strcpy (argument, "checked");
-    else strcpy (argument, "");
-    WSContentSend_P (INPUT_MODE_SELECT, D_CMND_PILOTWIRE_MODE, PILOTWIRE_ECO, PILOTWIRE_ECO, argument, D_PILOTWIRE_ECO);
+    str_argument = "";
+    if (actual_mode == PILOTWIRE_ECO) str_argument = D_WEB_PILOTWIRE_CHECKED;
+    WSContentSend_P (INPUT_MODE_SELECT, D_CMND_PILOTWIRE_MODE, PILOTWIRE_ECO, PILOTWIRE_ECO, str_argument.c_str (), D_PILOTWIRE_ECO);
     WSContentSend_P (PSTR ("<br/>"));
   }
 
   // selection : comfort
   if ((public_mode == false) || (temp_notavailable == true))
   {
-    if (actual_mode == PILOTWIRE_COMFORT) strcpy (argument, "checked");
-    else strcpy (argument, "");
-    WSContentSend_P (INPUT_MODE_SELECT, D_CMND_PILOTWIRE_MODE, PILOTWIRE_COMFORT, PILOTWIRE_COMFORT, argument, D_PILOTWIRE_COMFORT);
+    str_argument = "";
+    if (actual_mode == PILOTWIRE_COMFORT) str_argument = D_WEB_PILOTWIRE_CHECKED;
+    WSContentSend_P (INPUT_MODE_SELECT, D_CMND_PILOTWIRE_MODE, PILOTWIRE_COMFORT, PILOTWIRE_COMFORT, str_argument.c_str (), D_PILOTWIRE_COMFORT);
     WSContentSend_P (PSTR ("<br/>"));
   }
 
   // selection : thermostat
   if (temp_notavailable == false) 
   {
-    if (actual_mode == PILOTWIRE_THERMOSTAT) strcpy (argument, "checked");
-    else strcpy (argument, "");
-    WSContentSend_P (INPUT_MODE_SELECT, D_CMND_PILOTWIRE_MODE, PILOTWIRE_THERMOSTAT, PILOTWIRE_THERMOSTAT, argument, D_PILOTWIRE_THERMOSTAT);
+    // label
+    str_label = String (D_PILOTWIRE_THERMOSTAT) + " (°" + String (TempUnit ()) + ")";
 
-    // get temperatures
-    min_temperature    = PilotwireGetMinTemperature ();
-    max_temperature    = PilotwireGetMaxTemperature ();
-    target_temperature = PilotwireGetTargetTemperature ();
+    // temperatures
+    str_temp_min    = String (PilotwireGetMinTemperature ());
+    str_temp_max    = String (PilotwireGetMaxTemperature ());
+    str_temp_target = String (PilotwireGetTargetTemperature ());
 
     // selection : target temperature
-    WSContentSend_P (PSTR ("<input type='number' name='%s' min='%.1f' max='%.1f' step='%.1f' value='%.1f' title='%s'><br/>"), D_CMND_PILOTWIRE_TARGET, min_temperature, max_temperature, PILOTWIRE_TEMP_STEP, target_temperature, "argument");
+    str_argument = "";
+    if (actual_mode == PILOTWIRE_THERMOSTAT) str_argument = D_WEB_PILOTWIRE_CHECKED;
+    WSContentSend_P (INPUT_MODE_SELECT, D_CMND_PILOTWIRE_MODE, PILOTWIRE_THERMOSTAT, PILOTWIRE_THERMOSTAT, str_argument.c_str (), str_label.c_str());
+    WSContentSend_P (PSTR ("<input type='number' name='%s' min='%s' max='%s' step='%s' value='%s' title='%s'><br/>"), D_CMND_PILOTWIRE_TARGET, str_temp_min.c_str(), str_temp_max.c_str(), D_WEB_PILOTWIRE_TEMP_STEP, str_temp_target.c_str(), "argument");
   }
 }
 
 // Pilot Wire configuration button
 void PilotwireWebButton ()
 {
-  // heater icon and configuration button
-  WSContentSend_P (PSTR ("<table style='width:100%%;'><tr><td align='center' style='width:20%%;'>"));
-  PilotwireWebDisplayIconHeater (32);
-  WSContentSend_P (PSTR ("</td><td><form action='%s' method='get'><button>%s</button></form></td></tr></table>"), D_PAGE_PILOTWIRE_HEATER, D_PILOTWIRE_CONF_HEATER);
-
-  // meter icon and configuration button
-  WSContentSend_P (PSTR ("<table style='width:100%%;'><tr><td align='center' style='width:20%%;'>"));
-  PilotwireWebDisplayIconMeter (32);
-  WSContentSend_P (PSTR ("</td><td><form action='%s' method='get'><button>%s</button></form></td></tr></table>"), D_PAGE_PILOTWIRE_METER, D_PILOTWIRE_CONF_METER);
+  // heater and meter configuration button
+  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>"), D_PAGE_PILOTWIRE_HEATER, D_PILOTWIRE_CONF_HEATER);
+  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>"), D_PAGE_PILOTWIRE_METER, D_PILOTWIRE_CONF_METER);
 }
 
-// Pilot Wire heater public configuration web page
-void PilotwireWebPageControl ()
+// append pilot wire state to main page
+bool PilotwireWebSensor ()
 {
-  float   target_temperature, actual_temperature, min_temperature, max_temperature;
-  uint8_t actual_mode;
-  char    argument[PILOTWIRE_BUFFER_SIZE];
+  uint8_t     actual_mode;
+  uint16_t    contract_power;
+  String      str_temperature, str_color, str_label;
 
-  // if heater has to be switched off, set in anti-frost mode
-  if (WebServer->hasArg(D_CMND_PILOTWIRE_OFF)) PilotwireSetMode (PILOTWIRE_FROST); 
-
-  // else, if heater has to be switched on, set in thermostat mode
-  else if (WebServer->hasArg(D_CMND_PILOTWIRE_ON)) PilotwireSetMode (PILOTWIRE_THERMOSTAT);
-
-  // else, if target temperature has been defined
-  else if (WebServer->hasArg(D_CMND_PILOTWIRE_TARGET))
-  {
-    // get target temperature according to 'target' parameter
-    WebGetArg (D_CMND_PILOTWIRE_TARGET, argument, PILOTWIRE_BUFFER_SIZE);
-    if (strlen(argument) > 0) PilotwireSetThermostat (atof (argument));
-  }
-
-  // get current temperature
-  min_temperature = PilotwireGetMinTemperature ();
-  max_temperature = PilotwireGetMaxTemperature ();
-  target_temperature = PilotwireGetTargetTemperature ();
-  actual_temperature = PilotwireGetTemperatureWithDrift ();
+  // get heater condition
   actual_mode = PilotwireGetMode ();
 
-//  dtostrf(actual_temperature, PILOTWIRE_BUFFER_SIZE, 1, argument);
-
-  // beginning of form without authentification
-  WSContentStart_P (D_PILOTWIRE_PARAM_CONTROL, false);
-
-  WSContentSend_P(PSTR ("</script>"));
-  
-  WSContentSend_P(PSTR ("<meta http-equiv='refresh' content='30'/>"));
-  
-  WSContentSend_P(PSTR ("<style>"));
-
-  // beginning of page
-  WSContentSend_P(PSTR (".page {color:white;border-color:white;background-color:#303030;font-family:tahoma;font-size:20px;}"));
-  WSContentSend_P(PSTR (".white {color:grey;border-color:grey;background-color:white;}"));
-  WSContentSend_P(PSTR (".green {color:green;border-color:green;background-color:#D0FFD0;}"));
-  WSContentSend_P(PSTR (".red {color:red;border-color:red;background-color:#FFD0D0;}"));
-  WSContentSend_P(PSTR (".yellow {color:#FFFF33;}"));
-  WSContentSend_P(PSTR (".big {font-size:48px;font-weight:bold;}"));
-  WSContentSend_P(PSTR (".bold {font-weight:bold;}"));
-  WSContentSend_P(PSTR (".target {font-size:24px;}"));
- 
-  WSContentSend_P(PSTR (".slider {width:100%;height:16px;border:none;border-radius:8px;-webkit-appearance:none;}"));
-  WSContentSend_P(PSTR (".slider::-webkit-slider-thumb {width:32px;height:32px;border-radius:16px;background-color:#808080;-webkit-appearance:none;appearance:none;}"));
-  WSContentSend_P(PSTR (".slider::-moz-range-thumb {width:32px;height:32px;border-radius:16px;background-color:#808080;}"));
-  
-  WSContentSend_P(PSTR ("div {width:80%;margin:auto;padding:10px;text-align:center;vertical-align:middle;}"));
-
-  WSContentSend_P(PSTR ("fieldset {border-radius:14px;margin-top:20px;}"));
-  WSContentSend_P(PSTR ("button {border:1px solid white;margin-top:14px;padding:14px 28px;border-radius:14px;font-size:20px;}"));
-
-  WSContentSend_P(PSTR ("</style></head>"));
-
-  WSContentSend_P(PSTR ("<body class='page'>"));
-  WSContentSend_P(PSTR ("<div class='big bold'>%s</div>"), Settings.friendlyname[0]);
-  
-  WSContentSend_P(PSTR ("<div><span class='big yellow'>%.1f °C</span></div>"), actual_temperature);
-  
-  WSContentSend_P(PSTR ("<form method='get' action='%s'>"), D_PAGE_PILOTWIRE_CONTROL);
-  
+  // if pilot wire is in thermostat mode, display target temperature
   if (actual_mode == PILOTWIRE_THERMOSTAT)
   {
-    WSContentSend_P(PSTR ("<div><button name='off' type='submit' class='red'>Eteindre le thermostat</button></div>"));
-    
-    WSContentSend_P(PSTR ("<div><fieldset class='grey'><legend>&nbsp; Température souhaitée &nbsp;</legend>"));
-    WSContentSend_P(PSTR ("<div class='big'><span id='val'></span> °C</div><br /><br />"));
-    WSContentSend_P(PSTR ("<input name='target' type='range' min='%.1f' max='%.1f' value='%.1f' step='0.2' class='slider' id='sld'><br /><br />"), min_temperature, max_temperature, target_temperature);
-    WSContentSend_P(PSTR ("<button name='temp' type='submit' class='white'>Définir</button><br />"));
-    WSContentSend_P(PSTR ("</fieldset></div>"));
+    // read temperature
+    str_temperature  = "<b>" + String (PilotwireGetTemperatureWithDrift (), 1) + "</b>";
+    str_temperature += " / " + String (PilotwireGetTargetTemperature (), 1);
+    WSContentSend_PD(HTTP_SNS_TEMP, D_PILOTWIRE_ROOM, str_temperature.c_str (), TempUnit ());
+  }
 
-    WSContentSend_P(PSTR ("<script>"));
-    WSContentSend_P(PSTR ("var sld=document.getElementById('sld');"));
-    WSContentSend_P(PSTR ("var val=document.getElementById('val');"));
-    WSContentSend_P(PSTR ("val.innerHTML=sld.value;"));
-    WSContentSend_P(PSTR ("sld.oninput=function() {val.innerHTML=this.value;}"));
-    WSContentSend_P(PSTR ("</script><div>"));
+  // if house power is subscribed, display power
+  if (pilotwire_topic_subscribed == true)
+  {
+    contract_power = PilotwireMqttGetContract ();
+    WSContentSend_PD (PSTR("<tr><th>%s</th><td><b>%d</b> / %dW</td></tr>"), D_PILOTWIRE_WATT, pilotwire_house_power, contract_power);
+  }
+  
+  // if pilot wire mode is enabled
+  if (actual_mode != PILOTWIRE_DISABLED)
+  {
+    // get actual state and according color
+    actual_mode = PilotwireGetRelayState ();
+    PilotwireGetStateColor (actual_mode, str_color);
+
+    // if heater is not offloaded, get state
+    if (pilotwire_offloaded == false) PilotwireGetStateLabel (actual_mode, str_label);
+
+    // else, display offload information
+    else
+    {
+      str_label = D_PILOTWIRE_OFFLOAD;
+      if (pilotwire_priority_count > 0) str_label += " <small>(" + String (pilotwire_priority_count) + "/" + String (PilotwireMqttGetPriority ()) + ")</small>";
     }
 
-  else WSContentSend_P(PSTR ("<div><button name='on' type='submit' class='green'>Allumer le thermostat</button></div>"));
-
-  // end of page
-  WSContentSend_P(PSTR ("</form>"));
-  WSContentStop();
+    // display current state
+    WSContentSend_PD (PSTR("<tr><th colspan=2 style='font-size:2em; color:%s; text-align:center;'>%s</th></tr>"), str_color.c_str (), str_label.c_str ());
+  }
 }
 
 // Pilot Wire heater configuration web page
 void PilotwireWebPageHeater ()
 {
-  uint8_t  target_mode;
-  uint8_t  priority_heater;
-  bool     temp_notavailable;
-  float    drift_temperature, actual_temperature, target_temperature, min_temperature, max_temperature;
-  char     argument[PILOTWIRE_BUFFER_SIZE];
+  uint8_t target_mode, val_pullup;
+  bool    temp_notavailable, state_pullup;
+  float   actual_temperature;
+  char    argument[PILOTWIRE_BUFFER_SIZE];
+  String  str_temperature, str_unit, str_pullup;
 
   // if access not allowed, close
   if (!HttpCheckPriviledgedAccess()) return;
@@ -780,6 +809,7 @@ void PilotwireWebPageHeater ()
   target_mode = PilotwireGetMode ();
   actual_temperature = PilotwireGetTemperature ();
   temp_notavailable = isnan (actual_temperature);
+  str_unit = String (TempUnit ());
 
   // page comes from save button on configuration page
   if (WebServer->hasArg("save"))
@@ -803,6 +833,11 @@ void PilotwireWebPageHeater ()
     // get temperature drift according to 'drift' parameter
     WebGetArg (D_CMND_PILOTWIRE_DRIFT, argument, PILOTWIRE_BUFFER_SIZE);
     if (strlen(argument) > 0) PilotwireSetDrift (atof (argument));
+
+    // get temperature drift according to 'drift' parameter
+    WebGetArg (D_CMND_PILOTWIRE_PULLUP, argument, PILOTWIRE_BUFFER_SIZE);
+    if (strlen(argument) > 0) PilotwireSetPullup (true);
+    else PilotwireSetPullup (false);
   }
 
   // beginning of form
@@ -818,34 +853,41 @@ void PilotwireWebPageHeater ()
   if (temp_notavailable == false) 
   {
     // temperature correction label and input
-    drift_temperature = PilotwireGetDrift ();
+    str_temperature = String (PilotwireGetDrift ());
+    WSContentSend_P (PSTR ("<br/>%s (°%s)<br/>"), D_PILOTWIRE_DRIFT, str_unit.c_str ());
+    WSContentSend_P (PSTR ("<input type='number' name='%s' min='%s' max='%s' step='%s' value='%s'>"), D_CMND_PILOTWIRE_DRIFT, D_WEB_PILOTWIRE_DRIFT_MIN, D_WEB_PILOTWIRE_DRIFT_MAX, D_WEB_PILOTWIRE_DRIFT_STEP, str_temperature.c_str());
     WSContentSend_P (PSTR ("<br/>"));
-    WSContentSend_P (PSTR ("%s<br/>"), D_PILOTWIRE_DRIFT);
-    WSContentSend_P (PSTR ("<input type='number' name='%s' min='%d' max='%d' step='%.2f' value='%.2f'><br/>"), D_CMND_PILOTWIRE_DRIFT, PILOTWIRE_DRIFT_MIN, PILOTWIRE_DRIFT_MAX, PILOTWIRE_DRIFT_STEP, drift_temperature);
 
     // temperature minimum label and input
-    min_temperature = PilotwireGetMinTemperature ();
+    str_temperature = String (PilotwireGetMinTemperature ());
+    WSContentSend_P (PSTR ("<br/>%s (°%s)<br/>"), D_PILOTWIRE_MIN, str_unit.c_str ());
+    WSContentSend_P (PSTR ("<input type='number' name='%s' min='%s' max='%s' step='%s' value='%s'>"), D_CMND_PILOTWIRE_MIN, D_WEB_PILOTWIRE_TEMP_MIN, D_WEB_PILOTWIRE_TEMP_MAX, D_WEB_PILOTWIRE_TEMP_STEP, str_temperature.c_str());
     WSContentSend_P (PSTR ("<br/>"));
-    WSContentSend_P (PSTR ("%s<br/>"), D_PILOTWIRE_MIN);
-    WSContentSend_P (PSTR ("<input type='number' name='%s' min='%d' max='%d' step='%.2f' value='%.2f'><br/>"), D_CMND_PILOTWIRE_MIN, PILOTWIRE_TEMP_MIN, PILOTWIRE_TEMP_MAX, PILOTWIRE_TEMP_STEP, min_temperature);
 
     // temperature maximum label and input
-    max_temperature = PilotwireGetMaxTemperature ();
+    str_temperature = String (PilotwireGetMaxTemperature ());
+    WSContentSend_P (PSTR ("<br/>%s (°%s)<br/>"), D_PILOTWIRE_MAX, str_unit.c_str ());
+    WSContentSend_P (PSTR ("<input type='number' name='%s' min='%s' max='%s' step='%s' value='%s'>"), D_CMND_PILOTWIRE_MAX, D_WEB_PILOTWIRE_TEMP_MIN, D_WEB_PILOTWIRE_TEMP_MAX, D_WEB_PILOTWIRE_TEMP_STEP, str_temperature.c_str());
     WSContentSend_P (PSTR ("<br/>"));
-    WSContentSend_P (PSTR ("%s<br/>"), D_PILOTWIRE_MAX);
-    WSContentSend_P (PSTR ("<input type='number' name='%s' min='%d' max='%d' step='%.2f' value='%.2f'><br/>"), D_CMND_PILOTWIRE_MAX, PILOTWIRE_TEMP_MIN, PILOTWIRE_TEMP_MAX, PILOTWIRE_TEMP_STEP, max_temperature);
   }
+
+  // pullup option for ds18b20 sensor
+  state_pullup = PilotwireGetPullup ();
+  if (state_pullup == true) str_pullup = "checked";
+  WSContentSend_P (PSTR ("<br/>"));
+  WSContentSend_P (PSTR ("<input type='checkbox' name='%s' %s>%s"), D_CMND_PILOTWIRE_PULLUP, str_pullup.c_str(), D_PILOTWIRE_PULLUP);
+  WSContentSend_P (PSTR ("<br/>"));
 
   // end of form
   WSContentSend_P (INPUT_FIELDSET_STOP);
-  WSContentSend_P("<button name='save' type='submit' class='button bgrn'>%s</button>", D_SAVE);
-  WSContentSend_P(INPUT_FORM_STOP);
+  WSContentSend_P (PSTR ("<button name='save' type='submit' class='button bgrn'>%s</button>"), D_SAVE);
+  WSContentSend_P (INPUT_FORM_STOP);
 
   // configuration button
-  WSContentSpaceButton(BUTTON_CONFIGURATION);
+  WSContentSpaceButton (BUTTON_CONFIGURATION);
 
   // end of page
-  WSContentStop();
+  WSContentStop ();
 }
 
 // Pilot Wire web page
@@ -854,8 +896,8 @@ void PilotwireWebPageMeter ()
   uint8_t  priority_heater;
   uint16_t power_heater, power_limit;
   char     argument[PILOTWIRE_BUFFER_SIZE];
-  char*    power_topic;
-  char*    json_key;
+  String   str_topic;
+  String   str_key;
 
   // if access not allowed, close
   if (!HttpCheckPriviledgedAccess()) return;
@@ -894,14 +936,15 @@ void PilotwireWebPageMeter ()
 
   // power of heater label and input
   power_heater = PilotwireGetHeaterPower ();
-  WSContentSend_P (PSTR ("%s<br/>"), D_PILOTWIRE_POWER);
+  WSContentSend_P (PSTR ("%s (W)<br/>"), D_PILOTWIRE_POWER);
   WSContentSend_P (PSTR ("<input type='number' name='%s' value='%d'><br/>"), D_CMND_PILOTWIRE_POWER, power_heater);
+  WSContentSend_P (PSTR ("<br/>"));
 
   // priority of heater label and input
   priority_heater  = PilotwireMqttGetPriority ();
+  WSContentSend_P (PSTR ("<br/>%s<br/>"), D_PILOTWIRE_PRIORITY);
+  WSContentSend_P (PSTR ("<input type='number' name='%s' min='%d' max='%d' step='1' value='%d'>"), D_CMND_PILOTWIRE_PRIORITY, PILOTWIRE_PRIORITY_MIN, PILOTWIRE_PRIORITY_MAX, priority_heater);
   WSContentSend_P (PSTR ("<br/>"));
-  WSContentSend_P (PSTR ("%s<br/>"), D_PILOTWIRE_PRIORITY);
-  WSContentSend_P (PSTR ("<input type='number' name='%s' min='1' max='5' step='1' value='%d'><br/>"), D_CMND_PILOTWIRE_PRIORITY, priority_heater);
 
     // house section
   WSContentSend_P (INPUT_FIELDSET_STOP);
@@ -909,29 +952,26 @@ void PilotwireWebPageMeter ()
 
   // contract power limit label and input
   power_limit = PilotwireMqttGetContract ();
-  WSContentSend_P (PSTR ("%s<br/>"), D_PILOTWIRE_CONTRACT);
-  WSContentSend_P (PSTR ("<input type='number' name='%s' value='%d'><br/>"), D_CMND_PILOTWIRE_CONTRACT, power_limit);
+  WSContentSend_P (PSTR ("%s (W)<br/>"), D_PILOTWIRE_CONTRACT);
+  WSContentSend_P (PSTR ("<input type='number' name='%s' value='%d'>"), D_CMND_PILOTWIRE_CONTRACT, power_limit);
+  WSContentSend_P (PSTR ("<br/>"));
 
   // power mqtt topic label and input
-  power_topic = PilotwireMqttGetTopic ();
-  if (power_topic == NULL) strcpy (argument, "");
-  else strcpy (argument, power_topic);
+  PilotwireMqttGetTopic (str_topic);
+  WSContentSend_P (PSTR ("<br/>%s<br/>"), D_PILOTWIRE_MQTTTOPIC);
+  WSContentSend_P (PSTR ("<input name='%s' value='%s'>"), D_CMND_PILOTWIRE_MQTTTOPIC, str_topic.c_str ());
   WSContentSend_P (PSTR ("<br/>"));
-  WSContentSend_P (PSTR ("%s<br/>"), D_PILOTWIRE_MQTTTOPIC);
-  WSContentSend_P (PSTR ("<input name='%s' value='%s'><br/>"), D_CMND_PILOTWIRE_MQTTTOPIC, argument);
 
   // power json key label and input
-  json_key = PilotwireMqttGetJsonKey ();
-  if (json_key == NULL) strcpy (argument, "");
-  else strcpy (argument, json_key);
+  PilotwireMqttGetJsonKey (str_key);
+  WSContentSend_P (PSTR ("<br/>%s<br/>"), D_PILOTWIRE_JSONKEY);
+  WSContentSend_P (PSTR ("<input name='%s' value='%s'>"), D_CMND_PILOTWIRE_JSONKEY, str_key.c_str ());
   WSContentSend_P (PSTR ("<br/>"));
-  WSContentSend_P (PSTR ("%s<br/>"), D_PILOTWIRE_JSONKEY);
-  WSContentSend_P (PSTR ("<input name='%s' value='%s'><br/>"), D_CMND_PILOTWIRE_JSONKEY, argument);
 
   // end of form
   WSContentSend_P (INPUT_FIELDSET_STOP);
-  WSContentSend_P("<button name='save' type='submit' class='button bgrn'>%s</button>", D_SAVE);
-  WSContentSend_P(INPUT_FORM_STOP);
+  WSContentSend_P (PSTR ("<button name='save' type='submit' class='button bgrn'>%s</button>"), D_SAVE);
+  WSContentSend_P (INPUT_FORM_STOP);
 
   // configuration button
   WSContentSpaceButton(BUTTON_CONFIGURATION);
@@ -940,69 +980,124 @@ void PilotwireWebPageMeter ()
   WSContentStop();
 }
 
-// append pilot wire state to main page
-bool PilotwireWebState ()
+// Pilot Wire heater public configuration web page
+void PilotwireWebPageControl ()
 {
-  uint8_t  actual_mode, actual_state;
-  uint16_t contract_power;
-  uint32_t current_time;
-  float    corrected_temperature, target_temperature;
-  char     state_color[PILOTWIRE_COLOR_BUFFER_SIZE];
-  char*    actual_label;
-  TIME_T   current_dst;
+  uint8_t actual_mode, actual_state, other_langage;
+  char    argument[PILOTWIRE_BUFFER_SIZE];
+  String  str_temperature, str_temp_min, str_temp_max, str_temp_target, str_flag;
+  
+  // if langage is changed
+  if (WebServer->hasArg(D_CMND_PILOTWIRE_LANG))
+  {
+    // get langage according to 'lang' parameter
+    WebGetArg (D_CMND_PILOTWIRE_LANG, argument, PILOTWIRE_BUFFER_SIZE);
 
-  // if pilot wire is in thermostat mode, display target temperature
+    if (strcmp (argument, D_PILOTWIRE_ENGLISH) == 0) controlLangage = PILOTWIRE_LANGAGE_ENGLISH;
+    else if (strcmp (argument, D_PILOTWIRE_FRENCH) == 0) controlLangage = PILOTWIRE_LANGAGE_FRENCH;
+  }
+
+  // else if heater has to be switched off, set in anti-frost mode
+  else if (WebServer->hasArg(D_CMND_PILOTWIRE_OFF)) PilotwireSetMode (PILOTWIRE_FROST); 
+
+  // else, if heater has to be switched on, set in thermostat mode
+  else if (WebServer->hasArg(D_CMND_PILOTWIRE_ON)) PilotwireSetMode (PILOTWIRE_THERMOSTAT);
+
+   // else, if target temperature has been defined
+  else if (WebServer->hasArg(D_CMND_PILOTWIRE_TARGET))
+  {
+    // get target temperature according to 'target' parameter
+    WebGetArg (D_CMND_PILOTWIRE_TARGET, argument, PILOTWIRE_BUFFER_SIZE);
+    if (strlen(argument) > 0) PilotwireSetThermostat (atof (argument));
+  }
+
+  // mode
   actual_mode  = PilotwireGetMode ();
+  actual_state = PilotwireGetRelayState ();
+
+  // get other langage
+  other_langage = (controlLangage + 1) % 2;
+
+  // get tempreratures
+  str_temperature = String (PilotwireGetTemperatureWithDrift (), 1);
+  str_temp_min    = String (PilotwireGetMinTemperature (), 1);
+  str_temp_max    = String (PilotwireGetMaxTemperature (), 1);
+  str_temp_target = String (PilotwireGetTargetTemperature (), 1);
+
+  // beginning of form without authentification with 30 seconds auto refresh
+  WSContentStart_P (D_PILOTWIRE_PARAM_CONTROL, false);
+  WSContentSend_P (PSTR ("</script>\n"));
+  WSContentSend_P (PSTR ("<meta http-equiv='refresh' content='30;URL=/%s' />\n"), D_PAGE_PILOTWIRE_CONTROL);
+  
+  // beginning of page
+  WSContentSend_P (PSTR ("<style>\n"));
+  WSContentSend_P (PSTR (".page {color:white;border-color:white;background-color:#303030;font-family:tahoma;font-size:20px;}\n"));
+  WSContentSend_P (PSTR (".title {font-size:32px;}\n"));
+  WSContentSend_P (PSTR (".temp {font-size:44px;}\n"));
+  WSContentSend_P (PSTR (".target {font-size:40px;}\n"));
+  WSContentSend_P (PSTR (".bold {font-weight:bold;}\n"));
+
+  WSContentSend_P (PSTR ("div {width:90%%;margin:auto;padding:10px;text-align:center;vertical-align:middle;}\n"));
+  WSContentSend_P (PSTR ("span.flag {float:right;}\n"));
+  WSContentSend_P (PSTR ("fieldset {border-radius:14px;}\n"));
+  WSContentSend_P (PSTR (".text {border:1px solid white;margin-top:14px;padding:10px 20px;border-radius:14px;font-size:20px;}\n"));
+
+  WSContentSend_P (PSTR (".white {color:grey;border-color:grey;background-color:white;}\n"));
+  WSContentSend_P (PSTR (".green {color:green;border-color:green;background-color:#D0FFD0;}\n"));
+  WSContentSend_P (PSTR (".red {color:red;border-color:red;background-color:#FFD0D0;}\n"));
+  WSContentSend_P (PSTR (".yellow {color:#FFFF33;}\n"));
+ 
+  WSContentSend_P (PSTR (".slider {width:100%%;margin-top:20px;height:16px;border:none;border-radius:8px;-webkit-appearance:none;}\n"));
+  WSContentSend_P (PSTR (".slider::-webkit-slider-thumb {width:36px;height:36px;border-radius:18px;background-color:#808080;-webkit-appearance:none;appearance:none;}\n"));
+  WSContentSend_P (PSTR (".slider::-moz-range-thumb {width:36px;height:36px;border-radius:18px;background-color:#808080;}\n"));
+  
+  WSContentSend_P (PSTR ("</style>\n</head>\n"));
+
+  WSContentSend_P (PSTR ("<body class='page'>\n"));
+
+  WSContentSend_P (PSTR ("<form method='get' action='%s'>\n"), D_PAGE_PILOTWIRE_CONTROL);
+
+  WSContentSend_P (PSTR ("<div class='title bold'>%s</div>\n"), SettingsText(SET_FRIENDLYNAME1));
+  
+  // actual temperature with langage flag
+  WSContentSend_P (PSTR ("<div class='temp yellow'><b>%s</b> °C"), str_temperature.c_str());
+
+  if (other_langage == PILOTWIRE_LANGAGE_ENGLISH) str_flag = "en";
+  else if (other_langage == PILOTWIRE_LANGAGE_FRENCH) str_flag = "fr";
+  WSContentSend_P (PSTR ("<span class='flag'><a href='/control?lang=%s'>"), str_flag.c_str ());
+  PilotwireWebDisplayFlag (other_langage);
+  WSContentSend_P (PSTR ("</a></span>"));
+
+  WSContentSend_P (PSTR ("</div>\n"));
+
+  // if heater is in thermostat mode   
   if (actual_mode == PILOTWIRE_THERMOSTAT)
   {
-    // read temperature
-    corrected_temperature = PilotwireGetTemperatureWithDrift ();
-    target_temperature = PilotwireGetTargetTemperature ();
+    // fielset with target temperature
+    WSContentSend_P (PSTR ("<div><fieldset class='grey'><legend>&nbsp; %s &nbsp;</legend>\n"), arrControlTemp[controlLangage]);
+    WSContentSend_P (PSTR ("<input name='target' type='range' min='%s' max='%s' value='%s' step='0.2' class='slider' id='sld'><br />\n"), str_temp_min.c_str(), str_temp_max.c_str(), str_temp_target.c_str());
+    WSContentSend_P (PSTR ("<div class='target'><span id='val'></span> °C</div>\n"));
+    WSContentSend_P (PSTR ("<button name='temp' type='submit' class='text white'>%s</button><br />\n"), arrControlSet[controlLangage]);
+    WSContentSend_P (PSTR ("</fieldset></div>\n"));
 
-    // add it to JSON
-    snprintf_P (mqtt_data, sizeof(mqtt_data), "%s<tr><th>%s</th><td><font color='blue'>%.1f</font> / %.1f°C</td></tr>", mqtt_data, D_PILOTWIRE_BOTHTEMP, corrected_temperature, target_temperature);
-  }
-
-  // if house power is subscribed, display power
-  if (pilotwire_topic_subscribed == true)
-  {
-    contract_power = PilotwireMqttGetContract ();
-    if (pilotwire_house_power >= contract_power) strcpy (state_color, "red");
-    else strcpy (state_color, "blue");
-    snprintf_P (mqtt_data, sizeof(mqtt_data), "%s<tr><td><b>%s</b></td><td><font color='%s'>%d</font> / %dW</td></tr>", mqtt_data, D_PILOTWIRE_WATT, state_color, pilotwire_house_power, contract_power);
-  }
+    // script to update target value
+    WSContentSend_P (PSTR ("<script>"));
+    WSContentSend_P (PSTR ("var sld=document.getElementById('sld');"));
+    WSContentSend_P (PSTR ("var val=document.getElementById('val');"));
+    WSContentSend_P (PSTR ("val.innerHTML=sld.value;"));
+    WSContentSend_P (PSTR ("sld.oninput=function() {val.innerHTML=this.value;}"));
+    WSContentSend_P (PSTR ("</script>\n"));
   
-  // if pilot wire mode is enabled
-  if (actual_mode != PILOTWIRE_DISABLED)
-  {
-    // get state and label
-    if (pilotwire_offloaded == true) actual_state = PILOTWIRE_OFFLOAD;
-    else actual_state = PilotwireGetRelayState ();
-    actual_label = PilotwireGetStateLabel (actual_state);
-    
-    // set color according to state
-    switch (actual_state)
-    {
-      case PILOTWIRE_COMFORT:
-        strcpy (state_color, "green");
-        break;
-      case PILOTWIRE_FROST:
-        strcpy (state_color, "grey");
-        break;
-      case PILOTWIRE_ECO:
-        strcpy (state_color, "blue");
-        break;
-      case PILOTWIRE_OFF:
-      case PILOTWIRE_OFFLOAD:
-        strcpy (state_color, "red");
-        break;
-      default:
-        strcpy (state_color, "black");
+    // button to switch off heater
+    WSContentSend_P (PSTR ("<div><button name='off' type='submit' class='text red'>%s</button></div>\n"), arrControlOff[controlLangage]);
     }
- 
-    // if pilotwire is not disabled, display current state
-    if (actual_mode != PILOTWIRE_DISABLED) snprintf_P (mqtt_data, sizeof(mqtt_data), "%s<tr><td colspan=2 style='font-size:2em; font-weight:bold; color:%s; text-align:center;'>%s</td></tr>", mqtt_data, state_color, actual_label);
-  }
+
+  // else, button to switch on thermostat
+  else WSContentSend_P (PSTR ("<div><button name='on' type='submit' class='text green'>%s</button></div>\n"), arrControlOn[controlLangage]);
+
+  // end of page
+  WSContentSend_P (PSTR ("</form>\n"));
+  WSContentStop ();
 }
 
 #endif  // USE_WEBSERVER
@@ -1034,12 +1129,9 @@ bool Xsns98 (uint8_t function)
       WebServer->on ("/" D_PAGE_PILOTWIRE_METER, PilotwireWebPageMeter);
       WebServer->on ("/" D_PAGE_PILOTWIRE_CONTROL, PilotwireWebPageControl);
       break;
-    case FUNC_WEB_APPEND:
-      PilotwireWebState ();
+    case FUNC_WEB_SENSOR:
+      PilotwireWebSensor ();
       break;
-//    case FUNC_WEB_ADD_MAIN_BUTTON:
-//      PilotwireWebMainButton ();
-//      break;
     case FUNC_WEB_ADD_BUTTON:
       PilotwireWebButton ();
       break;
