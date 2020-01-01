@@ -5,7 +5,7 @@ This evolution of Tasmota firmware has been enhanced to handle France electrical
 
 Protocol is a pilotwire 2 orders on **Sonoff Basic** and pilotwire 4 orders on **Sonoff Dual R2**.
 
-This Tasmota firmware is based on sonoff original version **v6.5.0** modified with :
+This Tasmota firmware is based on sonoff original version **v8.1** modified with :
   * pilotwire Web configuration interface
   * pilotwire status messages (JSON)
   * pilotwire MQTT messages handling
@@ -27,6 +27,6 @@ MQTT JSON result should look like that :
 
 Pilotwire protocol is described at http://www.radiateur-electrique.org/fil-pilote-radiateur.php
 
-Pre-compiled version of Tasmota handling fil pilote is available : **tasmota-pilotwire.bin**
+Pre-compiled version of Tasmota handling fil pilote is available : **tasmota.bin**
 
 Complete setup guide will be available at http://www.bernaerts-nicolas.fr/iot/...
