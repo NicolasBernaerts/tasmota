@@ -5,16 +5,18 @@ This evolution of Tasmota firmware has been enhanced to handle France electrical
 
 Protocol is a pilotwire 2 orders on **Sonoff Basic** and pilotwire 4 orders on **Sonoff Dual R2**.
 
-This Tasmota firmware is based on sonoff original version **v8.1** modified with :
-  * pilotwire Web configuration interface
-  * pilotwire status messages (JSON)
-  * pilotwire MQTT messages handling
-  * heater offload according to house instant power
+This Tasmota firmware is based on version **v8.1** modified to handle **Pilotwire** with :
+  * Web configuration interface
+  * public page (**/control**)
+  * MQTT status messages (JSON)
+  * specific MQTT commands
+  * automatic offload when house instant power is overloading
 
 To enable **Pilotwire** mode on a **Sonoff Basic** or **Sonoff Dual R2**, you need to :
   * connect diodes on the Sonoff output port(s)
+  * connect a DF18B20 temperature sensor on **serial RX**
   * flash provided firmware
-  * Setup the **Pilotwire** configuration page
+  * Setup configuration pages
  
 MQTT JSON result should look like that :
 
