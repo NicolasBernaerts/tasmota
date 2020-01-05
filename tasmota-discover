@@ -17,7 +17,7 @@ NETMASK=$(ip addr | grep inet | grep brd | head -n 1 | xargs | cut -d' ' -f2)
 echo "Netmask is ${NETMASK}"
 
 # load array from fping
-ARR_IP=( $(fping --addr --retry=1 --generate "${NETMASK}" 2>/dev/null | grep "alive" | cut -d' ' -f1) )
+ARR_IP=( $(fping --addr --retry=2 --generate "${NETMASK}" 2>/dev/null | grep "alive" | cut -d' ' -f1) )
 
 # display number of IP
 NBR_IP="${#ARR_IP[@]}"
@@ -30,13 +30,13 @@ do
 	echo -ne "${IP}\r"
 
 	# get module type
-	TASMOTA_MODULE=$(wget --quiet --tries=1 --timeout=2 -O - "http://${IP}" | grep "Tasmota" | sed "s/[<>]/\n/g" | grep "Module")
+	TASMOTA_MODULE=$(wget --quiet --tries=1 --timeout=5 -O - "http://${IP}" | grep "Tasmota" | sed "s/[<>]/\n/g" | grep "Module")
 
 	# if tasmota detected, display
 	if [ "${TASMOTA_MODULE}" != "" ]
 	then
 		# get tasmota details
-		TASMOTA_DATA=$(wget --quiet --tries=1 --timeout=2 -O - "http://${IP}/in" | sed "s/}2/ /g" | sed "s/}1/\n/g" | sed "s/>/\n/g")
+		TASMOTA_DATA=$(wget --quiet --tries=1 --timeout=5 -O - "http://${IP}/in" | sed "s/}2/ /g" | sed "s/}1/\n/g" | sed "s/>/\n/g")
 		TASMOTA_VERSION=$(echo "${TASMOTA_DATA}" | grep "Program Version" | cut -d' ' -f3)
 		TASMOTA_HOSTNAME=$(echo "${TASMOTA_DATA}" | grep "Hostname" | cut -d' ' -f2)
 		TASMOTA_UPTIME=$(echo "${TASMOTA_DATA}" | grep "Uptime" | cut -d' ' -f2 | cut -d':' -f1-2 | tr 'T' 'd' | tr ':' 'h')
