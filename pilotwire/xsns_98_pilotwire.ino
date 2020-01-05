@@ -63,10 +63,11 @@
 #define D_CMND_PILOTWIRE_DRIFT          "drift"
 #define D_CMND_PILOTWIRE_PULLUP         "pullup"
 #define D_CMND_PILOTWIRE_POWER          "power"
-#define D_CMND_PILOTWIRE_PRIORITY       "priority"
+#define D_CMND_PILOTWIRE_MESS_BEFORE    "before"
+#define D_CMND_PILOTWIRE_MESS_AFTER     "after"
 #define D_CMND_PILOTWIRE_CONTRACT       "contract"
-#define D_CMND_PILOTWIRE_MQTTTOPIC      "topic"
-#define D_CMND_PILOTWIRE_JSONKEY        "key"
+#define D_CMND_PILOTWIRE_HOUSE_TOPIC    "topic"
+#define D_CMND_PILOTWIRE_HOUSE_KEY      "key"
 
 #define D_PILOTWIRE_ENGLISH             "en"
 #define D_PILOTWIRE_FRENCH              "fr"
@@ -91,7 +92,7 @@
 #define D_WEB_PILOTWIRE_DRIFT_STEP      "0.1"
 #define D_WEB_PILOTWIRE_CHECKED         "checked"
 
-#define PILOTWIRE_TEMP_THRESHOLD        0.4
+#define PILOTWIRE_TEMP_THRESHOLD        0.3
 #define PILOTWIRE_TEMP_UNDEFINED        -50
 
 #define PILOTWIRE_LANGAGE_ENGLISH       0
@@ -129,8 +130,8 @@ const char *const arrControlTemp[] PROGMEM = {strControlTempEn, strControlTempFr
 const char strControlSetEn[] PROGMEM = "Set target";
 const char strControlSetFr[] PROGMEM = "Définir";
 const char *const arrControlSet[] PROGMEM = {strControlSetEn, strControlSetFr};
-const char strControlVersionEn[] PROGMEM = "English version";
-const char strControlVersionFr[] PROGMEM = "version française";
+const char strControlVersionEn[] PROGMEM = "Version française";
+const char strControlVersionFr[] PROGMEM = "English version";
 const char *const arrControlVersion[] PROGMEM = {strControlVersionEn, strControlVersionFr};
 int   controlLangage = PILOTWIRE_LANGAGE_ENGLISH;
 
@@ -138,15 +139,15 @@ int   controlLangage = PILOTWIRE_LANGAGE_ENGLISH;
 enum PilotWireModes { PILOTWIRE_DISABLED, PILOTWIRE_OFF, PILOTWIRE_COMFORT, PILOTWIRE_ECO, PILOTWIRE_FROST, PILOTWIRE_THERMOSTAT, PILOTWIRE_OFFLOAD };
 
 // fil pilote commands
-enum PilotWireCommands { CMND_PILOTWIRE_MODE, CMND_PILOTWIRE_OFFLOAD, CMND_PILOTWIRE_MIN, CMND_PILOTWIRE_MAX, CMND_PILOTWIRE_TARGET, CMND_PILOTWIRE_DRIFT, CMND_PILOTWIRE_PULLUP, CMND_PILOTWIRE_POWER, CMND_PILOTWIRE_PRIORITY, CMND_PILOTWIRE_CONTRACT, CMND_PILOTWIRE_MQTTTOPIC, CMND_PILOTWIRE_JSONKEY };
-const char kPilotWireCommands[] PROGMEM = D_CMND_PILOTWIRE_MODE "|" D_CMND_PILOTWIRE_OFFLOAD "|" D_CMND_PILOTWIRE_MIN "|" D_CMND_PILOTWIRE_MAX "|" D_CMND_PILOTWIRE_TARGET "|" D_CMND_PILOTWIRE_DRIFT "|" D_CMND_PILOTWIRE_PULLUP "|" D_CMND_PILOTWIRE_POWER "|" D_CMND_PILOTWIRE_PRIORITY "|" D_CMND_PILOTWIRE_CONTRACT "|" D_CMND_PILOTWIRE_MQTTTOPIC "|" D_CMND_PILOTWIRE_JSONKEY;
+enum PilotWireCommands { CMND_PILOTWIRE_MODE, CMND_PILOTWIRE_OFFLOAD, CMND_PILOTWIRE_MIN, CMND_PILOTWIRE_MAX, CMND_PILOTWIRE_TARGET, CMND_PILOTWIRE_DRIFT, CMND_PILOTWIRE_PULLUP, CMND_PILOTWIRE_POWER, CMND_PILOTWIRE_MESS_BEFORE, CMND_PILOTWIRE_MESS_AFTER, CMND_PILOTWIRE_CONTRACT, CMND_PILOTWIRE_HOUSE_TOPIC, CMND_PILOTWIRE_HOUSE_KEY };
+const char kPilotWireCommands[] PROGMEM = D_CMND_PILOTWIRE_MODE "|" D_CMND_PILOTWIRE_OFFLOAD "|" D_CMND_PILOTWIRE_MIN "|" D_CMND_PILOTWIRE_MAX "|" D_CMND_PILOTWIRE_TARGET "|" D_CMND_PILOTWIRE_DRIFT "|" D_CMND_PILOTWIRE_PULLUP "|" D_CMND_PILOTWIRE_POWER "|" D_CMND_PILOTWIRE_MESS_BEFORE "|" D_CMND_PILOTWIRE_MESS_AFTER "|" D_CMND_PILOTWIRE_CONTRACT "|" D_CMND_PILOTWIRE_HOUSE_TOPIC "|" D_CMND_PILOTWIRE_HOUSE_KEY;
 
 // header of publicly accessible control page
 const char INPUT_HEAD_CONTROL[] PROGMEM = "<div style='text-align:left;display:inline-block;min-width:340px;'><div style='text-align:center;'><noscript>" D_NOSCRIPT "<br/></noscript><h2>%s</h2><h2 style='color:blue;'>%s °C</h2><h2 style='color:green;'>%s</h2></div>";
 const char INPUT_MODE_SELECT[] PROGMEM = "<input type='radio' name='%s' id='%d' value='%d' %s>%s";
 const char INPUT_FORM_START[] PROGMEM = "<form method='get' action='%s'>";
 const char INPUT_FORM_STOP[] PROGMEM = "</form>";
-const char INPUT_FIELDSET_START[] PROGMEM = "<fieldset><legend><b>&nbsp;%s&nbsp;</b></legend><br />";
+const char INPUT_FIELDSET_START[] PROGMEM = "<fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>";
 const char INPUT_FIELDSET_STOP[] PROGMEM = "</fieldset><br />";
 
 /**************************************************\
@@ -749,7 +750,7 @@ void PilotwireWebButton ()
 bool PilotwireWebSensor ()
 {
   uint8_t     actual_mode;
-  uint16_t    contract_power;
+  uint16_t    contract_power, num_message;
   String      str_temperature, str_color, str_label;
 
   // get heater condition
@@ -768,7 +769,7 @@ bool PilotwireWebSensor ()
   if (pilotwire_topic_subscribed == true)
   {
     contract_power = PilotwireMqttGetContract ();
-    WSContentSend_PD (PSTR("<tr><th>%s</th><td><b>%d</b> / %dW</td></tr>"), D_PILOTWIRE_WATT, pilotwire_house_power, contract_power);
+    WSContentSend_PD (PSTR("<tr><th>%s</th><td><b>%d</b> / %dW</td></tr>"), D_PILOTWIRE_HOUSE, pilotwire_house_power, contract_power);
   }
   
   // if pilot wire mode is enabled
@@ -778,18 +779,28 @@ bool PilotwireWebSensor ()
     actual_mode = PilotwireGetRelayState ();
     PilotwireGetStateColor (actual_mode, str_color);
 
-    // if heater is not offloaded, get state
-    if (pilotwire_offloaded == false) PilotwireGetStateLabel (actual_mode, str_label);
-
-    // else, display offload information
-    else
+    // if heater is on the way to be offloaded,
+    if (pilotwire_action_before > 0)
     {
-      str_label = D_PILOTWIRE_OFFLOAD;
-      if (pilotwire_priority_count > 0) str_label += " <small>(" + String (pilotwire_priority_count) + "/" + String (PilotwireMqttGetPriority ()) + ")</small>";
+      num_message = PilotwireMqttGetPriorityBeforeOffload ();
+      str_label = String (D_PILOTWIRE_SENSOR_BEFORE) + "<br/><small>" + String (pilotwire_action_before) + String (D_PILOTWIRE_MESSAGE) + "</small>";
     }
 
+    // else, if heater is on the way to remove offload
+    else if (pilotwire_action_after > 0)
+    {
+      num_message = PilotwireMqttGetPriorityAfterOffload ();
+      str_label = String (D_PILOTWIRE_SENSOR_AFTER) + "<br/><small>" + String (pilotwire_action_after) + String (D_PILOTWIRE_MESSAGE) + "</small>";
+    }
+
+    // else, if heater is offloaded
+    else if (pilotwire_offloaded == true) str_label = D_PILOTWIRE_OFFLOAD;
+  
+    // else, get current state
+    else PilotwireGetStateLabel (actual_mode, str_label);
+    
     // display current state
-    WSContentSend_PD (PSTR("<tr><th colspan=2 style='font-size:2em; color:%s; text-align:center;'>%s</th></tr>"), str_color.c_str (), str_label.c_str ());
+    WSContentSend_PD (PSTR("<tr><th colspan=2 style='font-size:1.6em; color:%s; text-align:center;'>%s</th></tr>"), str_color.c_str (), str_label.c_str ());
   }
 }
 
@@ -845,19 +856,17 @@ void PilotwireWebPageHeater ()
   WSContentSendStyle ();
   WSContentSend_P (INPUT_FORM_START, D_PAGE_PILOTWIRE_HEATER);
 
-  // mode selection
+  // mode section  
+  // --------------
+
   WSContentSend_P (INPUT_FIELDSET_START, D_PILOTWIRE_MODE);
+
+  // mode selection
   PilotwireWebSelectMode (false);
 
   // if temperature sensor is present
   if (temp_notavailable == false) 
   {
-    // temperature correction label and input
-    str_temperature = String (PilotwireGetDrift ());
-    WSContentSend_P (PSTR ("<br/>%s (°%s)<br/>"), D_PILOTWIRE_DRIFT, str_unit.c_str ());
-    WSContentSend_P (PSTR ("<input type='number' name='%s' min='%s' max='%s' step='%s' value='%s'>"), D_CMND_PILOTWIRE_DRIFT, D_WEB_PILOTWIRE_DRIFT_MIN, D_WEB_PILOTWIRE_DRIFT_MAX, D_WEB_PILOTWIRE_DRIFT_STEP, str_temperature.c_str());
-    WSContentSend_P (PSTR ("<br/>"));
-
     // temperature minimum label and input
     str_temperature = String (PilotwireGetMinTemperature ());
     WSContentSend_P (PSTR ("<br/>%s (°%s)<br/>"), D_PILOTWIRE_MIN, str_unit.c_str ());
@@ -871,6 +880,13 @@ void PilotwireWebPageHeater ()
     WSContentSend_P (PSTR ("<br/>"));
   }
 
+  WSContentSend_P (INPUT_FIELDSET_STOP);
+
+  // ds18b20 section  
+  // ----------------
+
+  WSContentSend_P (INPUT_FIELDSET_START, D_PILOTWIRE_SENSOR);
+
   // pullup option for ds18b20 sensor
   state_pullup = PilotwireGetPullup ();
   if (state_pullup == true) str_pullup = "checked";
@@ -878,8 +894,20 @@ void PilotwireWebPageHeater ()
   WSContentSend_P (PSTR ("<input type='checkbox' name='%s' %s>%s"), D_CMND_PILOTWIRE_PULLUP, str_pullup.c_str(), D_PILOTWIRE_PULLUP);
   WSContentSend_P (PSTR ("<br/>"));
 
+  // if temperature sensor is present
+  if (temp_notavailable == false) 
+  {
+    // temperature correction label and input
+    str_temperature = String (PilotwireGetDrift ());
+    WSContentSend_P (PSTR ("<br/>%s (°%s)<br/>"), D_PILOTWIRE_DRIFT, str_unit.c_str ());
+    WSContentSend_P (PSTR ("<input type='number' name='%s' min='%s' max='%s' step='%s' value='%s'>"), D_CMND_PILOTWIRE_DRIFT, D_WEB_PILOTWIRE_DRIFT_MIN, D_WEB_PILOTWIRE_DRIFT_MAX, D_WEB_PILOTWIRE_DRIFT_STEP, str_temperature.c_str());
+    WSContentSend_P (PSTR ("<br/>"));
+  }
+
   // end of form
   WSContentSend_P (INPUT_FIELDSET_STOP);
+
+  // save button
   WSContentSend_P (PSTR ("<button name='save' type='submit' class='button bgrn'>%s</button>"), D_SAVE);
   WSContentSend_P (INPUT_FORM_STOP);
 
@@ -893,11 +921,9 @@ void PilotwireWebPageHeater ()
 // Pilot Wire web page
 void PilotwireWebPageMeter ()
 {
-  uint8_t  priority_heater;
-  uint16_t power_heater, power_limit;
+  uint16_t num_message, power_heater, power_limit;
   char     argument[PILOTWIRE_BUFFER_SIZE];
-  String   str_topic;
-  String   str_key;
+  String   str_topic, str_key;
 
   // if access not allowed, close
   if (!HttpCheckPriviledgedAccess()) return;
@@ -909,21 +935,25 @@ void PilotwireWebPageMeter ()
     WebGetArg (D_CMND_PILOTWIRE_POWER, argument, PILOTWIRE_BUFFER_SIZE);
     if (strlen(argument) > 0) PilotwireSetHeaterPower ((uint16_t)atoi (argument));
 
-    // get priority of heater according to 'priority' parameter
-    WebGetArg (D_CMND_PILOTWIRE_PRIORITY, argument, PILOTWIRE_BUFFER_SIZE);
-    PilotwireMqttSetPriority ((uint8_t)atoi (argument));
-
     // get maximum power limit according to 'contract' parameter
     WebGetArg (D_CMND_PILOTWIRE_CONTRACT, argument, PILOTWIRE_BUFFER_SIZE);
     PilotwireMqttSetContract ((uint16_t)atoi (argument));
 
     // get MQTT topic according to 'topic' parameter
-    WebGetArg (D_CMND_PILOTWIRE_MQTTTOPIC, argument, PILOTWIRE_BUFFER_SIZE);
-    PilotwireMqttSetTopic (argument);
+    WebGetArg (D_CMND_PILOTWIRE_HOUSE_TOPIC, argument, PILOTWIRE_BUFFER_SIZE);
+    PilotwireMqttSetHouseTopic (argument);
 
     // get JSON key according to 'key' parameter
-    WebGetArg (D_CMND_PILOTWIRE_JSONKEY, argument, PILOTWIRE_BUFFER_SIZE);
-    PilotwireMqttSetJsonKey (argument);
+    WebGetArg (D_CMND_PILOTWIRE_HOUSE_KEY, argument, PILOTWIRE_BUFFER_SIZE);
+    PilotwireMqttSetHouseKey (argument);
+
+    // get number of overload messages before offloading heater according to 'before' parameter
+    WebGetArg (D_CMND_PILOTWIRE_MESS_BEFORE, argument, PILOTWIRE_BUFFER_SIZE);
+    PilotwireMqttSetPriorityBeforeOffload ((uint8_t)atoi (argument));
+
+    // get number of correct load messages before removing offload of heater according to 'after' parameter
+    WebGetArg (D_CMND_PILOTWIRE_MESS_AFTER, argument, PILOTWIRE_BUFFER_SIZE);
+    PilotwireMqttSetPriorityAfterOffload ((uint8_t)atoi (argument));
   }
 
   // beginning of form
@@ -931,45 +961,55 @@ void PilotwireWebPageMeter ()
   WSContentSendStyle ();
   WSContentSend_P (INPUT_FORM_START, D_PAGE_PILOTWIRE_METER);
 
-  // heater section  
-  WSContentSend_P (INPUT_FIELDSET_START, D_PILOTWIRE_HEATER);
-
-  // power of heater label and input
-  power_heater = PilotwireGetHeaterPower ();
-  WSContentSend_P (PSTR ("%s (W)<br/>"), D_PILOTWIRE_POWER);
-  WSContentSend_P (PSTR ("<input type='number' name='%s' value='%d'><br/>"), D_CMND_PILOTWIRE_POWER, power_heater);
-  WSContentSend_P (PSTR ("<br/>"));
-
-  // priority of heater label and input
-  priority_heater  = PilotwireMqttGetPriority ();
-  WSContentSend_P (PSTR ("<br/>%s<br/>"), D_PILOTWIRE_PRIORITY);
-  WSContentSend_P (PSTR ("<input type='number' name='%s' min='%d' max='%d' step='1' value='%d'>"), D_CMND_PILOTWIRE_PRIORITY, PILOTWIRE_PRIORITY_MIN, PILOTWIRE_PRIORITY_MAX, priority_heater);
-  WSContentSend_P (PSTR ("<br/>"));
-
-    // house section
-  WSContentSend_P (INPUT_FIELDSET_STOP);
+  // house section  
+  // --------------
   WSContentSend_P (INPUT_FIELDSET_START, D_PILOTWIRE_HOUSE);
 
-  // contract power limit label and input
+  // house contract power limit
   power_limit = PilotwireMqttGetContract ();
   WSContentSend_P (PSTR ("%s (W)<br/>"), D_PILOTWIRE_CONTRACT);
   WSContentSend_P (PSTR ("<input type='number' name='%s' value='%d'>"), D_CMND_PILOTWIRE_CONTRACT, power_limit);
   WSContentSend_P (PSTR ("<br/>"));
 
-  // power mqtt topic label and input
-  PilotwireMqttGetTopic (str_topic);
-  WSContentSend_P (PSTR ("<br/>%s<br/>"), D_PILOTWIRE_MQTTTOPIC);
-  WSContentSend_P (PSTR ("<input name='%s' value='%s'>"), D_CMND_PILOTWIRE_MQTTTOPIC, str_topic.c_str ());
+  // house power mqtt topic
+  PilotwireMqttGetHouseTopic (str_topic);
+  WSContentSend_P (PSTR ("<br/>%s<br/>"), D_PILOTWIRE_HOUSE_TOPIC);
+  WSContentSend_P (PSTR ("<input name='%s' value='%s'>"), D_CMND_PILOTWIRE_HOUSE_TOPIC, str_topic.c_str ());
   WSContentSend_P (PSTR ("<br/>"));
 
-  // power json key label and input
-  PilotwireMqttGetJsonKey (str_key);
-  WSContentSend_P (PSTR ("<br/>%s<br/>"), D_PILOTWIRE_JSONKEY);
-  WSContentSend_P (PSTR ("<input name='%s' value='%s'>"), D_CMND_PILOTWIRE_JSONKEY, str_key.c_str ());
+  // house power json key
+  PilotwireMqttGetHouseKey (str_key);
+  WSContentSend_P (PSTR ("<br/>%s<br/>"), D_PILOTWIRE_HOUSE_KEY);
+  WSContentSend_P (PSTR ("<input name='%s' value='%s'>"), D_CMND_PILOTWIRE_HOUSE_KEY, str_key.c_str ());
   WSContentSend_P (PSTR ("<br/>"));
 
-  // end of form
   WSContentSend_P (INPUT_FIELDSET_STOP);
+
+  // heater section  
+  // --------------
+  WSContentSend_P (INPUT_FIELDSET_START, D_PILOTWIRE_HEATER);
+
+  // heater power
+  power_heater = PilotwireGetHeaterPower ();
+  WSContentSend_P (PSTR ("%s (W)<br/>"), D_PILOTWIRE_POWER);
+  WSContentSend_P (PSTR ("<input type='number' name='%s' value='%d'><br/>"), D_CMND_PILOTWIRE_POWER, power_heater);
+  WSContentSend_P (PSTR ("<br/>"));
+
+  // number of overload messages before offloading heater
+  num_message  = PilotwireMqttGetPriorityBeforeOffload ();
+  WSContentSend_P (PSTR ("<br/>%s<br/>"), D_PILOTWIRE_MESS_BEFORE);
+  WSContentSend_P (PSTR ("<input type='number' name='%s' min='0' step='1' value='%d'>"), D_CMND_PILOTWIRE_MESS_BEFORE, num_message);
+  WSContentSend_P (PSTR ("<br/>"));
+
+  // number of correct load messages before removing offload of heater
+  num_message  = PilotwireMqttGetPriorityAfterOffload ();
+  WSContentSend_P (PSTR ("<br/>%s<br/>"), D_PILOTWIRE_MESS_AFTER);
+  WSContentSend_P (PSTR ("<input type='number' name='%s' min='0' step='1' value='%d'>"), D_CMND_PILOTWIRE_MESS_AFTER, num_message);
+  WSContentSend_P (PSTR ("<br/>"));
+
+  WSContentSend_P (INPUT_FIELDSET_STOP);
+
+  // save button
   WSContentSend_P (PSTR ("<button name='save' type='submit' class='button bgrn'>%s</button>"), D_SAVE);
   WSContentSend_P (INPUT_FORM_STOP);
 
@@ -1038,7 +1078,7 @@ void PilotwireWebPageControl ()
   WSContentSend_P (PSTR (".bold {font-weight:bold;}\n"));
 
   WSContentSend_P (PSTR ("div {width:90%%;margin:auto;padding:10px;text-align:center;vertical-align:middle;}\n"));
-  WSContentSend_P (PSTR ("span.flag {float:right;}\n"));
+//  WSContentSend_P (PSTR ("span.flag {float:right;}\n"));
   WSContentSend_P (PSTR ("fieldset {border-radius:14px;}\n"));
   WSContentSend_P (PSTR (".text {border:1px solid white;margin-top:14px;padding:10px 20px;border-radius:14px;font-size:20px;}\n"));
 
@@ -1060,15 +1100,7 @@ void PilotwireWebPageControl ()
   WSContentSend_P (PSTR ("<div class='title bold'>%s</div>\n"), SettingsText(SET_FRIENDLYNAME1));
   
   // actual temperature with langage flag
-  WSContentSend_P (PSTR ("<div class='temp yellow'><b>%s</b> °C"), str_temperature.c_str());
-
-  if (other_langage == PILOTWIRE_LANGAGE_ENGLISH) str_flag = "en";
-  else if (other_langage == PILOTWIRE_LANGAGE_FRENCH) str_flag = "fr";
-  WSContentSend_P (PSTR ("<span class='flag'><a href='/control?lang=%s'>"), str_flag.c_str ());
-  PilotwireWebDisplayFlag (other_langage);
-  WSContentSend_P (PSTR ("</a></span>"));
-
-  WSContentSend_P (PSTR ("</div>\n"));
+  WSContentSend_P (PSTR ("<div class='temp yellow'><b>%s</b> °C</div>\n"), str_temperature.c_str());
 
   // if heater is in thermostat mode   
   if (actual_mode == PILOTWIRE_THERMOSTAT)
@@ -1094,6 +1126,12 @@ void PilotwireWebPageControl ()
 
   // else, button to switch on thermostat
   else WSContentSend_P (PSTR ("<div><button name='on' type='submit' class='text green'>%s</button></div>\n"), arrControlOn[controlLangage]);
+
+  if (other_langage == PILOTWIRE_LANGAGE_ENGLISH) str_flag = "en";
+  else if (other_langage == PILOTWIRE_LANGAGE_FRENCH) str_flag = "fr";
+  WSContentSend_P (PSTR ("<div><a href='/control?lang=%s'>"), str_flag.c_str ());
+  PilotwireWebDisplayFlag (other_langage);
+  WSContentSend_P (PSTR ("</a></div>"));
 
   // end of page
   WSContentSend_P (PSTR ("</form>\n"));
