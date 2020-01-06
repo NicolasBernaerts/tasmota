@@ -6,6 +6,7 @@
     05/07/2019 - v3.0 - Add max power management with automatic offload
                         Save power settings in Settings.energy... variables
     30/12/2019 - v4.0 - Switch settings to free_f03 for Tasmota 8.x compatibility
+    06/01/2019 - v4.1 - Handle offloading with finite state machine
                       
   Settings are stored using weighting scale parameters :
     - Settings.energy_max_power              = Heater power (W) 
@@ -41,14 +42,10 @@
 enum OffloadingStages { OFFLOADING_NONE, OFFLOADING_BEFORE, OFFLOADING_ACTIVE, OFFLOADING_AFTER };
 
 // variables
-bool     pilotwire_topic_subscribed = false;              // flag for power subscription
-//bool     pilotwire_offloaded        = false;        // flag of offloaded state
-//uint16_t pilotwire_action_before    = 0;            // number of power data reveived before offloading
-//uint16_t pilotwire_action_after     = 0;            // number of power data reveived before removing offload
-uint16_t pilotwire_house_power      = 0;                  // last total house power retrieved thru MQTT
-uint16_t offloading_counter         = 0;                  // message counter before or after offloading
 uint8_t  offloading_state           = OFFLOADING_NONE;    // current offloading state
-
+uint16_t offloading_counter         = 0;                  // message counter before or after offloading
+uint16_t pilotwire_house_power      = 0;                  // last total house power retrieved thru MQTT
+bool     pilotwire_topic_subscribed = false;              // flag for power subscription
 
 /**************************************************\
  *                  Accessors
