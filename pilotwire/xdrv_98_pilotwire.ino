@@ -33,19 +33,22 @@
 #ifdef USE_PILOTWIRE
 #define XDRV_98               98
 
-#define PILOTWIRE_PRIORITY_MIN          1
-#define PILOTWIRE_PRIORITY_MAX          10
-
 /*************************************************\
  *               Variables
 \*************************************************/
 
+// offloading stages
+enum OffloadingStages { OFFLOADING_NONE, OFFLOADING_BEFORE, OFFLOADING_ACTIVE, OFFLOADING_AFTER };
+
 // variables
-bool     pilotwire_topic_subscribed = false;        // flag for power subscription
-bool     pilotwire_offloaded        = false;        // flag of offloaded state
-uint16_t pilotwire_house_power      = 0;            // last total house power retrieved thru MQTT
-uint16_t pilotwire_action_before    = 0;            // number of power data reveived before offloading
-uint16_t pilotwire_action_after     = 0;            // number of power data reveived before removing offload
+bool     pilotwire_topic_subscribed = false;              // flag for power subscription
+//bool     pilotwire_offloaded        = false;        // flag of offloaded state
+//uint16_t pilotwire_action_before    = 0;            // number of power data reveived before offloading
+//uint16_t pilotwire_action_after     = 0;            // number of power data reveived before removing offload
+uint16_t pilotwire_house_power      = 0;                  // last total house power retrieved thru MQTT
+uint16_t offloading_counter         = 0;                  // message counter before or after offloading
+uint8_t  offloading_state           = OFFLOADING_NONE;    // current offloading state
+
 
 /**************************************************\
  *                  Accessors
@@ -158,6 +161,66 @@ void PilotwireMqttSetHouseKey (char* new_key)
  *                  Functions
 \**************************************************/
 
+// update offloading status
+void PilotwireUpdateOffloadingStatus ()
+{
+  uint16_t house_contract, heater_power;
+
+  // get MQTT power data
+  house_contract = PilotwireMqttGetContract ();
+  heater_power   = PilotwireGetHeaterPower ();
+
+  // if house contract and heater power are defined
+  if ((house_contract > 0) && (heater_power > 0))
+  {
+    // switch according to current state
+    switch (offloading_state)
+    { 
+      case OFFLOADING_NONE:
+        // if overload is detected
+        if (pilotwire_house_power > house_contract)
+        {
+          // set status to before offloading
+          offloading_counter = PilotwireMqttGetPriorityBeforeOffload ();
+          if (offloading_counter > 0) offloading_state = OFFLOADING_BEFORE;
+          else offloading_state = OFFLOADING_ACTIVE;
+        }
+        break;
+      case OFFLOADING_BEFORE:
+          // if house power has gone down, remove offloading countdown
+          if (pilotwire_house_power > house_contract) offloading_state = OFFLOADING_NONE;
+        
+          // else, decrement message counter to activate offloading
+          else
+          {
+            offloading_counter--;
+            if (offloading_counter == 0) offloading_state = OFFLOADING_ACTIVE;
+          }
+        break;
+      case OFFLOADING_ACTIVE:
+        if (pilotwire_house_power <= house_contract - heater_power)
+        {
+          // set status to after offloading
+          offloading_counter = PilotwireMqttGetPriorityAfterOffload ();
+          if (offloading_counter > 0) offloading_state = OFFLOADING_AFTER;
+          else offloading_state = OFFLOADING_NONE;
+        }
+        break;
+      case OFFLOADING_AFTER:
+        // if house power has gone again too high, offloading back to active state
+        if (pilotwire_house_power > house_contract - heater_power) offloading_state = OFFLOADING_ACTIVE;
+        
+        // else, decrement message counter to remove offloading
+        else
+        {
+          offloading_counter--;
+          if (offloading_counter == 0) offloading_state = OFFLOADING_NONE;
+        }
+        break;
+    }
+  }
+}
+
 // check and update MQTT power subsciption after disconnexion
 void PilotwireMqttCheckConnexion ()
 {
@@ -192,43 +255,11 @@ void PilotwireMqttCheckConnexion ()
 // update instant house power
 void PilotwireMqttUpdateHousePower (uint16_t new_power)
 {
-  uint16_t house_contract, heater_power;
-
   // update instant power
   pilotwire_house_power = new_power;
 
-  // get MQTT power data
-  house_contract = PilotwireMqttGetContract ();
-  heater_power   = PilotwireGetHeaterPower ();
-
-  // if house contract and heater power are defined
-  if ((house_contract > 0) && (heater_power > 0))
-  {
-    // if heater is not offloaded and power consumption exceeds house contract
-    if ((pilotwire_offloaded == false) && (pilotwire_house_power > house_contract))
-    {
-      // start or decrement counter before oflloading
-      if (pilotwire_action_before == 0) pilotwire_action_before = PilotwireMqttGetPriorityBeforeOffload ();
-      else pilotwire_action_before--;
-
-      // if counter reached 0, offload
-      if (pilotwire_action_before == 0) pilotwire_offloaded = true;
-    }
-
-    // else, if offloading is enabled and instant power is low enough, remove offloading
-    else if ((pilotwire_offloaded == true) && (pilotwire_house_power <= house_contract - heater_power))
-    {
-      // start or decrement counter before removing oflload
-      if (pilotwire_action_after == 0) pilotwire_action_after = PilotwireMqttGetPriorityAfterOffload ();
-      else pilotwire_action_after--;
-
-      // if counter reached 0, offload
-      if (pilotwire_action_after == 0) pilotwire_offloaded = false;
-    }
-
-    // else, if offloading was triggered and instant power is now under house contract, reset flag
-    else if ((pilotwire_action_before > 0) && (pilotwire_house_power <= house_contract)) pilotwire_action_before = 0;
-  }
+  // update offloading status according to new house instant power
+  PilotwireUpdateOffloadingStatus ();
 }
 
 // read received MQTT data to retrieve house instant power
