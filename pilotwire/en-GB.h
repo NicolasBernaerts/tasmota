@@ -369,10 +369,26 @@
 #define D_CONNECT_FAILED_TO "Connect failed to"
 
 // xdrv_98_pilotwire.ino
+#define D_OFFLOADING_CONF_METER     "Configure Meter"
+#define D_OFFLOADING_DEVICE         "Heater"
+#define D_OFFLOADING_HOUSE          "House"
+#define D_OFFLOADING_POWER          "Power"
+
+#define D_OFFLOADING_PARAM_METER    "Meter Parameters"
+#define D_OFFLOADING_SENSOR_BEFORE  "Offloading"
+#define D_OFFLOADING_SENSOR_AFTER   "Removing Offload"
+#define D_OFFLOADING_IN             "in "
+#define D_OFFLOADING_UPDATE         " update(s) ..."
+#define D_OFFLOADING_OFFLOAD        "Offloaded"
+#define D_OFFLOADING_CONTRACT       "Contract"
+#define D_OFFLOADING_UPDATE_BEFORE  "Nbr of overload messages before offloading (0 is immediate)"
+#define D_OFFLOADING_UPDATE_AFTER   "Nbr of normal load messages before removing offload (0 is immediate)"
+#define D_OFFLOADING_TOPIC          "House power MQTT Topic"
+#define D_OFFLOADING_KEY            "House power JSON Key"
+
+// xsns_98_pilotwire.ino
 #define D_PILOTWIRE_CONF_HEATER    "Configure Heater"
-#define D_PILOTWIRE_CONF_METER     "Configure Meter"
 #define D_PILOTWIRE_PARAM_HEATER   "Heater Parameters"
-#define D_PILOTWIRE_PARAM_METER    "Meter Parameters"
 #define D_PILOTWIRE_PARAM_CONTROL  "Heater Control"
 
 #define D_PILOTWIRE_DISABLED       "Disabled"
@@ -381,11 +397,8 @@
 #define D_PILOTWIRE_ECO            "Economy"
 #define D_PILOTWIRE_FROST          "No Frost"
 #define D_PILOTWIRE_THERMOSTAT     "Thermostat"
-#define D_PILOTWIRE_OFFLOAD        "Offloaded"
 
 #define D_PILOTWIRE_TEMPERATURE    "Temperature"
-#define D_PILOTWIRE_HEATER         "Heater"
-#define D_PILOTWIRE_HOUSE          "House"
 #define D_PILOTWIRE_MODE           "Operation mode"
 #define D_PILOTWIRE_SENSOR         "Temperature sensor"
 
@@ -395,18 +408,12 @@
 
 #define D_PILOTWIRE_TIME           "Local time"
 #define D_PILOTWIRE_ROOM           "Room"
-#define D_PILOTWIRE_SENSOR_BEFORE  "Offloading in "
-#define D_PILOTWIRE_SENSOR_AFTER   "Removing Offload in "
-#define D_PILOTWIRE_MESSAGE        " messages ..."
 
 #define D_PILOTWIRE_STATE          "Heater"
-#define D_PILOTWIRE_POWER          "Power"
-#define D_PILOTWIRE_CONTRACT       "Contract"
-#define D_PILOTWIRE_MESS_BEFORE    "Nbr of overload messages before offloading (0 is immediate)"
-#define D_PILOTWIRE_MESS_AFTER     "Nbr of normal load messages before removing offload (0 is immediate)"
-#define D_PILOTWIRE_HOUSE_TOPIC    "House power MQTT Topic"
-#define D_PILOTWIRE_HOUSE_KEY      "House power JSON Key"
 #define D_PILOTWIRE_PULLUP         "Enable DS18B20 internal pullup resistor"
+
+#define D_PILOTWIRE_ENGLISH        "en"
+#define D_PILOTWIRE_FRENCH         "fr"
 
 // xplg_wemohue.ino
 #define D_MULTICAST_DISABLED "Multicast disabled"

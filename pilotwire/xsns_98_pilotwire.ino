@@ -12,6 +12,8 @@
                         Save power settings in Settings.energy... variables
     12/12/2019 - v3.1 - Add public configuration page http://.../control
     30/12/2019 - v4.0 - Functions rewrite for Tasmota 8.x compatibility
+    06/01/2019 - v4.1 - Handle offloading with finite state machine
+    09/01/2019 - v4.2 - Separation between Offloading driver and Pilotwire sensor
                        
   Settings are stored using weighting scale parameters :
     - Settings.weight_reference             = Fil pilote mode
@@ -36,19 +38,13 @@
 
 #define XSNS_98                         98
 
-#include <Arduino.h>
-
 /*************************************************\
  *               Variables
 \*************************************************/
 
-#define PILOTWIRE_COLOR_BUFFER_SIZE     8
-#define PILOTWIRE_LABEL_BUFFER_SIZE     16
-#define PILOTWIRE_MESSAGE_BUFFER_SIZE   64
 #define PILOTWIRE_BUFFER_SIZE           128
 
 #define D_PAGE_PILOTWIRE_HEATER         "heater"
-#define D_PAGE_PILOTWIRE_METER          "meter"
 #define D_PAGE_PILOTWIRE_CONTROL        "control"
 
 #define D_CMND_PILOTWIRE_ON             "on"
@@ -62,20 +58,10 @@
 #define D_CMND_PILOTWIRE_TARGET         "target"
 #define D_CMND_PILOTWIRE_DRIFT          "drift"
 #define D_CMND_PILOTWIRE_PULLUP         "pullup"
-#define D_CMND_PILOTWIRE_POWER          "power"
-#define D_CMND_PILOTWIRE_MESS_BEFORE    "before"
-#define D_CMND_PILOTWIRE_MESS_AFTER     "after"
-#define D_CMND_PILOTWIRE_CONTRACT       "contract"
-#define D_CMND_PILOTWIRE_HOUSE_TOPIC    "topic"
-#define D_CMND_PILOTWIRE_HOUSE_KEY      "key"
-
-#define D_PILOTWIRE_ENGLISH             "en"
-#define D_PILOTWIRE_FRENCH              "fr"
 
 #define D_JSON_PILOTWIRE                "Pilotwire"
 #define D_JSON_PILOTWIRE_MODE           "Mode"
 #define D_JSON_PILOTWIRE_LABEL          "Label"
-#define D_JSON_PILOTWIRE_OFFLOAD        "Offload"
 #define D_JSON_PILOTWIRE_MIN            "Min"
 #define D_JSON_PILOTWIRE_MAX            "Max"
 #define D_JSON_PILOTWIRE_TARGET         "Target"
@@ -139,8 +125,8 @@ int   controlLangage = PILOTWIRE_LANGAGE_ENGLISH;
 enum PilotWireModes { PILOTWIRE_DISABLED, PILOTWIRE_OFF, PILOTWIRE_COMFORT, PILOTWIRE_ECO, PILOTWIRE_FROST, PILOTWIRE_THERMOSTAT, PILOTWIRE_OFFLOAD };
 
 // fil pilote commands
-enum PilotWireCommands { CMND_PILOTWIRE_MODE, CMND_PILOTWIRE_OFFLOAD, CMND_PILOTWIRE_MIN, CMND_PILOTWIRE_MAX, CMND_PILOTWIRE_TARGET, CMND_PILOTWIRE_DRIFT, CMND_PILOTWIRE_PULLUP, CMND_PILOTWIRE_POWER, CMND_PILOTWIRE_MESS_BEFORE, CMND_PILOTWIRE_MESS_AFTER, CMND_PILOTWIRE_CONTRACT, CMND_PILOTWIRE_HOUSE_TOPIC, CMND_PILOTWIRE_HOUSE_KEY };
-const char kPilotWireCommands[] PROGMEM = D_CMND_PILOTWIRE_MODE "|" D_CMND_PILOTWIRE_OFFLOAD "|" D_CMND_PILOTWIRE_MIN "|" D_CMND_PILOTWIRE_MAX "|" D_CMND_PILOTWIRE_TARGET "|" D_CMND_PILOTWIRE_DRIFT "|" D_CMND_PILOTWIRE_PULLUP "|" D_CMND_PILOTWIRE_POWER "|" D_CMND_PILOTWIRE_MESS_BEFORE "|" D_CMND_PILOTWIRE_MESS_AFTER "|" D_CMND_PILOTWIRE_CONTRACT "|" D_CMND_PILOTWIRE_HOUSE_TOPIC "|" D_CMND_PILOTWIRE_HOUSE_KEY;
+enum PilotWireCommands { CMND_PILOTWIRE_MODE, CMND_PILOTWIRE_MIN, CMND_PILOTWIRE_MAX, CMND_PILOTWIRE_TARGET, CMND_PILOTWIRE_DRIFT };
+const char kPilotWireCommands[] PROGMEM = D_CMND_PILOTWIRE_MODE "|" D_CMND_PILOTWIRE_MIN "|" D_CMND_PILOTWIRE_MAX "|" D_CMND_PILOTWIRE_TARGET "|" D_CMND_PILOTWIRE_DRIFT;
 
 // header of publicly accessible control page
 const char INPUT_HEAD_CONTROL[] PROGMEM = "<div style='text-align:left;display:inline-block;min-width:340px;'><div style='text-align:center;'><noscript>" D_NOSCRIPT "<br/></noscript><h2>%s</h2><h2 style='color:blue;'>%s °C</h2><h2 style='color:green;'>%s</h2></div>";
@@ -201,9 +187,6 @@ void PilotwireGetStateLabel (uint8_t state, String& str_label)
      break;
    case PILOTWIRE_THERMOSTAT:       // Thermostat
      str_label = D_PILOTWIRE_THERMOSTAT;
-     break;
-   case PILOTWIRE_OFFLOAD:          // Offloaded
-     str_label = D_PILOTWIRE_OFFLOAD;
      break;
   }
 }
@@ -308,9 +291,6 @@ uint8_t PilotwireGetMode ()
 // set pilot wire mode
 void PilotwireSetMode (uint8_t new_mode)
 {
-  // reset offloading
-  pilotwire_offloaded = false;
-
   // handle 1 relay device state conversion
   if (devices_present == 1)
   {
@@ -320,18 +300,6 @@ void PilotwireSetMode (uint8_t new_mode)
 
   // if within range, set mode
   if (new_mode <= PILOTWIRE_OFFLOAD) Settings.weight_reference = (unsigned long) new_mode;
-}
-
-// set pilot wire offload mode
-void PilotwireSetOffload (char* offload)
-{
-  // detect offload mode on
-  if (strcmp (offload, "1") == 0) pilotwire_offloaded = true;
-  else if (strcmp (offload, "ON") == 0) pilotwire_offloaded = true;
-
-  // detect offload mode off
-  else if (strcmp (offload, "0") == 0) pilotwire_offloaded = false;
-  else if (strcmp (offload, "OFF") == 0) pilotwire_offloaded = false;
 }
 
 // set pilot wire minimum temperature
@@ -482,73 +450,57 @@ float PilotwireGetTargetTemperature ()
 // Show JSON status (for MQTT)
 void PilotwireShowJSON (bool append)
 {
-//  float   drift_temperature;
-  float       actual_temperature;
-  uint8_t     actual_mode;
-  String      str_temperature, str_label;
-
-  // start message  -->  {  or  ,
-  if (append == false) snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("{"));
-  else snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,"), mqtt_data);
+  uint8_t  actual_mode;
+  float    actual_temperature;
+  String   str_json, str_temperature, str_label;
 
   // get temperature and mode
   actual_temperature = PilotwireGetTemperatureWithDrift ();
   actual_mode  = PilotwireGetMode ();
   PilotwireGetStateLabel (actual_mode, str_label);
  
+  // start message  -->  {  or message,
+  if (append == false) str_json = "{";
+  else str_json = String (mqtt_data) + ",";
+
   // pilotwire mode  -->  "PilotWire":{"Relay":2,"Mode":5,"Label":"Thermostat",Offload:"ON","Temperature":20.5,"Target":21,"Min"=15,"Max"=25}
-  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_PILOTWIRE "\":{"), mqtt_data);
-  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_PILOTWIRE_RELAY "\":%d"), mqtt_data, devices_present);
-  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,\"" D_JSON_PILOTWIRE_MODE "\":%d"), mqtt_data, actual_mode);
-  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,\"" D_JSON_PILOTWIRE_LABEL "\":\"%s\""), mqtt_data, str_label.c_str ());
- 
-  if (pilotwire_offloaded == true) snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,\"" D_JSON_PILOTWIRE_OFFLOAD "\":\"%s\""), mqtt_data, "ON");
-  else snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,\"" D_JSON_PILOTWIRE_OFFLOAD "\":\"%s\""), mqtt_data, "OFF");
+  str_json += "\"" + String (D_JSON_PILOTWIRE) + "\":{\"" + String (D_JSON_PILOTWIRE_RELAY) + "\":" + String (devices_present);
+  str_json += ",\"" + String (D_JSON_PILOTWIRE_MODE) + "\":" + String (actual_mode) + ",\"" + String (D_JSON_PILOTWIRE_LABEL) + "\":\"" + str_label + "\"";
 
-  if (actual_temperature != PILOTWIRE_TEMP_UNDEFINED)
-  {
-    str_temperature = String (PilotwireGetTemperatureWithDrift ());
-    snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,\"" D_JSON_PILOTWIRE_TEMPERATURE "\":%s"), mqtt_data, str_temperature.c_str ());
-  }
+  // if defined, add current temperature
+  if (actual_temperature != PILOTWIRE_TEMP_UNDEFINED) str_json += ",\"" + String (D_JSON_PILOTWIRE_TEMPERATURE) + "\":" + String (PilotwireGetTemperatureWithDrift ());
 
+  // thermostat data
   if (actual_mode == PILOTWIRE_THERMOSTAT)
   {
-    str_temperature = String (PilotwireGetTargetTemperature ());
-    snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,\"" D_JSON_PILOTWIRE_TARGET "\":%s"), mqtt_data, str_temperature.c_str());
-
-    str_temperature = String (PilotwireGetDrift ());
-    snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,\"" D_JSON_PILOTWIRE_DRIFT "\":%s"), mqtt_data, str_temperature.c_str());
-
-    str_temperature = String (PilotwireGetMinTemperature ());
-    snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,\"" D_JSON_PILOTWIRE_MIN "\":%s"), mqtt_data, str_temperature.c_str());
-
-    str_temperature = String (PilotwireGetMaxTemperature ());
-    snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,\"" D_JSON_PILOTWIRE_MAX "\":%s"), mqtt_data, str_temperature.c_str());
+    str_json += ",\"" + String (D_JSON_PILOTWIRE_TARGET) + "\":" + String (PilotwireGetTargetTemperature ());
+    str_json += ",\"" + String (D_JSON_PILOTWIRE_DRIFT) + "\":" + String (PilotwireGetDrift ());
+    str_json += ",\"" + String (D_JSON_PILOTWIRE_MIN) + "\":" + String (PilotwireGetMinTemperature ());
+    str_json += ",\"" + String (D_JSON_PILOTWIRE_MAX) + "\":" + String (PilotwireGetMaxTemperature ());
   }
 
-  snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s}"), mqtt_data);
+  str_json += "}";
 
   // if pilot wire mode is enabled
   if (actual_mode != PILOTWIRE_DISABLED)
   {
-    // relay state  -->  ,"Relay":{"Mode":4,"Label":"Comfort","Number":number}
+    // get mode and associated label
     actual_mode = PilotwireGetRelayState ();
     PilotwireGetStateLabel (actual_mode, str_label);
-    snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,\"" D_JSON_PILOTWIRE_STATE "\":{"), mqtt_data);
-    snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s\"" D_JSON_PILOTWIRE_MODE "\":%d"), mqtt_data, actual_mode);
-    snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s,\"" D_JSON_PILOTWIRE_LABEL "\":\"%s\""), mqtt_data, str_label.c_str ());
-    snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s}"), mqtt_data);
+
+    // relay state  -->  ,"State":{"Mode":4,"Label":"Comfort"}
+    str_json += ",\"" + String (D_JSON_PILOTWIRE_STATE) + "\":{\"" + String (D_JSON_PILOTWIRE_MODE) + "\":" + String (actual_mode);
+    str_json += ",\"" + String (D_JSON_PILOTWIRE_LABEL) + "\":\"" + str_label + "\"}";
   }
   
-  // if not in append mode, publish message 
-  if (append == false)
-  { 
-    // end of message   ->  }
-    snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("%s}"), mqtt_data);
+  // if not in append mode, add last bracket 
+  if (append == false) str_json += "}";
 
-    // publish full sensor state
-    MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
-  }
+  // add json string to MQTT message
+  snprintf_P (mqtt_data, sizeof(mqtt_data), str_json.c_str ());
+
+  // if not in append mode, publish message 
+  if (append == false) MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
 }
 
 // Handle pilot wire MQTT commands
@@ -565,9 +517,6 @@ bool PilotwireCommand ()
   {
     case CMND_PILOTWIRE_MODE:  // set mode
       PilotwireSetMode (XdrvMailbox.payload);
-      break;
-    case CMND_PILOTWIRE_OFFLOAD:  // set offloading
-      PilotwireSetOffload (XdrvMailbox.data);
       break;
     case CMND_PILOTWIRE_TARGET:  // set target temperature 
       PilotwireSetThermostat (atof (XdrvMailbox.data));
@@ -592,17 +541,21 @@ bool PilotwireCommand ()
 // update pilot wire relay states according to current status
 void PilotwireEvery250MSecond ()
 {
-  float    actual_temperature, target_temperature;
-  uint8_t  heater_mode, heater_state, target_state;
+  bool    is_offloaded;
+  uint8_t heater_mode, heater_state, target_state;
+  float   actual_temperature, target_temperature;
 
-  // get heater mode
-  heater_mode = PilotwireGetMode ();
+  // get heater mode and state
+  heater_mode  = PilotwireGetMode ();
+  heater_state = PilotwireGetRelayState ();
 
   // if pilotwire mode is enabled
   if (heater_mode != PILOTWIRE_DISABLED)
   {
+    is_offloaded = OffloadingIsOffloaded ();
+
     // if offload mode, target state is off
-    if (pilotwire_offloaded == true) target_state = PILOTWIRE_OFF;
+    if (is_offloaded == true) target_state = PILOTWIRE_OFF;
  
     // else if thermostat mode
     else if (heater_mode == PILOTWIRE_THERMOSTAT)
@@ -613,19 +566,16 @@ void PilotwireEvery250MSecond ()
 
       // if temperature is too low, target state is on
       // else, if too high, target state is off
-      target_state = heater_mode;
+      target_state = heater_state;
       if (actual_temperature < (target_temperature - PILOTWIRE_TEMP_THRESHOLD)) target_state = PILOTWIRE_COMFORT;
       else if (actual_temperature > (target_temperature + PILOTWIRE_TEMP_THRESHOLD)) target_state = PILOTWIRE_OFF;
     }
 
-    // else set mode if needed
+    // else target mode is heater mode
     else target_state = heater_mode;
 
-    // get heater status
-    heater_state = PilotwireGetRelayState ();
-
-    // if heater state different than target state, change state
-    if (heater_state != target_state)
+    // if target state is different than heater state, change state
+    if (target_state != heater_state)
     {
       // set relays
       PilotwireSetRelayState (target_state);
@@ -636,9 +586,9 @@ void PilotwireEvery250MSecond ()
   }
 }
 
-/*******************************************************\
- *                       Web
-\*******************************************************/
+/***********************************************\
+ *                    Web
+\***********************************************/
 
 #ifdef USE_WEBSERVER
 
@@ -741,67 +691,31 @@ void PilotwireWebSelectMode (bool public_mode)
 // Pilot Wire configuration button
 void PilotwireWebButton ()
 {
-  // heater and meter configuration button
+  // heater configuration button
   WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>"), D_PAGE_PILOTWIRE_HEATER, D_PILOTWIRE_CONF_HEATER);
-  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>"), D_PAGE_PILOTWIRE_METER, D_PILOTWIRE_CONF_METER);
 }
 
 // append pilot wire state to main page
 bool PilotwireWebSensor ()
 {
-  uint8_t     actual_mode;
-  uint16_t    contract_power, num_message;
-  String      str_temperature, str_color, str_label;
+  uint8_t actual_mode, actual_state;
+  String  str_temperature, str_label, str_color;
 
-  // get heater condition
+  // get current temperature and if pilot wire is in thermostat mode, add target temperature
   actual_mode = PilotwireGetMode ();
+  str_temperature = "<b>" + String (PilotwireGetTemperatureWithDrift (), 1) + "</b>";
+  if (actual_mode == PILOTWIRE_THERMOSTAT) str_temperature += " / " + String (PilotwireGetTargetTemperature (), 1);
 
-  // if pilot wire is in thermostat mode, display target temperature
-  if (actual_mode == PILOTWIRE_THERMOSTAT)
-  {
-    // read temperature
-    str_temperature  = "<b>" + String (PilotwireGetTemperatureWithDrift (), 1) + "</b>";
-    str_temperature += " / " + String (PilotwireGetTargetTemperature (), 1);
-    WSContentSend_PD(HTTP_SNS_TEMP, D_PILOTWIRE_ROOM, str_temperature.c_str (), TempUnit ());
-  }
+  // display temperature
+  WSContentSend_PD (HTTP_SNS_TEMP, D_PILOTWIRE_ROOM, str_temperature.c_str (), TempUnit ());
 
-  // if house power is subscribed, display power
-  if (pilotwire_topic_subscribed == true)
-  {
-    contract_power = PilotwireMqttGetContract ();
-    WSContentSend_PD (PSTR("<tr><th>%s</th><td><b>%d</b> / %dW</td></tr>"), D_PILOTWIRE_HOUSE, pilotwire_house_power, contract_power);
-  }
-  
-  // if pilot wire mode is enabled
-  if (actual_mode != PILOTWIRE_DISABLED)
-  {
-    // get actual state and according color
-    actual_mode = PilotwireGetRelayState ();
-    PilotwireGetStateColor (actual_mode, str_color);
+  // get heater mode, associated label and color
+  actual_state = PilotwireGetRelayState ();
+  PilotwireGetStateLabel (actual_state, str_label);
+  PilotwireGetStateColor (actual_state, str_color);
 
-    // if heater is on the way to be offloaded,
-    if (pilotwire_action_before > 0)
-    {
-      num_message = PilotwireMqttGetPriorityBeforeOffload ();
-      str_label = String (D_PILOTWIRE_SENSOR_BEFORE) + "<br/><small>" + String (pilotwire_action_before) + String (D_PILOTWIRE_MESSAGE) + "</small>";
-    }
-
-    // else, if heater is on the way to remove offload
-    else if (pilotwire_action_after > 0)
-    {
-      num_message = PilotwireMqttGetPriorityAfterOffload ();
-      str_label = String (D_PILOTWIRE_SENSOR_AFTER) + "<br/><small>" + String (pilotwire_action_after) + String (D_PILOTWIRE_MESSAGE) + "</small>";
-    }
-
-    // else, if heater is offloaded
-    else if (pilotwire_offloaded == true) str_label = D_PILOTWIRE_OFFLOAD;
-  
-    // else, get current state
-    else PilotwireGetStateLabel (actual_mode, str_label);
-    
-    // display current state
-    WSContentSend_PD (PSTR("<tr><th colspan=2 style='font-size:1.6em; color:%s; text-align:center;'>%s</th></tr>"), str_color.c_str (), str_label.c_str ());
-  }
+  // display current state
+  WSContentSend_PD (PSTR("<tr><th colspan=2 style='font-size:1.6em; color:%s; text-align:center;'>%s</th></tr>"), str_color.c_str (), str_label.c_str ());
 }
 
 // Pilot Wire heater configuration web page
@@ -858,7 +772,6 @@ void PilotwireWebPageHeater ()
 
   // mode section  
   // --------------
-
   WSContentSend_P (INPUT_FIELDSET_START, D_PILOTWIRE_MODE);
 
   // mode selection
@@ -884,7 +797,6 @@ void PilotwireWebPageHeater ()
 
   // ds18b20 section  
   // ----------------
-
   WSContentSend_P (INPUT_FIELDSET_START, D_PILOTWIRE_SENSOR);
 
   // pullup option for ds18b20 sensor
@@ -918,107 +830,6 @@ void PilotwireWebPageHeater ()
   WSContentStop ();
 }
 
-// Pilot Wire web page
-void PilotwireWebPageMeter ()
-{
-  uint16_t num_message, power_heater, power_limit;
-  char     argument[PILOTWIRE_BUFFER_SIZE];
-  String   str_topic, str_key;
-
-  // if access not allowed, close
-  if (!HttpCheckPriviledgedAccess()) return;
-
-  // page comes from save button on configuration page
-  if (WebServer->hasArg("save"))
-  {
-    // get power of heater according to 'power' parameter
-    WebGetArg (D_CMND_PILOTWIRE_POWER, argument, PILOTWIRE_BUFFER_SIZE);
-    if (strlen(argument) > 0) PilotwireSetHeaterPower ((uint16_t)atoi (argument));
-
-    // get maximum power limit according to 'contract' parameter
-    WebGetArg (D_CMND_PILOTWIRE_CONTRACT, argument, PILOTWIRE_BUFFER_SIZE);
-    PilotwireMqttSetContract ((uint16_t)atoi (argument));
-
-    // get MQTT topic according to 'topic' parameter
-    WebGetArg (D_CMND_PILOTWIRE_HOUSE_TOPIC, argument, PILOTWIRE_BUFFER_SIZE);
-    PilotwireMqttSetHouseTopic (argument);
-
-    // get JSON key according to 'key' parameter
-    WebGetArg (D_CMND_PILOTWIRE_HOUSE_KEY, argument, PILOTWIRE_BUFFER_SIZE);
-    PilotwireMqttSetHouseKey (argument);
-
-    // get number of overload messages before offloading heater according to 'before' parameter
-    WebGetArg (D_CMND_PILOTWIRE_MESS_BEFORE, argument, PILOTWIRE_BUFFER_SIZE);
-    PilotwireMqttSetPriorityBeforeOffload ((uint8_t)atoi (argument));
-
-    // get number of correct load messages before removing offload of heater according to 'after' parameter
-    WebGetArg (D_CMND_PILOTWIRE_MESS_AFTER, argument, PILOTWIRE_BUFFER_SIZE);
-    PilotwireMqttSetPriorityAfterOffload ((uint8_t)atoi (argument));
-  }
-
-  // beginning of form
-  WSContentStart_P (D_PILOTWIRE_CONF_METER);
-  WSContentSendStyle ();
-  WSContentSend_P (INPUT_FORM_START, D_PAGE_PILOTWIRE_METER);
-
-  // house section  
-  // --------------
-  WSContentSend_P (INPUT_FIELDSET_START, D_PILOTWIRE_HOUSE);
-
-  // house contract power limit
-  power_limit = PilotwireMqttGetContract ();
-  WSContentSend_P (PSTR ("%s (W)<br/>"), D_PILOTWIRE_CONTRACT);
-  WSContentSend_P (PSTR ("<input type='number' name='%s' value='%d'>"), D_CMND_PILOTWIRE_CONTRACT, power_limit);
-  WSContentSend_P (PSTR ("<br/>"));
-
-  // house power mqtt topic
-  PilotwireMqttGetHouseTopic (str_topic);
-  WSContentSend_P (PSTR ("<br/>%s<br/>"), D_PILOTWIRE_HOUSE_TOPIC);
-  WSContentSend_P (PSTR ("<input name='%s' value='%s'>"), D_CMND_PILOTWIRE_HOUSE_TOPIC, str_topic.c_str ());
-  WSContentSend_P (PSTR ("<br/>"));
-
-  // house power json key
-  PilotwireMqttGetHouseKey (str_key);
-  WSContentSend_P (PSTR ("<br/>%s<br/>"), D_PILOTWIRE_HOUSE_KEY);
-  WSContentSend_P (PSTR ("<input name='%s' value='%s'>"), D_CMND_PILOTWIRE_HOUSE_KEY, str_key.c_str ());
-  WSContentSend_P (PSTR ("<br/>"));
-
-  WSContentSend_P (INPUT_FIELDSET_STOP);
-
-  // heater section  
-  // --------------
-  WSContentSend_P (INPUT_FIELDSET_START, D_PILOTWIRE_HEATER);
-
-  // heater power
-  power_heater = PilotwireGetHeaterPower ();
-  WSContentSend_P (PSTR ("%s (W)<br/>"), D_PILOTWIRE_POWER);
-  WSContentSend_P (PSTR ("<input type='number' name='%s' value='%d'><br/>"), D_CMND_PILOTWIRE_POWER, power_heater);
-  WSContentSend_P (PSTR ("<br/>"));
-
-  // number of overload messages before offloading heater
-  num_message  = PilotwireMqttGetPriorityBeforeOffload ();
-  WSContentSend_P (PSTR ("<br/>%s<br/>"), D_PILOTWIRE_MESS_BEFORE);
-  WSContentSend_P (PSTR ("<input type='number' name='%s' min='0' step='1' value='%d'>"), D_CMND_PILOTWIRE_MESS_BEFORE, num_message);
-  WSContentSend_P (PSTR ("<br/>"));
-
-  // number of correct load messages before removing offload of heater
-  num_message  = PilotwireMqttGetPriorityAfterOffload ();
-  WSContentSend_P (PSTR ("<br/>%s<br/>"), D_PILOTWIRE_MESS_AFTER);
-  WSContentSend_P (PSTR ("<input type='number' name='%s' min='0' step='1' value='%d'>"), D_CMND_PILOTWIRE_MESS_AFTER, num_message);
-  WSContentSend_P (PSTR ("<br/>"));
-
-  WSContentSend_P (INPUT_FIELDSET_STOP);
-
-  // save button
-  WSContentSend_P (PSTR ("<button name='save' type='submit' class='button bgrn'>%s</button>"), D_SAVE);
-  WSContentSend_P (INPUT_FORM_STOP);
-
-  // configuration button
-  WSContentSpaceButton(BUTTON_CONFIGURATION);
-
-  // end of page
-  WSContentStop();
-}
 
 // Pilot Wire heater public configuration web page
 void PilotwireWebPageControl ()
@@ -1078,7 +889,6 @@ void PilotwireWebPageControl ()
   WSContentSend_P (PSTR (".bold {font-weight:bold;}\n"));
 
   WSContentSend_P (PSTR ("div {width:90%%;margin:auto;padding:10px;text-align:center;vertical-align:middle;}\n"));
-//  WSContentSend_P (PSTR ("span.flag {float:right;}\n"));
   WSContentSend_P (PSTR ("fieldset {border-radius:14px;}\n"));
   WSContentSend_P (PSTR (".text {border:1px solid white;margin-top:14px;padding:10px 20px;border-radius:14px;font-size:20px;}\n"));
 
@@ -1164,7 +974,6 @@ bool Xsns98 (uint8_t function)
 #ifdef USE_WEBSERVER
     case FUNC_WEB_ADD_HANDLER:
       WebServer->on ("/" D_PAGE_PILOTWIRE_HEATER, PilotwireWebPageHeater);
-      WebServer->on ("/" D_PAGE_PILOTWIRE_METER, PilotwireWebPageMeter);
       WebServer->on ("/" D_PAGE_PILOTWIRE_CONTROL, PilotwireWebPageControl);
       break;
     case FUNC_WEB_SENSOR:
