@@ -36,10 +36,11 @@
 
 #ifdef USE_PILOTWIRE
 
+#define XDRV_98                         98
 #define XSNS_98                         98
 
 /*************************************************\
- *               Variables
+ *               Constant
 \*************************************************/
 
 #define PILOTWIRE_BUFFER_SIZE           128
@@ -121,13 +122,6 @@ const char strControlVersionFr[] PROGMEM = "English version";
 const char *const arrControlVersion[] PROGMEM = {strControlVersionEn, strControlVersionFr};
 int   controlLangage = PILOTWIRE_LANGAGE_ENGLISH;
 
-// fil pilote modes
-enum PilotWireModes { PILOTWIRE_DISABLED, PILOTWIRE_OFF, PILOTWIRE_COMFORT, PILOTWIRE_ECO, PILOTWIRE_FROST, PILOTWIRE_THERMOSTAT, PILOTWIRE_OFFLOAD };
-
-// fil pilote commands
-enum PilotWireCommands { CMND_PILOTWIRE_MODE, CMND_PILOTWIRE_MIN, CMND_PILOTWIRE_MAX, CMND_PILOTWIRE_TARGET, CMND_PILOTWIRE_DRIFT };
-const char kPilotWireCommands[] PROGMEM = D_CMND_PILOTWIRE_MODE "|" D_CMND_PILOTWIRE_MIN "|" D_CMND_PILOTWIRE_MAX "|" D_CMND_PILOTWIRE_TARGET "|" D_CMND_PILOTWIRE_DRIFT;
-
 // header of publicly accessible control page
 const char INPUT_HEAD_CONTROL[] PROGMEM = "<div style='text-align:left;display:inline-block;min-width:340px;'><div style='text-align:center;'><noscript>" D_NOSCRIPT "<br/></noscript><h2>%s</h2><h2 style='color:blue;'>%s °C</h2><h2 style='color:green;'>%s</h2></div>";
 const char INPUT_MODE_SELECT[] PROGMEM = "<input type='radio' name='%s' id='%d' value='%d' %s>%s";
@@ -135,6 +129,20 @@ const char INPUT_FORM_START[] PROGMEM = "<form method='get' action='%s'>";
 const char INPUT_FORM_STOP[] PROGMEM = "</form>";
 const char INPUT_FIELDSET_START[] PROGMEM = "<fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>";
 const char INPUT_FIELDSET_STOP[] PROGMEM = "</fieldset><br />";
+
+/*************************************************\
+ *               Variables
+\*************************************************/
+
+// fil pilote modes
+enum PilotWireModes { PILOTWIRE_DISABLED, PILOTWIRE_OFF, PILOTWIRE_COMFORT, PILOTWIRE_ECO, PILOTWIRE_FROST, PILOTWIRE_THERMOSTAT, PILOTWIRE_OFFLOAD };
+
+// fil pilote commands
+enum PilotWireCommands { CMND_PILOTWIRE_MODE, CMND_PILOTWIRE_MIN, CMND_PILOTWIRE_MAX, CMND_PILOTWIRE_TARGET, CMND_PILOTWIRE_DRIFT };
+const char kPilotWireCommands[] PROGMEM = D_CMND_PILOTWIRE_MODE "|" D_CMND_PILOTWIRE_MIN "|" D_CMND_PILOTWIRE_MAX "|" D_CMND_PILOTWIRE_TARGET "|" D_CMND_PILOTWIRE_DRIFT;
+
+// pilotwire action
+bool pilotwire_command_allowed = false;
 
 /**************************************************\
  *                  Accessors
@@ -252,6 +260,9 @@ void PilotwireSetRelayState (uint8_t new_state)
     else if (new_state == PILOTWIRE_OFF) new_state = PILOTWIRE_FROST;
   }
 
+  // allow relay command
+  pilotwire_command_allowed = true;
+  
   // pilot relays
   switch (new_state)
   {
@@ -272,6 +283,9 @@ void PilotwireSetRelayState (uint8_t new_state)
       if (devices_present > 1) ExecuteCommandPower (2, POWER_OFF, SRC_IGNORE);
       break;
   }
+  
+  // disallow relay command
+  pilotwire_command_allowed = false;
 }
 
 // get pilot actual mode
@@ -953,6 +967,20 @@ void PilotwireWebPageControl ()
 /***********************************************************\
  *                      Interface
 \***********************************************************/
+
+bool Xdrv98 (uint8_t function)
+{
+  bool result = false;
+  
+  // main callback switch
+  switch (function)
+  {
+    case FUNC_SET_DEVICE_POWER:
+      result = (!pilotwire_command_allowed);
+      break;
+  }
+  return result;
+}
 
 bool Xsns98 (uint8_t function)
 {
