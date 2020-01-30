@@ -8,8 +8,8 @@ This firmware handles :
   * a pilotwire 4 orders on **Sonoff Dual R2**.
 
 You'll also get a **Thermostat** mode that will allow you to pilot the heater to maintain a target temperature in the room. To activate that mode, you'll need to :
-  * connect a **local DF18B20 temperature sensor**
-  * declare a **MQTT remote temperature sensor**
+  * connect a **local DF18B20** temperature sensor
+  * declare a **MQTT remote** temperature sensor
 
 You can also declare a **MQTT remote power meter** to handle **automatic offload** when global power is to high according to your energy contract.
 
