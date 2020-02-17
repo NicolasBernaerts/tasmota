@@ -368,26 +368,35 @@
 #define D_INSECURE "Insecure connection due to invalid Fingerprint"
 #define D_CONNECT_FAILED_TO "Connect failed to"
 
-// xdrv_98_pilotwire.ino
-#define D_OFFLOADING_CONF_METER     "Configure Meter"
-#define D_OFFLOADING_DEVICE         "Heater"
-#define D_OFFLOADING_HOUSE          "House"
-#define D_OFFLOADING_POWER          "Power"
+// xdrv_96_offloading.ino
+#define D_OFFLOADING                "Offload"
 
-#define D_OFFLOADING_PARAM_METER    "Meter Parameters"
-#define D_OFFLOADING_SENSOR_BEFORE  "Offloading"
-#define D_OFFLOADING_SENSOR_AFTER   "Removing Offload"
-#define D_OFFLOADING_IN             "in "
-#define D_OFFLOADING_UPDATE         " update(s) ..."
-#define D_OFFLOADING_OFFLOAD        "Offloaded"
+#define D_OFFLOADING_POWER          "Power"
+#define D_OFFLOADING_UPDATE_BEFORE  "Overload messages before offload (0 is immediate)"
+#define D_OFFLOADING_UPDATE_AFTER   "Non overload messages before removing offload (0 is immediate)"
+
+#define D_OFFLOADING_CONF_METER     "Configure Offloading"
+#define D_OFFLOADING_DEVICE         "Device"
+#define D_OFFLOADING_SENSOR_BEFORE  "Offload active after"
+#define D_OFFLOADING_SENSOR_AFTER   "Offload removed after"
+#define D_OFFLOADING_SENSOR_UPDATE  "updates"
+#define D_OFFLOADING_ACTIVE         "Active"
 #define D_OFFLOADING_CONTRACT       "Contract"
-#define D_OFFLOADING_UPDATE_BEFORE  "Nbr of overload messages before offloading (0 is immediate)"
-#define D_OFFLOADING_UPDATE_AFTER   "Nbr of normal load messages before removing offload (0 is immediate)"
-#define D_OFFLOADING_TOPIC          "House power MQTT Topic"
-#define D_OFFLOADING_KEY            "House power JSON Key"
+#define D_OFFLOADING_TOTAL_POWER    "Total power"
+#define D_OFFLOADING_TOPIC          "MQTT Topic"
+#define D_OFFLOADING_KEY            "MQTT JSON Key"
+
+// xdrv_97_temperature.ino
+#define D_TEMPERATURE_CONFIGURE     "Configure Remote Sensor"
+#define D_TEMPERATURE_REMOTE        "Temperature remote sensor"
+#define D_TEMPERATURE_TOPIC         "MQTT Topic"
+#define D_TEMPERATURE_KEY           "MQTT JSON Key"
 
 // xsns_98_pilotwire.ino
-#define D_PILOTWIRE_CONF_HEATER    "Configure Heater"
+#define D_PILOTWIRE                "Pilotwire"
+#define D_PILOTWIRE_STATE          "State"
+
+#define D_PILOTWIRE_CONF_HEATER    "Configure Pilotwire"
 #define D_PILOTWIRE_PARAM_HEATER   "Heater Parameters"
 #define D_PILOTWIRE_PARAM_CONTROL  "Heater Control"
 
@@ -400,17 +409,17 @@
 
 #define D_PILOTWIRE_TEMPERATURE    "Temperature"
 #define D_PILOTWIRE_MODE           "Operation mode"
-#define D_PILOTWIRE_SENSOR         "Temperature sensor"
+#define D_PILOTWIRE_LOCAL          "Local"
+#define D_PILOTWIRE_REMOTE         "Remote"
 
+#define D_PILOTWIRE_DS18B20        "DS18B20 sensor"
+#define D_PILOTWIRE_PULLUP         "Enable internal pullup resistor"
 #define D_PILOTWIRE_DRIFT          "Correction"
 #define D_PILOTWIRE_MIN            "Minimum"
 #define D_PILOTWIRE_MAX            "Maximum"
 
 #define D_PILOTWIRE_TIME           "Local time"
 #define D_PILOTWIRE_ROOM           "Room"
-
-#define D_PILOTWIRE_STATE          "Heater"
-#define D_PILOTWIRE_PULLUP         "Enable DS18B20 internal pullup resistor"
 
 #define D_PILOTWIRE_ENGLISH        "en"
 #define D_PILOTWIRE_FRENCH         "fr"
