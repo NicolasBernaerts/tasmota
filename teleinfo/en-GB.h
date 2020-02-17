@@ -1,18 +1,18 @@
 /*
-  en-GB.h - localization for English - United Kingdom for Sonoff-Tasmota
-  Copyright (C) 2019  Theo Arends
-                2019  Nicolas Bernaerts
+  en-GB.h - localization for English - United Kingdom for Tasmota
 
-  Integrates Teleinfo strings (xnrg_16_teleinfo.ino)
+  Copyright (C) 2019  Theo Arends
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
   (at your option) any later version.
+
   This program is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
   GNU General Public License for more details.
+
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
@@ -28,7 +28,7 @@
  * Use online command StateText to translate ON, OFF, HOLD and TOGGLE.
  * Use online command Prefix to translate cmnd, stat and tele.
  *
- * Updated until v6.2.1.11
+ * Updated until v8.0.0.0
 \*********************************************************************/
 
 //#define LANGUAGE_MODULE_NAME         // Enable to display "Module Generic" (ie Spanish), Disable to display "Generic Module" (ie English)
@@ -71,6 +71,7 @@
 #define D_COLDLIGHT "Cold"
 #define D_COMMAND "Command"
 #define D_CONNECTED "Connected"
+#define D_CORS_DOMAIN "CORS Domain"
 #define D_COUNT "Count"
 #define D_COUNTER "Counter"
 #define D_CURRENT "Current"          // As in Voltage and Current
@@ -93,6 +94,7 @@
 #define D_FALLBACK_TOPIC "Fallback Topic"
 #define D_FALSE "False"
 #define D_FILE "File"
+#define D_FLOW_RATE "Flow rate"
 #define D_FREE_MEMORY "Free Memory"
 #define D_FREQUENCY "Frequency"
 #define D_GAS "Gas"
@@ -156,6 +158,7 @@
 #define D_TO "to"
 #define D_TOGGLE "Toggle"
 #define D_TOPIC "Topic"
+#define D_TOTAL_USAGE "Total Usage"
 #define D_TRANSMIT "Transmit"
 #define D_TRUE "True"
 #define D_TVOC "TVOC"
@@ -180,7 +183,7 @@
 #define D_WARMLIGHT "Warm"
 #define D_WEB_SERVER "Web Server"
 
-// sonoff.ino
+// tasmota.ino
 #define D_WARNING_MINIMAL_VERSION "WARNING This version does not support persistent settings"
 #define D_LEVEL_10 "level 1-0"
 #define D_LEVEL_01 "level 0-1"
@@ -220,7 +223,7 @@
 
 // xdrv_02_webserver.ino
 #define D_NOSCRIPT "To use Tasmota, please enable JavaScript"
-#define D_MINIMAL_FIRMWARE_PLEASE_UPGRADE "MINIMAL firmware<br/>please upgrade"
+#define D_MINIMAL_FIRMWARE_PLEASE_UPGRADE "MINIMAL firmware<br>please upgrade"
 #define D_WEBSERVER_ACTIVE_ON "Web server active on"
 #define D_WITH_IP_ADDRESS "with IP address"
 #define D_WEBSERVER_STOPPED "Web server stopped"
@@ -255,6 +258,7 @@
 #define D_MODULE_PARAMETERS "Module parameters"
 #define D_MODULE_TYPE "Module type"
 #define D_PULLUP_ENABLE "No Button/Switch pull-up"
+#define D_ADC "ADC"
 #define D_GPIO "GPIO"
 #define D_SERIAL_IN "Serial In"
 #define D_SERIAL_OUT "Serial Out"
@@ -281,6 +285,7 @@
 
 #define D_LOGGING_PARAMETERS "Logging parameters"
 #define D_SERIAL_LOG_LEVEL "Serial log level"
+#define D_MQTT_LOG_LEVEL "Mqtt log level"
 #define D_WEB_LOG_LEVEL "Web log level"
 #define D_SYS_LOG_LEVEL "Syslog level"
 #define D_MORE_DEBUG "More debug"
@@ -304,8 +309,6 @@
 #define D_TEMPLATE_NAME "Name"
 #define D_BASE_TYPE "Based on"
 #define D_TEMPLATE_FLAGS "Options"
-#define D_ALLOW_ADC0 "ADC0 input"
-#define D_ALLOW_PULLUP "User pull-up selection"
 
 #define D_SAVE_CONFIGURATION "Save configuration"
 #define D_CONFIGURATION_SAVED "Configuration saved"
@@ -350,6 +353,7 @@
 #define D_UPLOAD_ERR_11 "Failed to erase RF chip"
 #define D_UPLOAD_ERR_12 "Failed to write to RF chip"
 #define D_UPLOAD_ERR_13 "Failed to decode RF firmware"
+#define D_UPLOAD_ERR_14 "Not compatible"
 #define D_UPLOAD_ERROR_CODE "Upload error code"
 
 #define D_ENTER_COMMAND "Enter command"
@@ -399,6 +403,7 @@
   #define D_DOMOTICZ_VOLTAGE "Voltage/PM2.5"
   #define D_DOMOTICZ_CURRENT "Current/PM10"
   #define D_DOMOTICZ_AIRQUALITY "AirQuality"
+  #define D_DOMOTICZ_P1_SMART_METER "P1SmartMeter"
 #define D_DOMOTICZ_UPDATE_TIMER "Update timer"
 
 // xdrv_09_timers.ino
@@ -424,7 +429,6 @@
 #define D_DELETE "Delete"
 #define D_REPLY "Reply"
 #define D_KNX_GROUP_ADDRESS_TO_READ "Group Addresses to Receive Data from"
-#define D_LOG_KNX "KNX: "
 #define D_RECEIVED_FROM "Received from"
 #define D_KNX_COMMAND_WRITE "Write"
 #define D_KNX_COMMAND_READ "Read"
@@ -440,10 +444,18 @@
 #define D_ENERGY_YESTERDAY "Energy Yesterday"
 #define D_ENERGY_TOTAL "Energy Total"
 
-// xnrg_16_teleinfo.ino
-#define D_TELEINFO_DISABLED  "Teleinfo disabled"
-#define D_TELEINFO_1200      "Teleinfo 1200"
-#define D_TELEINFO_9600      "Teleinfo 9600 (Linky)"
+// xdrv_27_shutter.ino
+#define D_OPEN "Open"
+#define D_CLOSE "Close"
+#define D_DOMOTICZ_SHUTTER "Shutter"
+
+// xdrv_28_pcf8574.ino
+#define D_CONFIGURE_PCF8574 "Configure PCF8574"
+#define D_PCF8574_PARAMETERS "PCF8574 parameters"
+#define D_INVERT_PORTS "Invert Ports"
+#define D_DEVICE "Device"
+#define D_DEVICE_INPUT "Input"
+#define D_DEVICE_OUTPUT "Output"
 
 // xsns_05_ds18b20.ino
 #define D_SENSOR_BUSY "Sensor busy"
@@ -497,7 +509,16 @@
 #define D_TX20_SOUTH "S"
 #define D_TX20_WEST "W"
 
-// sonoff_template.h - keep them as short as possible to be able to fit them in GUI drop down box
+//xsns_98_teleinfo.ino
+#define D_TELEINFO_MODE       "Teleinfo counter"
+#define D_TELEINFO_CONFIG     "Configure Teleinfo"
+#define D_TELEINFO_DISABLED   "Disabled"
+#define D_TELEINFO_1200       "TIC Historique (1200 bauds)"
+#define D_TELEINFO_9600       "TIC Standard (9600 bauds)"
+#define D_TELEINFO_COUNTER    "Frames received"
+#define D_TELEINFO_POWER      "Apparent power"
+
+// tasmota_template.h - keep them as short as possible to be able to fit them in GUI drop down box
 #define D_SENSOR_NONE          "None"
 #define D_SENSOR_USER          "User"
 #define D_SENSOR_DHT11         "DHT11"
@@ -513,6 +534,7 @@
 #define D_SENSOR_BUTTON        "Button"     // Suffix "1"
 #define D_SENSOR_RELAY         "Relay"      // Suffix "1i"
 #define D_SENSOR_LED           "Led"        // Suffix "1i"
+#define D_SENSOR_LED_LINK      "LedLink"    // Suffix "i"
 #define D_SENSOR_PWM           "PWM"        // Suffix "1"
 #define D_SENSOR_COUNTER       "Counter"    // Suffix "1"
 #define D_SENSOR_IRRECV        "IRrecv"
@@ -526,14 +548,19 @@
 #define D_SENSOR_SAIR_TX       "SAir Tx"
 #define D_SENSOR_SPI_CS        "SPI CS"
 #define D_SENSOR_SPI_DC        "SPI DC"
-#define D_SENSOR_BACKLIGHT     "BkLight"
+#define D_SENSOR_SPI_MISO      "SPI MISO"
+#define D_SENSOR_SPI_MOSI      "SPI MOSI"
+#define D_SENSOR_SPI_CLK       "SPI CLK"
+#define D_SENSOR_BACKLIGHT     "Backlight"
 #define D_SENSOR_PMS5003       "PMS5003"
 #define D_SENSOR_SDS0X1_RX     "SDS0X1 Rx"
 #define D_SENSOR_SDS0X1_TX     "SDS0X1 Tx"
+#define D_SENSOR_HPMA_RX       "HPMA Rx"
+#define D_SENSOR_HPMA_TX       "HPMA Tx"
 #define D_SENSOR_SBR_RX        "SerBr Rx"
 #define D_SENSOR_SBR_TX        "SerBr Tx"
-#define D_SENSOR_SR04_TRIG     "SR04 Tri"
-#define D_SENSOR_SR04_ECHO     "SR04 Ech"
+#define D_SENSOR_SR04_TRIG     "SR04 Tri/TX"
+#define D_SENSOR_SR04_ECHO     "SR04 Ech/RX"
 #define D_SENSOR_SDM120_TX     "SDMx20 Tx"
 #define D_SENSOR_SDM120_RX     "SDMx20 Rx"
 #define D_SENSOR_SDM630_TX     "SDM630 Tx"
@@ -578,19 +605,48 @@
 #define D_SENSOR_MY92X1_DI     "MY92x1 DI"
 #define D_SENSOR_MY92X1_DCKI   "MY92x1 DCKI"
 #define D_SENSOR_ARIRFRCV      "ALux IrRcv"
+#define D_SENSOR_ARIRFSEL      "ALux IrSel"
 #define D_SENSOR_TXD           "Serial Tx"
 #define D_SENSOR_RXD           "Serial Rx"
 #define D_SENSOR_ROTARY        "Rotary"     // Suffix "1A"
-// Teleinfo
-#define D_SENSOR_TELEINFO_TX   "Teleinfo Tx"
-#define D_SENSOR_TELEINFO_1200 "Teleinfo 1200"
-#define D_SENSOR_TELEINFO_9600 "Teleinfo 9600"
+#define D_SENSOR_HRE_CLOCK     "HRE Clock"
+#define D_SENSOR_HRE_DATA      "HRE Data"
+#define D_SENSOR_ADE7953_IRQ   "ADE7953 IRQ"
+#define D_SENSOR_BUZZER        "Buzzer"
+#define D_SENSOR_OLED_RESET    "OLED Reset"
+#define D_SENSOR_ZIGBEE_TXD    "Zigbee Tx"
+#define D_SENSOR_ZIGBEE_RXD    "Zigbee Rx"
+#define D_SENSOR_SOLAXX1_TX    "SolaxX1 Tx"
+#define D_SENSOR_SOLAXX1_RX    "SolaxX1 Rx"
+#define D_SENSOR_IBEACON_TX    "iBeacon TX"
+#define D_SENSOR_IBEACON_RX    "iBeacon RX"
+#define D_SENSOR_RDM6300_RX    "RDM6300 RX"
+#define D_SENSOR_CC1101_CS     "CC1101 CS"
+#define D_SENSOR_A4988_DIR     "A4988 DIR"
+#define D_SENSOR_A4988_STP     "A4988 STP"
+#define D_SENSOR_A4988_ENA     "A4988 ENA"
+#define D_SENSOR_A4988_MS1     "A4988 MS1"
+#define D_SENSOR_A4988_MS2     "A4988 MS2"
+#define D_SENSOR_A4988_MS3     "A4988 MS3"
+#define D_SENSOR_DDS2382_TX    "DDS238-2 Tx"
+#define D_SENSOR_DDS2382_RX    "DDS238-2 Rx"
+#define D_SENSOR_DDSU666_TX    "DDSU666 Tx"
+#define D_SENSOR_DDSU666_RX    "DDSU666 Rx"
+#define D_SENSOR_SM2135_CLK    "SM2135 Clk"
+#define D_SENSOR_SM2135_DAT    "SM2135 Dat"
+#define D_SENSOR_DEEPSLEEP     "DeepSleep"
+#define D_SENSOR_EXS_ENABLE    "EXS Enable"
+#define D_SENSOR_SLAVE_TX    "Slave TX"
+#define D_SENSOR_SLAVE_RX    "Slave RX"
+#define D_SENSOR_SLAVE_RESET "Slave RST"
 
 // Units
 #define D_UNIT_AMPERE "A"
 #define D_UNIT_CENTIMETER "cm"
 #define D_UNIT_HERTZ "Hz"
 #define D_UNIT_HOUR "Hr"
+#define D_UNIT_GALLONS "gal"
+#define D_UNIT_GALLONS_PER_MIN "g/m"
 #define D_UNIT_INCREMENTS "inc"
 #define D_UNIT_KILOGRAM "kg"
 #define D_UNIT_KILOMETER_PER_HOUR "km/h"  // or "km/h"
@@ -618,31 +674,6 @@
 #define D_UNIT_WATTHOUR "Wh"
 #define D_UNIT_WATT_METER_QUADRAT "W/m²"
 
-// Log message prefix
-#define D_LOG_APPLICATION "APP: "  // Application
-#define D_LOG_BRIDGE "BRG: "       // Bridge
-#define D_LOG_CONFIG "CFG: "       // Settings
-#define D_LOG_COMMAND "CMD: "      // Command
-#define D_LOG_DEBUG "DBG: "        // Debug
-#define D_LOG_DHT "DHT: "          // DHT sensor
-#define D_LOG_DOMOTICZ "DOM: "     // Domoticz
-#define D_LOG_DSB "DSB: "          // DS18xB20 sensor
-#define D_LOG_HTTP "HTP: "         // HTTP webserver
-#define D_LOG_I2C "I2C: "          // I2C
-#define D_LOG_IRR "IRR: "          // Infra Red Received
-#define D_LOG_LOG "LOG: "          // Logging
-#define D_LOG_MODULE "MOD: "       // Module
-#define D_LOG_MDNS "DNS: "         // mDNS
-#define D_LOG_MQTT "MQT: "         // MQTT
-#define D_LOG_OTHER "OTH: "        // Other
-#define D_LOG_RESULT "RSL: "       // Result
-#define D_LOG_RFR "RFR: "          // RF Received
-#define D_LOG_SERIAL "SER: "       // Serial
-#define D_LOG_SHT1 "SHT: "         // SHT1x sensor
-#define D_LOG_UPLOAD "UPL: "       // Upload
-#define D_LOG_UPNP "UPP: "         // UPnP
-#define D_LOG_WIFI "WIF: "         // Wifi
-
 //SDM220
 #define D_PHASE_ANGLE     "Phase Angle"
 #define D_IMPORT_ACTIVE   "Import Active"
@@ -653,4 +684,28 @@
 #define D_UNIT_KWARH      "kVArh"
 #define D_UNIT_ANGLE      "Deg"
 
-#endif // _LANGUAGE_EN_GB_H_
+//SOLAXX1
+#define D_PV1_VOLTAGE     "PV1 Voltage"
+#define D_PV1_CURRENT     "PV1 Current"
+#define D_PV1_POWER       "PV1 Power"
+#define D_PV2_VOLTAGE     "PV2 Voltage"
+#define D_PV2_CURRENT     "PV2 Current"
+#define D_PV2_POWER       "PV2 Power"
+#define D_SOLAR_POWER     "Solar Power"
+#define D_INVERTER_POWER  "Inverter Power"
+#define D_STATUS          "Status"
+#define D_WAITING         "Waiting"
+#define D_CHECKING        "Checking"
+#define D_WORKING         "Working"
+#define D_FAILURE         "Failure"
+#define D_SOLAX_ERROR_0   "No Error Code"
+#define D_SOLAX_ERROR_1   "Grid Lost Fault"
+#define D_SOLAX_ERROR_2   "Grid Voltage Fault"
+#define D_SOLAX_ERROR_3   "Grid Frequency Fault"
+#define D_SOLAX_ERROR_4   "Pv Voltage Fault"
+#define D_SOLAX_ERROR_5   "Isolation Fault"
+#define D_SOLAX_ERROR_6   "Over Temperature Fault"
+#define D_SOLAX_ERROR_7   "Fan Fault"
+#define D_SOLAX_ERROR_8   "Other Device Fault"
+
+#endif  // _LANGUAGE_EN_GB_H_
