@@ -867,7 +867,7 @@ const mytmplt kModules[MAXMODULE] PROGMEM = {
      0,                // GPIO10 (SD_DATA3 Flash QIO or ESP8285)
                        // GPIO11 (SD_CMD   Flash)
      GPIO_REL1,        // GPIO12 Red Led and Relay (0 = Off, 1 = On)
-//     GPIO_LED1_INV,    // GPIO13 Green Led (0 = On, 1 = Off) - Link and Power status
+// invert relay LED for filpilote control (LED on if heater in comfort mode / LED off if heater in frost mode)
      GPIO_LED1,        // GPIO13 Green Led (0 = On, 1 = Off) - Link and Power status
      GPIO_USER,        // GPIO14 Optional sensor
      0,                // GPIO15

@@ -583,6 +583,8 @@
  *    Pilotwire firmware configuration
 \********************************************/
 
+#define USE_OFFLOADING_MQTT                   // Add support for MQTT maximum power offloading
+#define USE_TEMPERATURE_MQTT                  // Add support for MQTT temperature sensor
 #define USE_PILOTWIRE                         // Add support for France Pilotwire protocol for electrical heaters (+1k1 code)
 
 #undef APP_SLEEP
