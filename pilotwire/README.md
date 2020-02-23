@@ -45,3 +45,5 @@ Pilotwire protocol is described at http://www.radiateur-electrique.org/fil-pilot
 Pre-compiled version of Tasmota handling fil pilote is available : **tasmota.bin**
 
 Complete setup guide will be available at http://www.bernaerts-nicolas.fr/iot/...
+
+![Control page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/pilotwire/tasmota-pilotwire-control.png)
