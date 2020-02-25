@@ -407,6 +407,7 @@
 #define D_PILOTWIRE_FROST          "No Frost"
 #define D_PILOTWIRE_THERMOSTAT     "Thermostat"
 
+#define D_PILOTWIRE_CONTROL        "Control"
 #define D_PILOTWIRE_TEMPERATURE    "Temperature"
 #define D_PILOTWIRE_MODE           "Operation mode"
 #define D_PILOTWIRE_LOCAL          "Local"

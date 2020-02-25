@@ -17,6 +17,7 @@
     15/01/2020 - v5.0 - Separate temperature driver and add remote MQTT sensor
     05/02/2020 - v5.1 - Block relay command if not coming from a mode set
     21/02/2020 - v5.2 - Add daily temperature graph
+    24/02/2020 - v5.3 - Add control button to main page
 
   Settings are stored using weighting scale parameters :
     - Settings.weight_reference             = Fil pilote mode
@@ -751,6 +752,13 @@ void PilotwireWebSelectMode (bool public_mode)
   }
 }
 
+// append pilotwire control button to main page
+void PilotwireWebMainButton ()
+{
+  // heater configuration button
+  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>"), D_PAGE_PILOTWIRE_CONTROL, D_PILOTWIRE_CONTROL);
+}
+
 // Pilot Wire configuration button
 void PilotwireWebButton ()
 {
@@ -1065,40 +1073,45 @@ void PilotwireWebPageControl ()
   WSContentSend_P (PSTR ("<style>\n"));
 
   WSContentSend_P (PSTR ("div {width:100%%;margin:auto;padding:3px 0px;text-align:center;vertical-align:middle;}\n"));
-
+  WSContentSend_P (PSTR ("fieldset {border-radius:10px;}\n"));
+  
   WSContentSend_P (PSTR (".page {color:white;background-color:#303030;font-family:tahoma;}\n"));
   WSContentSend_P (PSTR (".title {font-size:2.4em;}\n"));
   WSContentSend_P (PSTR (".dash {font-size:1.8em;}\n"));
   WSContentSend_P (PSTR (".target {font-size:1.8em;}\n"));
+  WSContentSend_P (PSTR (".switch {text-align:left;font-size:1.6em;}\n"));
   WSContentSend_P (PSTR (".bold {font-weight:bold;}\n"));
   
   WSContentSend_P (PSTR (".flag {position:absolute;top:15px;right:40%%;}\n"));
-  WSContentSend_P (PSTR (".slider {width:%d%%;max-width:%dpx;height:120px;}\n"), PILOTWIRE_GRAPH_PERCENT_STOP - PILOTWIRE_GRAPH_PERCENT_START, PILOTWIRE_GRAPH_WIDTH * (PILOTWIRE_GRAPH_PERCENT_STOP - PILOTWIRE_GRAPH_PERCENT_START) / 100);
-  WSContentSend_P (PSTR (".button {border:1px solid white;margin:16px auto;padding:6px 12px;border-radius:12px;font-size:1.4em;}\n"));
+  WSContentSend_P (PSTR (".centered {width:%d%%;max-width:%dpx;}\n"), PILOTWIRE_GRAPH_PERCENT_STOP - PILOTWIRE_GRAPH_PERCENT_START, PILOTWIRE_GRAPH_WIDTH * (PILOTWIRE_GRAPH_PERCENT_STOP - PILOTWIRE_GRAPH_PERCENT_START) / 100);
   WSContentSend_P (PSTR (".graph {max-width:%dpx;}\n"), PILOTWIRE_GRAPH_WIDTH);
-
-  WSContentSend_P (PSTR (".white {color:grey;border-color:grey;background-color:white;}\n"));
-  WSContentSend_P (PSTR (".green {color:green;border-color:green;background-color:#D0FFD0;}\n"));
-  WSContentSend_P (PSTR (".red {color:red;border-color:red;background-color:#FFD0D0;}\n"));
+  WSContentSend_P (PSTR (".thermostat {height:140px;}\n"));
   WSContentSend_P (PSTR (".yellow {color:#FFFF33;}\n"));
 
-  WSContentSend_P (PSTR ("input[type=range] {width:100%%;margin:5px auto;border-radius:8px;-webkit-appearance:none;}\n"));
-  WSContentSend_P (PSTR ("input[type=range]:focus {outline:none;}\n"));
-  WSContentSend_P (PSTR ("input[type=range]::-webkit-slider-runnable-track {width:100%%;height:16px;cursor:pointer;animate:0.2s;border-radius:8px;box-shadow:1px 1px 1px #000000,0px 0px 1px #0d0d0d;background:#808080;border:0.2px solid #010101;}\n"));
-  WSContentSend_P (PSTR ("input[type=range]::-webkit-slider-thumb {height:36px;width:36px;border-radius:18px;background:#ffffff;cursor:pointer;margin-top:-14px;box-shadow:1px 1px 1px #000000,0px 0px 1px #0d0d0d;border:1px solid #000000;-webkit-appearance:none;}\n"));
-  WSContentSend_P (PSTR ("input[type=range]::-moz-range-track {width:100%%;height:16px;cursor:pointer;animate:0.2s;background:#808080;border-radius:8px;box-shadow:1px 1px 1px #000000,0px 0px 1px #0d0d0d;border:0.2px solid #010101;}\n"));
-  WSContentSend_P (PSTR ("input[type=range]::-moz-range-thumb {height:36px;width:36px;border-radius:18px;background:#ffffff;cursor:pointer;box-shadow:1px 1px 1px #000000,0px 0px 1px #0d0d0d;border:1px solid #000000;}\n"));
-  WSContentSend_P (PSTR ("input[type=range]::-ms-track {width:100%%;height:16px;cursor:pointer;animate:0.2s;border-width:16px 0;border-radius:8px;color:transparent;background:transparent;border-color:transparent;}\n"));
-  WSContentSend_P (PSTR ("input[type=range]::-ms-thumb {height:36px;width:36px;border-radius:18px;background:#ffffff;cursor:pointer;border:1px solid #000000;box-shadow:1px 1px 1px #000000,0px 0px 1px #0d0d0d;}\n"));
-  WSContentSend_P (PSTR ("input[type=range]::-ms-fill-lower {background:#808080;border:0.2px solid #010101;border-radius:8px;box-shadow:1px 1px 1px #000000,0px 0px 1px #0d0d0d;}\n"));
-  WSContentSend_P (PSTR ("input[type=range]::-ms-fill-upper {background:#808080;border:0.2px solid #010101;border-radius:8px;box-shadow:1px 1px 1px #000000,0px 0px 1px #0d0d0d;}\n"));
+  WSContentSend_P (PSTR (".button {border:1px solid white;margin:12px 0px auto;padding:4px 12px;border-radius:12px;font-size:1.4em;}\n"));
+  WSContentSend_P (PSTR (".btn-read {color:orange;border:1px solid transparent;background-color:transparent;font-weight:bold;}\n"));
+  WSContentSend_P (PSTR (".btn-set {color:orange;border-color:orange;background-color:#FFEBE8;}\n"));
+
+  WSContentSend_P (PSTR (".slider {width:100%%;height:8px;border-radius:4px;background:#FFEBE8;outline:none;opacity:0.7;-webkit-appearance:none;}\n"));
+  WSContentSend_P (PSTR (".slider::-webkit-slider-thumb {width:25px;height:25px;border-radius:50%%;background:orange;cursor:pointer;border:1px solid orange;appearance:none;-webkit-appearance:none;}\n"));
+  WSContentSend_P (PSTR (".slider::-moz-range-thumb {width:25px;height:25px;border-radius:50%%;background:orange;cursor:pointer;border:1px solid orange;}\n"));
+  WSContentSend_P (PSTR (".slider::-ms-thumb {width:25px;height:25px;border-radius:50%%;background:orange;cursor:pointer;border:1px solid orange;}\n"));
+
+  WSContentSend_P (PSTR (".toggle input {display:none;}\n"));
+  WSContentSend_P (PSTR (".toggle {position:relative;display:inline-block;width:140px;height:40px;margin:10px auto;}\n"));
+  WSContentSend_P (PSTR (".slide-off {position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#bc2612;border:1px solid #aaa;border-radius:5px;}\n"));
+  WSContentSend_P (PSTR (".slide-off:before {position:absolute;content:'';width:64px;height:34px;left:2px;top:2px;background-color:#eee;border-radius:5px;}\n"));
+  WSContentSend_P (PSTR (".slide-off:after {position:absolute;content:'Off';top:2px;right:20px;color:#fff;}\n"));
+  WSContentSend_P (PSTR (".slide-on {position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#8cbc13;border:1px solid #aaa;border-radius:5px;}\n"));
+  WSContentSend_P (PSTR (".slide-on:before {position:absolute;content:'';width:64px;height:34px;left:2px;top:2px;background-color:#eee;border-radius:5px;transform:translateX(70px);}\n"));
+  WSContentSend_P (PSTR (".slide-on:after {position:absolute;content:'On';top:4px;left:15px;color:#fff;}\n"));
 
   WSContentSend_P (PSTR ("rect {stroke:grey;stroke-dasharray:1;fill:#101010;}\n"));
   WSContentSend_P (PSTR ("line.temp {stroke:yellow;stroke-width:4;}\n"));
   WSContentSend_P (PSTR ("line.dash {stroke:grey;stroke-width:4;stroke-dasharray:4;}\n"));
   WSContentSend_P (PSTR ("text.dash {stroke:white;fill:white;}\n"));
-  WSContentSend_P (PSTR ("line.target {stroke:red;stroke-width:4;stroke-dasharray:2;}\n"));
-  WSContentSend_P (PSTR ("text.target {stroke:red;fill:red;}\n"));
+  WSContentSend_P (PSTR ("line.target {stroke:orange;stroke-width:4;stroke-dasharray:2;}\n"));
+  WSContentSend_P (PSTR ("text.target {stroke:orange;fill:orange;}\n"));
 
   WSContentSend_P (PSTR ("</style>\n</head>\n"));
 
@@ -1109,7 +1122,7 @@ void PilotwireWebPageControl ()
   // langage flag
   if (other_langage == PILOTWIRE_LANGAGE_ENGLISH) str_flag = "en";
   else if (other_langage == PILOTWIRE_LANGAGE_FRENCH) str_flag = "fr";
-  WSContentSend_P (PSTR ("<div class='flag'><a href='/control?lang=%s'>\n"), str_flag.c_str ());
+  WSContentSend_P (PSTR ("<div class='flag'><a href='/control?lang=%s'>"), str_flag.c_str ());
   PilotwireWebDisplayFlag (other_langage);
   WSContentSend_P (PSTR ("</a></div>\n"));
 
@@ -1118,18 +1131,26 @@ void PilotwireWebPageControl ()
   WSContentSend_P (PSTR ("<div class='title bold yellow'>%s°C</div>\n"), str_temp_current.c_str());
 
   // if heater is in thermostat mode, button to switch off heater, else button to switch on thermostat
-  if (actual_mode == PILOTWIRE_THERMOSTAT) WSContentSend_P (PSTR ("<div><button name='off' type='submit' class='button red'>%s</button></div>\n"), arrControlOff[controlLangage]);
-  else WSContentSend_P (PSTR ("<div><button name='on' type='submit' class='button green'>%s</button></div>\n"), arrControlOn[controlLangage]);
+  WSContentSend_P (PSTR ("<div class='centered'>"));
+  if (actual_mode == PILOTWIRE_THERMOSTAT) WSContentSend_P (PSTR ("<label class='toggle'><input name='off' type='submit'/><span class='slide-on switch'></span></label>"));
+  else WSContentSend_P (PSTR ("<label class='toggle'><input name='on' type='submit'/><span class='slide-off switch'></span></label>"));
+  WSContentSend_P (PSTR ("</div>\n"));
 
   // target temperature
-  WSContentSend_P (PSTR ("<div class='slider'>\n"));
+  WSContentSend_P (PSTR ("<div class='centered thermostat'>\n"));
   if (actual_mode == PILOTWIRE_THERMOSTAT)
   {
+    // start of fieldset
+    WSContentSend_P (PSTR ("<fieldset><legend>&nbsp;%s&nbsp;</legend>\n"), arrControlTemp[controlLangage]);
+
     // temperature selection slider
-    WSContentSend_P (PSTR ("<input id='slid' name='target' type='range' min='%s' max='%s' value='%s' step='%s'>\n"), str_temp_min.c_str(), str_temp_max.c_str(), str_temp_target.c_str(), D_WEB_PILOTWIRE_TEMP_STEP);
+    WSContentSend_P (PSTR ("<input id='slid' name='target' type='range' class='slider' min='%s' max='%s' value='%s' step='%s' />\n"), str_temp_min.c_str(), str_temp_max.c_str(), str_temp_target.c_str(), D_WEB_PILOTWIRE_TEMP_STEP);
 
     // button to set target temperature
-    WSContentSend_P (PSTR ("<button id='temp' name='temp' type='submit' class='button white'>%s %s°C</button>\n"), arrControlSet[controlLangage], str_temp_target.c_str());
+    WSContentSend_P (PSTR ("<button id='temp' name='temp' type='submit' class='button btn-read'>%s°C</button>\n"), str_temp_target.c_str());
+
+    // end of fieldset
+    WSContentSend_P (PSTR ("</fieldset>\n"));
   }
   WSContentSend_P (PSTR ("</div>\n"));
 
@@ -1152,7 +1173,8 @@ void PilotwireWebPageControl ()
     WSContentSend_P (PSTR ("slid.oninput=function() {\n"));
     WSContentSend_P (PSTR ("var posline=100 * (1- ((Number(this.value) - %s) / %s));\n"), str_temp_min.c_str(), str_temp_scope.c_str());
     WSContentSend_P (PSTR ("var postext=Math.max (Math.min (posline+2, 100), 4);\n"));
-    WSContentSend_P (PSTR ("temp.innerHTML='%s ' + Number(this.value).toFixed(1) + '°C';\n"), arrControlSet[controlLangage]);
+    WSContentSend_P (PSTR ("if (this.value == %s) { temp.innerHTML=Number(this.value).toFixed(1) + '°C'; temp.setAttribute('class', 'button btn-read'); }\n"), str_temp_target.c_str());
+    WSContentSend_P (PSTR ("else { temp.innerHTML='%s ' + Number(this.value).toFixed(1) + '°C'; temp.setAttribute('class', 'button btn-set'); }\n"), arrControlSet[controlLangage]);
     WSContentSend_P (PSTR ("line.setAttribute('y1', posline + '%%');\n"));
     WSContentSend_P (PSTR ("line.setAttribute('y2', posline + '%%');\n"));
     WSContentSend_P (PSTR ("text.innerHTML=Number(this.value).toFixed(1) + '°C';\n"));
@@ -1203,6 +1225,9 @@ bool Xsns98 (uint8_t function)
       break;
     case FUNC_WEB_SENSOR:
       PilotwireWebSensor ();
+      break;
+    case FUNC_WEB_ADD_MAIN_BUTTON:
+      PilotwireWebMainButton ();
       break;
     case FUNC_WEB_ADD_BUTTON:
       PilotwireWebButton ();
