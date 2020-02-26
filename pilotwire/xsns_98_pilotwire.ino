@@ -98,7 +98,7 @@
 #define PILOTWIRE_LANGAGE_ENGLISH       0
 #define PILOTWIRE_LANGAGE_FRENCH        1
 
-// english flag coded in base64
+// english flag icon coded in base64
 const char strFlagEn0[] PROGMEM = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgBAMAAACBVGfHAAAMtnpUWHRSYXcgcHJvZmlsZSB0eXBlIGV4aWYAAHjazZlbcuRIrkT/YxWzhHg/lhMvmN0dzPLnIMhkpjSq6uq2+zHKkpiimEGEO+BwsMz+9/+J+RdfoaVsYio1t5wtX7HF5jtvqr2+rqOz8fw8X/7+E79/OW+eP3hOBY7h+jXv+/rO+fT+QIn3+fH1vCnzXqfeCzn75dZB76zv1x3kvVDw13l3/27a/YGeP7Zzf/t5L/va1rffYwGMlVgveON3cMGen/66UyCK0ELXM+dn5UJ7v0/89OEH/MwD3Q8APu++4WdfkYU3HNdCr23lbzjd5136dj48t/FfInL+ubP/jCgNu+3n1wd+IquK7Gt3PZJHLeZ7U6+tnHdcOIAznI9lXoXvxPtyXo1Xtd1OWFtsdRg7+KU5D+LioluuO3H7HKebhBj99oWj99OHc66G4pufh5SoLye+GPhZocLEhLnAaf/E4s59m96Pm1XuvBxXesdiyuiXl/l+4p++viwkomnunK0PVsTlNb8IQ5nTn1wFIU5uTNPB15nrYL9/KbEBBtOBubLBbse1xEjunVvh8BxsMlwa7VUvrqx7ASDi3olgXIABm0lpl50t3hfnwLHCTydyH6IfMOCSSX4RpY8hZMihGrg3nynuXOuTv04jLxCRQg4FaiggyIoxxUy9VVKomxRSTCnlVFJNLfUccswp";
 const char strFlagEn1[] PROGMEM = "51yy6lQvocSSSi6l1NJKr6HGmmqupdbaam++BWQsmZZbabW11js37bGzVuf6zonhRxhxpJFHGXW00SfpM+NMM88y62yzL7/CQgLMyqusutrq221Saceddt5l1912F3JNgkRJkqVIlSb9Ye1m9Str35n7PWvuZs0fovS68maN06W8lnAqJ0k5gzEfHYwXZYCE9sqZrS5Gr8wpZ7b5YEJIniiTkrOcMgaDcTufxD3cvZn7JW8GdP8ub/4n5oxS9//BnFHqPpj7b95+YG31I7fhEKRVCKYoZKD8wKR2/kmYskq8ftEe9dNR4vB7jrFHm2tL6ivvZgpvdx7DSRhNdhGWXc3tKVLKlCllsysu3lFGTY7O3B2IpTxRspaGgNsQFpLp2DJ6mGWvLFwNIDKW7qBx43g+3Hapvszhrl8tW1xnWaTWSQrL6Pu0ZtmxXtedG7a9OMbiowCyrK0hJY3WRil9iONefpS9PdBtvo3kft/F7RxaKStKY7+DLcMG0c0lJawxawi0jVUkNwGguOMoSS8r4tMy9YVylO5tP7/Zv3EcCwiBxoB98amDbmmiN1jSmzRtKTkrTgGc1iQjNCcGsQL7GPbgk/amqivHalLaZfAmpRnqlBEkhCHkRB6A8gH3hErSyM9riemVzgsVzM4yUa7ripPm3Q7vhfVIjDUIR9qVnQBIsLKre30GE3ACW8MkZKikCJrFZ80YkRhI6JokwMfcGtqm3uiKLEsN0A3XFOcP";
 const char strFlagEn2[] PROGMEM = "ToBeSeHqzW9zmOPYVJ20DKriR+4R3gKbrlqgg+xI1Ewo21QKmw2vQlgk7Aq9Tei3QslGKu7KLY2ktlRWzihQAHChsinanXFLBJ7NItO2e0DRY6N3UyJz0rr/GHTzQv0fg65IIzuGjsft/erkRA6UCdcTBN82EYkf0+6xQx6rUNto2Ua4ED5HwjVZovVMHylmTs3rMvvum8/GLgSXPP3Dk1RaTWi+JzVxRq+aRXlXtHfJ3kf06IHS6Q7ox4gYzJdTRCwACDE06jRSZhXyWRtFzVrCuaMTA3ayCcqqhk/NEE1RYUNTWFuLb/bAmtlN2ZSIUCO8aCqoqsbHKYQ60n68GSHNTrLIbJQ7UaCvbecvSZHeScHhTopDhC7oG+tFI5oVV1I0usXJCdGUKIP2pKwIFGjK/FrU9K15iVpdLzlLGo2w5kRc7SZ/244rX3Tmb3Sy2YtOMpvekVyLBYYU4oUkatcI9pDpR6cD4YXYTOt8RFJFvumm+pb+conYNi6PvtsKbIWqmpumlm2/axL5BNuxNf1l3WobgbccCksJohSO1pdKLZkJ1FLs13r+dev5qfOY37ceoNZWSSs8lbC9kqjG26pSEiMsYBSwCeaQlJSkzSzplmYnWEpdRBNapieBLCVBSgI9KNI3UH3wAR0th520NMxUJIlQkYSNVBRJ0mmAY0R2gXqD4+gKO2Bq89j1gBleYHhfBet3gbFdoEBe7SGonJ2LRgU/WrqmPftjFO1P";
@@ -109,7 +109,7 @@ const char strFlagEn6[] PROGMEM = "RagQaoVWHUxe+gdNGpIUF0fBteDgz2LVwcVZVwdXQRD8A
 const char strFlagEn7[] PROGMEM = "QnDAiSaA0hPgwGjWpISAAlQGgITgCAHAom3b7kRw99juREgBkCKDScp7BvIr/gHVR6uybMxOBLc+NsbWw5VgVCa/xY4qXnE9AZ6PHYGlhH5gkwyihBZiTRbihBYKKLPJwUXXZ30Zg338HlQ9ymrYH7/DE1YIbsUViqSPAAAAAElFTkSuQmCC";
 const char *const arrFlagEnBase64[] PROGMEM = {strFlagEn0, strFlagEn1, strFlagEn2, strFlagEn3, strFlagEn4, strFlagEn5, strFlagEn6, strFlagEn7};
 
-// french flag coded in base64
+// french flag icon coded in base64
 const char strFlagFr0[] PROGMEM = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgBAMAAACBVGfHAAAHdXpUWHRSYXcgcHJvZmlsZSB0eXBlIGV4aWYAAHjarVdbkisrDvzXKmYJvIRgObwUcXcwy58UlN3dbrtP3zO2w1UYlwFlJkpE67//KP0Hr+hCpsRScs3Z4ZVqqqGhUdx5nbt3aV/3K1w/4fuXfrr/ENAVcY/na17X8w39/PEHSVd//9pPMq5xyjXQ9cNtwGgz22zzWuQ1UAyn31/fqV5LavlTONcnyonk9vDj9yQAYzI6Y6CwogdYdg1npohVxBqb9exrwYPuaidcOcbv+NEduicA3lsP+Llx9ccPOM5At7DyA05Xv+fn+G2UPq/Ih/vM4fOKenPNfX59wk91FtV1omsJOqopX0HdQtktPNgB50Ej4y34MNqy3xXvgmkGgJ8ItZPr+FJ9AOLqk5++efVr34cfWGIKKwjuIYwQd1+JEmoYm5Rkb69BCPzMWMDJAHMR3eG+Fr/nrTYfJiuYeXo8GTwGM0a/vOmx42/fXwZSNZl778odK6wrmL6wDGPOrngKhHi9MOWNr6dzc48vIzaCQd4wFwTYXD9DdPYf2oqb5+iY8GhyR/Je5jUAIMLcjMX4CAZc9pF99k5CEO+BYwE/DSsPMYUOBjwTh4lVhhRjBjnYDZgb/xG/nw0cTjfSC4jgmKOAGmwgkJUSp4z9ViChRhw5MXNm4cKVW445Zc45S7Y81SRKEpYsIkWq";
 const char strFlagFr1[] PROGMEM = "tBJLKlxykVJKLa2GGpHGmGquUkuttTVM2lLDWA3PN3T00GNPnXvu0kuvvQ3IZ6TBIw8ZZdTRZphxIgXQzFNmmXW25RektNLilZessupqCq1p1KSsWUWLVm131i5Wv7L2yNzPrPmLtbCJsufkgzV0i9yG8JZO2DgDYyF5MC7GAAQdjDNXfErBmDPOXA2RYuSAVbKRM70xBgbT8oHV37n7YO4lbwR0/y1v4RlzZNS9gzky6j4x9523J6zNttNt3ATZLgSmyJAR22+5VVooTVuPQ5w14U9P79hHcIKCdWubrdfouWB46hMLn2OGkuJsUxuXcMasC5nq1ZhYN3DoqzMeLKt3Wj0Lr7HmQkC6RHd6WGO0XvClp1hVpY4+el5VJp7JvfsyE+fOOU38mzEWyZRY+5wYes6sfeqokmMYS0PSNbpm0T4AWu6a7KmsUea4lp2KumRtKs3s2jp/ca+a2GwWF7t7D5LyZEw5abcWZIOpIyJryPvFa8evOtM1b3BLXzOwQaIFHexW6b5qTqB3+WRIARDVvGBec8Qz4gLIw4UeAE+zwHrQMeJqMgggA8AMzCeGSNrr8hBxDaIQZY86lwQNRudS6VLbGoDYYoO2hqw0dpzEdriwmJ/cLXuiEX0/PeEWDg4UW0Qr1dMYjcaUBamr2jkD4swdbLay4eQFx1yv59FoaMdqDZric0TkFbtggBZg3IHKNJRmL/mMOBz20I0sZ/IBSpioZtOQzKS0NTTx";
 const char strFlagFr2[] PROGMEM = "zwwpQUMq8NxLRPj9iAi0mogMTI08sVN3jH3hIDFq+a4jbHssFYmr3CafBxX/TDpflEP/h3S+KIc+SWcLx86zdv0mnkeVP4iJtpreICbaX/Jeb+a4ak1u3GbN8wBTbh0WT8+IB6vZDaRP1u6R+2gipQ2HpIfIVjsakeqQn+9kP95lDGFFHt2NwWVoD5ZGAKro6ICmixyUfD0jwgfzS+VbcEgrXLGqTBMLyV4ZGUclQ2fCGFI08NaIxj5qxIw6qy5F6sKmQLIH0H1MRVbunnm1QSwtCdwlAB0FTB8TxnyQSbcOmJJyR0C2BGvAf5odbjEFMiQOtbKmIBXy0UkfBct4mdz6yrZl5TRWGFlmjYu6Fo6KjSo4g3ZDqIsbZ8TitLvXqsRGmdmu2tIiv04Sq1vWWtKK+fTgsGhetiaM5dpa1WnJHzopn3RCvxbKH3RCvxbKF50YAGKJ+K4T+kkotzv7ExrMB7bcn8ZG/k2xkf+72L7tAXJvio3mm2Ij9u/hjeRNsVF+U2yU+D28Ef8uNiQx7LimyMpXfA3pZRz3so1Meyf/xtzv3m5l6nd3p39h79/cHdnp5u+TXtn74/3YvZ0ZZxCnBtTYmMtAMdiF0FGOKpDV8rxysB2UU1ze9TsQf7Bxeubjf2Pj9MzH/8bG6dHPz2nF7BwwbjdXNjev281xfq6KVA87PxMcQ58aaDv6PI4e1rjkahYVIJxshVOY7l4BvBQK/V4pPwuFfq+Un4VC";
@@ -118,21 +118,9 @@ const char strFlagFr4[] PROGMEM = "6wf/g9+ztfIT415SOA6EXhznYxjo3AUaNcf5PnacxgkQf
 const char *const arrFlagFrBase64[] PROGMEM = {strFlagFr0, strFlagFr1, strFlagFr2, strFlagFr3, strFlagFr4};
 
 // control page texts
-const char strControlOffEn[] PROGMEM = "Switch OFF";
-const char strControlOffFr[] PROGMEM = "Eteindre";
-const char *const arrControlOff[] PROGMEM = {strControlOffEn, strControlOffFr};
-const char strControlOnEn[] PROGMEM = "Switch ON";
-const char strControlOnFr[] PROGMEM = "Allumer";
-const char *const arrControlOn[] PROGMEM = {strControlOnEn, strControlOnFr};
-const char strControlTempEn[] PROGMEM = "Target";
-const char strControlTempFr[] PROGMEM = "Thermostat";
-const char *const arrControlTemp[] PROGMEM = {strControlTempEn, strControlTempFr};
-const char strControlSetEn[] PROGMEM = "Set to";
-const char strControlSetFr[] PROGMEM = "Définir à";
-const char *const arrControlSet[] PROGMEM = {strControlSetEn, strControlSetFr};
-const char strControlVersionEn[] PROGMEM = "Version française";
-const char strControlVersionFr[] PROGMEM = "English version";
-const char *const arrControlVersion[] PROGMEM = {strControlVersionEn, strControlVersionFr};
+const char *const arrControlTemp[]   PROGMEM = {"Target", "Thermostat"};
+const char *const arrControlSet[]    PROGMEM = {"Set to", "Définir à"};
+const char *const arrControlStatus[] PROGMEM = {"Currently heating", "Radiateur en chauffe"};
 int   controlLangage = PILOTWIRE_LANGAGE_ENGLISH;
 
 // fil pilote modes
@@ -147,8 +135,6 @@ const char kPilotWireCommands[] PROGMEM = D_CMND_PILOTWIRE_MODE "|" D_CMND_PILOT
 
 // header of publicly accessible control page
 const char PILOTWIRE_MODE_SELECT[] PROGMEM = "<input type='radio' name='%s' id='%d' value='%d' %s>%s";
-const char PILOTWIRE_FORM_START[] PROGMEM = "<form method='get' action='%s'>";
-const char PILOTWIRE_FORM_STOP[] PROGMEM = "</form>";
 const char PILOTWIRE_FIELDSET_START[] PROGMEM = "<fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>";
 const char PILOTWIRE_FIELDSET_STOP[] PROGMEM = "</fieldset><br />";
 
@@ -567,7 +553,7 @@ bool PilotwireMqttCommand ()
 }
 
 // update pilot wire relay states according to current status
-void PilotwireEvery250MSecond ()
+void PilotwireUpdateStatus ()
 {
   bool    is_offloaded;
   uint8_t heater_mode, heater_state, target_state;
@@ -633,8 +619,6 @@ void PilotwireAddTemperature2History ()
 
 void PilotwireEverySecond ()
 {
-  AddLog_P2(LOG_LEVEL_INFO, PSTR("Every second"));
-
   // increment delay counter and if delay reached, update history data
   temperature_data_counter ++;
   if (temperature_data_counter >= PILOTWIRE_GRAPH_DELAY) PilotwireAddTemperature2History ();
@@ -658,16 +642,13 @@ void PilotwireInit ()
 
 #ifdef USE_WEBSERVER
 
-// Pilot Wire langage flag
+// Pilotwire langage flag
 void PilotwireWebDisplayFlag (uint8_t langage_code)
 {
   uint8_t nbrItem, index;
 
-  // display img according to height
-  WSContentSend_P (PSTR ("<img  title='%s' src='data:image/png;base64,"), arrControlVersion[controlLangage]);
-
-
   // display flag according to langage
+  WSContentSend_P (PSTR ("<img  src='data:image/png;base64,"));
   switch (langage_code)
   {
     case PILOTWIRE_LANGAGE_ENGLISH:  // english flag
@@ -682,7 +663,7 @@ void PilotwireWebDisplayFlag (uint8_t langage_code)
   WSContentSend_P (PSTR ("' />"));
 }
 
-// Pilot Wire mode selection 
+// Pilotwire mode selection 
 void PilotwireWebSelectMode (bool public_mode)
 {
   uint8_t actual_mode;
@@ -860,7 +841,7 @@ void PilotwireWebPageHeater ()
   // beginning of form
   WSContentStart_P (D_PILOTWIRE_CONF_HEATER);
   WSContentSendStyle ();
-  WSContentSend_P (PILOTWIRE_FORM_START, D_PAGE_PILOTWIRE_HEATER);
+  WSContentSend_P (PSTR("<form method='get' action='%s'>"), D_PAGE_PILOTWIRE_HEATER);
 
   // mode section  
   // --------------
@@ -907,7 +888,7 @@ void PilotwireWebPageHeater ()
 
   // save button
   WSContentSend_P (PSTR ("<button name='save' type='submit' class='button bgrn'>%s</button>"), D_SAVE);
-  WSContentSend_P (PILOTWIRE_FORM_STOP);
+  WSContentSend_P (PSTR("</form>"));
 
   // configuration button
   WSContentSpaceButton (BUTTON_CONFIGURATION);
@@ -919,11 +900,11 @@ void PilotwireWebPageHeater ()
 // Temperature graph
 void PilotwireWebTemperatureGraph (uint8_t mode)
 {
-  uint32_t index, array_index;
-  float    temp_min, temp_max, temp_scope, temp_current;
-  float    graph_start, graph_stop, graph_width;
-  float    graph_x1, graph_x2, graph_y1, graph_y2;
-  String   str_temperature, str_graph_x1, str_graph_x2, str_graph_y1, str_graph_y2;
+  int    index, array_index;
+  float  temp_min, temp_max, temp_scope, temp_current;
+  float  graph_start, graph_stop, graph_width;
+  float  graph_x1, graph_x2, graph_y1, graph_y2;
+  String str_temperature, str_graph_x1, str_graph_x2, str_graph_y1, str_graph_y2;
 
   // get min and max temperature
   temp_min   = PilotwireGetMinTemperature ();
@@ -999,12 +980,13 @@ void PilotwireWebTemperatureGraph (uint8_t mode)
     temp_current = PilotwireGetTargetTemperature ();
 
     // calculate and display target temperature line
-    index = (uint32_t) (100 * (1 - ((temp_current - temp_min) / temp_scope)));
+    index = (100 * (1 - ((temp_current - temp_min) / temp_scope)));
     WSContentSend_P (PSTR ("<line id='line' class='target' x1='%d%%' y1='%d%%' x2='%d%%' y2='%d%%' />\n"), PILOTWIRE_GRAPH_PERCENT_START, index, PILOTWIRE_GRAPH_PERCENT_STOP, index);
 
     // display target temperature text
+    index = max (min (index + 2, 100), 4);
     str_temperature = String (temp_current, 1) + "°C";
-    WSContentSend_P (PSTR ("<text id='text' class='target' x='%d%%' y='%d%%'>%s</text>\n"), PILOTWIRE_GRAPH_PERCENT_STOP + 1, index +2, str_temperature.c_str ());
+    WSContentSend_P (PSTR ("<text id='text' class='target' x='%d%%' y='%d%%'>%s</text>\n"), PILOTWIRE_GRAPH_PERCENT_STOP + 1, index, str_temperature.c_str ());
   }
 
   // end of SVG graph
@@ -1017,7 +999,7 @@ void PilotwireWebPageControl ()
   uint8_t actual_mode, actual_state, other_langage;
   char    argument[PILOTWIRE_BUFFER_SIZE];
   float   temp_current, temp_target, temp_min, temp_max, temp_scope;
-  String  str_temp_current, str_temp_target, str_temp_min, str_temp_max, str_temp_scope, str_flag;
+  String  str_temp_current, str_temp_target, str_temp_min, str_temp_max, str_temp_scope, str_text;
 
   // if langage is changed
   if (WebServer->hasArg(D_CMND_PILOTWIRE_LANG))
@@ -1042,6 +1024,9 @@ void PilotwireWebPageControl ()
     WebGetArg (D_CMND_PILOTWIRE_TARGET, argument, PILOTWIRE_BUFFER_SIZE);
     if (strlen(argument) > 0) PilotwireSetThermostat (atof (argument));
   }
+
+  // update heater status
+  PilotwireUpdateStatus ();
 
   // mode
   actual_mode  = PilotwireGetMode ();
@@ -1072,23 +1057,26 @@ void PilotwireWebPageControl ()
   // page style
   WSContentSend_P (PSTR ("<style>\n"));
 
+  WSContentSend_P (PSTR ("body {color:white;background-color:#303030;font-family:Arial, Helvetica, sans-serif;}\n"));
   WSContentSend_P (PSTR ("div {width:100%%;margin:auto;padding:3px 0px;text-align:center;vertical-align:middle;}\n"));
   WSContentSend_P (PSTR ("fieldset {border-radius:10px;}\n"));
   
-  WSContentSend_P (PSTR (".page {color:white;background-color:#303030;font-family:tahoma;}\n"));
-  WSContentSend_P (PSTR (".title {font-size:2.4em;}\n"));
-  WSContentSend_P (PSTR (".dash {font-size:1.8em;}\n"));
-  WSContentSend_P (PSTR (".target {font-size:1.8em;}\n"));
-  WSContentSend_P (PSTR (".switch {text-align:left;font-size:1.6em;}\n"));
+  WSContentSend_P (PSTR (".title {font-size:5vh;}\n"));
+  WSContentSend_P (PSTR (".dash {font-size:24px;}\n"));
+  WSContentSend_P (PSTR (".target {font-size:24px;}\n"));
+  WSContentSend_P (PSTR (".switch {text-align:left;font-size:24px;}\n"));
   WSContentSend_P (PSTR (".bold {font-weight:bold;}\n"));
   
-  WSContentSend_P (PSTR (".flag {position:absolute;top:15px;right:40%%;}\n"));
+  WSContentSend_P (PSTR (".flag {position:absolute;top:20px;right:40%%;}\n"));
+
   WSContentSend_P (PSTR (".centered {width:%d%%;max-width:%dpx;}\n"), PILOTWIRE_GRAPH_PERCENT_STOP - PILOTWIRE_GRAPH_PERCENT_START, PILOTWIRE_GRAPH_WIDTH * (PILOTWIRE_GRAPH_PERCENT_STOP - PILOTWIRE_GRAPH_PERCENT_START) / 100);
   WSContentSend_P (PSTR (".graph {max-width:%dpx;}\n"), PILOTWIRE_GRAPH_WIDTH);
-  WSContentSend_P (PSTR (".thermostat {height:140px;}\n"));
+  WSContentSend_P (PSTR (".thermostat {height:150px;}\n"));
   WSContentSend_P (PSTR (".yellow {color:#FFFF33;}\n"));
 
-  WSContentSend_P (PSTR (".button {border:1px solid white;margin:12px 0px auto;padding:4px 12px;border-radius:12px;font-size:1.4em;}\n"));
+  WSContentSend_P (PSTR (".status {margin-top:10px;color:orange;font-size:18px;font-style:italic;}\n"));
+
+  WSContentSend_P (PSTR (".button {border:1px solid white;margin:12px 0px auto;padding:4px 12px;border-radius:12px;font-size:20px;}\n"));
   WSContentSend_P (PSTR (".btn-read {color:orange;border:1px solid transparent;background-color:transparent;font-weight:bold;}\n"));
   WSContentSend_P (PSTR (".btn-set {color:orange;border-color:orange;background-color:#FFEBE8;}\n"));
 
@@ -1101,10 +1089,10 @@ void PilotwireWebPageControl ()
   WSContentSend_P (PSTR (".toggle {position:relative;display:inline-block;width:140px;height:40px;margin:10px auto;}\n"));
   WSContentSend_P (PSTR (".slide-off {position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#bc2612;border:1px solid #aaa;border-radius:5px;}\n"));
   WSContentSend_P (PSTR (".slide-off:before {position:absolute;content:'';width:64px;height:34px;left:2px;top:2px;background-color:#eee;border-radius:5px;}\n"));
-  WSContentSend_P (PSTR (".slide-off:after {position:absolute;content:'Off';top:2px;right:20px;color:#fff;}\n"));
+  WSContentSend_P (PSTR (".slide-off:after {position:absolute;content:'Off';top:5px;right:20px;color:#fff;}\n"));
   WSContentSend_P (PSTR (".slide-on {position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#8cbc13;border:1px solid #aaa;border-radius:5px;}\n"));
-  WSContentSend_P (PSTR (".slide-on:before {position:absolute;content:'';width:64px;height:34px;left:2px;top:2px;background-color:#eee;border-radius:5px;transform:translateX(70px);}\n"));
-  WSContentSend_P (PSTR (".slide-on:after {position:absolute;content:'On';top:4px;left:15px;color:#fff;}\n"));
+  WSContentSend_P (PSTR (".slide-on:before {position:absolute;content:'';width:64px;height:34px;left:72px;top:2px;background-color:#eee;border-radius:5px;}\n"));
+  WSContentSend_P (PSTR (".slide-on:after {position:absolute;content:'On';top:5px;left:15px;color:#fff;}\n"));
 
   WSContentSend_P (PSTR ("rect {stroke:grey;stroke-dasharray:1;fill:#101010;}\n"));
   WSContentSend_P (PSTR ("line.temp {stroke:yellow;stroke-width:4;}\n"));
@@ -1116,13 +1104,13 @@ void PilotwireWebPageControl ()
   WSContentSend_P (PSTR ("</style>\n</head>\n"));
 
   // page body
-  WSContentSend_P (PSTR ("<body class='page'>\n"));
+  WSContentSend_P (PSTR ("<body>\n"));
   WSContentSend_P (PSTR ("<form method='get' action='%s'>\n"), D_PAGE_PILOTWIRE_CONTROL);
 
   // langage flag
-  if (other_langage == PILOTWIRE_LANGAGE_ENGLISH) str_flag = "en";
-  else if (other_langage == PILOTWIRE_LANGAGE_FRENCH) str_flag = "fr";
-  WSContentSend_P (PSTR ("<div class='flag'><a href='/control?lang=%s'>"), str_flag.c_str ());
+  if (other_langage == PILOTWIRE_LANGAGE_ENGLISH) str_text = "en";
+  else if (other_langage == PILOTWIRE_LANGAGE_FRENCH) str_text = "fr";
+  WSContentSend_P (PSTR ("<div class='flag'><a href='/control?lang=%s'>"), str_text.c_str ());
   PilotwireWebDisplayFlag (other_langage);
   WSContentSend_P (PSTR ("</a></div>\n"));
 
@@ -1147,10 +1135,15 @@ void PilotwireWebPageControl ()
     WSContentSend_P (PSTR ("<input id='slid' name='target' type='range' class='slider' min='%s' max='%s' value='%s' step='%s' />\n"), str_temp_min.c_str(), str_temp_max.c_str(), str_temp_target.c_str(), D_WEB_PILOTWIRE_TEMP_STEP);
 
     // button to set target temperature
-    WSContentSend_P (PSTR ("<button id='temp' name='temp' type='submit' class='button btn-read'>%s°C</button>\n"), str_temp_target.c_str());
+    WSContentSend_P (PSTR ("<div><button id='temp' name='temp' type='submit' class='button btn-read'>%s°C</button></div>\n"), str_temp_target.c_str());
 
     // end of fieldset
     WSContentSend_P (PSTR ("</fieldset>\n"));
+
+    // if needed, display heater status
+    str_text = "";
+    if (actual_state == PILOTWIRE_COMFORT) str_text = arrControlStatus[controlLangage];
+    WSContentSend_P (PSTR ("<div class='status'>&nbsp;%s&nbsp;</div>\n"), str_text.c_str());
   }
   WSContentSend_P (PSTR ("</div>\n"));
 
@@ -1208,11 +1201,11 @@ bool Xsns98 (uint8_t function)
     case FUNC_COMMAND:
       result = PilotwireMqttCommand ();
       break;
+    case FUNC_EVERY_250_MSECOND:
+      PilotwireUpdateStatus ();
+      break;
     case FUNC_EVERY_SECOND:
       PilotwireEverySecond ();
-      break;
-    case FUNC_EVERY_250_MSECOND:
-      PilotwireEvery250MSecond ();
       break;
     case FUNC_JSON_APPEND:
       PilotwireShowJSON (true);
