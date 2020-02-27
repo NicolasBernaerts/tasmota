@@ -40,12 +40,6 @@
 #define D_JSON_TEMPERATURE_TOPIC    "Topic"
 #define D_JSON_TEMPERATURE_KEY      "Key"
 
-// form strings
-const char TEMPERATURE_FORM_START[] PROGMEM = "<form method='get' action='%s'>";
-const char TEMPERATURE_FORM_STOP[] PROGMEM = "</form>";
-const char TEMPERATURE_FIELDSET_START[] PROGMEM = "<fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>";
-const char TEMPERATURE_FIELDSET_STOP[] PROGMEM = "</fieldset><br />";
-
 // temperature commands
 enum TemperatureCommands { CMND_TEMPERATURE_TOPIC, CMND_TEMPERATURE_KEY };
 const char kTemperatureCommands[] PROGMEM = D_CMND_TEMPERATURE_TOPIC "|" D_CMND_TEMPERATURE_KEY;
@@ -344,29 +338,24 @@ void TemperatureWebPage ()
   // beginning of form
   WSContentStart_P (D_TEMPERATURE_CONFIGURE);
   WSContentSendStyle ();
-  WSContentSend_P (TEMPERATURE_FORM_START, D_PAGE_TEMPERATURE);
+  WSContentSend_P (PSTR("<form method='get' action='%s'>\n"), D_PAGE_TEMPERATURE);
 
   // remote sensor section  
   // --------------
-  WSContentSend_P (TEMPERATURE_FIELDSET_START, D_TEMPERATURE_REMOTE);
+  WSContentSend_P (PSTR("<fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n"), D_TEMPERATURE_REMOTE);
 
   // remote sensor mqtt topic
   TemperatureGetMqttTopic (str_topic);
-  WSContentSend_P (PSTR ("<br/>%s<br/>"), D_TEMPERATURE_TOPIC);
-  WSContentSend_P (PSTR ("<input name='%s' value='%s'>"), D_CMND_TEMPERATURE_TOPIC, str_topic.c_str ());
-  WSContentSend_P (PSTR ("<br/>"));
+  WSContentSend_P (PSTR ("<p>%s<br><input name='%s' value='%s'></p>\n"), D_TEMPERATURE_TOPIC, D_CMND_TEMPERATURE_TOPIC, str_topic.c_str ());
 
   // remote sensor json key
   TemperatureGetMqttKey (str_key);
-  WSContentSend_P (PSTR ("<br/>%s<br/>"), D_TEMPERATURE_KEY);
-  WSContentSend_P (PSTR ("<input name='%s' value='%s'>"), D_CMND_TEMPERATURE_KEY, str_key.c_str ());
-  WSContentSend_P (PSTR ("<br/>"));
+  WSContentSend_P (PSTR ("<p>%s<br/><input name='%s' value='%s'><br/>\n"), D_TEMPERATURE_KEY, D_CMND_TEMPERATURE_KEY, str_key.c_str ());
 
-  WSContentSend_P (TEMPERATURE_FIELDSET_STOP);
-
-  // save button
-  WSContentSend_P (PSTR ("<button name='save' type='submit' class='button bgrn'>%s</button>"), D_SAVE);
-  WSContentSend_P (TEMPERATURE_FORM_STOP);
+  // end of form and save button
+  WSContentSend_P (PSTR("</fieldset><br>\n"));
+  WSContentSend_P (PSTR ("<button name='save' type='submit' class='button bgrn'>%s</button>\n"), D_SAVE);
+  WSContentSend_P (PSTR("</form>\n"));
 
   // configuration button
   WSContentSpaceButton(BUTTON_CONFIGURATION);

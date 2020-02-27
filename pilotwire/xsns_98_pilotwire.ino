@@ -18,6 +18,7 @@
     05/02/2020 - v5.1 - Block relay command if not coming from a mode set
     21/02/2020 - v5.2 - Add daily temperature graph
     24/02/2020 - v5.3 - Add control button to main page
+    27/02/2020 - v5.4 - Add target temperature and relay state to temperature graph
 
   Settings are stored using weighting scale parameters :
     - Settings.weight_reference             = Fil pilote mode
@@ -88,7 +89,7 @@
 #define PILOTWIRE_GRAPH_XMIN            5
 #define PILOTWIRE_GRAPH_XMAX            95
 #define PILOTWIRE_GRAPH_REFRESH         60          // refresh control page every 1mn (in seconds)
-#define PILOTWIRE_GRAPH_DELAY           300         // Collect temperature every 5mn (in seconds)
+#define PILOTWIRE_GRAPH_DELAY           1         // Collect temperature every 5mn (in seconds)
 #define PILOTWIRE_GRAPH_SAMPLE          288         // 24 hours if every 5mn
 #define PILOTWIRE_GRAPH_WIDTH           800      
 #define PILOTWIRE_GRAPH_HEIGHT          500 
@@ -121,7 +122,7 @@ const char *const arrFlagFrBase64[] PROGMEM = {strFlagFr0, strFlagFr1, strFlagFr
 const char *const arrControlTemp[]   PROGMEM = {"Target", "Thermostat"};
 const char *const arrControlSet[]    PROGMEM = {"Set to", "Définir à"};
 const char *const arrControlStatus[] PROGMEM = {"Currently heating", "Radiateur en chauffe"};
-int   controlLangage = PILOTWIRE_LANGAGE_ENGLISH;
+int   pilotwire_langage = PILOTWIRE_LANGAGE_ENGLISH;
 
 // fil pilote modes
 enum PilotwireModes { PILOTWIRE_DISABLED, PILOTWIRE_OFF, PILOTWIRE_COMFORT, PILOTWIRE_ECO, PILOTWIRE_FROST, PILOTWIRE_THERMOSTAT, PILOTWIRE_OFFLOAD };
@@ -135,8 +136,6 @@ const char kPilotWireCommands[] PROGMEM = D_CMND_PILOTWIRE_MODE "|" D_CMND_PILOT
 
 // header of publicly accessible control page
 const char PILOTWIRE_MODE_SELECT[] PROGMEM = "<input type='radio' name='%s' id='%d' value='%d' %s>%s";
-const char PILOTWIRE_FIELDSET_START[] PROGMEM = "<fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>";
-const char PILOTWIRE_FIELDSET_STOP[] PROGMEM = "</fieldset><br />";
 
 /*************************************************\
  *               Variables
@@ -146,9 +145,13 @@ const char PILOTWIRE_FIELDSET_STOP[] PROGMEM = "</fieldset><br />";
 uint8_t pilotwire_temperature_source = PILOTWIRE_SOURCE_NONE;         // temperature source
 
 // temperature data for graph
-uint32_t temperature_data_counter = 0;
-uint32_t temperature_data_index   = 0;
-float    arr_temperature_data[PILOTWIRE_GRAPH_SAMPLE];
+uint32_t pilotwire_graph_index   = 0;
+uint32_t pilotwire_graph_counter = 0;
+float    current_temperature, current_target;
+uint8_t  current_state;
+float    arr_temperature[PILOTWIRE_GRAPH_SAMPLE];
+float    arr_target[PILOTWIRE_GRAPH_SAMPLE];
+uint8_t  arr_state[PILOTWIRE_GRAPH_SAMPLE];
 
 /**************************************************\
  *                  Accessors
@@ -606,33 +609,75 @@ void PilotwireUpdateStatus ()
   }
 }
 
-void PilotwireAddTemperature2History ()
+void PilotwireUpdateGraph ()
 {
-    AddLog_P2(LOG_LEVEL_INFO, PSTR("PilotwireAddTemperature2History"));
   // if index is ok, check index set current graph value
-  arr_temperature_data[temperature_data_index] = PilotwireGetTemperature ( );
+  arr_temperature[pilotwire_graph_index] = current_temperature;
+  arr_target[pilotwire_graph_index] = current_target;
+  arr_state[pilotwire_graph_index] = current_state;
+
+  // init current values
+  current_temperature = NAN;
+  current_target = NAN;
+  current_state = PILOTWIRE_OFF;
 
   // increase temperature data index and reset if max reached
-  temperature_data_index ++;
-  temperature_data_index = temperature_data_index % PILOTWIRE_GRAPH_SAMPLE;
+  pilotwire_graph_index ++;
+  pilotwire_graph_index = pilotwire_graph_index % PILOTWIRE_GRAPH_SAMPLE;
 }
 
 void PilotwireEverySecond ()
 {
+  float   temperature, target;
+  uint8_t state;
+
+  // update current values
+  temperature = PilotwireGetTemperature ( );
+  target = PilotwireGetTargetTemperature ( );
+  state = PilotwireGetRelayState ( );
+
+  // update current values
+//  current_temperature = temperature;
+//  current_target = target;
+
+  if (isnan(temperature) == false)
+  {
+    if (isnan(current_temperature) == false) current_temperature = min (current_temperature, temperature);
+    else current_temperature = temperature;
+  }
+
+  if (isnan(target) == false)
+  {
+    if (isnan(current_target) == false) current_target = min (current_target, target);
+    else current_target = target;
+  } 
+
+  if (current_state != PILOTWIRE_COMFORT) current_state = state;
+
   // increment delay counter and if delay reached, update history data
-  temperature_data_counter ++;
-  if (temperature_data_counter >= PILOTWIRE_GRAPH_DELAY) PilotwireAddTemperature2History ();
+  if (pilotwire_graph_counter == 0) PilotwireUpdateGraph ();
   
-  //  and if needed reset counter
-  temperature_data_counter = temperature_data_counter % PILOTWIRE_GRAPH_DELAY;
+  // increment and reset counter in case of overflow
+  pilotwire_graph_counter ++;
+  pilotwire_graph_counter = pilotwire_graph_counter % PILOTWIRE_GRAPH_DELAY;
 }
 
 void PilotwireInit ()
 {
   uint32_t index;
 
+  // init current values
+  current_temperature = NAN;
+  current_target = NAN;
+  current_state = PILOTWIRE_OFF;
+
   // initialise temperature graph
-  for (index = 0; index < PILOTWIRE_GRAPH_SAMPLE; index++) arr_temperature_data[index] = NAN;
+  for (index = 0; index < PILOTWIRE_GRAPH_SAMPLE; index++)
+  {
+    arr_temperature[index] = NAN;
+    arr_target[index] = NAN;
+    arr_state[index] = PILOTWIRE_OFF;
+  }
 }
 
 
@@ -671,7 +716,7 @@ void PilotwireWebSelectMode (bool public_mode)
   String  str_argument, str_label, str_temp_min, str_temp_max, str_temp_target;
  
   // get mode and temperature
-  actual_mode        = PilotwireGetMode ();
+  actual_mode = PilotwireGetMode ();
   actual_temperature = PilotwireGetTemperature ();
 
   // selection : disabled
@@ -845,7 +890,7 @@ void PilotwireWebPageHeater ()
 
   // mode section  
   // --------------
-  WSContentSend_P (PILOTWIRE_FIELDSET_START, D_PILOTWIRE_MODE);
+  WSContentSend_P (PSTR("<fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>"), D_PILOTWIRE_MODE);
 
   // mode selection
   PilotwireWebSelectMode (false);
@@ -872,11 +917,11 @@ void PilotwireWebPageHeater ()
     WSContentSend_P (PSTR ("<br/>"));
   }
 
-  WSContentSend_P (PILOTWIRE_FIELDSET_STOP);
+  WSContentSend_P (PSTR("</fieldset><br />"));
 
   // local ds18b20 sensor section  
   // --------------
-  WSContentSend_P (PILOTWIRE_FIELDSET_START, D_PILOTWIRE_DS18B20);
+  WSContentSend_P (PSTR("<fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>"), D_PILOTWIRE_DS18B20);
 
   // pullup option for ds18b20 sensor
   if (PilotwireGetDS18B20Pullup ()) str_pullup = "checked";
@@ -884,7 +929,7 @@ void PilotwireWebPageHeater ()
   WSContentSend_P (PSTR ("<input type='checkbox' name='%s' %s>%s"), D_CMND_PILOTWIRE_PULLUP, str_pullup.c_str(), D_PILOTWIRE_PULLUP);
   WSContentSend_P (PSTR ("<br/>"));
 
-  WSContentSend_P (PILOTWIRE_FIELDSET_STOP);
+  WSContentSend_P (PSTR("</fieldset><br />"));
 
   // save button
   WSContentSend_P (PSTR ("<button name='save' type='submit' class='button bgrn'>%s</button>"), D_SAVE);
@@ -900,11 +945,11 @@ void PilotwireWebPageHeater ()
 // Temperature graph
 void PilotwireWebTemperatureGraph (uint8_t mode)
 {
-  int    index, array_index;
-  float  temp_min, temp_max, temp_scope, temp_current;
-  float  graph_start, graph_stop, graph_width;
-  float  graph_x1, graph_x2, graph_y1, graph_y2;
-  String str_temperature, str_graph_x1, str_graph_x2, str_graph_y1, str_graph_y2;
+  int     index, array_index;
+  uint8_t state_current, state_previous;
+  float   temp_min, temp_max, temp_scope, temp_current;
+  float   graph_start, graph_stop, graph_width, graph_x, graph_y, graph_start_x;
+  String str_temperature;
 
   // get min and max temperature
   temp_min   = PilotwireGetMinTemperature ();
@@ -920,58 +965,101 @@ void PilotwireWebTemperatureGraph (uint8_t mode)
   WSContentSend_P (PSTR ("<svg viewBox='0 0 %d %d'>\n"), PILOTWIRE_GRAPH_WIDTH, PILOTWIRE_GRAPH_HEIGHT);
 
   // graph curve zone
-  WSContentSend_P (PSTR ("<rect x='%d%%' y='0%%' width='%d%%' height='100%%' rx='20' ry='20' />\n"), PILOTWIRE_GRAPH_PERCENT_START, PILOTWIRE_GRAPH_PERCENT_STOP - PILOTWIRE_GRAPH_PERCENT_START);
+  WSContentSend_P (PSTR ("<rect x='%d%%' y='0%%' width='%d%%' height='100%%' rx='5' />\n"), PILOTWIRE_GRAPH_PERCENT_START, PILOTWIRE_GRAPH_PERCENT_STOP - PILOTWIRE_GRAPH_PERCENT_START);
+
+  // loop for the relay state as background red color
+  graph_start_x  = graph_start;
+  state_previous = PILOTWIRE_OFF;
+  for (index = 0; index < PILOTWIRE_GRAPH_SAMPLE; index++)
+  {
+    // get target temperature value and set to minimum if not defined
+    array_index = (index + pilotwire_graph_index) % PILOTWIRE_GRAPH_SAMPLE;
+    state_current = arr_state[array_index];
+
+    // last graph point, force draw
+    if ((index == PILOTWIRE_GRAPH_SAMPLE - 1) && (state_previous == PILOTWIRE_COMFORT)) state_current = PILOTWIRE_OFF;
+
+    // if relay just switched on, record point
+    if ((state_previous != PILOTWIRE_COMFORT) && (state_current == PILOTWIRE_COMFORT))
+    {
+      // calculate start point x (from 10% to 100%)
+      graph_start_x = (graph_start + (graph_width * index / PILOTWIRE_GRAPH_SAMPLE)) * PILOTWIRE_GRAPH_WIDTH;
+    }
+    
+    // esle, if relay just switched off, display state
+    else if ((state_previous == PILOTWIRE_COMFORT) && (state_current != PILOTWIRE_COMFORT))
+    {
+      // calculate end point x (from 10% to 100%)
+      graph_x = (graph_start + (graph_width * index / PILOTWIRE_GRAPH_SAMPLE)) * PILOTWIRE_GRAPH_WIDTH;
+
+      // draw relay off line
+      WSContentSend_P (PSTR ("<rect class='relay' x='%d' y='%d' width='%d' height='%d' />\n"), (int)graph_start_x, 0, (int)(graph_x - graph_start_x), PILOTWIRE_GRAPH_HEIGHT);
+    }
+
+    // update previous state
+    state_previous = state_current;
+  }
 
   // graph temperature text
+  str_temperature = String (temp_max, 1);
+  WSContentSend_P (PSTR ("<text class='dash' x='1%%' y='4%%'>%s°C</text>\n"), str_temperature.c_str ());
   str_temperature = String (temp_min + (temp_max - temp_min) * 0.75, 1);
   WSContentSend_P (PSTR ("<text class='dash' x='1%%' y='27%%'>%s°C</text>\n"), str_temperature.c_str ());
   str_temperature = String (temp_min + (temp_max - temp_min) * 0.5, 1);
   WSContentSend_P (PSTR ("<text class='dash' x='1%%' y='52%%'>%s°C</text>\n"), str_temperature.c_str ());
   str_temperature = String (temp_min + (temp_max - temp_min) * 0.25, 1);
   WSContentSend_P (PSTR ("<text class='dash' x='1%%' y='77%%'>%s°C</text>\n"), str_temperature.c_str ());
+  str_temperature = String (temp_min, 1);
+  WSContentSend_P (PSTR ("<text class='dash' x='1%%' y='100%%'>%s°C</text>\n"), str_temperature.c_str ());
 
   // graph separation lines
   WSContentSend_P (PSTR ("<line class='dash' x1='%d%%' y1='25%%' x2='%d%%' y2='25%%' />\n"), PILOTWIRE_GRAPH_PERCENT_START, PILOTWIRE_GRAPH_PERCENT_STOP);
   WSContentSend_P (PSTR ("<line class='dash' x1='%d%%' y1='50%%' x2='%d%%' y2='50%%' />\n"), PILOTWIRE_GRAPH_PERCENT_START, PILOTWIRE_GRAPH_PERCENT_STOP);
   WSContentSend_P (PSTR ("<line class='dash' x1='%d%%' y1='75%%' x2='%d%%' y2='75%%' />\n"), PILOTWIRE_GRAPH_PERCENT_START, PILOTWIRE_GRAPH_PERCENT_STOP);
 
-  // initial points
-  graph_x1 = NAN;
-  graph_y1 = NAN;
-  
-  // loop thru the temperature data
+
+  // loop for the target temperature graph
+  WSContentSend_P (PSTR ("<polyline class='target' points='"));
   for (index = 0; index < PILOTWIRE_GRAPH_SAMPLE; index++)
   {
-    // calculate end point x2 (from 10% to 100%)
-    graph_x2 = (graph_start + (graph_width * index / PILOTWIRE_GRAPH_SAMPLE)) * PILOTWIRE_GRAPH_WIDTH;
+    // get target temperature value and set to minimum if not defined
+    array_index = (index + pilotwire_graph_index) % PILOTWIRE_GRAPH_SAMPLE;
+    temp_current = arr_target[array_index];
+    if (isnan (temp_current) == true) temp_current = temp_min;
 
-    // get temperature from temperature array
-    array_index = (index + temperature_data_index) % PILOTWIRE_GRAPH_SAMPLE;
-    temp_current = arr_temperature_data[array_index];
+    // calculate end point x (from 10% to 100%)
+    graph_x = (graph_start + (graph_width * index / PILOTWIRE_GRAPH_SAMPLE)) * PILOTWIRE_GRAPH_WIDTH;
 
+    // calculate y (with graph min and max)
+    temp_current = min (max (temp_current, temp_min), temp_max);
+    graph_y = (1 - ((temp_current - temp_min) / temp_scope)) * PILOTWIRE_GRAPH_HEIGHT;
+
+    // add the point to the line
+    WSContentSend_P (PSTR("%d,%d "), (int) graph_x, (int) graph_y);
+  }
+  WSContentSend_P (PSTR("'/>\n"));
+
+  // loop for the temperature graph
+  WSContentSend_P (PSTR ("<polyline class='temp' points='"));
+  for (index = 0; index < PILOTWIRE_GRAPH_SAMPLE; index++)
+  {
     // if temperature value is defined
+    array_index = (index + pilotwire_graph_index) % PILOTWIRE_GRAPH_SAMPLE;
+    temp_current = arr_temperature[array_index];
     if (isnan (temp_current) == false)
     {
-      // calculate end point y2
+      // calculate end point x (from 10% to 100%)
+      graph_x = (graph_start + (graph_width * index / PILOTWIRE_GRAPH_SAMPLE)) * PILOTWIRE_GRAPH_WIDTH;
+
+      // calculate y (with graph min and max)
       temp_current = min (max (temp_current, temp_min), temp_max);
-      graph_y2  = (1 - ((temp_current - temp_min) / temp_scope)) * PILOTWIRE_GRAPH_HEIGHT;
+      graph_y = (1 - ((temp_current - temp_min) / temp_scope)) * PILOTWIRE_GRAPH_HEIGHT;
 
-      // if starting point exists, draw the line
-      if (isnan (graph_x1) == false)
-      {
-        // display pixel
-        str_graph_x1 = String (graph_x1, 1);
-        str_graph_y1 = String (graph_y1, 1);
-        str_graph_x2 = String (graph_x2, 1);
-        str_graph_y2 = String (graph_y2, 1);
-        WSContentSend_P (PSTR ("<line class='temp' x1='%s' y1='%s' x2='%s' y2='%s' />\n"), str_graph_x1.c_str (), str_graph_y1.c_str (), str_graph_x2.c_str (), str_graph_y2.c_str ());
-      }
-
-      // store current end point as next starting point
-      graph_x1 = graph_x2;
-      graph_y1 = graph_y2;
+      // add the point to the line
+      WSContentSend_P (PSTR("%d,%d "), (int) graph_x, (int) graph_y);
     }
   }
+  WSContentSend_P (PSTR("'/>\n"));
 
   // if thermostat mode, display target
   if (mode == PILOTWIRE_THERMOSTAT)
@@ -1007,8 +1095,8 @@ void PilotwireWebPageControl ()
     // get langage according to 'lang' parameter
     WebGetArg (D_CMND_PILOTWIRE_LANG, argument, PILOTWIRE_BUFFER_SIZE);
 
-    if (strcmp (argument, D_PILOTWIRE_ENGLISH) == 0) controlLangage = PILOTWIRE_LANGAGE_ENGLISH;
-    else if (strcmp (argument, D_PILOTWIRE_FRENCH) == 0) controlLangage = PILOTWIRE_LANGAGE_FRENCH;
+    if (strcmp (argument, D_PILOTWIRE_ENGLISH) == 0) pilotwire_langage = PILOTWIRE_LANGAGE_ENGLISH;
+    else if (strcmp (argument, D_PILOTWIRE_FRENCH) == 0) pilotwire_langage = PILOTWIRE_LANGAGE_FRENCH;
   }
 
   // else if heater has to be switched off, set in anti-frost mode
@@ -1033,7 +1121,7 @@ void PilotwireWebPageControl ()
   actual_state = PilotwireGetRelayState ();
 
   // get other langage
-  other_langage = (controlLangage + 1) % 2;
+  other_langage = (pilotwire_langage + 1) % 2;
 
   // get tempreratures
   temp_current = PilotwireGetTemperature ();
@@ -1074,7 +1162,7 @@ void PilotwireWebPageControl ()
   WSContentSend_P (PSTR (".thermostat {height:150px;}\n"));
   WSContentSend_P (PSTR (".yellow {color:#FFFF33;}\n"));
 
-  WSContentSend_P (PSTR (".status {margin-top:10px;color:orange;font-size:18px;font-style:italic;}\n"));
+  WSContentSend_P (PSTR (".status {margin-top:10px;color:red;font-size:18px;font-weight:bold;font-style:italic;}\n"));
 
   WSContentSend_P (PSTR (".button {border:1px solid white;margin:12px 0px auto;padding:4px 12px;border-radius:12px;font-size:20px;}\n"));
   WSContentSend_P (PSTR (".btn-read {color:orange;border:1px solid transparent;background-color:transparent;font-weight:bold;}\n"));
@@ -1094,9 +1182,11 @@ void PilotwireWebPageControl ()
   WSContentSend_P (PSTR (".slide-on:before {position:absolute;content:'';width:64px;height:34px;left:72px;top:2px;background-color:#eee;border-radius:5px;}\n"));
   WSContentSend_P (PSTR (".slide-on:after {position:absolute;content:'On';top:5px;left:15px;color:#fff;}\n"));
 
-  WSContentSend_P (PSTR ("rect {stroke:grey;stroke-dasharray:1;fill:#101010;}\n"));
-  WSContentSend_P (PSTR ("line.temp {stroke:yellow;stroke-width:4;}\n"));
-  WSContentSend_P (PSTR ("line.dash {stroke:grey;stroke-width:4;stroke-dasharray:4;}\n"));
+  WSContentSend_P (PSTR ("rect.graph {stroke:grey;stroke-dasharray:1;fill:#101010;}\n"));
+  WSContentSend_P (PSTR ("rect.relay {fill:red;fill-opacity:25%%;}\n"));
+  WSContentSend_P (PSTR ("polyline.temp {fill:none;stroke:yellow;stroke-width:4;}\n"));
+  WSContentSend_P (PSTR ("polyline.target {fill:none;stroke:orange;stroke-width:1;}\n"));
+  WSContentSend_P (PSTR ("line.dash {stroke:grey;stroke-width:2;stroke-dasharray:4;}\n"));
   WSContentSend_P (PSTR ("text.dash {stroke:white;fill:white;}\n"));
   WSContentSend_P (PSTR ("line.target {stroke:orange;stroke-width:4;stroke-dasharray:2;}\n"));
   WSContentSend_P (PSTR ("text.target {stroke:orange;fill:orange;}\n"));
@@ -1129,20 +1219,20 @@ void PilotwireWebPageControl ()
   if (actual_mode == PILOTWIRE_THERMOSTAT)
   {
     // start of fieldset
-    WSContentSend_P (PSTR ("<fieldset><legend>&nbsp;%s&nbsp;</legend>\n"), arrControlTemp[controlLangage]);
+    WSContentSend_P (PSTR ("<fieldset><legend>&nbsp;%s&nbsp;</legend>\n"), arrControlTemp[pilotwire_langage]);
 
     // temperature selection slider
-    WSContentSend_P (PSTR ("<input id='slid' name='target' type='range' class='slider' min='%s' max='%s' value='%s' step='%s' />\n"), str_temp_min.c_str(), str_temp_max.c_str(), str_temp_target.c_str(), D_WEB_PILOTWIRE_TEMP_STEP);
+    WSContentSend_P (PSTR ("<input id='slider' name='target' type='range' class='slider' min='%s' max='%s' value='%s' step='%s' />\n"), str_temp_min.c_str(), str_temp_max.c_str(), str_temp_target.c_str(), D_WEB_PILOTWIRE_TEMP_STEP);
 
     // button to set target temperature
-    WSContentSend_P (PSTR ("<div><button id='temp' name='temp' type='submit' class='button btn-read'>%s°C</button></div>\n"), str_temp_target.c_str());
+    WSContentSend_P (PSTR ("<div><button id='button' name='temp' type='submit' class='button btn-read'>%s°C</button></div>\n"), str_temp_target.c_str());
 
     // end of fieldset
     WSContentSend_P (PSTR ("</fieldset>\n"));
 
     // if needed, display heater status
     str_text = "";
-    if (actual_state == PILOTWIRE_COMFORT) str_text = arrControlStatus[controlLangage];
+    if (actual_state == PILOTWIRE_COMFORT) str_text = arrControlStatus[pilotwire_langage];
     WSContentSend_P (PSTR ("<div class='status'>&nbsp;%s&nbsp;</div>\n"), str_text.c_str());
   }
   WSContentSend_P (PSTR ("</div>\n"));
@@ -1158,20 +1248,31 @@ void PilotwireWebPageControl ()
     // script to update target value
     WSContentSend_P (PSTR ("<script>\n"));
 
-    WSContentSend_P (PSTR ("var slid=document.getElementById('slid');\n"));
-    WSContentSend_P (PSTR ("var temp=document.getElementById('temp');\n"));
+    WSContentSend_P (PSTR ("var slider=document.getElementById('slider');\n"));
+    WSContentSend_P (PSTR ("var button=document.getElementById('button');\n"));
     WSContentSend_P (PSTR ("var line=document.getElementById('line');\n"));
     WSContentSend_P (PSTR ("var text=document.getElementById('text');\n"));
 
-    WSContentSend_P (PSTR ("slid.oninput=function() {\n"));
+    WSContentSend_P (PSTR ("line.style.display='none';"));
+
+    WSContentSend_P (PSTR ("slider.oninput=function() {\n"));
+
     WSContentSend_P (PSTR ("var posline=100 * (1- ((Number(this.value) - %s) / %s));\n"), str_temp_min.c_str(), str_temp_scope.c_str());
     WSContentSend_P (PSTR ("var postext=Math.max (Math.min (posline+2, 100), 4);\n"));
-    WSContentSend_P (PSTR ("if (this.value == %s) { temp.innerHTML=Number(this.value).toFixed(1) + '°C'; temp.setAttribute('class', 'button btn-read'); }\n"), str_temp_target.c_str());
-    WSContentSend_P (PSTR ("else { temp.innerHTML='%s ' + Number(this.value).toFixed(1) + '°C'; temp.setAttribute('class', 'button btn-set'); }\n"), arrControlSet[controlLangage]);
+
     WSContentSend_P (PSTR ("line.setAttribute('y1', posline + '%%');\n"));
     WSContentSend_P (PSTR ("line.setAttribute('y2', posline + '%%');\n"));
-    WSContentSend_P (PSTR ("text.innerHTML=Number(this.value).toFixed(1) + '°C';\n"));
     WSContentSend_P (PSTR ("text.setAttribute('y', postext + '%%');\n"));
+    WSContentSend_P (PSTR ("text.innerHTML=Number(this.value).toFixed(1) + '°C';\n"));
+
+    WSContentSend_P (PSTR ("if (this.value == %s) { "), str_temp_target.c_str());
+    WSContentSend_P (PSTR ("button.innerHTML=Number(this.value).toFixed(1) + '°C'; button.setAttribute('class', 'button btn-read'); "));
+    WSContentSend_P (PSTR ("line.style.display='none';"));
+    WSContentSend_P (PSTR ("} else { "));
+    WSContentSend_P (PSTR ("button.innerHTML='%s ' + Number(this.value).toFixed(1) + '°C'; button.setAttribute('class', 'button btn-set'); "), arrControlSet[pilotwire_langage]);
+    WSContentSend_P (PSTR ("line.style.display='block';"));
+    WSContentSend_P (PSTR ("}\n"));
+
     WSContentSend_P (PSTR ("}\n"));
 
     WSContentSend_P (PSTR ("</script>\n"));

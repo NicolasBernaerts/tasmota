@@ -7,7 +7,6 @@
     30/12/2019 - v4.0 - Switch settings to free_f03 for Tasmota 8.x compatibility
     06/01/2019 - v4.1 - Handle offloading with finite state machine
     09/01/2019 - v4.2 - Separation between Offloading driver and Pilotwire sensor
-    15/01/2020 - v5.0 - Separate temperature driver and add remote MQTT sensor
     05/02/2020 - v5.1 - Block relay command if not coming from a mode set
                    
   Settings are stored using weighting scale parameters :
@@ -57,12 +56,6 @@
 #define D_JSON_OFFLOADING_POWER     "Power"
 #define D_JSON_OFFLOADING_TOPIC     "Topic"
 #define D_JSON_OFFLOADING_KEY       "Key"
-
-// form strings
-const char OFFLOADING_FORM_START[] PROGMEM = "<form method='get' action='%s'>";
-const char OFFLOADING_FORM_STOP[] PROGMEM = "</form>";
-const char OFFLOADING_FIELDSET_START[] PROGMEM = "<fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>";
-const char OFFLOADING_FIELDSET_STOP[] PROGMEM = "</fieldset><br />";
 
 // offloading commands
 enum OffloadingCommands { CMND_OFFLOADING_POWER, CMND_OFFLOADING_CONTRACT, CMND_OFFLOADING_BEFORE, CMND_OFFLOADING_AFTER, CMND_OFFLOADING_TOPIC, CMND_OFFLOADING_KEY };
@@ -541,23 +534,19 @@ void OffloadingWebPage ()
   // beginning of form
   WSContentStart_P (D_OFFLOADING_CONF_METER);
   WSContentSendStyle ();
-  WSContentSend_P (OFFLOADING_FORM_START, D_PAGE_OFFLOADING_METER);
+  WSContentSend_P (PSTR("<form method='get' action='%s'>\n"), D_PAGE_OFFLOADING_METER);
 
   // house section  
   // --------------
-  WSContentSend_P (OFFLOADING_FIELDSET_START, D_OFFLOADING_TOTAL_POWER);
+  WSContentSend_P (PSTR("<fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n"), D_OFFLOADING_TOTAL_POWER);
 
   // house power mqtt topic
   OffloadingGetMqttPowerTopic (str_topic);
-  WSContentSend_P (PSTR ("<br/>%s<br/>"), D_OFFLOADING_TOPIC);
-  WSContentSend_P (PSTR ("<input name='%s' value='%s'>"), D_CMND_OFFLOADING_TOPIC, str_topic.c_str ());
-  WSContentSend_P (PSTR ("<br/>"));
+  WSContentSend_P (PSTR ("<p>%s<br><input name='%s' value='%s'></p>\n"), D_OFFLOADING_TOPIC, D_CMND_OFFLOADING_TOPIC, str_topic.c_str ());
 
   // house power json key
   OffloadingGetMqttPowerKey (str_key);
-  WSContentSend_P (PSTR ("<br/>%s<br/>"), D_OFFLOADING_KEY);
-  WSContentSend_P (PSTR ("<input name='%s' value='%s'>"), D_CMND_OFFLOADING_KEY, str_key.c_str ());
-  WSContentSend_P (PSTR ("<br/>"));
+  WSContentSend_P (PSTR ("<p>%s<br><input name='%s' value='%s'></p>\n"), D_OFFLOADING_KEY, D_CMND_OFFLOADING_KEY, str_key.c_str ());
 
   // contract power limit
   power_limit = OffloadingGetContract ();
@@ -565,11 +554,11 @@ void OffloadingWebPage ()
   WSContentSend_P (PSTR ("<input type='number' name='%s' value='%d'>"), D_CMND_OFFLOADING_CONTRACT, power_limit);
   WSContentSend_P (PSTR ("<br/>"));
 
-  WSContentSend_P (OFFLOADING_FIELDSET_STOP);
+  WSContentSend_P (PSTR("</fieldset><br />"));
 
   // heater section  
   // --------------
-  WSContentSend_P (OFFLOADING_FIELDSET_START, D_OFFLOADING_DEVICE);
+  WSContentSend_P (PSTR("<fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>"), D_OFFLOADING_DEVICE);
 
   // heater power
   power_heater = OffloadingGetDevicePower ();
@@ -589,11 +578,11 @@ void OffloadingWebPage ()
   WSContentSend_P (PSTR ("<input type='number' name='%s' min='0' step='1' value='%d'>"), D_CMND_OFFLOADING_AFTER, num_message);
   WSContentSend_P (PSTR ("<br/>"));
 
-  WSContentSend_P (OFFLOADING_FIELDSET_STOP);
+  WSContentSend_P (PSTR("</fieldset><br />"));
 
   // save button
   WSContentSend_P (PSTR ("<button name='save' type='submit' class='button bgrn'>%s</button>"), D_SAVE);
-  WSContentSend_P (OFFLOADING_FORM_STOP);
+  WSContentSend_P (PSTR("</form>"));
 
   // configuration button
   WSContentSpaceButton(BUTTON_CONFIGURATION);
