@@ -136,79 +136,61 @@ void OffloadingSetUpdateAfterOffload (uint16_t number)
 // get current total power MQTT topic
 void OffloadingGetMqttPowerTopic (String& str_topic)
 {
-  String str_setting, str_power;
-  int position;
+  int    index_stop;
+  String str_setting;
 
-  // init
-  str_topic = "";
-
-  // extract power data from settings
+  // extract power topic from settings (power topic;power key|temperature topic;temperature key)
   str_setting = (char*)Settings.free_f03;
-  position = str_setting.indexOf ('|');
-  if (position > 0) str_power = str_setting.substring (0, position);
-  else str_power = str_setting;
-
-  // extract topic from power data 
-  position = str_power.indexOf (';');
-  if (position > 0) str_topic = str_power.substring (0, position);
+  index_stop  = str_setting.indexOf (';');
+  if (index_stop != -1) str_topic = str_setting.substring (0, index_stop);
+  else str_topic = "";
 }
 
-// get current total power JSON key
+// get current total power JSON key (power topic;power key|temperature topic;temperature key)
 void OffloadingGetMqttPowerKey (String& str_key)
 {
-  String str_setting, str_power;
-  int position;
-
-  // init
-  str_key = "";
+  int    index_start, index_stop;
+  String str_setting;
 
   // extract power data from settings
   str_setting = (char*)Settings.free_f03;
-  position = str_setting.indexOf ('|');
-  if (position > 0) str_power = str_setting.substring (0, position);
-  else str_power = str_setting;
-
-  // extract key from power data 
-  position = str_power.indexOf (';');
-  if (position > 0) str_key = str_power.substring (position + 1);
+  index_start = str_setting.indexOf (';');
+  index_stop  = str_setting.indexOf ('|');
+  if ((index_start != -1) && (index_stop != -1)) str_key = str_setting.substring (index_start + 1, index_stop);
+  else str_key = "";
 }
 
 
-// set current total power MQTT topic
+// set current total power MQTT topic (power topic;power key|temperature topic;temperature key)
 void OffloadingSetMqttPowerTopic (char* str_topic)
 {
-  String str_setting, str_end, str_key;
-  int position;
+  int    index_stop;
+  String str_setting;
 
-  // get key
-  OffloadingGetMqttPowerKey (str_key);
-
-  // extract temperature data from settings
+  // extract data other than power topic
   str_setting = (char*)Settings.free_f03;
-  position = str_setting.indexOf ('|');
-  if (position >= 0) str_end = str_setting.substring (position + 1);
+  index_stop  = str_setting.indexOf (';');
+  if (index_stop != -1) str_setting = str_topic + str_setting.substring (index_stop);
+  else str_setting = String (str_topic) + ";|;";
 
   // save the full settings
-  str_setting = String (str_topic) + ";" + str_key + "|" + str_end;
   strncpy ((char*)Settings.free_f03, str_setting.c_str (), 233);
 }
 
-// set current total power JSON key
+// set current total power JSON key (power topic;power key|temperature topic;temperature key)
 void OffloadingSetMqttPowerKey (char* str_key)
 {
-  String str_setting, str_end, str_topic;
-  int position;
+  int    index_start, index_stop;
+  String str_setting;
 
-  // get key
-  OffloadingGetMqttPowerTopic (str_topic);
-
-  // extract temperature data from settings
+  // extract data other than power key
   str_setting = (char*)Settings.free_f03;
-  position = str_setting.indexOf ('|');
-  if (position >= 0) str_end = str_setting.substring (position + 1);
+  index_start = str_setting.indexOf (';');
+  index_stop  = str_setting.indexOf ('|');
+  if ((index_start != -1) && (index_stop != -1)) str_setting = str_setting.substring (0, index_start + 1) + str_key + str_setting.substring (index_stop);
+  else str_setting = ";" + String (str_key) + "|;";
 
   // save the full settings
-  str_setting = str_topic + ";" + String (str_key) + "|" + str_end;
   strncpy ((char*)Settings.free_f03, str_setting.c_str (), 233);
 }
 
@@ -538,7 +520,7 @@ void OffloadingWebPage ()
 
   // house section  
   // --------------
-  WSContentSend_P (PSTR("<fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n"), D_OFFLOADING_TOTAL_POWER);
+  WSContentSend_P (PSTR("<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n"), D_OFFLOADING_TOTAL_POWER);
 
   // house power mqtt topic
   OffloadingGetMqttPowerTopic (str_topic);
@@ -550,39 +532,30 @@ void OffloadingWebPage ()
 
   // contract power limit
   power_limit = OffloadingGetContract ();
-  WSContentSend_P (PSTR ("%s (W)<br/>"), D_OFFLOADING_CONTRACT);
-  WSContentSend_P (PSTR ("<input type='number' name='%s' value='%d'>"), D_CMND_OFFLOADING_CONTRACT, power_limit);
-  WSContentSend_P (PSTR ("<br/>"));
+  WSContentSend_P (PSTR ("<p>%s (W)<br><input type='number' name='%s' value='%d'></p>\n"), D_OFFLOADING_CONTRACT, D_CMND_OFFLOADING_CONTRACT, power_limit);
 
-  WSContentSend_P (PSTR("</fieldset><br />"));
+  WSContentSend_P (PSTR("</fieldset></p>\n"));
 
   // heater section  
   // --------------
-  WSContentSend_P (PSTR("<fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>"), D_OFFLOADING_DEVICE);
+  WSContentSend_P (PSTR("<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>"), D_OFFLOADING_DEVICE);
 
   // heater power
   power_heater = OffloadingGetDevicePower ();
-  WSContentSend_P (PSTR ("%s (W)<br/>"), D_OFFLOADING_POWER);
-  WSContentSend_P (PSTR ("<input type='number' name='%s' value='%d'><br/>"), D_CMND_OFFLOADING_POWER, power_heater);
-  WSContentSend_P (PSTR ("<br/>"));
+  WSContentSend_P (PSTR ("<p>%s (W)<br><input type='number' name='%s' value='%d'></p>\n"), D_OFFLOADING_POWER, D_CMND_OFFLOADING_POWER, power_heater);
 
   // number of overload messages before offloading heater
   num_message  = OffloadingGetUpdateBeforeOffload ();
-  WSContentSend_P (PSTR ("<br/>%s<br/>"), D_OFFLOADING_UPDATE_BEFORE);
-  WSContentSend_P (PSTR ("<input type='number' name='%s' min='0' step='1' value='%d'>"), D_CMND_OFFLOADING_BEFORE, num_message);
-  WSContentSend_P (PSTR ("<br/>"));
+  WSContentSend_P (PSTR ("<p>%s<br><input type='number' name='%s' min='0' step='1' value='%d'></p>\n"), D_OFFLOADING_UPDATE_BEFORE, D_CMND_OFFLOADING_BEFORE, num_message);
 
   // number of correct load messages before removing offload of heater
   num_message  = OffloadingGetUpdateAfterOffload ();
-  WSContentSend_P (PSTR ("<br/>%s<br/>"), D_OFFLOADING_UPDATE_AFTER);
-  WSContentSend_P (PSTR ("<input type='number' name='%s' min='0' step='1' value='%d'>"), D_CMND_OFFLOADING_AFTER, num_message);
-  WSContentSend_P (PSTR ("<br/>"));
-
-  WSContentSend_P (PSTR("</fieldset><br />"));
+  WSContentSend_P (PSTR ("<p>%s<br><input type='number' name='%s' min='0' step='1' value='%d'></p>\n"), D_OFFLOADING_UPDATE_AFTER, D_CMND_OFFLOADING_AFTER, num_message);
+  WSContentSend_P (PSTR("</fieldset></p>\n"));
 
   // save button
-  WSContentSend_P (PSTR ("<button name='save' type='submit' class='button bgrn'>%s</button>"), D_SAVE);
-  WSContentSend_P (PSTR("</form>"));
+  WSContentSend_P (PSTR ("<p><button name='save' type='submit' class='button bgrn'>%s</button></p>\n"), D_SAVE);
+  WSContentSend_P (PSTR("</form>\n"));
 
   // configuration button
   WSContentSpaceButton(BUTTON_CONFIGURATION);

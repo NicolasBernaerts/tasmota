@@ -387,7 +387,7 @@
 #define D_OFFLOADING_KEY            "MQTT JSON Key"
 
 // xdrv_97_temperature.ino
-#define D_TEMPERATURE_CONFIGURE     "Configure Remote Sensor"
+#define D_TEMPERATURE_CONFIGURE     "Configure Temperature"
 #define D_TEMPERATURE_REMOTE        "Temperature remote sensor"
 #define D_TEMPERATURE_TOPIC         "MQTT Topic"
 #define D_TEMPERATURE_KEY           "MQTT JSON Key"
@@ -412,6 +412,7 @@
 #define D_PILOTWIRE_MODE           "Operation mode"
 #define D_PILOTWIRE_LOCAL          "Local"
 #define D_PILOTWIRE_REMOTE         "Remote"
+#define D_PILOTWIRE_NOSENSOR       "No temperature sensor available"
 
 #define D_PILOTWIRE_DS18B20        "DS18B20 sensor"
 #define D_PILOTWIRE_PULLUP         "Enable internal pullup resistor"

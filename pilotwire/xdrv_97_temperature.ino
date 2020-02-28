@@ -57,87 +57,64 @@ uint32_t temperature_last_update      = 0;            // last time (in millis) t
  *                  Accessors
 \**************************************************/
 
-// get current temperature MQTT topic
+// get current temperature MQTT topic (power topic;power key|temperature topic;temperature key)
 void TemperatureGetMqttTopic (String& str_topic)
 {
-  String str_setting, str_temperature;
-  int position;
+  int    index_start, index_stop;
+  String str_setting;
 
-  // init
-  str_topic = "";
-
-  // extract temperature from settings
+  // extract temperature topic from settings
   str_setting = (char*)Settings.free_f03;
-  position = str_setting.indexOf ('|');
-  if (position > 0)
-  {
-    // extract temperature data
-    str_temperature = str_setting.substring (position + 1);
-
-    // extract topic from power data 
-    position = str_temperature.indexOf(';');
-    if (position > 0) str_topic = str_temperature.substring(0, position);
-  }
+  index_start = str_setting.indexOf ('|');
+  index_stop  = str_setting.lastIndexOf (';');
+  if ((index_start != -1) && (index_stop != -1)) str_topic = str_setting.substring (index_start + 1, index_stop);
+  else str_topic = "";
 }
 
-// get current temperature JSON key
+// get current temperature JSON key (power topic;power key|temperature topic;temperature key)
 void TemperatureGetMqttKey (String& str_key)
 {
-  String str_setting, str_temperature;
-  int position;
+  int    index_start;
+  String str_setting;
 
-  // init
-  str_key = "";
-
-  // extract power data from settings
+  // extract temperature topic from settings
   str_setting = (char*)Settings.free_f03;
-  position = str_setting.indexOf ('|');
-  if (position >= 0)
-  {
-    // extract temperature data
-    str_temperature = str_setting.substring (position + 1);
- 
-    // extract key from temperature data 
-    position = str_temperature.indexOf (';');
-    if (position > 0) str_key = str_temperature.substring (position + 1);
-  }
+  index_start = str_setting.lastIndexOf (';');
+  if (index_start != -1) str_key = str_setting.substring (index_start + 1);
+  else str_key = "";
 }
 
-// set current temperature MQTT topic
+// set current temperature MQTT topic (power topic;power key|temperature topic;temperature key)
 void TemperatureSetMqttTopic (char* str_topic)
 {
-  String str_setting, str_start, str_key;
-  int position;
+  int    index_start, index_stop;
+  String str_setting;
 
-  // get key
-  TemperatureGetMqttKey (str_key);
-
-  // backup offloading data from settings
+  // extract temperature topic from settings
   str_setting = (char*)Settings.free_f03;
-  position = str_setting.indexOf ('|');
-  if (position >= 0) str_start = str_setting.substring (0, position);
+  index_start = str_setting.indexOf ('|');
+  index_stop  = str_setting.lastIndexOf (';');
+  if ((index_start != -1) && (index_stop != -1)) str_setting = str_setting.substring (0, index_start + 1) + str_topic + str_setting.substring (index_stop);
+  else str_setting = ";|" + String (str_topic) + ";";
 
   // save the full settings
-  str_setting = str_start + "|" + String (str_topic) + ";" + str_key;
   strncpy ((char*)Settings.free_f03, str_setting.c_str (), 233);
 }
 
-// set current temperature JSON key
+// set current temperature JSON key (power topic;power key|temperature topic;temperature key)
 void TemperatureSetMqttKey (char* str_key)
 {
-  String str_setting, str_start, str_topic;
-  int position;
+  int    index_start, index_stop;
+  String str_setting;
 
-  // get key
-  TemperatureGetMqttTopic (str_topic);
-
-  // backup offloading data from settings
+  // extract temperature topic from settings
   str_setting = (char*)Settings.free_f03;
-  position = str_setting.indexOf ('|');
-  if (position > 0) str_start = str_setting.substring(0, position);
+  index_start = str_setting.indexOf ('|');
+  index_stop  = str_setting.lastIndexOf (';');
+  if ((index_start != -1) && (index_stop != -1)) str_setting = str_setting.substring (0, index_stop + 1) + str_key;
+  else str_setting = ";|;" + String (str_key);
 
   // save the full settings
-  str_setting = str_start + "|" + str_topic + ";" + String (str_key);
   strncpy ((char*)Settings.free_f03, str_setting.c_str (), 233);
 }
 
@@ -342,7 +319,7 @@ void TemperatureWebPage ()
 
   // remote sensor section  
   // --------------
-  WSContentSend_P (PSTR("<fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n"), D_TEMPERATURE_REMOTE);
+  WSContentSend_P (PSTR("<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n"), D_TEMPERATURE_REMOTE);
 
   // remote sensor mqtt topic
   TemperatureGetMqttTopic (str_topic);
@@ -351,10 +328,10 @@ void TemperatureWebPage ()
   // remote sensor json key
   TemperatureGetMqttKey (str_key);
   WSContentSend_P (PSTR ("<p>%s<br/><input name='%s' value='%s'><br/>\n"), D_TEMPERATURE_KEY, D_CMND_TEMPERATURE_KEY, str_key.c_str ());
+  WSContentSend_P (PSTR("</fieldset></p>\n"));
 
   // end of form and save button
-  WSContentSend_P (PSTR("</fieldset><br>\n"));
-  WSContentSend_P (PSTR ("<button name='save' type='submit' class='button bgrn'>%s</button>\n"), D_SAVE);
+  WSContentSend_P (PSTR ("<p><button name='save' type='submit' class='button bgrn'>%s</button></p>\n"), D_SAVE);
   WSContentSend_P (PSTR("</form>\n"));
 
   // configuration button
