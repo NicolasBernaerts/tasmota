@@ -26,7 +26,7 @@ Finaly, you need to select your Teleinfo adapter baud rate :
 
 Teleinfo protocol is described in this document : https://www.enedis.fr/sites/default/files/Enedis-NOI-CPT_54E.pdf
 
-Pre-compiled version is available under **tasmota-teleinfo.bin**
+Pre-compiled version is available under **tasmota.bin**
 
 MQTT result should look like that :
 
