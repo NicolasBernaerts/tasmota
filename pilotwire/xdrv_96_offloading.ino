@@ -526,8 +526,17 @@ void OffloadingWebPage ()
   WSContentSendStyle ();
   WSContentSend_P (PSTR("<form method='get' action='%s'>\n"), D_PAGE_OFFLOADING_METER);
 
-  // house section  
+  // device section  
   // --------------
+  WSContentSend_P (PSTR("<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>"), D_OFFLOADING_DEVICE);
+
+  // heater power
+  power_heater = OffloadingGetDevicePower ();
+  WSContentSend_P (PSTR ("<p>%s (W)<span %s>%s</span><br><input type='number' name='%s' value='%d'></p>\n"), D_OFFLOADING_POWER, OFFLOADING_TOPIC_STYLE, D_CMND_OFFLOADING_DEVICE, D_CMND_OFFLOADING_DEVICE, power_heater);
+  WSContentSend_P (PSTR("</fieldset></p>\n"));
+
+  // house power section  
+  // -------------------
   WSContentSend_P (PSTR("<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n"), D_OFFLOADING_TOTAL_POWER);
 
   // house power mqtt topic
@@ -541,16 +550,11 @@ void OffloadingWebPage ()
   // contract power limit
   power_limit = OffloadingGetContract ();
   WSContentSend_P (PSTR ("<p>%s (W)<span %s>%s</span><br><input type='number' name='%s' value='%d'></p>\n"), D_OFFLOADING_CONTRACT, OFFLOADING_TOPIC_STYLE, D_CMND_OFFLOADING_CONTRACT, D_CMND_OFFLOADING_CONTRACT, power_limit);
-
   WSContentSend_P (PSTR("</fieldset></p>\n"));
 
-  // heater section  
-  // --------------
-  WSContentSend_P (PSTR("<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>"), D_OFFLOADING_DEVICE);
-
-  // heater power
-  power_heater = OffloadingGetDevicePower ();
-  WSContentSend_P (PSTR ("<p>%s (W)<span %s>%s</span><br><input type='number' name='%s' value='%d'></p>\n"), D_OFFLOADING_POWER, OFFLOADING_TOPIC_STYLE, D_CMND_OFFLOADING_DEVICE, D_CMND_OFFLOADING_DEVICE, power_heater);
+  // messages section  
+  // ----------------
+  WSContentSend_P (PSTR("<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>"), D_OFFLOADING_MESSAGE);
 
   // number of overload messages before offloading heater
   num_message  = OffloadingGetUpdateBeforeOffload ();
@@ -561,7 +565,8 @@ void OffloadingWebPage ()
   WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input type='number' name='%s' min='0' step='1' value='%d'></p>\n"), D_OFFLOADING_UPDATE_AFTER, OFFLOADING_TOPIC_STYLE, D_CMND_OFFLOADING_AFTER, D_CMND_OFFLOADING_AFTER, num_message);
   WSContentSend_P (PSTR("</fieldset></p>\n"));
 
-  // save button
+  // save button  
+  // --------------
   WSContentSend_P (PSTR ("<p><button name='save' type='submit' class='button bgrn'>%s</button></p>\n"), D_SAVE);
   WSContentSend_P (PSTR("</form>\n"));
 

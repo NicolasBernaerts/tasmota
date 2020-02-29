@@ -372,8 +372,9 @@
 #define D_OFFLOADING                "Offload"
 
 #define D_OFFLOADING_POWER          "Power"
-#define D_OFFLOADING_UPDATE_BEFORE  "Messages before setting offload (0:immediate)"
-#define D_OFFLOADING_UPDATE_AFTER   "Messages before removing offload (0:immediate)"
+#define D_OFFLOADING_MESSAGE        "Overload messages"
+#define D_OFFLOADING_UPDATE_BEFORE  "Before offloading (0:immediate)"
+#define D_OFFLOADING_UPDATE_AFTER   "Before removing offload (0:immediate)"
 
 #define D_OFFLOADING_CONF_METER     "Configure Offloading"
 #define D_OFFLOADING_DEVICE         "Device"
@@ -382,7 +383,7 @@
 #define D_OFFLOADING_SENSOR_UPDATE  "updates"
 #define D_OFFLOADING_ACTIVE         "Active"
 #define D_OFFLOADING_CONTRACT       "Contract"
-#define D_OFFLOADING_TOTAL_POWER    "Total power"
+#define D_OFFLOADING_TOTAL_POWER    "Instant power"
 #define D_OFFLOADING_TOPIC          "MQTT Topic"
 #define D_OFFLOADING_KEY            "MQTT JSON Key"
 
