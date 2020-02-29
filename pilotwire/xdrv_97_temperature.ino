@@ -44,6 +44,9 @@
 enum TemperatureCommands { CMND_TEMPERATURE_TOPIC, CMND_TEMPERATURE_KEY };
 const char kTemperatureCommands[] PROGMEM = D_CMND_TEMPERATURE_TOPIC "|" D_CMND_TEMPERATURE_KEY;
 
+// form topic style
+const char TEMPERATURE_TOPIC_STYLE[] PROGMEM = "style='float:right;font-size:0.7rem;'";
+
 /*************************************************\
  *               Variables
 \*************************************************/
@@ -177,6 +180,7 @@ void TemperatureShowJSON (bool append)
 // Handle Temperature MQTT commands
 bool TemperatureMqttCommand ()
 {
+  bool command_handled = true;
   int  command_code;
   char command [CMDSZ];
 
@@ -192,12 +196,14 @@ bool TemperatureMqttCommand ()
     case CMND_TEMPERATURE_KEY:  // set mqtt temperature key 
       TemperatureSetMqttKey (XdrvMailbox.data);
       break;
+    default:
+      command_handled = false;
   }
 
-  // send MQTT status
-  TemperatureShowJSON (false);
+  // if needed, send updated status
+  if (command_handled == true) TemperatureShowJSON (false);
   
-  return true;
+  return command_handled;
 }
 
 // MQTT connexion update
@@ -323,11 +329,11 @@ void TemperatureWebPage ()
 
   // remote sensor mqtt topic
   TemperatureGetMqttTopic (str_topic);
-  WSContentSend_P (PSTR ("<p>%s<br><input name='%s' value='%s'></p>\n"), D_TEMPERATURE_TOPIC, D_CMND_TEMPERATURE_TOPIC, str_topic.c_str ());
+  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input name='%s' value='%s'></p>\n"), D_TEMPERATURE_TOPIC, TEMPERATURE_TOPIC_STYLE, D_CMND_TEMPERATURE_TOPIC, D_CMND_TEMPERATURE_TOPIC, str_topic.c_str ());
 
   // remote sensor json key
   TemperatureGetMqttKey (str_key);
-  WSContentSend_P (PSTR ("<p>%s<br/><input name='%s' value='%s'><br/>\n"), D_TEMPERATURE_KEY, D_CMND_TEMPERATURE_KEY, str_key.c_str ());
+  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br/><input name='%s' value='%s'><br/>\n"), D_TEMPERATURE_KEY, TEMPERATURE_TOPIC_STYLE, D_CMND_TEMPERATURE_KEY, D_CMND_TEMPERATURE_KEY, str_key.c_str ());
   WSContentSend_P (PSTR("</fieldset></p>\n"));
 
   // end of form and save button

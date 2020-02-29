@@ -372,8 +372,8 @@
 #define D_OFFLOADING                "Offload"
 
 #define D_OFFLOADING_POWER          "Power"
-#define D_OFFLOADING_UPDATE_BEFORE  "Overload messages before offload (0 is immediate)"
-#define D_OFFLOADING_UPDATE_AFTER   "Non overload messages before removing offload (0 is immediate)"
+#define D_OFFLOADING_UPDATE_BEFORE  "Messages before setting offload (0:immediate)"
+#define D_OFFLOADING_UPDATE_AFTER   "Messages before removing offload (0:immediate)"
 
 #define D_OFFLOADING_CONF_METER     "Configure Offloading"
 #define D_OFFLOADING_DEVICE         "Device"

@@ -137,6 +137,9 @@ const char kPilotWireCommands[] PROGMEM = D_CMND_PILOTWIRE_MODE "|" D_CMND_PILOT
 // header of publicly accessible control page
 const char PILOTWIRE_MODE_SELECT[] PROGMEM = "<input type='radio' name='%s' id='%d' value='%d' %s>%s<br>\n";
 
+// form topic style
+const char PILOTWIRE_TOPIC_STYLE[] PROGMEM = "style='float:right;font-size:0.7rem;'";
+
 /*************************************************\
  *               Variables
 \*************************************************/
@@ -523,6 +526,7 @@ void PilotwireShowJSON (bool append)
 // Handle pilot wire MQTT commands
 bool PilotwireMqttCommand ()
 {
+  bool command_handled = true;
   int  command_code;
   char command [CMDSZ];
 
@@ -547,12 +551,14 @@ bool PilotwireMqttCommand ()
     case CMND_PILOTWIRE_MAX:  // set maximum temperature 
       PilotwireSetMaxTemperature (atof (XdrvMailbox.data));
       break;
+    default:
+      command_handled = false;
   }
 
-  // send MQTT status
-  PilotwireShowJSON (false);
+  // if needed, send updated status
+  if (command_handled == true) PilotwireShowJSON (false);
   
-  return true;
+  return command_handled;
 }
 
 // update pilot wire relay states according to current status
@@ -636,22 +642,21 @@ void PilotwireEverySecond ()
   target = PilotwireGetTargetTemperature ( );
   state = PilotwireGetRelayState ( );
 
-  // update current values
-//  current_temperature = temperature;
-//  current_target = target;
-
+  // update current temperature
   if (isnan(temperature) == false)
   {
     if (isnan(current_temperature) == false) current_temperature = min (current_temperature, temperature);
     else current_temperature = temperature;
   }
 
+  // update target temperature
   if (isnan(target) == false)
   {
     if (isnan(current_target) == false) current_target = min (current_target, target);
     else current_target = target;
   } 
 
+  // update relay state
   if (current_state != PILOTWIRE_COMFORT) current_state = state;
 
   // increment delay counter and if delay reached, update history data
@@ -715,7 +720,7 @@ void PilotwireWebDisplayFlag (uint8_t langage_code)
 }
 
 // Pilotwire mode selection 
-void PilotwireWebSelectMode (bool public_mode)
+void PilotwireWebSelectMode ()
 {
   uint8_t actual_mode;
   float   actual_temperature;
@@ -725,13 +730,10 @@ void PilotwireWebSelectMode (bool public_mode)
   actual_mode = PilotwireGetMode ();
   actual_temperature = PilotwireGetTemperature ();
 
-  // selection : disabled
-  if (public_mode == false)
-  {
-    str_argument = "";
-    if (actual_mode == PILOTWIRE_DISABLED) str_argument = D_WEB_PILOTWIRE_CHECKED; 
-    WSContentSend_P (PILOTWIRE_MODE_SELECT, D_CMND_PILOTWIRE_MODE, PILOTWIRE_DISABLED, PILOTWIRE_DISABLED, str_argument.c_str (), D_PILOTWIRE_DISABLED);
-  }
+  str_argument = "";
+  if (actual_mode == PILOTWIRE_DISABLED) str_argument = D_WEB_PILOTWIRE_CHECKED; 
+  WSContentSend_P (PSTR ("<span %s>%s</span>"), PILOTWIRE_TOPIC_STYLE, D_CMND_PILOTWIRE_MODE);
+  WSContentSend_P (PILOTWIRE_MODE_SELECT, D_CMND_PILOTWIRE_MODE, PILOTWIRE_DISABLED, PILOTWIRE_DISABLED, str_argument.c_str (), D_PILOTWIRE_DISABLED);
 
   // selection : off
   str_argument = "";
@@ -739,7 +741,7 @@ void PilotwireWebSelectMode (bool public_mode)
   WSContentSend_P (PILOTWIRE_MODE_SELECT, D_CMND_PILOTWIRE_MODE, PILOTWIRE_OFF, PILOTWIRE_OFF, str_argument.c_str (), D_PILOTWIRE_OFF);
 
   // if dual relay device
-  if ((public_mode == false) && (devices_present > 1))
+  if (devices_present > 1)
   {
     // selection : no frost
     str_argument = "";
@@ -753,12 +755,9 @@ void PilotwireWebSelectMode (bool public_mode)
   }
 
   // selection : comfort
-  if ((public_mode == false) || (isnan(actual_temperature) == true))
-  {
-    str_argument = "";
-    if (actual_mode == PILOTWIRE_COMFORT) str_argument = D_WEB_PILOTWIRE_CHECKED;
-    WSContentSend_P (PILOTWIRE_MODE_SELECT, D_CMND_PILOTWIRE_MODE, PILOTWIRE_COMFORT, PILOTWIRE_COMFORT, str_argument.c_str (), D_PILOTWIRE_COMFORT);
-  }
+  str_argument = "";
+  if (actual_mode == PILOTWIRE_COMFORT) str_argument = D_WEB_PILOTWIRE_CHECKED;
+  WSContentSend_P (PILOTWIRE_MODE_SELECT, D_CMND_PILOTWIRE_MODE, PILOTWIRE_COMFORT, PILOTWIRE_COMFORT, str_argument.c_str (), D_PILOTWIRE_COMFORT);
 
   // selection : thermostat
   if (isnan(actual_temperature) == false) 
@@ -774,8 +773,9 @@ void PilotwireWebSelectMode (bool public_mode)
     // selection : target temperature
     str_argument = "";
     if (actual_mode == PILOTWIRE_THERMOSTAT) str_argument = D_WEB_PILOTWIRE_CHECKED;
+    WSContentSend_P (PSTR ("<span %s>%s</span>"), PILOTWIRE_TOPIC_STYLE, D_CMND_PILOTWIRE_TARGET);
     WSContentSend_P (PILOTWIRE_MODE_SELECT, D_CMND_PILOTWIRE_MODE, PILOTWIRE_THERMOSTAT, PILOTWIRE_THERMOSTAT, str_argument.c_str (), str_label.c_str());
-    WSContentSend_P (PSTR ("<input type='number' name='%s' min='%s' max='%s' step='%s' value='%s' title='%s'><br>\n"), D_CMND_PILOTWIRE_TARGET, str_temp_min.c_str(), str_temp_max.c_str(), D_WEB_PILOTWIRE_TEMP_STEP, str_temp_target.c_str(), "argument");
+    WSContentSend_P (PSTR ("<input type='number' name='%s' min='%s' max='%s' step='%s' value='%s' title='%s'><br>\n"), D_CMND_PILOTWIRE_TARGET, str_temp_min.c_str(), str_temp_max.c_str(), D_WEB_PILOTWIRE_TEMP_STEP, str_temp_target.c_str());
   }
   else WSContentSend_P (PSTR ("<p><i>%s</i></p>\n"), D_PILOTWIRE_NOSENSOR);
 }
@@ -895,22 +895,22 @@ void PilotwireWebPageHeater ()
   WSContentSend_P (PSTR("<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n"), D_PILOTWIRE_MODE);
 
   // mode selection
-  PilotwireWebSelectMode (false);
+  PilotwireWebSelectMode ();
 
   // if temperature is available
   if (!isnan (actual_temperature)) 
   {
     // temperature minimum label and input
     str_temperature = String (PilotwireGetMinTemperature ());
-    WSContentSend_P (PSTR ("<p>%s (°%s)<br><input type='number' name='%s' min='%s' max='%s' step='%s' value='%s'></p>\n"), D_PILOTWIRE_MIN, str_unit.c_str (), D_CMND_PILOTWIRE_MIN, D_WEB_PILOTWIRE_TEMP_MIN, D_WEB_PILOTWIRE_TEMP_MAX, D_WEB_PILOTWIRE_TEMP_STEP, str_temperature.c_str());
+    WSContentSend_P (PSTR ("<p>%s (°%s)<span %s>%s</span><br><input type='number' name='%s' min='%s' max='%s' step='%s' value='%s'></p>\n"), D_PILOTWIRE_MIN, str_unit.c_str (), PILOTWIRE_TOPIC_STYLE, D_CMND_PILOTWIRE_MIN, D_CMND_PILOTWIRE_MIN, D_WEB_PILOTWIRE_TEMP_MIN, D_WEB_PILOTWIRE_TEMP_MAX, D_WEB_PILOTWIRE_TEMP_STEP, str_temperature.c_str());
 
     // temperature maximum label and input
     str_temperature = String (PilotwireGetMaxTemperature ());
-    WSContentSend_P (PSTR ("<p>%s (°%s)<br><input type='number' name='%s' min='%s' max='%s' step='%s' value='%s'></p>\n"), D_PILOTWIRE_MAX, str_unit.c_str (), D_CMND_PILOTWIRE_MAX, D_WEB_PILOTWIRE_TEMP_MIN, D_WEB_PILOTWIRE_TEMP_MAX, D_WEB_PILOTWIRE_TEMP_STEP, str_temperature.c_str());
+    WSContentSend_P (PSTR ("<p>%s (°%s)<span %s>%s</span><br><input type='number' name='%s' min='%s' max='%s' step='%s' value='%s'></p>\n"), D_PILOTWIRE_MAX, str_unit.c_str (), PILOTWIRE_TOPIC_STYLE, D_CMND_PILOTWIRE_MAX, D_CMND_PILOTWIRE_MAX, D_WEB_PILOTWIRE_TEMP_MIN, D_WEB_PILOTWIRE_TEMP_MAX, D_WEB_PILOTWIRE_TEMP_STEP, str_temperature.c_str());
 
     // temperature correction label and input
     str_temperature = String (PilotwireGetDrift ());
-    WSContentSend_P (PSTR ("<p>%s (°%s)<br><input type='number' name='%s' min='%s' max='%s' step='%s' value='%s'></p>\n"), D_PILOTWIRE_DRIFT, str_unit.c_str (), D_CMND_PILOTWIRE_DRIFT, D_WEB_PILOTWIRE_DRIFT_MIN, D_WEB_PILOTWIRE_DRIFT_MAX, D_WEB_PILOTWIRE_DRIFT_STEP, str_temperature.c_str());
+    WSContentSend_P (PSTR ("<p>%s (°%s)<span %s>%s</span><br><input type='number' name='%s' min='%s' max='%s' step='%s' value='%s'></p>\n"), D_PILOTWIRE_DRIFT, str_unit.c_str (), PILOTWIRE_TOPIC_STYLE, D_CMND_PILOTWIRE_DRIFT, D_CMND_PILOTWIRE_DRIFT, D_WEB_PILOTWIRE_DRIFT_MIN, D_WEB_PILOTWIRE_DRIFT_MAX, D_WEB_PILOTWIRE_DRIFT_STEP, str_temperature.c_str());
   }
 
   WSContentSend_P (PSTR("</fieldset></p>\n"));
@@ -1151,10 +1151,10 @@ void PilotwireWebPageControl ()
 
   WSContentSend_P (PSTR (".centered {width:%d%%;max-width:%dpx;}\n"), PILOTWIRE_GRAPH_PERCENT_STOP - PILOTWIRE_GRAPH_PERCENT_START, PILOTWIRE_GRAPH_WIDTH * (PILOTWIRE_GRAPH_PERCENT_STOP - PILOTWIRE_GRAPH_PERCENT_START) / 100);
   WSContentSend_P (PSTR (".graph {max-width:%dpx;}\n"), PILOTWIRE_GRAPH_WIDTH);
-  WSContentSend_P (PSTR (".thermostat {height:150px;}\n"));
+  WSContentSend_P (PSTR (".thermostat {height:160px;}\n"));
   WSContentSend_P (PSTR (".yellow {color:#FFFF33;}\n"));
 
-  WSContentSend_P (PSTR (".status {margin-top:10px;color:red;font-size:18px;font-weight:bold;font-style:italic;}\n"));
+  WSContentSend_P (PSTR (".status {color:red;font-size:18px;font-weight:bold;font-style:italic;}\n"));
 
   WSContentSend_P (PSTR (".button {border:1px solid white;margin:12px 0px auto;padding:4px 12px;border-radius:12px;font-size:20px;}\n"));
   WSContentSend_P (PSTR (".btn-read {color:orange;border:1px solid transparent;background-color:transparent;font-weight:bold;}\n"));
@@ -1213,6 +1213,11 @@ void PilotwireWebPageControl ()
   WSContentSend_P (PSTR ("<div class='centered thermostat'>\n"));
   if (actual_mode == PILOTWIRE_THERMOSTAT)
   {
+    // if needed, display heater status
+    str_text = "";
+    if (actual_state == PILOTWIRE_COMFORT) str_text = arrControlStatus[pilotwire_langage];
+    WSContentSend_P (PSTR ("<div class='status'>&nbsp;%s&nbsp;</div>\n"), str_text.c_str());
+
     // start of fieldset
     WSContentSend_P (PSTR ("<fieldset><legend>&nbsp;%s&nbsp;</legend>\n"), arrControlTemp[pilotwire_langage]);
 
@@ -1220,15 +1225,10 @@ void PilotwireWebPageControl ()
     WSContentSend_P (PSTR ("<input id='slider' name='target' type='range' class='slider' min='%s' max='%s' value='%s' step='%s' />\n"), str_temp_min.c_str(), str_temp_max.c_str(), str_temp_target.c_str(), D_WEB_PILOTWIRE_TEMP_STEP);
 
     // button to set target temperature
-    WSContentSend_P (PSTR ("<div><button id='button' name='temp' type='submit' class='button btn-read'>%s°C</button></div>\n"), str_temp_target.c_str());
+    WSContentSend_P (PSTR ("<button id='button' name='temp' type='submit' class='button btn-read'>%s°C</button>\n"), str_temp_target.c_str());
 
     // end of fieldset
     WSContentSend_P (PSTR ("</fieldset>\n"));
-
-    // if needed, display heater status
-    str_text = "";
-    if (actual_state == PILOTWIRE_COMFORT) str_text = arrControlStatus[pilotwire_langage];
-    WSContentSend_P (PSTR ("<div class='status'>&nbsp;%s&nbsp;</div>\n"), str_text.c_str());
   }
   WSContentSend_P (PSTR ("</div>\n"));
 

@@ -43,7 +43,7 @@
 
 #define D_CMND_OFFLOADING_BEFORE    "before"
 #define D_CMND_OFFLOADING_AFTER     "after"
-#define D_CMND_OFFLOADING_POWER     "power"
+#define D_CMND_OFFLOADING_DEVICE    "device"
 #define D_CMND_OFFLOADING_CONTRACT  "contract"
 #define D_CMND_OFFLOADING_TOPIC     "ptopic"
 #define D_CMND_OFFLOADING_KEY       "pkey"
@@ -58,8 +58,11 @@
 #define D_JSON_OFFLOADING_KEY       "Key"
 
 // offloading commands
-enum OffloadingCommands { CMND_OFFLOADING_POWER, CMND_OFFLOADING_CONTRACT, CMND_OFFLOADING_BEFORE, CMND_OFFLOADING_AFTER, CMND_OFFLOADING_TOPIC, CMND_OFFLOADING_KEY };
-const char kOffloadingCommands[] PROGMEM = D_CMND_OFFLOADING_POWER "|" D_CMND_OFFLOADING_CONTRACT "|" D_CMND_OFFLOADING_BEFORE "|" D_CMND_OFFLOADING_AFTER "|" D_CMND_OFFLOADING_TOPIC "|" D_CMND_OFFLOADING_KEY;
+enum OffloadingCommands { CMND_OFFLOADING_DEVICE, CMND_OFFLOADING_CONTRACT, CMND_OFFLOADING_BEFORE, CMND_OFFLOADING_AFTER, CMND_OFFLOADING_TOPIC, CMND_OFFLOADING_KEY };
+const char kOffloadingCommands[] PROGMEM = D_CMND_OFFLOADING_DEVICE "|" D_CMND_OFFLOADING_CONTRACT "|" D_CMND_OFFLOADING_BEFORE "|" D_CMND_OFFLOADING_AFTER "|" D_CMND_OFFLOADING_TOPIC "|" D_CMND_OFFLOADING_KEY;
+
+// form topic style
+const char OFFLOADING_TOPIC_STYLE[] PROGMEM = "style='float:right;font-size:0.7rem;'";
 
 /*************************************************\
  *               Variables
@@ -240,42 +243,14 @@ void OffloadingShowJSON (bool append)
   if (append == false) MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
 }
 
-// Handle offloading MQTT commands
-bool OffloadingMqttCommand ()
+// update instant house power
+void OffloadingUpdateHousePower (uint16_t new_power)
 {
-  int  command_code;
-  char command [CMDSZ];
+  // update instant power
+  offloading_house_power = new_power;
 
-  // check MQTT command
-  command_code = GetCommandCode (command, sizeof(command), XdrvMailbox.topic, kOffloadingCommands);
-
-  // handle command
-  switch (command_code)
-  {
-    case CMND_OFFLOADING_POWER:  // set device power
-      OffloadingSetDevicePower (XdrvMailbox.payload);
-      break;
-    case CMND_OFFLOADING_CONTRACT:  // set house contract power
-      OffloadingSetContract (XdrvMailbox.payload);
-      break;
-    case CMND_OFFLOADING_TOPIC:  // set mqtt house power topic 
-      OffloadingSetMqttPowerTopic (XdrvMailbox.data);
-      break;
-    case CMND_OFFLOADING_KEY:  // set mqtt house power key 
-      OffloadingSetMqttPowerKey (XdrvMailbox.data);
-      break;
-    case CMND_OFFLOADING_BEFORE:  // set number of updates before offloading 
-      OffloadingSetUpdateBeforeOffload (XdrvMailbox.payload);
-      break;
-    case CMND_OFFLOADING_AFTER:  // set number of updates after offloading 
-      OffloadingSetUpdateAfterOffload (XdrvMailbox.payload);
-      break;
-  }
-
-  // send MQTT status
-  OffloadingShowJSON (false);
-  
-  return true;
+  // update offloading status according to new house instant power
+  OffloadingUpdateStatus ();
 }
 
 // update offloading status
@@ -373,14 +348,45 @@ void OffloadingCheckMqttConnexion ()
   else offloading_topic_subscribed = false;
 }
 
-// update instant house power
-void OffloadingUpdateHousePower (uint16_t new_power)
+// Handle offloading MQTT commands
+bool OffloadingMqttCommand ()
 {
-  // update instant power
-  offloading_house_power = new_power;
+  bool command_handled = true;
+  int  command_code;
+  char command [CMDSZ];
 
-  // update offloading status according to new house instant power
-  OffloadingUpdateStatus ();
+  // check MQTT command
+  command_code = GetCommandCode (command, sizeof(command), XdrvMailbox.topic, kOffloadingCommands);
+
+  // handle command
+  switch (command_code)
+  {
+    case CMND_OFFLOADING_DEVICE:  // set device power
+      OffloadingSetDevicePower (XdrvMailbox.payload);
+      break;
+    case CMND_OFFLOADING_CONTRACT:  // set house contract power
+      OffloadingSetContract (XdrvMailbox.payload);
+      break;
+    case CMND_OFFLOADING_TOPIC:  // set mqtt house power topic 
+      OffloadingSetMqttPowerTopic (XdrvMailbox.data);
+      break;
+    case CMND_OFFLOADING_KEY:  // set mqtt house power key 
+      OffloadingSetMqttPowerKey (XdrvMailbox.data);
+      break;
+    case CMND_OFFLOADING_BEFORE:  // set number of updates before offloading 
+      OffloadingSetUpdateBeforeOffload (XdrvMailbox.payload);
+      break;
+    case CMND_OFFLOADING_AFTER:  // set number of updates after offloading 
+      OffloadingSetUpdateAfterOffload (XdrvMailbox.payload);
+      break;
+    default:
+      command_handled = false;
+  }
+
+  // if needed, send updated status
+  if (command_handled == true) OffloadingShowJSON (false);
+  
+  return command_handled;
 }
 
 // read received MQTT data to retrieve house instant power
@@ -391,10 +397,12 @@ bool OffloadingMqttData ()
   String  str_power_topic, str_power_key;
   String  str_mailbox_topic, str_mailbox_data, str_mailbox_value;
 
-  // get topics to compare
-  str_mailbox_topic = XdrvMailbox.topic;
+  // get topic and 
   OffloadingGetMqttPowerKey (str_power_key);
   OffloadingGetMqttPowerTopic (str_power_topic);
+  // get topics to compare
+  str_mailbox_topic = XdrvMailbox.topic;
+
 
   // get power data (removing SPACE and QUOTE)
   str_mailbox_data  = XdrvMailbox.data;
@@ -489,7 +497,7 @@ void OffloadingWebPage ()
   if (WebServer->hasArg("save"))
   {
     // get power of heater according to 'power' parameter
-    WebGetArg (D_CMND_OFFLOADING_POWER, argument, OFFLOADING_BUFFER_SIZE);
+    WebGetArg (D_CMND_OFFLOADING_DEVICE, argument, OFFLOADING_BUFFER_SIZE);
     if (strlen(argument) > 0) OffloadingSetDevicePower ((uint16_t)atoi (argument));
 
     // get maximum power limit according to 'contract' parameter
@@ -524,15 +532,15 @@ void OffloadingWebPage ()
 
   // house power mqtt topic
   OffloadingGetMqttPowerTopic (str_topic);
-  WSContentSend_P (PSTR ("<p>%s<br><input name='%s' value='%s'></p>\n"), D_OFFLOADING_TOPIC, D_CMND_OFFLOADING_TOPIC, str_topic.c_str ());
+  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input name='%s' value='%s'></p>\n"), D_OFFLOADING_TOPIC, OFFLOADING_TOPIC_STYLE, D_CMND_OFFLOADING_TOPIC, D_CMND_OFFLOADING_TOPIC, str_topic.c_str ());
 
   // house power json key
   OffloadingGetMqttPowerKey (str_key);
-  WSContentSend_P (PSTR ("<p>%s<br><input name='%s' value='%s'></p>\n"), D_OFFLOADING_KEY, D_CMND_OFFLOADING_KEY, str_key.c_str ());
+  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input name='%s' value='%s'></p>\n"), D_OFFLOADING_KEY, OFFLOADING_TOPIC_STYLE, D_CMND_OFFLOADING_KEY, D_CMND_OFFLOADING_KEY, str_key.c_str ());
 
   // contract power limit
   power_limit = OffloadingGetContract ();
-  WSContentSend_P (PSTR ("<p>%s (W)<br><input type='number' name='%s' value='%d'></p>\n"), D_OFFLOADING_CONTRACT, D_CMND_OFFLOADING_CONTRACT, power_limit);
+  WSContentSend_P (PSTR ("<p>%s (W)<span %s>%s</span><br><input type='number' name='%s' value='%d'></p>\n"), D_OFFLOADING_CONTRACT, OFFLOADING_TOPIC_STYLE, D_CMND_OFFLOADING_CONTRACT, D_CMND_OFFLOADING_CONTRACT, power_limit);
 
   WSContentSend_P (PSTR("</fieldset></p>\n"));
 
@@ -542,15 +550,15 @@ void OffloadingWebPage ()
 
   // heater power
   power_heater = OffloadingGetDevicePower ();
-  WSContentSend_P (PSTR ("<p>%s (W)<br><input type='number' name='%s' value='%d'></p>\n"), D_OFFLOADING_POWER, D_CMND_OFFLOADING_POWER, power_heater);
+  WSContentSend_P (PSTR ("<p>%s (W)<span %s>%s</span><br><input type='number' name='%s' value='%d'></p>\n"), D_OFFLOADING_POWER, OFFLOADING_TOPIC_STYLE, D_CMND_OFFLOADING_DEVICE, D_CMND_OFFLOADING_DEVICE, power_heater);
 
   // number of overload messages before offloading heater
   num_message  = OffloadingGetUpdateBeforeOffload ();
-  WSContentSend_P (PSTR ("<p>%s<br><input type='number' name='%s' min='0' step='1' value='%d'></p>\n"), D_OFFLOADING_UPDATE_BEFORE, D_CMND_OFFLOADING_BEFORE, num_message);
+  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input type='number' name='%s' min='0' step='1' value='%d'></p>\n"), D_OFFLOADING_UPDATE_BEFORE, OFFLOADING_TOPIC_STYLE, D_CMND_OFFLOADING_BEFORE, D_CMND_OFFLOADING_BEFORE, num_message);
 
   // number of correct load messages before removing offload of heater
   num_message  = OffloadingGetUpdateAfterOffload ();
-  WSContentSend_P (PSTR ("<p>%s<br><input type='number' name='%s' min='0' step='1' value='%d'></p>\n"), D_OFFLOADING_UPDATE_AFTER, D_CMND_OFFLOADING_AFTER, num_message);
+  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input type='number' name='%s' min='0' step='1' value='%d'></p>\n"), D_OFFLOADING_UPDATE_AFTER, OFFLOADING_TOPIC_STYLE, D_CMND_OFFLOADING_AFTER, D_CMND_OFFLOADING_AFTER, num_message);
   WSContentSend_P (PSTR("</fieldset></p>\n"));
 
   // save button
