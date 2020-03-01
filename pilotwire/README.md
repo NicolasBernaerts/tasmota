@@ -7,8 +7,13 @@ This firmware handles :
   * a pilotwire 2 orders on **Sonoff Basic**
   * a pilotwire 4 orders on **Sonoff Dual R2**.
 
-You'll also get a **Thermostat** mode that will allow you to pilot the heater to maintain a target temperature in the room. To activate that mode, you'll need to :
-  * connect a **local DF18B20** temperature sensor
+To enable **Pilotwire** mode on a **Sonoff Basic** or **Sonoff Dual R2**, you need to :
+  * connect diodes on the Sonoff output port(s)
+  * flash provided firmware
+  * Setup configuration pages
+  
+You'll also get a **Thermostat** mode that will allow you to pilot the heater to maintain a target temperature in the room. To activate that mode, you'll need either to :
+  * connect a **local DF18B20** temperature sensor (on **serial RX** for example)
   * declare a **MQTT remote** temperature sensor
 
 You can also declare a **MQTT remote power meter** to handle **automatic offload** when global power is to high according to your energy contract.
@@ -24,15 +29,6 @@ This Tasmota firmware is based on version **v8.1** modified to handle **Pilotwir
   * new specific MQTT commands
   * automatic offload when global power is overloading your contract
   * timers management (ON = target temperature, OFF = night mode temperature)
-
-To enable **Pilotwire** mode on a **Sonoff Basic** or **Sonoff Dual R2**, you need to :
-  * connect diodes on the Sonoff output port(s)
-  * flash provided firmware
-  * Setup configuration pages
- 
-To enable **Thermostat** mode, you need either to :
-  * connect a local DF18B20 temperature sensor (on **serial RX** for example)
-  * declare a remote temperature sensor
 
 MQTT JSON result should look like that :
 
