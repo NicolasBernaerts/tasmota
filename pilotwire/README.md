@@ -13,19 +13,24 @@ You'll also get a **Thermostat** mode that will allow you to pilot the heater to
 
 You can also declare a **MQTT remote power meter** to handle **automatic offload** when global power is to high according to your energy contract.
 
+In thermostat mode, if you use Tasmota standard timers, you'll be able to manage 2 different target temperatures :
+  * Timer **ON** means normal target temperature
+  * Timer **OFF** means target temperature minus night dropdown
+
 This Tasmota firmware is based on version **v8.1** modified to handle **Pilotwire** with :
   * Web configuration interface
   * public page (**/control**)
   * extension of JSON MQTT status
   * new specific MQTT commands
   * automatic offload when global power is overloading your contract
+  * timers management (ON = target temperature, OFF = night mode temperature)
 
 To enable **Pilotwire** mode on a **Sonoff Basic** or **Sonoff Dual R2**, you need to :
   * connect diodes on the Sonoff output port(s)
   * flash provided firmware
   * Setup configuration pages
  
-To enable **Thermostat** mode, you need to 
+To enable **Thermostat** mode, you need either to :
   * connect a local DF18B20 temperature sensor (on **serial RX** for example)
   * declare a remote temperature sensor
 
