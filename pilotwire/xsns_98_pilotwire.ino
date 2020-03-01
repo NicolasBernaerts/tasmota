@@ -27,7 +27,7 @@
     - Settings.weight_calibration           = Temperature correction (0 = -5°C, 50 = 0°C, 100 = +5°C)
     - Settings.weight_item                  = Minimum temperature (x10 -> 125 = 12.5°C)
     - Settings.energy_frequency_calibration = Maximum temperature (x10 -> 240 = 24.0°C)
-    - Settings.energy_kWhtotal_time         = Night dropdown temperature (x10 -> 25 = 2.5°C)
+    - Settings.energy_voltage_calibration   = Night dropdown temperature (x10 -> 25 = 2.5°C)
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -51,7 +51,7 @@
 
 #define PILOTWIRE_BUFFER_SIZE           128
 
-#define D_PAGE_PILOTWIRE_HEATER         "heater"
+#define D_PAGE_PILOTWIRE_CONFIG         "config"
 #define D_PAGE_PILOTWIRE_CONTROL        "control"
 
 #define D_CMND_PILOTWIRE_ON             "on"
@@ -305,7 +305,7 @@ void PilotwireSetMode (uint8_t new_mode)
 void PilotwireSetMinTemperature (float new_temperature)
 {
   // if within range, save temperature correction
-  if ((new_temperature >= PILOTWIRE_TEMP_MIN) && (new_temperature <= PILOTWIRE_TEMP_MAX)) Settings.weight_item = (unsigned long) (new_temperature * 10);
+  if ((new_temperature >= PILOTWIRE_TEMP_MIN) && (new_temperature <= PILOTWIRE_TEMP_MAX)) Settings.weight_item = (unsigned long) int (new_temperature * 10);
 }
 
 // get pilot wire minimum temperature
@@ -314,8 +314,7 @@ float PilotwireGetMinTemperature ()
   float min_temperature;
 
   // get drift temperature (/10)
-  min_temperature = (float) Settings.weight_item;
-  min_temperature = min_temperature / 10;
+  min_temperature = float (Settings.weight_item) / 10;
   
   // check if within range
   if (min_temperature < PILOTWIRE_TEMP_MIN) min_temperature = PILOTWIRE_TEMP_MIN;
@@ -328,7 +327,7 @@ float PilotwireGetMinTemperature ()
 void PilotwireSetMaxTemperature (float new_temperature)
 {
   // if within range, save temperature correction
-  if ((new_temperature >= PILOTWIRE_TEMP_MIN) && (new_temperature <= PILOTWIRE_TEMP_MAX)) Settings.energy_frequency_calibration = (unsigned long) (new_temperature * 10);
+  if ((new_temperature >= PILOTWIRE_TEMP_MIN) && (new_temperature <= PILOTWIRE_TEMP_MAX)) Settings.energy_frequency_calibration = (unsigned long) int (new_temperature * 10);
 }
 
 // get pilot wire maximum temperature
@@ -337,8 +336,7 @@ float PilotwireGetMaxTemperature ()
   float max_temperature;
 
   // get drift temperature (/10)
-  max_temperature = (float) Settings.energy_frequency_calibration;
-  max_temperature = max_temperature / 10;
+  max_temperature = float (Settings.energy_frequency_calibration) / 10;
   
   // check if within range
   if (max_temperature < PILOTWIRE_TEMP_MIN) max_temperature = PILOTWIRE_TEMP_MIN;
@@ -351,7 +349,7 @@ float PilotwireGetMaxTemperature ()
 void PilotwireSetDrift (float new_drift)
 {
   // if within range, save temperature correction
-  if ((new_drift >= PILOTWIRE_SHIFT_MIN) && (new_drift <= PILOTWIRE_SHIFT_MAX)) Settings.weight_calibration = (unsigned long) (50 + (new_drift * 10));
+  if ((new_drift >= PILOTWIRE_SHIFT_MIN) && (new_drift <= PILOTWIRE_SHIFT_MAX)) Settings.weight_calibration = (unsigned long) int (50 + (new_drift * 10));
 }
 
 // get pilot wire drift temperature
@@ -360,7 +358,7 @@ float PilotwireGetDrift ()
   float drift;
 
   // get drift temperature (/10)
-  drift = (float) Settings.weight_calibration;
+  drift = float (Settings.weight_calibration);
   drift = ((drift - 50) / 10);
   
   // check if within range
@@ -377,7 +375,7 @@ void PilotwireSetTargetTemperature (float new_thermostat)
   if ((new_thermostat >= PILOTWIRE_TEMP_MIN) && (new_thermostat <= PILOTWIRE_TEMP_MAX))
   {
     // save new target
-    Settings.weight_max = (uint16_t) (new_thermostat * 10);
+    Settings.weight_max = (uint16_t) int (new_thermostat * 10);
 
     // reset night mode
     pilotwire_nightmode = false;
@@ -390,8 +388,7 @@ float PilotwireGetTargetTemperature ()
   float temperature;
 
   // get target temperature (/10)
-  temperature = (float) Settings.weight_max;
-  temperature = temperature / 10;
+  temperature = float (Settings.weight_max) / 10;
   
   // check if within range
   if (temperature < PILOTWIRE_TEMP_MIN) temperature = PILOTWIRE_TEMP_MIN;
@@ -404,7 +401,7 @@ float PilotwireGetTargetTemperature ()
 void PilotwireSetNightDropdown (float new_dropdown)
 {
   // save target temperature
-  if (new_dropdown <= PILOTWIRE_SHIFT_MAX) Settings.energy_kWhtotal_time = (uint32_t) (new_dropdown * 10);
+  if (new_dropdown <= PILOTWIRE_SHIFT_MAX) Settings.energy_voltage_calibration = (unsigned long) int (new_dropdown * 10);
 }
 
 // get night dropdown temperature
@@ -413,8 +410,7 @@ float PilotwireGetNightDropdown ()
   float temperature;
 
   // get target temperature (/10)
-  temperature = (float) Settings.energy_kWhtotal_time;
-  temperature = temperature / 10;
+  temperature = float (Settings.energy_voltage_calibration) / 10;
  
   return temperature;
 }
@@ -822,7 +818,7 @@ void PilotwireWebMainButton ()
 void PilotwireWebButton ()
 {
   // heater configuration button
-  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), D_PAGE_PILOTWIRE_HEATER, D_PILOTWIRE_CONFIGURE);
+  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), D_PAGE_PILOTWIRE_CONFIG, D_PILOTWIRE_CONFIGURE);
 }
 
 // append pilot wire state to main page
@@ -880,7 +876,7 @@ bool PilotwireWebSensor ()
 }
 
 // Pilotwire heater configuration web page
-void PilotwireWebPageHeater ()
+void PilotwireWebPageConfigure ()
 {
   uint8_t target_mode;
   float   actual_temperature;
@@ -933,7 +929,7 @@ void PilotwireWebPageHeater ()
   // beginning of form
   WSContentStart_P (D_PILOTWIRE_CONFIGURE);
   WSContentSendStyle ();
-  WSContentSend_P (PSTR("<form method='get' action='%s'>\n"), D_PAGE_PILOTWIRE_HEATER);
+  WSContentSend_P (PSTR("<form method='get' action='%s'>\n"), D_PAGE_PILOTWIRE_CONFIG);
 
   // operation mode 
   // --------------
@@ -1016,8 +1012,8 @@ void PilotwireWebTemperatureGraph (uint8_t mode)
   temp_scope = temp_max - temp_min;
 
   // start of SVG graph
-  graph_start  = (float) PILOTWIRE_GRAPH_PERCENT_START / 100;
-  graph_stop   = (float) PILOTWIRE_GRAPH_PERCENT_STOP / 100;
+  graph_start  = float (PILOTWIRE_GRAPH_PERCENT_START) / 100;
+  graph_stop   = float (PILOTWIRE_GRAPH_PERCENT_STOP) / 100;
   graph_width  = graph_stop - graph_start;
 
   // start of SVG graph
@@ -1376,7 +1372,7 @@ bool Xsns98 (uint8_t function)
 
 #ifdef USE_WEBSERVER
     case FUNC_WEB_ADD_HANDLER:
-      WebServer->on ("/" D_PAGE_PILOTWIRE_HEATER, PilotwireWebPageHeater);
+      WebServer->on ("/" D_PAGE_PILOTWIRE_CONFIG, PilotwireWebPageConfigure);
       WebServer->on ("/" D_PAGE_PILOTWIRE_CONTROL, PilotwireWebPageControl);
       break;
     case FUNC_WEB_SENSOR:
