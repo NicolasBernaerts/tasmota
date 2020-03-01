@@ -19,6 +19,7 @@
     21/02/2020 - v5.2 - Add daily temperature graph
     24/02/2020 - v5.3 - Add control button to main page
     27/02/2020 - v5.4 - Add target temperature and relay state to temperature graph
+    01/03/2020 - v5.5 - Add timer management with night dropdown temperature
 
   Settings are stored using weighting scale parameters :
     - Settings.weight_reference             = Fil pilote mode
@@ -26,6 +27,7 @@
     - Settings.weight_calibration           = Temperature correction (0 = -5°C, 50 = 0°C, 100 = +5°C)
     - Settings.weight_item                  = Minimum temperature (x10 -> 125 = 12.5°C)
     - Settings.energy_frequency_calibration = Maximum temperature (x10 -> 240 = 24.0°C)
+    - Settings.energy_kWhtotal_time         = Night dropdown temperature (x10 -> 25 = 2.5°C)
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -61,6 +63,7 @@
 #define D_CMND_PILOTWIRE_MIN            "min"
 #define D_CMND_PILOTWIRE_MAX            "max"
 #define D_CMND_PILOTWIRE_TARGET         "target"
+#define D_CMND_PILOTWIRE_NIGHT          "night"
 #define D_CMND_PILOTWIRE_DRIFT          "drift"
 #define D_CMND_PILOTWIRE_PULLUP         "pullup"
 
@@ -75,16 +78,20 @@
 #define D_JSON_PILOTWIRE_RELAY          "Relay"
 #define D_JSON_PILOTWIRE_STATE          "State"
 
-#define D_WEB_PILOTWIRE_TEMP_MIN        "5"
-#define D_WEB_PILOTWIRE_TEMP_MAX        "30"
-#define D_WEB_PILOTWIRE_TEMP_STEP       "0.5"
-#define D_WEB_PILOTWIRE_DRIFT_MIN       "-5"
-#define D_WEB_PILOTWIRE_DRIFT_MAX       "5"
-#define D_WEB_PILOTWIRE_DRIFT_STEP      "0.1"
 #define D_WEB_PILOTWIRE_CHECKED         "checked"
 
+#define PILOTWIRE_TEMP_MIN              5
+#define PILOTWIRE_TEMP_MAX              30
+#define PILOTWIRE_TEMP_DEFAULT          18
+#define PILOTWIRE_TEMP_STEP             0.5
+
+#define PILOTWIRE_SHIFT_MIN             -10
+#define PILOTWIRE_SHIFT_MAX             10
+
+#define PILOTWIRE_DRIFT_DEFAULT         0
+#define PILOTWIRE_DRIFT_STEP            0.1
+
 #define PILOTWIRE_TEMP_THRESHOLD        0.3
-#define PILOTWIRE_TEMP_UNDEFINED        -50
 
 #define PILOTWIRE_GRAPH_XMIN            5
 #define PILOTWIRE_GRAPH_XMAX            95
@@ -95,9 +102,6 @@
 #define PILOTWIRE_GRAPH_HEIGHT          500 
 #define PILOTWIRE_GRAPH_PERCENT_START   15      
 #define PILOTWIRE_GRAPH_PERCENT_STOP    85      
-
-#define PILOTWIRE_LANGAGE_ENGLISH       0
-#define PILOTWIRE_LANGAGE_FRENCH        1
 
 // english flag icon coded in base64
 const char strFlagEn0[] PROGMEM = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgBAMAAACBVGfHAAAMtnpUWHRSYXcgcHJvZmlsZSB0eXBlIGV4aWYAAHjazZlbcuRIrkT/YxWzhHg/lhMvmN0dzPLnIMhkpjSq6uq2+zHKkpiimEGEO+BwsMz+9/+J+RdfoaVsYio1t5wtX7HF5jtvqr2+rqOz8fw8X/7+E79/OW+eP3hOBY7h+jXv+/rO+fT+QIn3+fH1vCnzXqfeCzn75dZB76zv1x3kvVDw13l3/27a/YGeP7Zzf/t5L/va1rffYwGMlVgveON3cMGen/66UyCK0ELXM+dn5UJ7v0/89OEH/MwD3Q8APu++4WdfkYU3HNdCr23lbzjd5136dj48t/FfInL+ubP/jCgNu+3n1wd+IquK7Gt3PZJHLeZ7U6+tnHdcOIAznI9lXoXvxPtyXo1Xtd1OWFtsdRg7+KU5D+LioluuO3H7HKebhBj99oWj99OHc66G4pufh5SoLye+GPhZocLEhLnAaf/E4s59m96Pm1XuvBxXesdiyuiXl/l+4p++viwkomnunK0PVsTlNb8IQ5nTn1wFIU5uTNPB15nrYL9/KbEBBtOBubLBbse1xEjunVvh8BxsMlwa7VUvrqx7ASDi3olgXIABm0lpl50t3hfnwLHCTydyH6IfMOCSSX4RpY8hZMihGrg3nynuXOuTv04jLxCRQg4FaiggyIoxxUy9VVKomxRSTCnlVFJNLfUccswp";
@@ -122,17 +126,15 @@ const char *const arrFlagFrBase64[] PROGMEM = {strFlagFr0, strFlagFr1, strFlagFr
 const char *const arrControlTemp[]   PROGMEM = {"Target", "Thermostat"};
 const char *const arrControlSet[]    PROGMEM = {"Set to", "Définir à"};
 const char *const arrControlStatus[] PROGMEM = {"Currently heating", "Radiateur en chauffe"};
-int   pilotwire_langage = PILOTWIRE_LANGAGE_ENGLISH;
 
-// fil pilote modes
+// enumarations
 enum PilotwireModes { PILOTWIRE_DISABLED, PILOTWIRE_OFF, PILOTWIRE_COMFORT, PILOTWIRE_ECO, PILOTWIRE_FROST, PILOTWIRE_THERMOSTAT, PILOTWIRE_OFFLOAD };
-
-// fil pilote commands
 enum PilotwireSources { PILOTWIRE_SOURCE_NONE, PILOTWIRE_SOURCE_LOCAL, PILOTWIRE_SOURCE_REMOTE };
+enum PilotwireLangages { PILOTWIRE_LANGAGE_ENGLISH, PILOTWIRE_LANGAGE_FRENCH };
 
 // fil pilote commands
-enum PilotwireCommands { CMND_PILOTWIRE_MODE, CMND_PILOTWIRE_MIN, CMND_PILOTWIRE_MAX, CMND_PILOTWIRE_TARGET, CMND_PILOTWIRE_DRIFT};
-const char kPilotWireCommands[] PROGMEM = D_CMND_PILOTWIRE_MODE "|" D_CMND_PILOTWIRE_MIN "|" D_CMND_PILOTWIRE_MAX "|" D_CMND_PILOTWIRE_TARGET "|" D_CMND_PILOTWIRE_DRIFT;
+enum PilotwireCommands { CMND_PILOTWIRE_MODE, CMND_PILOTWIRE_MIN, CMND_PILOTWIRE_MAX, CMND_PILOTWIRE_TARGET, CMND_PILOTWIRE_NIGHT, CMND_PILOTWIRE_DRIFT};
+const char kPilotWireCommands[] PROGMEM = D_CMND_PILOTWIRE_MODE "|" D_CMND_PILOTWIRE_MIN "|" D_CMND_PILOTWIRE_MAX "|" D_CMND_PILOTWIRE_TARGET "|" D_CMND_PILOTWIRE_NIGHT "|" D_CMND_PILOTWIRE_DRIFT;
 
 // header of publicly accessible control page
 const char PILOTWIRE_MODE_SELECT[] PROGMEM = "<input type='radio' name='%s' id='%d' value='%d' %s>%s<br>\n";
@@ -145,13 +147,14 @@ const char PILOTWIRE_TOPIC_STYLE[] PROGMEM = "style='float:right;font-size:0.7re
 \*************************************************/
 
 // variables
-uint8_t pilotwire_temperature_source = PILOTWIRE_SOURCE_NONE;         // temperature source
-
-// temperature data for graph
-uint32_t pilotwire_graph_index   = 0;
-uint32_t pilotwire_graph_counter = 0;
-float    current_temperature, current_target;
-uint8_t  current_state;
+bool     pilotwire_nightmode;
+uint8_t  pilotwire_temperature_source;         // temperature source
+uint8_t  pilotwire_langage;
+uint32_t pilotwire_graph_index;
+uint32_t pilotwire_graph_counter;
+float    pilotwire_current_temperature;
+float    pilotwire_current_target;
+uint8_t  pilotwire_current_state;
 float    arr_temperature[PILOTWIRE_GRAPH_SAMPLE];
 float    arr_target[PILOTWIRE_GRAPH_SAMPLE];
 uint8_t  arr_state[PILOTWIRE_GRAPH_SAMPLE];
@@ -301,28 +304,22 @@ void PilotwireSetMode (uint8_t new_mode)
 // set pilot wire minimum temperature
 void PilotwireSetMinTemperature (float new_temperature)
 {
-  float temp_min, temp_max;
-  temp_min = atof (D_WEB_PILOTWIRE_TEMP_MIN);
-  temp_max = atof (D_WEB_PILOTWIRE_TEMP_MAX);
-
   // if within range, save temperature correction
-  if ((new_temperature >= temp_min) && (new_temperature <= temp_max)) Settings.weight_item = (unsigned long) (new_temperature * 10);
+  if ((new_temperature >= PILOTWIRE_TEMP_MIN) && (new_temperature <= PILOTWIRE_TEMP_MAX)) Settings.weight_item = (unsigned long) (new_temperature * 10);
 }
 
 // get pilot wire minimum temperature
 float PilotwireGetMinTemperature ()
 {
-  float min_temperature, temp_min, temp_max;
-  temp_min = atof (D_WEB_PILOTWIRE_TEMP_MIN);
-  temp_max = atof (D_WEB_PILOTWIRE_TEMP_MAX);
+  float min_temperature;
 
   // get drift temperature (/10)
   min_temperature = (float) Settings.weight_item;
   min_temperature = min_temperature / 10;
   
   // check if within range
-  if (min_temperature < temp_min) min_temperature = temp_min;
-  if (min_temperature > temp_max) min_temperature = temp_max;
+  if (min_temperature < PILOTWIRE_TEMP_MIN) min_temperature = PILOTWIRE_TEMP_MIN;
+  if (min_temperature > PILOTWIRE_TEMP_MAX) min_temperature = PILOTWIRE_TEMP_MAX;
 
   return min_temperature;
 }
@@ -330,28 +327,22 @@ float PilotwireGetMinTemperature ()
 // set pilot wire maximum temperature
 void PilotwireSetMaxTemperature (float new_temperature)
 {
-  float temp_min, temp_max;
-  temp_min = atof (D_WEB_PILOTWIRE_TEMP_MIN);
-  temp_max = atof (D_WEB_PILOTWIRE_TEMP_MAX);
-
   // if within range, save temperature correction
-  if ((new_temperature >= temp_min) && (new_temperature <= temp_max)) Settings.energy_frequency_calibration = (unsigned long) (new_temperature * 10);
+  if ((new_temperature >= PILOTWIRE_TEMP_MIN) && (new_temperature <= PILOTWIRE_TEMP_MAX)) Settings.energy_frequency_calibration = (unsigned long) (new_temperature * 10);
 }
 
 // get pilot wire maximum temperature
 float PilotwireGetMaxTemperature ()
 {
-  float max_temperature, temp_min, temp_max;
-  temp_min = atof (D_WEB_PILOTWIRE_TEMP_MIN);
-  temp_max = atof (D_WEB_PILOTWIRE_TEMP_MAX);
+  float max_temperature;
 
   // get drift temperature (/10)
   max_temperature = (float) Settings.energy_frequency_calibration;
   max_temperature = max_temperature / 10;
   
   // check if within range
-  if (max_temperature < temp_min) max_temperature = temp_min;
-  if (max_temperature > temp_max) max_temperature = temp_max;
+  if (max_temperature < PILOTWIRE_TEMP_MIN) max_temperature = PILOTWIRE_TEMP_MIN;
+  if (max_temperature > PILOTWIRE_TEMP_MAX) max_temperature = PILOTWIRE_TEMP_MAX;
 
   return max_temperature;
 }
@@ -359,58 +350,72 @@ float PilotwireGetMaxTemperature ()
 // set pilot wire drift temperature
 void PilotwireSetDrift (float new_drift)
 {
-  float drift_min, drift_max;
-  drift_min = atof (D_WEB_PILOTWIRE_DRIFT_MIN);
-  drift_max = atof (D_WEB_PILOTWIRE_DRIFT_MAX);
-
   // if within range, save temperature correction
-  if ((new_drift >= drift_min) && (new_drift <= drift_max)) Settings.weight_calibration = (unsigned long) (50 + (new_drift * 10));
+  if ((new_drift >= PILOTWIRE_SHIFT_MIN) && (new_drift <= PILOTWIRE_SHIFT_MAX)) Settings.weight_calibration = (unsigned long) (50 + (new_drift * 10));
 }
 
 // get pilot wire drift temperature
 float PilotwireGetDrift ()
 {
-  float drift, drift_min, drift_max;
-  drift_min = atof (D_WEB_PILOTWIRE_DRIFT_MIN);
-  drift_max = atof (D_WEB_PILOTWIRE_DRIFT_MAX);
+  float drift;
 
   // get drift temperature (/10)
   drift = (float) Settings.weight_calibration;
   drift = ((drift - 50) / 10);
   
   // check if within range
-  if (drift < drift_min) drift = drift_min;
-  if (drift > drift_max) drift = drift_max;
+  if (drift < PILOTWIRE_SHIFT_MIN) drift = PILOTWIRE_SHIFT_MIN;
+  if (drift > PILOTWIRE_SHIFT_MAX) drift = PILOTWIRE_SHIFT_MAX;
 
   return drift;
 }
 
-// set pilot wire in thermostat mode
-void PilotwireSetThermostat (float new_thermostat)
+// set target temperature
+void PilotwireSetTargetTemperature (float new_thermostat)
 {
-  float temp_min, temp_max;
-  temp_min = atof (D_WEB_PILOTWIRE_TEMP_MIN);
-  temp_max = atof (D_WEB_PILOTWIRE_TEMP_MAX);
-
   // save target temperature
-  if ((new_thermostat >= temp_min) && (new_thermostat <= temp_max)) Settings.weight_max = (uint16_t) (new_thermostat * 10);
+  if ((new_thermostat >= PILOTWIRE_TEMP_MIN) && (new_thermostat <= PILOTWIRE_TEMP_MAX))
+  {
+    // save new target
+    Settings.weight_max = (uint16_t) (new_thermostat * 10);
+
+    // reset night mode
+    pilotwire_nightmode = false;
+  }
 }
 
 // get target temperature
 float PilotwireGetTargetTemperature ()
 {
-  float temperature, temp_min, temp_max;
-  temp_min = atof (D_WEB_PILOTWIRE_TEMP_MIN);
-  temp_max = atof (D_WEB_PILOTWIRE_TEMP_MAX);
+  float temperature;
 
   // get target temperature (/10)
   temperature = (float) Settings.weight_max;
   temperature = temperature / 10;
   
   // check if within range
-  if (temperature < temp_min) temperature = temp_min;
-  if (temperature > temp_max) temperature = temp_max;
+  if (temperature < PILOTWIRE_TEMP_MIN) temperature = PILOTWIRE_TEMP_MIN;
+  if (temperature > PILOTWIRE_TEMP_MAX) temperature = PILOTWIRE_TEMP_MAX;
 
+  return temperature;
+}
+
+// set night dropdown temperature
+void PilotwireSetNightDropdown (float new_dropdown)
+{
+  // save target temperature
+  if (new_dropdown <= PILOTWIRE_SHIFT_MAX) Settings.energy_kWhtotal_time = (uint32_t) (new_dropdown * 10);
+}
+
+// get night dropdown temperature
+float PilotwireGetNightDropdown ()
+{
+  float temperature;
+
+  // get target temperature (/10)
+  temperature = (float) Settings.energy_kWhtotal_time;
+  temperature = temperature / 10;
+ 
   return temperature;
 }
 
@@ -465,6 +470,26 @@ float PilotwireGetTemperature ()
   else pilotwire_temperature_source = PILOTWIRE_SOURCE_NONE;
 
   return temperature;
+}
+
+// get current target temperature (handling night dropdown)
+float PilotwireGetCurrentTarget ()
+{
+  float  temp_target;
+
+  // get target temperature
+  temp_target = PilotwireGetTargetTemperature ();
+
+  // if night time, substract night dropdown
+  if (pilotwire_nightmode == true) temp_target -= PilotwireGetNightDropdown ();
+
+  return temp_target;
+}
+
+void PilotwireHandleTimer (uint32_t state)
+{
+  // set night mode according to relay state (OFF = night mode)
+  pilotwire_nightmode = (state == POWER_OFF);
 }
 
 // Show JSON status (for MQTT)
@@ -540,7 +565,7 @@ bool PilotwireMqttCommand ()
       PilotwireSetMode (XdrvMailbox.payload);
       break;
     case CMND_PILOTWIRE_TARGET:  // set target temperature 
-      PilotwireSetThermostat (atof (XdrvMailbox.data));
+      PilotwireSetTargetTemperature (atof (XdrvMailbox.data));
       break;
     case CMND_PILOTWIRE_DRIFT:  // set temperature drift correction 
       PilotwireSetDrift (atof (XdrvMailbox.data));
@@ -550,6 +575,9 @@ bool PilotwireMqttCommand ()
       break;
     case CMND_PILOTWIRE_MAX:  // set maximum temperature 
       PilotwireSetMaxTemperature (atof (XdrvMailbox.data));
+      break;
+    case CMND_PILOTWIRE_NIGHT:  // set night dropdown 
+      PilotwireSetNightDropdown (atof (XdrvMailbox.data));
       break;
     default:
       command_handled = false;
@@ -585,7 +613,7 @@ void PilotwireUpdateStatus ()
     {
       // get current and target temperature
       actual_temperature = PilotwireGetTemperature ();
-      target_temperature = PilotwireGetTargetTemperature ();
+      target_temperature = PilotwireGetCurrentTarget ();
 
       // if temperature is too low, target state is on
       // else, if too high, target state is off
@@ -618,14 +646,14 @@ void PilotwireUpdateStatus ()
 void PilotwireUpdateGraph ()
 {
   // if index is ok, check index set current graph value
-  arr_temperature[pilotwire_graph_index] = current_temperature;
-  arr_target[pilotwire_graph_index] = current_target;
-  arr_state[pilotwire_graph_index] = current_state;
+  arr_temperature[pilotwire_graph_index] = pilotwire_current_temperature;
+  arr_target[pilotwire_graph_index] = pilotwire_current_target;
+  arr_state[pilotwire_graph_index] = pilotwire_current_state;
 
   // init current values
-  current_temperature = NAN;
-  current_target = NAN;
-  current_state = PILOTWIRE_OFF;
+  pilotwire_current_temperature = NAN;
+  pilotwire_current_target      = NAN;
+  pilotwire_current_state       = PILOTWIRE_OFF;
 
   // increase temperature data index and reset if max reached
   pilotwire_graph_index ++;
@@ -639,25 +667,25 @@ void PilotwireEverySecond ()
 
   // update current values
   temperature = PilotwireGetTemperature ( );
-  target = PilotwireGetTargetTemperature ( );
+  target = PilotwireGetCurrentTarget ( );
   state = PilotwireGetRelayState ( );
 
   // update current temperature
   if (isnan(temperature) == false)
   {
-    if (isnan(current_temperature) == false) current_temperature = min (current_temperature, temperature);
-    else current_temperature = temperature;
+    if (isnan(pilotwire_current_temperature) == false) pilotwire_current_temperature = min (pilotwire_current_temperature, temperature);
+    else pilotwire_current_temperature = temperature;
   }
 
   // update target temperature
   if (isnan(target) == false)
   {
-    if (isnan(current_target) == false) current_target = min (current_target, target);
-    else current_target = target;
+    if (isnan(pilotwire_current_target) == false) pilotwire_current_target = min (pilotwire_current_target, target);
+    else pilotwire_current_target = target;
   } 
 
   // update relay state
-  if (current_state != PILOTWIRE_COMFORT) current_state = state;
+  if (pilotwire_current_state != PILOTWIRE_COMFORT) pilotwire_current_state = state;
 
   // increment delay counter and if delay reached, update history data
   if (pilotwire_graph_counter == 0) PilotwireUpdateGraph ();
@@ -672,10 +700,15 @@ void PilotwireInit ()
   int    index;
   String str_setting;
 
-  // init current values
-  current_temperature = NAN;
-  current_target = NAN;
-  current_state = PILOTWIRE_OFF;
+  // init default values
+  pilotwire_nightmode           = false;
+  pilotwire_current_temperature = NAN;
+  pilotwire_current_target      = NAN;
+  pilotwire_current_state       = PILOTWIRE_OFF;
+  pilotwire_graph_index         = 0;
+  pilotwire_graph_counter       = 0;
+  pilotwire_langage             = PILOTWIRE_LANGAGE_ENGLISH;
+  pilotwire_temperature_source  = PILOTWIRE_SOURCE_NONE;
 
   // initialise temperature graph
   for (index = 0; index < PILOTWIRE_GRAPH_SAMPLE; index++)
@@ -685,12 +718,21 @@ void PilotwireInit ()
     arr_state[index] = PILOTWIRE_OFF;
   }
 
-  // if needed, initialise offloading and temperature settings
+  // if needed, initialise settings
   str_setting = (char*)Settings.free_f03;
   index = str_setting.indexOf ('|');
-  if (index == -1) strcpy ((char*)Settings.free_f03, ";|;");
-}
+  if (index == -1)
+  {
+    // offloading and temperature settings
+    strcpy ((char*)Settings.free_f03, ";|;");
 
+    // default values
+    PilotwireSetDrift (PILOTWIRE_DRIFT_DEFAULT);
+    PilotwireSetMinTemperature (PILOTWIRE_TEMP_MIN);
+    PilotwireSetMaxTemperature (PILOTWIRE_TEMP_MAX);
+    PilotwireSetTargetTemperature (PILOTWIRE_TEMP_DEFAULT);
+  } 
+}
 
 /***********************************************\
  *                    Web
@@ -724,7 +766,7 @@ void PilotwireWebSelectMode ()
 {
   uint8_t actual_mode;
   float   actual_temperature;
-  String  str_argument, str_label, str_temp_min, str_temp_max, str_temp_target;
+  String  str_argument, str_label, str_temp_target;
  
   // get mode and temperature
   actual_mode = PilotwireGetMode ();
@@ -762,22 +804,11 @@ void PilotwireWebSelectMode ()
   // selection : thermostat
   if (isnan(actual_temperature) == false) 
   {
-    // label
-    str_label = String (D_PILOTWIRE_THERMOSTAT) + " (°" + String (TempUnit ()) + ")";
-
-    // temperatures
-    str_temp_min    = String (PilotwireGetMinTemperature ());
-    str_temp_max    = String (PilotwireGetMaxTemperature ());
-    str_temp_target = String (PilotwireGetTargetTemperature ());
-
     // selection : target temperature
     str_argument = "";
     if (actual_mode == PILOTWIRE_THERMOSTAT) str_argument = D_WEB_PILOTWIRE_CHECKED;
-    WSContentSend_P (PSTR ("<span %s>%s</span>"), PILOTWIRE_TOPIC_STYLE, D_CMND_PILOTWIRE_TARGET);
-    WSContentSend_P (PILOTWIRE_MODE_SELECT, D_CMND_PILOTWIRE_MODE, PILOTWIRE_THERMOSTAT, PILOTWIRE_THERMOSTAT, str_argument.c_str (), str_label.c_str());
-    WSContentSend_P (PSTR ("<input type='number' name='%s' min='%s' max='%s' step='%s' value='%s' title='%s'><br>\n"), D_CMND_PILOTWIRE_TARGET, str_temp_min.c_str(), str_temp_max.c_str(), D_WEB_PILOTWIRE_TEMP_STEP, str_temp_target.c_str());
+    WSContentSend_P (PILOTWIRE_MODE_SELECT, D_CMND_PILOTWIRE_MODE, PILOTWIRE_THERMOSTAT, PILOTWIRE_THERMOSTAT, str_argument.c_str (), D_PILOTWIRE_THERMOSTAT); 
   }
-  else WSContentSend_P (PSTR ("<p><i>%s</i></p>\n"), D_PILOTWIRE_NOSENSOR);
 }
 
 // append pilotwire control button to main page
@@ -791,7 +822,7 @@ void PilotwireWebMainButton ()
 void PilotwireWebButton ()
 {
   // heater configuration button
-  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), D_PAGE_PILOTWIRE_HEATER, D_PILOTWIRE_CONF_HEATER);
+  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), D_PAGE_PILOTWIRE_HEATER, D_PILOTWIRE_CONFIGURE);
 }
 
 // append pilot wire state to main page
@@ -799,7 +830,7 @@ bool PilotwireWebSensor ()
 {
   uint8_t actual_mode, actual_state;
   float   temperature;
-  String  str_title, str_text, str_label, str_color;
+  String  str_title, str_text, str_label, str_color, str_target;
 
   // get current mode and temperature
   actual_mode = PilotwireGetMode ();
@@ -823,38 +854,48 @@ bool PilotwireWebSensor ()
   }
 
   // add target temperature and unit
-  if (actual_mode == PILOTWIRE_THERMOSTAT) str_text += " / " + String (PilotwireGetTargetTemperature (), 1);
+  str_target = String (PilotwireGetCurrentTarget (), 1);
+  if (actual_mode == PILOTWIRE_THERMOSTAT) str_text += " / " + str_target;
   str_text += "°" + String (TempUnit ());
 
   // display temperature
   WSContentSend_PD ("{s}%s{m}%s{e}", str_title.c_str (), str_text.c_str ());
 
-  // get heater mode, associated label and color
+  // display day or night night mode
+  str_label = String (PilotwireGetNightDropdown (), 1);
+  str_title = D_PILOTWIRE_MODE;
+  if (pilotwire_nightmode == true) str_text = "<span><b>" + String (D_PILOTWIRE_NIGHT) + "</b> (-" + str_label.c_str() + "°" + String (TempUnit ()) + ")</span>";
+  else str_text = "<span><b>" + String (D_PILOTWIRE_NORMAL) + "</b></span>";
+  WSContentSend_PD (PSTR("{s}%s{m}%s{e}"), str_title.c_str (), str_text.c_str ());
+
+  // get heater state, associated label and color
   actual_state = PilotwireGetRelayState ();
   PilotwireGetStateLabel (actual_state, str_label);
   PilotwireGetStateColor (actual_state, str_color);
 
   // display current state
-  str_title = D_PILOTWIRE + String (" ") + D_PILOTWIRE_STATE;
+  str_title = D_PILOTWIRE_HEATER + String (" ") + D_PILOTWIRE_STATE;
   str_text  = "<span style='color:" + str_color + ";'><b>" + str_label + "</b></span>";
   WSContentSend_PD (PSTR("{s}%s{m}%s{e}"), str_title.c_str (), str_text.c_str ());
 }
 
-// Pilot Wire heater configuration web page
+// Pilotwire heater configuration web page
 void PilotwireWebPageHeater ()
 {
   uint8_t target_mode;
   float   actual_temperature;
   char    argument[PILOTWIRE_BUFFER_SIZE];
-  String  str_temperature, str_unit, str_pullup;
+  String  str_temperature, str_temp_target, str_temp_step, str_drift_step, str_unit, str_pullup;
 
   // if access not allowed, close
   if (!HttpCheckPriviledgedAccess()) return;
 
   // get temperature and target mode
-  target_mode = PilotwireGetMode ();
   actual_temperature = PilotwireGetTemperature ();
-  str_unit = String (TempUnit ());
+  target_mode = PilotwireGetMode ();
+  str_unit       = String (TempUnit ());
+  str_temp_step  = String (PILOTWIRE_TEMP_STEP, 1);
+  str_drift_step = String (PILOTWIRE_DRIFT_STEP, 1);
 
   // page comes from save button on configuration page
   if (WebServer->hasArg("save"))
@@ -873,7 +914,11 @@ void PilotwireWebPageHeater ()
 
     // get target temperature according to 'target' parameter
     WebGetArg (D_CMND_PILOTWIRE_TARGET, argument, PILOTWIRE_BUFFER_SIZE);
-    if (strlen(argument) > 0) PilotwireSetThermostat (atof (argument));
+    if (strlen(argument) > 0) PilotwireSetTargetTemperature (atof (argument));
+
+    // get night dropdown temperature according to 'night' parameter
+    WebGetArg (D_CMND_PILOTWIRE_NIGHT, argument, PILOTWIRE_BUFFER_SIZE);
+    if (strlen(argument) > 0) PilotwireSetNightDropdown (atof (argument));
 
     // get temperature drift according to 'drift' parameter
     WebGetArg (D_CMND_PILOTWIRE_DRIFT, argument, PILOTWIRE_BUFFER_SIZE);
@@ -886,11 +931,11 @@ void PilotwireWebPageHeater ()
   }
 
   // beginning of form
-  WSContentStart_P (D_PILOTWIRE_CONF_HEATER);
+  WSContentStart_P (D_PILOTWIRE_CONFIGURE);
   WSContentSendStyle ();
   WSContentSend_P (PSTR("<form method='get' action='%s'>\n"), D_PAGE_PILOTWIRE_HEATER);
 
-  // mode section  
+  // operation mode 
   // --------------
   WSContentSend_P (PSTR("<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n"), D_PILOTWIRE_MODE);
 
@@ -898,25 +943,46 @@ void PilotwireWebPageHeater ()
   PilotwireWebSelectMode ();
 
   // if temperature is available
-  if (!isnan (actual_temperature)) 
+  if (isnan (actual_temperature) == false) 
   {
-    // temperature minimum label and input
-    str_temperature = String (PilotwireGetMinTemperature ());
-    WSContentSend_P (PSTR ("<p>%s (°%s)<span %s>%s</span><br><input type='number' name='%s' min='%s' max='%s' step='%s' value='%s'></p>\n"), D_PILOTWIRE_MIN, str_unit.c_str (), PILOTWIRE_TOPIC_STYLE, D_CMND_PILOTWIRE_MIN, D_CMND_PILOTWIRE_MIN, D_WEB_PILOTWIRE_TEMP_MIN, D_WEB_PILOTWIRE_TEMP_MAX, D_WEB_PILOTWIRE_TEMP_STEP, str_temperature.c_str());
+    // target temperature
+    str_temperature = String (PilotwireGetTargetTemperature ());
+    WSContentSend_P (PSTR ("<p>%s (°%s)<span %s>%s</span><br><input type='number' name='%s' min='%d' max='%d' step='%s' value='%s'></p>\n"), D_PILOTWIRE_TARGET, str_unit.c_str (), PILOTWIRE_TOPIC_STYLE, D_CMND_PILOTWIRE_TARGET, D_CMND_PILOTWIRE_TARGET, PILOTWIRE_TEMP_MIN, PILOTWIRE_TEMP_MAX, str_temp_step.c_str(), str_temperature.c_str());
 
-    // temperature maximum label and input
-    str_temperature = String (PilotwireGetMaxTemperature ());
-    WSContentSend_P (PSTR ("<p>%s (°%s)<span %s>%s</span><br><input type='number' name='%s' min='%s' max='%s' step='%s' value='%s'></p>\n"), D_PILOTWIRE_MAX, str_unit.c_str (), PILOTWIRE_TOPIC_STYLE, D_CMND_PILOTWIRE_MAX, D_CMND_PILOTWIRE_MAX, D_WEB_PILOTWIRE_TEMP_MIN, D_WEB_PILOTWIRE_TEMP_MAX, D_WEB_PILOTWIRE_TEMP_STEP, str_temperature.c_str());
+    // night temperature dropdown
+    str_temperature = String (PilotwireGetNightDropdown ());
+    WSContentSend_P (PSTR ("<p>%s (°%s)<span %s>%s</span><br><input type='number' name='%s' min='%d' max='%d' step='%s' value='%s'></p>\n"), D_PILOTWIRE_NIGHT, str_unit.c_str (), PILOTWIRE_TOPIC_STYLE, D_CMND_PILOTWIRE_NIGHT, D_CMND_PILOTWIRE_NIGHT, 0, PILOTWIRE_SHIFT_MAX, str_temp_step.c_str(), str_temperature.c_str());
 
     // temperature correction label and input
     str_temperature = String (PilotwireGetDrift ());
-    WSContentSend_P (PSTR ("<p>%s (°%s)<span %s>%s</span><br><input type='number' name='%s' min='%s' max='%s' step='%s' value='%s'></p>\n"), D_PILOTWIRE_DRIFT, str_unit.c_str (), PILOTWIRE_TOPIC_STYLE, D_CMND_PILOTWIRE_DRIFT, D_CMND_PILOTWIRE_DRIFT, D_WEB_PILOTWIRE_DRIFT_MIN, D_WEB_PILOTWIRE_DRIFT_MAX, D_WEB_PILOTWIRE_DRIFT_STEP, str_temperature.c_str());
+    WSContentSend_P (PSTR ("<p>%s (°%s)<span %s>%s</span><br><input type='number' name='%s' min='%d' max='%d' step='%s' value='%s'></p>\n"), D_PILOTWIRE_DRIFT, str_unit.c_str (), PILOTWIRE_TOPIC_STYLE, D_CMND_PILOTWIRE_DRIFT, D_CMND_PILOTWIRE_DRIFT, PILOTWIRE_SHIFT_MIN, PILOTWIRE_SHIFT_MAX, str_drift_step.c_str(), str_temperature.c_str());
   }
+  else WSContentSend_P (PSTR ("<p><i>%s</i></p>\n"), D_PILOTWIRE_NOSENSOR);
 
   WSContentSend_P (PSTR("</fieldset></p>\n"));
 
-  // local ds18b20 sensor section  
+  // control settings  
+  // --------------------
+
+  // if temperature is available
+  if (isnan (actual_temperature) == false) 
+  {
+    WSContentSend_P (PSTR("<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n"), D_PILOTWIRE_SETTING);
+
+    // temperature minimum label and input
+    str_temperature = String (PilotwireGetMinTemperature ());
+    WSContentSend_P (PSTR ("<p>%s (°%s)<span %s>%s</span><br><input type='number' name='%s' min='%d' max='%d' step='%s' value='%s'></p>\n"), D_PILOTWIRE_MIN, str_unit.c_str (), PILOTWIRE_TOPIC_STYLE, D_CMND_PILOTWIRE_MIN, D_CMND_PILOTWIRE_MIN, PILOTWIRE_TEMP_MIN, PILOTWIRE_TEMP_MAX, str_temp_step.c_str(), str_temperature.c_str());
+
+    // temperature maximum label and input
+    str_temperature = String (PilotwireGetMaxTemperature ());
+    WSContentSend_P (PSTR ("<p>%s (°%s)<span %s>%s</span><br><input type='number' name='%s' min='%d' max='%d' step='%s' value='%s'></p>\n"), D_PILOTWIRE_MAX, str_unit.c_str (), PILOTWIRE_TOPIC_STYLE, D_CMND_PILOTWIRE_MAX, D_CMND_PILOTWIRE_MAX, PILOTWIRE_TEMP_MIN, PILOTWIRE_TEMP_MAX, str_temp_step.c_str(), str_temperature.c_str());
+
+    WSContentSend_P (PSTR("</fieldset></p>\n"));
+  }
+
+  // ds18b20 sensor  
   // --------------
+
   WSContentSend_P (PSTR("<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n"), D_PILOTWIRE_DS18B20);
 
   // pullup option for ds18b20 sensor
@@ -1080,7 +1146,7 @@ void PilotwireWebPageControl ()
   uint8_t actual_mode, actual_state;
   char    argument[PILOTWIRE_BUFFER_SIZE];
   float   temp_current, temp_target, temp_min, temp_max, temp_scope;
-  String  str_temp_current, str_temp_target, str_temp_min, str_temp_max, str_temp_scope, str_text;
+  String  str_temp_current, str_temp_target, str_temp_min, str_temp_max, str_temp_step, str_temp_scope, str_text;
 
   // if langage is changed
   if (WebServer->hasArg(D_CMND_PILOTWIRE_LANG))
@@ -1103,7 +1169,7 @@ void PilotwireWebPageControl ()
   {
     // get target temperature according to 'target' parameter
     WebGetArg (D_CMND_PILOTWIRE_TARGET, argument, PILOTWIRE_BUFFER_SIZE);
-    if (strlen(argument) > 0) PilotwireSetThermostat (atof (argument));
+    if (strlen(argument) > 0) PilotwireSetTargetTemperature (atof (argument));
   }
 
   // update heater status
@@ -1126,9 +1192,10 @@ void PilotwireWebPageControl ()
   str_temp_min     = String (temp_min, 1);
   str_temp_max     = String (temp_max, 1);
   str_temp_scope   = String (temp_scope, 1);
+  str_temp_step    = String (PILOTWIRE_TEMP_STEP, 1);
 
   // beginning of form without authentification with 60 seconds auto refresh
-  WSContentStart_P (D_PILOTWIRE_PARAM_CONTROL, false);
+  WSContentStart_P (D_PILOTWIRE_CONTROL, false);
   WSContentSend_P (PSTR ("</script>\n"));
   WSContentSend_P (PSTR ("<meta http-equiv='refresh' content='%d;URL=/%s' />\n"), PILOTWIRE_GRAPH_REFRESH, D_PAGE_PILOTWIRE_CONTROL);
   
@@ -1222,7 +1289,7 @@ void PilotwireWebPageControl ()
     WSContentSend_P (PSTR ("<fieldset><legend>&nbsp;%s&nbsp;</legend>\n"), arrControlTemp[pilotwire_langage]);
 
     // temperature selection slider
-    WSContentSend_P (PSTR ("<input id='slider' name='target' type='range' class='slider' min='%s' max='%s' value='%s' step='%s' />\n"), str_temp_min.c_str(), str_temp_max.c_str(), str_temp_target.c_str(), D_WEB_PILOTWIRE_TEMP_STEP);
+    WSContentSend_P (PSTR ("<input id='slider' name='target' type='range' class='slider' min='%s' max='%s' value='%s' step='%s' />\n"), str_temp_min.c_str(), str_temp_max.c_str(), str_temp_target.c_str(), str_temp_step.c_str());
 
     // button to set target temperature
     WSContentSend_P (PSTR ("<button id='button' name='temp' type='submit' class='button btn-read'>%s°C</button>\n"), str_temp_target.c_str());

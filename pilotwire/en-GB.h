@@ -395,31 +395,35 @@
 
 // xsns_98_pilotwire.ino
 #define D_PILOTWIRE                "Pilotwire"
+#define D_PILOTWIRE_HEATER         "Heater"
 #define D_PILOTWIRE_STATE          "State"
 
-#define D_PILOTWIRE_CONF_HEATER    "Configure Pilotwire"
-#define D_PILOTWIRE_PARAM_HEATER   "Heater Parameters"
-#define D_PILOTWIRE_PARAM_CONTROL  "Heater Control"
+#define D_PILOTWIRE_CONFIGURE      "Configure Pilotwire"
 
+#define D_PILOTWIRE_MODE           "Mode"
 #define D_PILOTWIRE_DISABLED       "Disabled"
 #define D_PILOTWIRE_OFF            "Off"
 #define D_PILOTWIRE_COMFORT        "Comfort"
 #define D_PILOTWIRE_ECO            "Economy"
 #define D_PILOTWIRE_FROST          "No Frost"
 #define D_PILOTWIRE_THERMOSTAT     "Thermostat"
+#define D_PILOTWIRE_TARGET         "Target temperature"
+#define D_PILOTWIRE_NORMAL         "Normal"
+#define D_PILOTWIRE_NIGHT          "Night"
+#define D_PILOTWIRE_DRIFT          "Sensor correction"
+
+#define D_PILOTWIRE_SETTING        "Public settings"
+#define D_PILOTWIRE_MIN            "Minimum"
+#define D_PILOTWIRE_MAX            "Maximum"
+#define D_PILOTWIRE_NOSENSOR       "No temperature sensor available"
 
 #define D_PILOTWIRE_CONTROL        "Control"
 #define D_PILOTWIRE_TEMPERATURE    "Temperature"
-#define D_PILOTWIRE_MODE           "Operation mode"
 #define D_PILOTWIRE_LOCAL          "Local"
 #define D_PILOTWIRE_REMOTE         "Remote"
-#define D_PILOTWIRE_NOSENSOR       "No temperature sensor available"
 
 #define D_PILOTWIRE_DS18B20        "DS18B20 sensor"
 #define D_PILOTWIRE_PULLUP         "Enable internal pullup resistor"
-#define D_PILOTWIRE_DRIFT          "Correction"
-#define D_PILOTWIRE_MIN            "Minimum"
-#define D_PILOTWIRE_MAX            "Maximum"
 
 #define D_PILOTWIRE_TIME           "Local time"
 #define D_PILOTWIRE_ROOM           "Room"
