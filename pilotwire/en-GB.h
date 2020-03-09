@@ -401,6 +401,8 @@
 #define D_PILOTWIRE_CONFIGURE      "Configure Pilotwire"
 
 #define D_PILOTWIRE_MODE           "Mode"
+#define D_PILOTWIRE_NORMAL         "Normal"
+#define D_PILOTWIRE_OUTSIDE        "Outside"
 #define D_PILOTWIRE_DISABLED       "Disabled"
 #define D_PILOTWIRE_OFF            "Off"
 #define D_PILOTWIRE_COMFORT        "Comfort"
@@ -408,8 +410,7 @@
 #define D_PILOTWIRE_FROST          "No Frost"
 #define D_PILOTWIRE_THERMOSTAT     "Thermostat"
 #define D_PILOTWIRE_TARGET         "Target temperature"
-#define D_PILOTWIRE_NORMAL         "Normal"
-#define D_PILOTWIRE_NIGHT          "Night"
+#define D_PILOTWIRE_DROPDOWN       "Dropdown"
 #define D_PILOTWIRE_DRIFT          "Sensor correction"
 
 #define D_PILOTWIRE_SETTING        "Public settings"
