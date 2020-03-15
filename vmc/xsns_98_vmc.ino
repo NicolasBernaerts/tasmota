@@ -6,6 +6,7 @@
     15/03/2019 - v1.0 - Creation
     01/03/2020 - v2.0 - Functions rewrite for Tasmota 8.x compatibility
     07/03/2020 - v2.1 - Add daily humidity / temperature graph
+    13/03/2020 - v2.2 - Add time on graph
 
   Settings are stored using weighting scale parameters :
     - Settings.weight_reference   = VMC mode
@@ -51,23 +52,23 @@
 #define D_JSON_VMC_THRESHOLD    "Threshold"
 #define D_JSON_VMC_RELAY        "Relay"
 
-#define VMC_GRAPH_REFRESH          300         // refresh page and collect temperature every 5mn (in seconds)
-#define VMC_GRAPH_SAMPLE           288         // 24 hours if every 5mn
-#define VMC_GRAPH_WIDTH            800      
-#define VMC_GRAPH_HEIGHT           400 
-#define VMC_GRAPH_PERCENT_START    12      
-#define VMC_GRAPH_PERCENT_STOP     88      
-#define VMC_GRAPH_TEMPERATURE_MIN  15      
-#define VMC_GRAPH_TEMPERATURE_MAX  25  
-#define VMC_GRAPH_HUMIDITY_MIN     0      
-#define VMC_GRAPH_HUMIDITY_MAX     100  
+#define VMC_GRAPH_STEP          5           // every 5 mn
+#define VMC_GRAPH_SAMPLE        288         // 24 hours if every 5mn
+#define VMC_GRAPH_WIDTH         800      
+#define VMC_GRAPH_HEIGHT        400 
+#define VMC_GRAPH_PERCENT_START 12      
+#define VMC_GRAPH_PERCENT_STOP  88      
+#define VMC_GRAPH_TEMP_MIN      15      
+#define VMC_GRAPH_TEMP_MAX      25  
+#define VMC_GRAPH_HUMIDITY_MIN  0      
+#define VMC_GRAPH_HUMIDITY_MAX  100  
 
-#define VMC_TARGET_MAX             99
-#define VMC_TARGET_DEFAULT         50
-#define VMC_THRESHOLD_MAX          10
-#define VMC_THRESHOLD_DEFAULT      2
+#define VMC_TARGET_MAX          99
+#define VMC_TARGET_DEFAULT      50
+#define VMC_THRESHOLD_MAX       10
+#define VMC_THRESHOLD_DEFAULT   2
 
-#define VMC_BUFFER_SIZE            128
+#define VMC_BUFFER_SIZE         128
 
 // VMC modes
 enum VmcModes { VMC_DISABLED, VMC_LOW, VMC_HIGH, VMC_AUTO };
@@ -81,6 +82,7 @@ const char kVmcCommands[] PROGMEM = D_CMND_VMC_MODE "|" D_CMND_VMC_TARGET "|" D_
 \*************************************************/
 
 // variables
+int      vmc_graph_refresh;
 uint32_t vmc_graph_index;
 uint32_t vmc_graph_counter;
 float    vmc_current_temperature;
@@ -393,7 +395,7 @@ void VmcEverySecond ()
 
   // increment delay counter and if delay reached, update history data
   vmc_graph_counter ++;
-  vmc_graph_counter = vmc_graph_counter % VMC_GRAPH_REFRESH;
+  vmc_graph_counter = vmc_graph_counter % vmc_graph_refresh;
   if (vmc_graph_counter == 0) VmcUpdateHistory ();
 
   // if VMC mode is not disabled
@@ -443,6 +445,7 @@ void VmcInit ()
   vmc_current_state       = VMC_LOW;
   vmc_graph_index         = 0;
   vmc_graph_counter       = 0;
+  vmc_graph_refresh       = 60 * VMC_GRAPH_STEP;
 
   // initialise graph data
   for (index = 0; index < VMC_GRAPH_SAMPLE; index++)
@@ -630,16 +633,19 @@ void VmcWebPageConfig ()
 // Humidity and temperature graph
 void VmcWebDisplayGraph ()
 {
+  TIME_T   current_dst;
+  uint32_t current_time;
   int     index, array_idx;
   int     graph_x, graph_y, graph_x1, graph_x2, graph_left, graph_right;
   uint8_t target, state_curr, state_prev;
   float   graph_width, graph_pos;
   float   humidity, temperature, temp_min, temp_max, temp_scope;
+  char    str_hour[4];
   String  str_unit;
 
   // loop to adjust min and max temperature
-  temp_min   = VMC_GRAPH_TEMPERATURE_MIN;
-  temp_max   = VMC_GRAPH_TEMPERATURE_MAX;
+  temp_min   = VMC_GRAPH_TEMP_MIN;
+  temp_max   = VMC_GRAPH_TEMP_MAX;
   for (index = 0; index < VMC_GRAPH_SAMPLE; index++)
   {
     // if needed, adjust minimum and maximum temperature
@@ -687,6 +693,10 @@ void VmcWebDisplayGraph ()
   WSContentSend_P (PSTR ("<text class='humidity' x='%d%%' y='%d%%'>%d %%</text>\n"), VMC_GRAPH_PERCENT_STOP + 2, 77, 25);
   WSContentSend_P (PSTR ("<text class='humidity' x='%d%%' y='%d%%'>%d %%</text>\n"), VMC_GRAPH_PERCENT_STOP + 2, 99, 0);
 
+  // ---------------
+  //   Relay state
+  // ---------------
+
   // loop for the relay state as background red color
   state_prev = VMC_LOW;
   graph_x1 = 0;
@@ -710,7 +720,7 @@ void VmcWebDisplayGraph ()
     if ((graph_x1 != 0) && (graph_x2 != 0))
     {
       // display graph
-      WSContentSend_P (PSTR ("<rect class='relay' x='%d' y='98%%' width='%d' height='2%%' />\n"), graph_x1, graph_x2 - graph_x1);
+      WSContentSend_P (PSTR ("<rect class='relay' x='%d' y='98%%' width='%d' height='3%%' />\n"), graph_x1, graph_x2 - graph_x1);
 
       // reset records
       graph_x1 = 0;
@@ -720,6 +730,10 @@ void VmcWebDisplayGraph ()
     // update previous state
     state_prev = state_curr;
   }
+
+  // --------------------
+  //   Target Humidity
+  // --------------------
 
   // loop for the target humidity graph
   WSContentSend_P (PSTR ("<polyline class='target' points='"));
@@ -744,6 +758,10 @@ void VmcWebDisplayGraph ()
   }
   WSContentSend_P (PSTR("'/>\n"));
 
+  // ----------------
+  //   Temperature
+  // ----------------
+
   // loop for the temperature graph
   WSContentSend_P (PSTR ("<polyline class='temperature' points='"));
   for (index = 0; index < VMC_GRAPH_SAMPLE; index++)
@@ -762,6 +780,10 @@ void VmcWebDisplayGraph ()
     }
   }
   WSContentSend_P (PSTR("'/>\n"));
+
+  // ---------------
+  //    Humidity
+  // ---------------
 
   // loop for the humidity graph
   WSContentSend_P (PSTR ("<polyline class='humidity' points='"));
@@ -785,6 +807,38 @@ void VmcWebDisplayGraph ()
   }
   WSContentSend_P (PSTR("'/>\n"));
 
+  // ------------
+  //     Time
+  // ------------
+
+  // get current time
+  current_time = LocalTime();
+  BreakTime (current_time, current_dst);
+
+  // dislay first time mark
+  if (current_dst.minute <= 20)
+  {
+    current_dst.hour = (current_dst.hour + 1) % 24;
+    graph_x  = graph_left;
+    graph_x += (8 + (20 - current_dst.minute) % VMC_GRAPH_STEP) * int (graph_width) / VMC_GRAPH_SAMPLE;
+  }
+  else
+  {
+    current_dst.hour = (current_dst.hour + 2) % 24;
+    graph_x  = graph_left; 
+    graph_x += (8 + (80 - current_dst.minute) % VMC_GRAPH_STEP) * int (graph_width) / VMC_GRAPH_SAMPLE;
+  }
+  sprintf(str_hour, "%02d", current_dst.hour);
+  WSContentSend_P (PSTR ("<text class='time' x='%d' y='52%%'>%sh</text>\n"), graph_x, str_hour);
+
+  // dislay next 5 time marks (every 4 hours)
+  for (index = 0; index < 5; index++)
+  {
+    current_dst.hour = (current_dst.hour + 4) % 24;
+    graph_x += 48 * int (graph_width) / VMC_GRAPH_SAMPLE;
+    sprintf(str_hour, "%02d", current_dst.hour);
+    WSContentSend_P (PSTR ("<text class='time' x='%d' y='52%%'>%sh</text>\n"), graph_x, str_hour);
+  }
   // end of SVG graph
   WSContentSend_P (PSTR ("</svg>\n"));
 }
@@ -809,6 +863,7 @@ void VmcWebPageControl ()
   WSContentSend_P (PSTR (".title {font-size:5vh;}\n"));
   WSContentSend_P (PSTR (".temperature {font-size:24px;}\n"));
   WSContentSend_P (PSTR (".humidity {font-size:24px;}\n"));
+  WSContentSend_P (PSTR (".time {font-size:20px;}\n"));
   WSContentSend_P (PSTR (".bold {font-weight:bold;}\n"));
 
   WSContentSend_P (PSTR (".graph {max-width:%dpx;}\n"), VMC_GRAPH_WIDTH);
@@ -823,6 +878,7 @@ void VmcWebPageControl ()
   WSContentSend_P (PSTR ("line.dash {stroke:grey;stroke-width:1;stroke-dasharray:8;}\n"));
   WSContentSend_P (PSTR ("text.temperature {stroke:yellow;fill:yellow;}\n"));
   WSContentSend_P (PSTR ("text.humidity {stroke:orange;fill:orange;}\n"));
+  WSContentSend_P (PSTR ("text.time {stroke:white;fill:white;}\n"));
 
   WSContentSend_P (PSTR ("</style>\n</head>\n"));
 
