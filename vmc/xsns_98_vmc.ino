@@ -52,12 +52,12 @@
 #define D_JSON_VMC_THRESHOLD    "Threshold"
 #define D_JSON_VMC_RELAY        "Relay"
 
-#define VMC_GRAPH_STEP          5           // every 5 mn
-#define VMC_GRAPH_SAMPLE        288         // 24 hours if every 5mn
+#define VMC_GRAPH_STEP          5           // collect graph data every 5 mn
+#define VMC_GRAPH_SAMPLE        288         // 24 hours if data is collected every 5mn
 #define VMC_GRAPH_WIDTH         800      
 #define VMC_GRAPH_HEIGHT        400 
 #define VMC_GRAPH_PERCENT_START 12      
-#define VMC_GRAPH_PERCENT_STOP  88      
+#define VMC_GRAPH_PERCENT_STOP  88
 #define VMC_GRAPH_TEMP_MIN      15      
 #define VMC_GRAPH_TEMP_MAX      25  
 #define VMC_GRAPH_HUMIDITY_MIN  0      
@@ -394,9 +394,9 @@ void VmcEverySecond ()
   if (vmc_current_state != VMC_HIGH) vmc_current_state = actual_state;
 
   // increment delay counter and if delay reached, update history data
+  if (vmc_graph_counter == 0) VmcUpdateHistory ();
   vmc_graph_counter ++;
   vmc_graph_counter = vmc_graph_counter % vmc_graph_refresh;
-  if (vmc_graph_counter == 0) VmcUpdateHistory ();
 
   // if VMC mode is not disabled
   mode = VmcGetMode ();
@@ -839,6 +839,7 @@ void VmcWebDisplayGraph ()
     sprintf(str_hour, "%02d", current_dst.hour);
     WSContentSend_P (PSTR ("<text class='time' x='%d' y='52%%'>%sh</text>\n"), graph_x, str_hour);
   }
+
   // end of SVG graph
   WSContentSend_P (PSTR ("</svg>\n"));
 }
