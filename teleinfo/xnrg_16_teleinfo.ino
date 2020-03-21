@@ -9,6 +9,7 @@
     05/07/2019 - v2.0 - Rework with selection thru web interface
     02/01/2020 - v3.0 - Functions rewrite for Tasmota 8.x compatibility
     05/02/2020 - v3.1 - Add support for 3 phases meters
+    14/03/2020 - v3.2 - Add support for 3 phases meters
     
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -50,34 +51,34 @@
 enum TeleinfoOverload { TELEINFO_OVERLOAD_NONE, TELEINFO_OVERLOAD_DETECTED, TELEINFO_OVERLOAD_READY };
 
 // teleinfo status
-bool     teleinfo_configured     = false;
-bool     teleinfo_enabled        = false;
-uint32_t teleinfo_phase          = 1;
-uint32_t teleinfo_framecount     = 0;
-uint8_t  teleinfo_overload       = TELEINFO_OVERLOAD_NONE;
-float    teleinfo_current_total  = 0;
-float    teleinfo_current[3]     = { 0, 0, 0 };
-bool     teleinfo_current_set[3] = { false, false, false };
-uint32_t teleinfo_papp_total     = 0;
-bool     teleinfo_papp_set       = false;
+bool    teleinfo_configured     = false;
+bool    teleinfo_enabled        = false;
+long    teleinfo_phase          = 1;
+long    teleinfo_framecount     = 0;
+uint8_t teleinfo_overload       = TELEINFO_OVERLOAD_NONE;
+float   teleinfo_current_total  = 0;
+float   teleinfo_current[3]     = { 0, 0, 0 };
+bool    teleinfo_current_set[3] = { false, false, false };
+long    teleinfo_papp_total     = 0;
+bool    teleinfo_papp_set       = false;
 
 // teleinfo counters
-uint32_t teleinfo_total      = 0;
-uint32_t teleinfo_base       = 0;
-uint32_t teleinfo_hchc       = 0;
-uint32_t teleinfo_hchp       = 0;
-uint32_t teleinfo_bbrhcjb    = 0;
-uint32_t teleinfo_bbrhpjb    = 0;
-uint32_t teleinfo_bbrhcjw    = 0;
-uint32_t teleinfo_bbrhpjw    = 0;
-uint32_t teleinfo_bbrhcjr    = 0;
-uint32_t teleinfo_bbrhpjr    = 0;
-uint32_t teleinfo_ejphn      = 0;
-uint32_t teleinfo_ejphpm     = 0;
+long teleinfo_total   = 0;
+long teleinfo_base    = 0;
+long teleinfo_hchc    = 0;
+long teleinfo_hchp    = 0;
+long teleinfo_bbrhcjb = 0;
+long teleinfo_bbrhpjb = 0;
+long teleinfo_bbrhcjw = 0;
+long teleinfo_bbrhpjw = 0;
+long teleinfo_bbrhcjr = 0;
+long teleinfo_bbrhpjr = 0;
+long teleinfo_ejphn   = 0;
+long teleinfo_ejphpm  = 0;
 
 // other variables
 TasmotaSerial *teleinfo_serial = NULL;
-String str_teleinfo_json, str_teleinfo_buffer, str_teleinfo_line;
+String str_teleinfo_json, str_teleinfo_buffer, str_teleinfo_line, str_teleinfo_contract;
 
 /*******************************************\
  *               Accessor
@@ -138,22 +139,22 @@ float TeleinfoConvertToFloat (String strValue, float defaultValue)
 }
 
 // convert teleinfo value to uint if valid, otherwise use default value
-uint32_t TeleinfoConvertToUint32 (String strValue, uint32_t defaultValue)
+long TeleinfoConvertToLong (String strValue, long defaultValue)
 {
-  bool  isValue = true;
-  int   index, length;
-  char  cValue[8];
-  uint32_t newValue;
+  bool isValue = true;
+  int  index, length;
+  char cValue[16];
+  long newValue;
 
   // split string to char array
-  strValue.toCharArray (cValue, 8);
-  length = min (8, (int)strValue.length ());
+  strValue.toCharArray (cValue, 16);
+  length = min (16, int (strValue.length ()));
 
   // loop to check if there is no junk
   for (index = 0; index < length; index ++) if (isDigit(cValue[index]) == false) isValue = false;
 
   // if provided value is numeric, convert it, else use provided default value
-  if (isValue == true) newValue = (uint32_t) strValue.toInt (); 
+  if (isValue == true) newValue = strValue.toInt (); 
   else newValue = defaultValue;
 
   return newValue;
@@ -165,7 +166,7 @@ void TeleinfoEvery200ms ()
   uint32_t teleinfo_delta, teleinfo_newtotal;
   float    current_total;
   ulong    time_start, time_now;
-  String   str_etiquette, str_donnee, str_contract, str_power;
+  String   str_etiquette, str_donnee, str_power;
 
   // init timers
   time_start = millis ();
@@ -294,11 +295,7 @@ void TeleinfoEvery200ms ()
         if (str_donnee.length () > 0)
         {
           // contract number
-          if (str_etiquette.compareTo ("ADCO") == 0)
-          {
-            str_contract = SettingsText(SET_FRIENDLYNAME1);
-            if (str_contract != str_donnee) SettingsUpdateText(SET_FRIENDLYNAME1, str_donnee.c_str ());
-           }
+          if (str_etiquette.compareTo ("ADCO") == 0) str_teleinfo_contract = str_donnee;
 
           // instant current and active power
           else if ((str_etiquette.compareTo ("IINST") == 0) || (str_etiquette.compareTo ("IINST1") == 0))
@@ -351,23 +348,23 @@ void TeleinfoEvery200ms ()
           else if (str_etiquette.compareTo ("ADIR3") == 0) teleinfo_overload  = TELEINFO_OVERLOAD_DETECTED;
 
           // Contract Base
-          else if (str_etiquette.compareTo ("BASE") == 0) teleinfo_base = TeleinfoConvertToUint32 (str_donnee, teleinfo_base);
+          else if (str_etiquette.compareTo ("BASE") == 0) teleinfo_base = TeleinfoConvertToLong (str_donnee, teleinfo_base);
 
           // Contract Heures Creuses
-          else if (str_etiquette.compareTo ("HCHC") == 0) teleinfo_hchc = TeleinfoConvertToUint32 (str_donnee, teleinfo_hchc);
-          else if (str_etiquette.compareTo ("HCHP") == 0) teleinfo_hchp = TeleinfoConvertToUint32 (str_donnee, teleinfo_hchp);
+          else if (str_etiquette.compareTo ("HCHC") == 0) teleinfo_hchc = TeleinfoConvertToLong (str_donnee, teleinfo_hchc);
+          else if (str_etiquette.compareTo ("HCHP") == 0) teleinfo_hchp = TeleinfoConvertToLong (str_donnee, teleinfo_hchp);
 
           // Contract Tempo
-          else if (str_etiquette.compareTo ("BBRHCJB") == 0) teleinfo_bbrhcjb = TeleinfoConvertToUint32 (str_donnee, teleinfo_bbrhcjb);
-          else if (str_etiquette.compareTo ("BBRHPJB") == 0) teleinfo_bbrhpjb = TeleinfoConvertToUint32 (str_donnee, teleinfo_bbrhpjb);
-          else if (str_etiquette.compareTo ("BBRHCJW") == 0) teleinfo_bbrhcjw = TeleinfoConvertToUint32 (str_donnee, teleinfo_bbrhcjw);
-          else if (str_etiquette.compareTo ("BBRHPJW") == 0) teleinfo_bbrhpjw = TeleinfoConvertToUint32 (str_donnee, teleinfo_bbrhpjw);
-          else if (str_etiquette.compareTo ("BBRHCJR") == 0) teleinfo_bbrhcjr = TeleinfoConvertToUint32 (str_donnee, teleinfo_bbrhcjr);
-          else if (str_etiquette.compareTo ("BBRHPJR") == 0) teleinfo_bbrhpjr = TeleinfoConvertToUint32 (str_donnee, teleinfo_bbrhpjr);
+          else if (str_etiquette.compareTo ("BBRHCJB") == 0) teleinfo_bbrhcjb = TeleinfoConvertToLong (str_donnee, teleinfo_bbrhcjb);
+          else if (str_etiquette.compareTo ("BBRHPJB") == 0) teleinfo_bbrhpjb = TeleinfoConvertToLong (str_donnee, teleinfo_bbrhpjb);
+          else if (str_etiquette.compareTo ("BBRHCJW") == 0) teleinfo_bbrhcjw = TeleinfoConvertToLong (str_donnee, teleinfo_bbrhcjw);
+          else if (str_etiquette.compareTo ("BBRHPJW") == 0) teleinfo_bbrhpjw = TeleinfoConvertToLong (str_donnee, teleinfo_bbrhpjw);
+          else if (str_etiquette.compareTo ("BBRHCJR") == 0) teleinfo_bbrhcjr = TeleinfoConvertToLong (str_donnee, teleinfo_bbrhcjr);
+          else if (str_etiquette.compareTo ("BBRHPJR") == 0) teleinfo_bbrhpjr = TeleinfoConvertToLong (str_donnee, teleinfo_bbrhpjr);
 
           // Contract EJP
-          else if (str_etiquette.compareTo ("EJPHN")  == 0) teleinfo_ejphn  = TeleinfoConvertToUint32 (str_donnee, teleinfo_ejphn);
-          else if (str_etiquette.compareTo ("EJPHPM") == 0) teleinfo_ejphpm = TeleinfoConvertToUint32 (str_donnee, teleinfo_ejphpm);
+          else if (str_etiquette.compareTo ("EJPHN")  == 0) teleinfo_ejphn  = TeleinfoConvertToLong (str_donnee, teleinfo_ejphn);
+          else if (str_etiquette.compareTo ("EJPHPM") == 0) teleinfo_ejphpm = TeleinfoConvertToLong (str_donnee, teleinfo_ejphpm);
 
           // add current data to JSON message
           if (str_teleinfo_buffer.length () > 0) str_teleinfo_buffer += ",";

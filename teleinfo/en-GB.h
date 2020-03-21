@@ -512,6 +512,8 @@
 //xsns_98_teleinfo.ino
 #define D_TELEINFO_MODE       "Teleinfo counter"
 #define D_TELEINFO_CONFIG     "Configure Teleinfo"
+#define D_TELEINFO_CONTROL    "Control"
+#define D_TELEINFO_CONTRACT   "Contract n°"
 #define D_TELEINFO_DISABLED   "Disabled"
 #define D_TELEINFO_1200       "TIC Historique (1200 bauds)"
 #define D_TELEINFO_9600       "TIC Standard (9600 bauds)"
