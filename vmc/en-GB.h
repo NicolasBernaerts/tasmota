@@ -509,10 +509,20 @@
 #define D_TX20_SOUTH "S"
 #define D_TX20_WEST "W"
 
+// xdrv_97_humidity.ino
+#define D_HUMIDITY_CONFIGURE     "Remote Humidity Sensor"
+#define D_HUMIDITY_REMOTE        "Humidity remote sensor"
+#define D_HUMIDITY_TOPIC         "MQTT Topic"
+#define D_HUMIDITY_KEY           "MQTT JSON Key"
+
 // xsns_98_vmc.ino
 #define D_VMC_MODE        "VMC Mode"
 #define D_VMC_STATE       "VMC State"
 #define D_VMC_CONTROL     "Control"
+#define D_VMC_LOCAL       "Local"
+#define D_VMC_REMOTE      "Remote"
+#define D_VMC_HUMIDITY    "Humidity"
+#define D_VMC_SENSOR      "Sensor"
 #define D_VMC_DISABLED    "Disabled"
 #define D_VMC_LOW         "Low speed"
 #define D_VMC_HIGH        "High speed"

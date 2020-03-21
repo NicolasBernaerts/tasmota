@@ -583,6 +583,7 @@
  * VMC control firmware configuration
 \*********************************************************************************************/
 
+#define USE_HUMIDITY_MQTT                     // Add support for MQTT humidity sensor
 #define USE_VMC                               // Add support for Ventilation Motor Controled according to humidity level (+??k code)
 
 #undef APP_SLEEP
@@ -657,6 +658,11 @@
 #undef USE_RF_SENSOR                          // Disable support for RF sensor receiver (434MHz or 868MHz) (+0k8 code)
 #undef DEBUG_THEO                             // Disable debug code
 #undef USE_DEBUG_DRIVER                       // Disable debug code
+
+// add support to MQTT events subscription
+#ifndef SUPPORT_MQTT_EVENT
+#define SUPPORT_MQTT_EVENT
+#endif
 
 /*********************************************************************************************\
  * No user configurable items below
