@@ -608,7 +608,7 @@
 //#undef USE_SUNRISE                          // Disable support for Sunrise and sunset tools
 //#undef USE_RULES                            // Disable support for rules
 #undef USE_I2C                                // Disable all I2C sensors and devices
-#undef USE_DHT                                // Disable internal DHT sensor
+//#undef USE_DHT                                // Disable internal DHT sensor
 //#undef USE_DS18x20                            // Disable DS18x20 sensor
 #undef USE_SPI                                // Disable all SPI devices
 #undef USE_BH1750                             // Enable BH1750 sensor

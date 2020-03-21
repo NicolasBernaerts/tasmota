@@ -449,10 +449,19 @@ float PilotwireGetTemperature ()
   uint8_t index;
   float   temperature = NAN;
 
-  // read temperature from sensor
+  // read temperature from local sensor
   pilotwire_temperature_source = PILOTWIRE_SOURCE_LOCAL;
+
+#ifdef USE_DS18x20
+  // read from DS18B20 sensor
   index = ds18x20_sensor[0].index;
   if (ds18x20_sensor[index].valid) temperature = ds18x20_sensor[index].temperature;
+#endif // USE_DS18x20
+
+#ifdef USE_DHT
+  // read from DHT sensor
+  if (isnan (temperature)) temperature = Dht[0].t;
+#endif // USE_DHT
 
   // if not available, read MQTT temperature
   if (isnan (temperature))
@@ -695,6 +704,7 @@ void PilotwireInit ()
   String str_setting;
 
   // init default values
+  pilotwire_temperature_source  = PILOTWIRE_SOURCE_NONE;
   pilotwire_outside_mode        = false;
   pilotwire_current_temperature = NAN;
   pilotwire_current_target      = NAN;
@@ -702,7 +712,6 @@ void PilotwireInit ()
   pilotwire_graph_index         = 0;
   pilotwire_graph_counter       = 0;
   pilotwire_langage             = PILOTWIRE_LANGAGE_ENGLISH;
-  pilotwire_temperature_source  = PILOTWIRE_SOURCE_NONE;
   pilotwire_graph_refresh       = 60 * PILOTWIRE_GRAPH_STEP;
 
   // initialise temperature graph
@@ -834,13 +843,13 @@ bool PilotwireWebSensor ()
 {
   uint8_t actual_mode, actual_state;
   float   temperature;
-  String  str_title, str_text, str_label, str_color, str_target;
+  String  str_title, str_text, str_label, str_color;
 
   // get current mode and temperature
   actual_mode = PilotwireGetMode ();
   temperature = PilotwireGetTemperature ();
 
-  // handle command
+  // handle sensor source
   switch (pilotwire_temperature_source)
   {
     case PILOTWIRE_SOURCE_NONE:  // no temperature source available 
@@ -858,8 +867,7 @@ bool PilotwireWebSensor ()
   }
 
   // add target temperature and unit
-  str_target = String (PilotwireGetCurrentTarget (), 1);
-  if (actual_mode == PILOTWIRE_THERMOSTAT) str_text += " / " + str_target;
+  if (actual_mode == PILOTWIRE_THERMOSTAT) str_text += " / " + String (PilotwireGetCurrentTarget (), 1);
   str_text += "°" + String (TempUnit ());
 
   // display temperature
@@ -1032,9 +1040,9 @@ void PilotwireWebTemperatureGraph (uint8_t mode)
   int      index, array_index;
   int      graph_left, graph_right, graph_width, graph_x, graph_pos;
   uint8_t  state_current, state_previous;
-  float    temperature, temp_min, temp_max, temp_scope, temp_y;
+  float    temp_min, temp_max, temp_scope, value, graph_y;
   char     str_hour[4];
-  String   str_temperature;
+  String   str_value;
 
   // start of SVG graph
   WSContentSend_P (PSTR ("<svg viewBox='0 0 %d %d'>\n"), PILOTWIRE_GRAPH_WIDTH, PILOTWIRE_GRAPH_HEIGHT);
@@ -1048,11 +1056,11 @@ void PilotwireWebTemperatureGraph (uint8_t mode)
   for (index = 0; index < PILOTWIRE_GRAPH_SAMPLE; index++)
   {
     // if needed, adjust minimum and maximum temperature
-    temperature = arr_temperature[index];
-    if (isnan (temperature) == false)
+    value = arr_temperature[index];
+    if (isnan (value) == false)
     {
-      if (temperature < temp_min) temp_min = floor (temperature);
-      if (temperature > temp_max) temp_max = ceil (temperature);
+      if (temperature < temp_min) temp_min = floor (value);
+      if (temperature > temp_max) temp_max = ceil (value);
     }
   }
   temp_scope = temp_max - temp_min;
@@ -1062,8 +1070,12 @@ void PilotwireWebTemperatureGraph (uint8_t mode)
   graph_right = PILOTWIRE_GRAPH_PERCENT_STOP * PILOTWIRE_GRAPH_WIDTH / 100;
   graph_width = graph_right - graph_left;
 
-  // loop for the relay state as background red color
-  graph_pos  = graph_left;
+  // ----------------------
+  //    Pilotwire state
+  // ----------------------
+
+  // loop for the pilotwire state as background red color
+  graph_pos = graph_left;
   state_previous = PILOTWIRE_OFF;
   for (index = 0; index < PILOTWIRE_GRAPH_SAMPLE; index++)
   {
@@ -1095,17 +1107,21 @@ void PilotwireWebTemperatureGraph (uint8_t mode)
     state_previous = state_current;
   }
 
+  // -----------------
+  //    Graph units
+  // -----------------
+
   // graph temperature text
-  str_temperature = String (temp_max, 1);
-  WSContentSend_P (PSTR ("<text class='temperature' x='%d%%' y='%d%%'>%s°C</text>\n"), 1, 5, str_temperature.c_str ());
-  str_temperature = String (temp_min + (temp_max - temp_min) * 0.75, 1);
-  WSContentSend_P (PSTR ("<text class='temperature' x='%d%%' y='%d%%'>%s°C</text>\n"), 1, 27, str_temperature.c_str ());
-  str_temperature = String (temp_min + (temp_max - temp_min) * 0.5, 1);
-  WSContentSend_P (PSTR ("<text class='temperature' x='%d%%' y='%d%%'>%s°C</text>\n"), 1, 52, str_temperature.c_str ());
-  str_temperature = String (temp_min + (temp_max - temp_min) * 0.25, 1);
-  WSContentSend_P (PSTR ("<text class='temperature' x='%d%%' y='%d%%'>%s°C</text>\n"), 1, 77, str_temperature.c_str ());
-  str_temperature = String (temp_min, 1);
-  WSContentSend_P (PSTR ("<text class='temperature' x='%d%%' y='%d%%'>%s°C</text>\n"), 1, 99, str_temperature.c_str ());
+  str_value = String (temp_max, 1);
+  WSContentSend_P (PSTR ("<text class='temperature' x='%d%%' y='%d%%'>%s°C</text>\n"), 1, 5, str_value.c_str ());
+  str_value = String (temp_min + (temp_max - temp_min) * 0.75, 1);
+  WSContentSend_P (PSTR ("<text class='temperature' x='%d%%' y='%d%%'>%s°C</text>\n"), 1, 27, str_value.c_str ());
+  str_value = String (temp_min + (temp_max - temp_min) * 0.50, 1);
+  WSContentSend_P (PSTR ("<text class='temperature' x='%d%%' y='%d%%'>%s°C</text>\n"), 1, 52, str_value.c_str ());
+  str_value = String (temp_min + (temp_max - temp_min) * 0.25, 1);
+  WSContentSend_P (PSTR ("<text class='temperature' x='%d%%' y='%d%%'>%s°C</text>\n"), 1, 77, str_value.c_str ());
+  str_value = String (temp_min, 1);
+  WSContentSend_P (PSTR ("<text class='temperature' x='%d%%' y='%d%%'>%s°C</text>\n"), 1, 99, str_value.c_str ());
 
   // graph separation lines
   WSContentSend_P (PSTR ("<line class='dash' x1='%d%%' y1='25%%' x2='%d%%' y2='25%%' />\n"), PILOTWIRE_GRAPH_PERCENT_START, PILOTWIRE_GRAPH_PERCENT_STOP);
@@ -1122,15 +1138,15 @@ void PilotwireWebTemperatureGraph (uint8_t mode)
   {
     // get target temperature value and set to minimum if not defined
     array_index = (index + pilotwire_graph_index) % PILOTWIRE_GRAPH_SAMPLE;
-    temperature = arr_target[array_index];
-    if (isnan (temperature) == true) temperature = temp_min;
+    value = arr_target[array_index];
+    if (isnan (value) == true) value = temp_min;
 
     // calculate end point x and y
     graph_x = graph_left + (graph_width * index / PILOTWIRE_GRAPH_SAMPLE);
-    temp_y  = (1 - ((temperature - temp_min) / temp_scope)) * PILOTWIRE_GRAPH_HEIGHT;
+    graph_y = (1 - ((value - temp_min) / temp_scope)) * PILOTWIRE_GRAPH_HEIGHT;
 
     // add the point to the line
-    WSContentSend_P (PSTR("%d,%d "), graph_x, int (temp_y));
+    WSContentSend_P (PSTR("%d,%d "), graph_x, int (graph_y));
   }
   WSContentSend_P (PSTR("'/>\n"));
 
@@ -1144,15 +1160,15 @@ void PilotwireWebTemperatureGraph (uint8_t mode)
   {
     // if temperature value is defined
     array_index = (index + pilotwire_graph_index) % PILOTWIRE_GRAPH_SAMPLE;
-    temperature = arr_temperature[array_index];
-    if (isnan (temperature) == false)
+    value = arr_temperature[array_index];
+    if (isnan (value) == false)
     {
       // calculate end point x and y
       graph_x = graph_left + (graph_width * index / PILOTWIRE_GRAPH_SAMPLE);
-      temp_y  = (1 - ((temperature - temp_min) / temp_scope)) * PILOTWIRE_GRAPH_HEIGHT;
+      graph_y  = (1 - ((value - temp_min) / temp_scope)) * PILOTWIRE_GRAPH_HEIGHT;
 
       // add the point to the line
-      WSContentSend_P (PSTR("%d,%d "), graph_x, int (temp_y));
+      WSContentSend_P (PSTR("%d,%d "), graph_x, int (graph_y));
     }
   }
   WSContentSend_P (PSTR("'/>\n"));
@@ -1198,16 +1214,17 @@ void PilotwireWebTemperatureGraph (uint8_t mode)
   if (mode == PILOTWIRE_THERMOSTAT)
   {
     // get target temperature
-    temperature = PilotwireGetTargetTemperature ();
+    value = PilotwireGetTargetTemperature ();
 
     // calculate and display target temperature line
-    index = (100 * (1 - ((temperature - temp_min) / temp_scope)));
+    graph_y = (100 * (1 - ((value - temp_min) / temp_scope)));
+    index   = int (graph_y);
     WSContentSend_P (PSTR ("<line id='line' class='target' x1='%d%%' y1='%d%%' x2='%d%%' y2='%d%%' />\n"), PILOTWIRE_GRAPH_PERCENT_START, index, PILOTWIRE_GRAPH_PERCENT_STOP, index);
 
     // display target temperature text
     index = max (min (index + 2, 99), 4);
-    str_temperature = String (temperature, 1) + "°C";
-    WSContentSend_P (PSTR ("<text id='text' class='target' x='%d%%' y='%d%%'>%s</text>\n"), PILOTWIRE_GRAPH_PERCENT_STOP + 1, index, str_temperature.c_str ());
+    str_value = String (value, 1) + "°C";
+    WSContentSend_P (PSTR ("<text id='text' class='target' x='%d%%' y='%d%%'>%s</text>\n"), PILOTWIRE_GRAPH_PERCENT_STOP + 1, index, str_value.c_str ());
   }
 
   // end of SVG graph

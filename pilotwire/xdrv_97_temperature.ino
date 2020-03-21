@@ -139,7 +139,7 @@ float TemperatureGetValue ( )
 // update temperature
 void TemperatureSetValue (float new_temperature)
 {
-  // read temperature from sensor
+  // set current temperature
   temperature_mqtt_value = new_temperature;
 
   // temperature updated
@@ -222,10 +222,10 @@ void TemperatureCheckMqttConnexion ()
     is_connected = MqttIsConnected();
     if (is_connected)
     {
-      // if still no subsciption to power topic
+      // if still no subsciption to temperature topic
       if (temperature_topic_subscribed == false)
       {
-        // subscribe to power meter
+        // subscribe to temperature meter
         MqttSubscribe(str_topic.c_str ());
 
         // subscription done
@@ -271,10 +271,10 @@ bool TemperatureMqttData ()
       if (idx_value >= 0) str_mailbox_value = str_mailbox_data.substring (idx_value + 1);
     }
 
-    // else, no power key provided, data holds the value
+    // else, no temperature key provided, data holds the value
     else str_mailbox_value = str_mailbox_data;
 
-    // convert and update instant power
+    // convert and update temperature
     TemperatureSetValue (str_mailbox_value.toFloat ());
 
     // data from message has been handled
@@ -296,7 +296,7 @@ void TemperatureWebButton ()
   WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>"), D_PAGE_TEMPERATURE, D_TEMPERATURE_CONFIGURE);
 }
 
-// Pilot Wire web page
+// Temperature MQTT setting web page
 void TemperatureWebPage ()
 {
   bool   state_pullup;
