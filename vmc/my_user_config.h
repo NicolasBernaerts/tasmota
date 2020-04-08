@@ -584,6 +584,7 @@
 \*********************************************************************************************/
 
 #define USE_HUMIDITY_MQTT                     // Add support for MQTT humidity sensor
+#define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_VMC                               // Add support for Ventilation Motor Controled according to humidity level (+??k code)
 
 #undef APP_SLEEP

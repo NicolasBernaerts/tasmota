@@ -8,6 +8,7 @@
     07/03/2020 - v2.1 - Add daily humidity / temperature graph
     13/03/2020 - v2.2 - Add time on graph
     17/03/2020 - v2.3 - Handle Sonoff Dual and remote humidity sensor
+    05/04/2020 - v2.4 - Add Timezone management
 
   Settings are stored using weighting scale parameters :
     - Settings.weight_reference   = VMC mode
@@ -548,8 +549,6 @@ void VmcWebConfigButton ()
 // append VMC state to main page
 bool VmcWebSensor ()
 {
-  TIME_T   current_dst;
-  uint32_t current_time;
   uint8_t  mode, state;
   float    humidity;
   String   str_title, str_text, str_color;
@@ -607,11 +606,6 @@ bool VmcWebSensor ()
     // display
     WSContentSend_PD (PSTR("{s}%s{m}%s{e}"), str_title.c_str(), str_text.c_str());
   }
-
-  // dislay current DST time
-  current_time = LocalTime();
-  BreakTime (current_time, current_dst);
-  WSContentSend_PD (PSTR("{s}%s{m}%02d:%02d:%02d{e}"), D_VMC_TIME, current_dst.hour, current_dst.minute, current_dst.second);
 }
 
 // VMC web page
@@ -678,7 +672,7 @@ void VmcWebDisplayGraph ()
   TIME_T   current_dst;
   uint32_t current_time;
   int      index, array_idx;
-  int      graph_x, graph_y, graph_x1, graph_x2, graph_left, graph_right, graph_width, graph_pos;
+  int      graph_x, graph_y, graph_x1, graph_x2, graph_left, graph_right, graph_width, graph_pos, graph_hour;
   uint8_t  target, state_curr, state_prev;
   float    humidity, temperature, temp_min, temp_max, temp_scope;
   char     str_hour[4];
@@ -856,29 +850,29 @@ void VmcWebDisplayGraph ()
   current_time = LocalTime();
   BreakTime (current_time, current_dst);
 
-  // dislay first time mark
-  if (current_dst.minute <= 20)
+  // calculate width of remaining (minutes) till next hour
+  current_dst.hour = (current_dst.hour + 1) % 24;
+  graph_hour = ((60 - current_dst.minute) * graph_width / 1440) - 15; 
+
+  // if shift is too small, shift to next hour
+  if (graph_hour < 0)
   {
     current_dst.hour = (current_dst.hour + 1) % 24;
-    graph_x  = graph_left;
-    graph_x += (8 + (20 - current_dst.minute) % VMC_GRAPH_STEP) * graph_width / VMC_GRAPH_SAMPLE;
+    graph_hour += graph_width / 24; 
   }
-  else
-  {
-    current_dst.hour = (current_dst.hour + 2) % 24;
-    graph_x  = graph_left; 
-    graph_x += (8 + (80 - current_dst.minute) % VMC_GRAPH_STEP) * graph_width / VMC_GRAPH_SAMPLE;
-  }
+
+  // dislay first time mark
+  graph_x = graph_left + graph_hour;
   sprintf(str_hour, "%02d", current_dst.hour);
-  WSContentSend_P (PSTR ("<text class='time' x='%d' y='52%%'>%sh</text>\n"), graph_x, str_hour);
+  WSContentSend_P (PSTR ("<text class='time' x='%d' y='%d%%'>%sh</text>\n"), graph_x, 52, str_hour);
 
   // dislay next 5 time marks (every 4 hours)
   for (index = 0; index < 5; index++)
   {
     current_dst.hour = (current_dst.hour + 4) % 24;
-    graph_x += 48 * graph_width / VMC_GRAPH_SAMPLE;
+    graph_x += graph_width / 6;
     sprintf(str_hour, "%02d", current_dst.hour);
-    WSContentSend_P (PSTR ("<text class='time' x='%d' y='52%%'>%sh</text>\n"), graph_x, str_hour);
+    WSContentSend_P (PSTR ("<text class='time' x='%d' y='%d%%'>%sh</text>\n"), graph_x, 52, str_hour);
   }
 
   // end of SVG graph

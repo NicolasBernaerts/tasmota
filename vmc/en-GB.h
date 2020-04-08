@@ -509,13 +509,29 @@
 #define D_TX20_SOUTH "S"
 #define D_TX20_WEST "W"
 
+// xdrv_95_timezone.ino
+#ifdef USE_TIMEZONE
+#define D_TIMEZONE            "Timezone"
+#define D_TIMEZONE_CONFIG     "Configure"
+#define D_TIMEZONE_TIME       "Time"
+#define D_TIMEZONE_STD        "Standard Time"
+#define D_TIMEZONE_DST        "Daylight Saving Time"
+#define D_TIMEZONE_OFFSET     "Offset to GMT (mn)"
+#define D_TIMEZONE_MONTH      "Month (1:jan ... 12:dec)"
+#define D_TIMEZONE_WEEK       "Week (0:last ... 4:fourth)"
+#define D_TIMEZONE_DAY        "Day of week (1:sun ... 7:sat)"
+#endif // USE_TIMEZONE
+
 // xdrv_97_humidity.ino
+#ifdef USE_HUMIDITY_MQTT
 #define D_HUMIDITY_CONFIGURE     "Remote Humidity Sensor"
 #define D_HUMIDITY_REMOTE        "Humidity remote sensor"
 #define D_HUMIDITY_TOPIC         "MQTT Topic"
 #define D_HUMIDITY_KEY           "MQTT JSON Key"
+#endif  // USE_HUMIDITY_MQTT
 
 // xsns_98_vmc.ino
+#ifdef USE_VMC
 #define D_VMC_MODE        "VMC Mode"
 #define D_VMC_STATE       "VMC State"
 #define D_VMC_CONTROL     "Control"
@@ -532,6 +548,7 @@
 #define D_VMC_THRESHOLD   "Humidity Threshold"
 #define D_VMC_CONFIGURE   "Configure VMC"
 #define D_VMC_TIME        "Time"
+#endif  // USE_VMC
 
 // tasmota_template.h - keep them as short as possible to be able to fit them in GUI drop down box
 #define D_SENSOR_NONE          "None"
