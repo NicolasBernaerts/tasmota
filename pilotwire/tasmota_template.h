@@ -872,6 +872,7 @@ const mytmplt kModules[MAXMODULE] PROGMEM = {
 //  - LED off if heater in frost mode
      GPIO_REL1,        // GPIO12 Red Led and Relay (0 = Off, 1 = On)
 // Pilotwire - end
+
      GPIO_LED1,        // GPIO13 Green Led (0 = On, 1 = Off) - Link and Power status
      GPIO_USER,        // GPIO14 Optional sensor
      0,                // GPIO15

@@ -368,14 +368,26 @@
 #define D_INSECURE "Insecure connection due to invalid Fingerprint"
 #define D_CONNECT_FAILED_TO "Connect failed to"
 
-// xdrv_96_offloading.ino
-#define D_OFFLOADING                "Offload"
+// xdrv_95_timezone.ino
+#ifdef USE_TIMEZONE
+#define D_TIMEZONE            "Timezone"
+#define D_TIMEZONE_CONFIG     "Configure"
+#define D_TIMEZONE_TIME       "Time"
+#define D_TIMEZONE_STD        "Standard Time"
+#define D_TIMEZONE_DST        "Daylight Saving Time"
+#define D_TIMEZONE_OFFSET     "Offset to GMT (mn)"
+#define D_TIMEZONE_MONTH      "Month (1:jan ... 12:dec)"
+#define D_TIMEZONE_WEEK       "Week (0:last ... 4:fourth)"
+#define D_TIMEZONE_DAY        "Day of week (1:sun ... 7:sat)"
+#endif // USE_TIMEZONE
 
+// xdrv_96_offloading.ino
+#ifdef USE_OFFLOADING_MQTT
+#define D_OFFLOADING                "Offload"
 #define D_OFFLOADING_POWER          "Power"
 #define D_OFFLOADING_MESSAGE        "Overload messages"
 #define D_OFFLOADING_UPDATE_BEFORE  "Before offloading (0:immediate)"
 #define D_OFFLOADING_UPDATE_AFTER   "Before removing offload (0:immediate)"
-
 #define D_OFFLOADING_CONF_METER     "Configure Offloading"
 #define D_OFFLOADING_DEVICE         "Device"
 #define D_OFFLOADING_SENSOR_BEFORE  "Offload active after"
@@ -386,20 +398,22 @@
 #define D_OFFLOADING_TOTAL_POWER    "Instant power"
 #define D_OFFLOADING_TOPIC          "MQTT Topic"
 #define D_OFFLOADING_KEY            "MQTT JSON Key"
+#endif // USE_OFFLOADING_MQTT
 
 // xdrv_97_temperature.ino
+#ifdef USE_TEMPERATURE_MQTT
 #define D_TEMPERATURE_CONFIGURE     "Configure Temperature"
 #define D_TEMPERATURE_REMOTE        "Temperature remote sensor"
 #define D_TEMPERATURE_TOPIC         "MQTT Topic"
 #define D_TEMPERATURE_KEY           "MQTT JSON Key"
+#endif // USE_TEMPERATURE_MQTT
 
 // xsns_98_pilotwire.ino
+#ifdef USE_PILOTWIRE
 #define D_PILOTWIRE                "Pilotwire"
 #define D_PILOTWIRE_HEATER         "Heater"
 #define D_PILOTWIRE_STATE          "State"
-
 #define D_PILOTWIRE_CONFIGURE      "Configure Pilotwire"
-
 #define D_PILOTWIRE_MODE           "Mode"
 #define D_PILOTWIRE_NORMAL         "Normal"
 #define D_PILOTWIRE_OUTSIDE        "Outside"
@@ -412,25 +426,21 @@
 #define D_PILOTWIRE_TARGET         "Target temperature"
 #define D_PILOTWIRE_DROPDOWN       "Dropdown"
 #define D_PILOTWIRE_DRIFT          "Sensor correction"
-
 #define D_PILOTWIRE_SETTING        "Public settings"
 #define D_PILOTWIRE_MIN            "Minimum"
 #define D_PILOTWIRE_MAX            "Maximum"
 #define D_PILOTWIRE_NOSENSOR       "No temperature sensor available"
-
 #define D_PILOTWIRE_CONTROL        "Control"
 #define D_PILOTWIRE_TEMPERATURE    "Temperature"
 #define D_PILOTWIRE_LOCAL          "Local"
 #define D_PILOTWIRE_REMOTE         "Remote"
-
 #define D_PILOTWIRE_DS18B20        "DS18B20 sensor"
 #define D_PILOTWIRE_PULLUP         "Enable internal pullup resistor"
-
 #define D_PILOTWIRE_TIME           "Local time"
 #define D_PILOTWIRE_ROOM           "Room"
-
 #define D_PILOTWIRE_ENGLISH        "en"
 #define D_PILOTWIRE_FRENCH         "fr"
+#endif // USE_PILOTWIRE
 
 // xplg_wemohue.ino
 #define D_MULTICAST_DISABLED "Multicast disabled"

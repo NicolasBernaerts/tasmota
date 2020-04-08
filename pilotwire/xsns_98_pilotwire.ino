@@ -21,6 +21,7 @@
     27/02/2020 - v5.4 - Add target temperature and relay state to temperature graph
     01/03/2020 - v5.5 - Add timer management with Outside mode
     13/03/2020 - v5.6 - Add time to graph
+    05/04/2020 - v5.7 - Add timezone management
 
   Settings are stored using weighting scale parameters :
     - Settings.weight_reference             = Fil pilote mode
@@ -1038,7 +1039,7 @@ void PilotwireWebTemperatureGraph (uint8_t mode)
   TIME_T   current_dst;
   uint32_t current_time;
   int      index, array_index;
-  int      graph_left, graph_right, graph_width, graph_x, graph_pos;
+  int      graph_left, graph_right, graph_width, graph_x, graph_pos, graph_hour;
   uint8_t  state_current, state_previous;
   float    temp_min, temp_max, temp_scope, value, graph_y;
   char     str_hour[4];
@@ -1059,8 +1060,8 @@ void PilotwireWebTemperatureGraph (uint8_t mode)
     value = arr_temperature[index];
     if (isnan (value) == false)
     {
-      if (temperature < temp_min) temp_min = floor (value);
-      if (temperature > temp_max) temp_max = ceil (value);
+      if (value < temp_min) temp_min = floor (value);
+      if (value > temp_max) temp_max = ceil (value);
     }
   }
   temp_scope = temp_max - temp_min;
@@ -1181,19 +1182,19 @@ void PilotwireWebTemperatureGraph (uint8_t mode)
   current_time = LocalTime();
   BreakTime (current_time, current_dst);
 
-  // dislay first time mark
-  if (current_dst.minute <= 20)
+  // calculate width of remaining (minutes) till next hour
+  current_dst.hour = (current_dst.hour + 1) % 24;
+  graph_hour = ((60 - current_dst.minute) * graph_width / 1440) - 15; 
+
+  // if shift is too small, shift to next hour
+  if (graph_hour < 0)
   {
     current_dst.hour = (current_dst.hour + 1) % 24;
-    graph_x  = graph_left;
-    graph_x += (8 + (20 - current_dst.minute) % PILOTWIRE_GRAPH_STEP) * graph_width / PILOTWIRE_GRAPH_SAMPLE;
+    graph_hour += graph_width / 24; 
   }
-  else
-  {
-    current_dst.hour = (current_dst.hour + 2) % 24;
-    graph_x  = graph_left; 
-    graph_x += (8 + (80 - current_dst.minute) % PILOTWIRE_GRAPH_STEP) * graph_width / PILOTWIRE_GRAPH_SAMPLE;
-  }
+
+  // dislay first time mark
+  graph_x = graph_left + graph_hour;
   sprintf(str_hour, "%02d", current_dst.hour);
   WSContentSend_P (PSTR ("<text class='time' x='%d' y='52%%'>%sh</text>\n"), graph_x, str_hour);
 
