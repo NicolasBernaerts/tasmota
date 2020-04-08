@@ -10,6 +10,7 @@
     02/01/2020 - v3.0 - Functions rewrite for Tasmota 8.x compatibility
     05/02/2020 - v3.1 - Add support for 3 phases meters
     14/03/2020 - v3.2 - Add apparent power graph
+    05/04/2020 - v3.3 - Add Timezone management
     
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -40,15 +41,15 @@
 #define D_WEB_TELEINFO_CHECKED        "checked"
 
 // graph data
-#define TELEINFO_GRAPH_STEP          5           // collect graph data every 5 mn
-#define TELEINFO_GRAPH_SAMPLE        288         // 24 hours if data is collected every 5mn
-#define TELEINFO_GRAPH_WIDTH         800      
-#define TELEINFO_GRAPH_HEIGHT        400 
-#define TELEINFO_GRAPH_PERCENT_START 10      
-#define TELEINFO_GRAPH_PERCENT_STOP  90
-#define TELEINFO_GRAPH_POWER_MAX     6000      
+#define TELEINFO_GRAPH_STEP           5           // collect graph data every 5 mn
+#define TELEINFO_GRAPH_SAMPLE         288         // 24 hours if data is collected every 5mn
+#define TELEINFO_GRAPH_WIDTH          800      
+#define TELEINFO_GRAPH_HEIGHT         400 
+#define TELEINFO_GRAPH_PERCENT_START  10      
+#define TELEINFO_GRAPH_PERCENT_STOP   90
 
-// buffer
+// others
+#define TELEINFO_MAX_PHASE            3      
 #define TELEINFO_MESSAGE_BUFFER_SIZE  64
 
 // form strings
@@ -72,8 +73,8 @@ const char *const arrColorPhase[] PROGMEM = {strColorPhase1, strColorPhase2, str
 int      teleinfo_graph_refresh;
 uint32_t teleinfo_graph_index;
 uint32_t teleinfo_graph_counter;
-int      teleinfo_apparent_power[3];
-int      arr_apparent_power[3][TELEINFO_GRAPH_SAMPLE];
+int      teleinfo_apparent_power[TELEINFO_MAX_PHASE];
+int      arr_apparent_power[TELEINFO_MAX_PHASE][TELEINFO_GRAPH_SAMPLE];
 
 /*********************************************\
  *               Functions
@@ -151,10 +152,11 @@ void TeleinfoDataInit ()
   teleinfo_graph_refresh = 60 * TELEINFO_GRAPH_STEP;
 
   // initialise graph data
-  for (phase = 0; phase < 3; phase++)
+  for (phase = 0; phase < TELEINFO_MAX_PHASE; phase++)
   {
     teleinfo_apparent_power[phase] = 0;
-    for (index = 0; index < TELEINFO_GRAPH_SAMPLE; index++) arr_apparent_power[phase][index] = 0;
+    for (index = 0; index < TELEINFO_GRAPH_SAMPLE; index++) 
+      arr_apparent_power[phase][index] = 0;
   }
 }
 
@@ -278,18 +280,21 @@ void TeleinfoWebDisplayGraph ()
   TIME_T   current_dst;
   uint32_t current_time;
   int      index, arridx, phase, hour, power, power_min, power_max;
-  int      graph_x, graph_y, graph_left, graph_right, graph_width;  
+  int      graph_x, graph_y, graph_left, graph_right, graph_width, graph_hour;  
   char     str_hour[4];
   String   str_color;
 
-  // loop to adjust min and max temperature
+  // max power adjustment
   power_min = 0;
-  for (index = 0; index < TELEINFO_GRAPH_SAMPLE; index++)
-  {
-    // loop thru phasis
-    for (phase = 0; phase < teleinfo_phase; phase++)
-      power_max = max (TELEINFO_GRAPH_POWER_MAX, arr_apparent_power[phase][index]);
-  }
+  power_max = TeleinfoGetContractPower ();
+
+  // loop thru phasis and power records
+  for (phase = 0; phase < TELEINFO_MAX_PHASE; phase++)
+    for (index = 0; index < TELEINFO_GRAPH_SAMPLE; index++)
+    {
+      power = arr_apparent_power[phase][index];
+      if ((power != INT_MAX) && (power > power_max)) power_max = power;
+    }
 
   // boundaries of SVG graph
   graph_left  = TELEINFO_GRAPH_PERCENT_START * TELEINFO_GRAPH_WIDTH / 100;
@@ -353,28 +358,28 @@ void TeleinfoWebDisplayGraph ()
   current_time = LocalTime();
   BreakTime (current_time, current_dst);
 
+  // calculate width of remaining (minutes) till next hour
+  current_dst.hour = (current_dst.hour + 1) % 24;
+  graph_hour = ((60 - current_dst.minute) * graph_width / 1440) - 15; 
+
+  // if shift is too small, shift to next hour
+  if (graph_hour < 0)
+  {
+    current_dst.hour = (current_dst.hour + 1) % 24;
+    graph_hour += graph_width / 24; 
+  }
+
   // dislay first time mark
-  if (current_dst.minute <= 20)
-  {
-    hour = (current_dst.hour + 1) % 24;
-    graph_x  = graph_left;
-    graph_x += (8 + (20 - current_dst.minute) % TELEINFO_GRAPH_STEP) * graph_width / TELEINFO_GRAPH_SAMPLE;
-  }
-  else
-  {
-    hour = (current_dst.hour + 2) % 24;
-    graph_x  = graph_left; 
-    graph_x += (8 + (80 - current_dst.minute) % TELEINFO_GRAPH_STEP) * graph_width / TELEINFO_GRAPH_SAMPLE;
-  }
-  sprintf(str_hour, "%02d", hour);
+  graph_x = graph_left + graph_hour;
+  sprintf(str_hour, "%02d", current_dst.hour);
   WSContentSend_P (PSTR ("<text class='time' x='%d' y='52%%'>%sh</text>\n"), graph_x, str_hour);
 
   // dislay next 5 time marks (every 4 hours)
   for (index = 0; index < 5; index++)
   {
-    hour = (hour + 4) % 24;
-    graph_x += 48 * int (graph_width) / TELEINFO_GRAPH_SAMPLE;
-    sprintf(str_hour, "%02d", hour);
+    current_dst.hour = (current_dst.hour + 4) % 24;
+    graph_x += graph_width / 6;
+    sprintf(str_hour, "%02d", current_dst.hour);
     WSContentSend_P (PSTR ("<text class='time' x='%d' y='52%%'>%sh</text>\n"), graph_x, str_hour);
   }
 

@@ -499,7 +499,7 @@
 #define D_CALIBRATE "Calibrate"
 #define D_CALIBRATION "Calibration"
 
-//xsns_35_tx20.ino
+// xsns_35_tx20.ino
 #define D_TX20_WIND_DIRECTION "Wind Direction"
 #define D_TX20_WIND_SPEED "Wind Speed"
 #define D_TX20_WIND_SPEED_AVG "Wind Speed Avg"
@@ -509,7 +509,21 @@
 #define D_TX20_SOUTH "S"
 #define D_TX20_WEST "W"
 
-//xsns_98_teleinfo.ino
+// xdrv_95_timezone.ino
+#ifdef USE_TIMEZONE
+#define D_TIMEZONE            "Timezone"
+#define D_TIMEZONE_CONFIG     "Configure"
+#define D_TIMEZONE_TIME       "Time"
+#define D_TIMEZONE_STD        "Standard Time"
+#define D_TIMEZONE_DST        "Daylight Saving Time"
+#define D_TIMEZONE_OFFSET     "Offset to GMT (mn)"
+#define D_TIMEZONE_MONTH      "Month (1:jan ... 12:dec)"
+#define D_TIMEZONE_WEEK       "Week (0:last ... 4:fourth)"
+#define D_TIMEZONE_DAY        "Day of week (1:sun ... 7:sat)"
+#endif // USE_TIMEZONE
+
+// xsns_98_teleinfo.ino
+#ifdef USE_TELEINFO
 #define D_TELEINFO_MODE       "Teleinfo counter"
 #define D_TELEINFO_CONFIG     "Configure Teleinfo"
 #define D_TELEINFO_CONTROL    "Control"
@@ -519,6 +533,7 @@
 #define D_TELEINFO_9600       "TIC Standard (9600 bauds)"
 #define D_TELEINFO_COUNTER    "Frames received"
 #define D_TELEINFO_POWER      "Apparent power"
+#endif // USE_TELEINFO
 
 // tasmota_template.h - keep them as short as possible to be able to fit them in GUI drop down box
 #define D_SENSOR_NONE          "None"
