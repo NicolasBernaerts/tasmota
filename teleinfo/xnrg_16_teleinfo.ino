@@ -9,7 +9,7 @@
     05/07/2019 - v2.0 - Rework with selection thru web interface
     02/01/2020 - v3.0 - Functions rewrite for Tasmota 8.x compatibility
     05/02/2020 - v3.1 - Add support for 3 phases meters
-    14/03/2020 - v3.2 - Add support for 3 phases meters
+    14/03/2020 - v3.2 - Add power graph on /control page
     
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -45,7 +45,8 @@
 
 // teleinfo constant
 #define TELEINFO_READ_TIMEOUT      200
-#define TELEINFO_VOLTAGE           230
+#define TELEINFO_VOLTAGE           220        // default voltage is 220V
+#define TELEINFO_CONTRACT          30         // default contract is 30A
 
 // overload states
 enum TeleinfoOverload { TELEINFO_OVERLOAD_NONE, TELEINFO_OVERLOAD_DETECTED, TELEINFO_OVERLOAD_READY };
@@ -63,6 +64,7 @@ long    teleinfo_papp_total     = 0;
 bool    teleinfo_papp_set       = false;
 
 // teleinfo counters
+long teleinfo_isousc  = TELEINFO_CONTRACT;
 long teleinfo_total   = 0;
 long teleinfo_base    = 0;
 long teleinfo_hchc    = 0;
@@ -110,6 +112,17 @@ void TeleinfoSetMode (uint16_t new_mode)
     // ask for restart
     restart_flag = 2;
   }
+}
+
+// get contract power
+int TeleinfoGetContractPower ()
+{
+  int power;
+
+  // calculate power
+  power = int (teleinfo_isousc) * TELEINFO_VOLTAGE;
+
+  return power;
 }
 
 /*********************************************\
@@ -297,6 +310,9 @@ void TeleinfoEvery200ms ()
           // contract number
           if (str_etiquette.compareTo ("ADCO") == 0) str_teleinfo_contract = str_donnee;
 
+          // max contract current
+          else if (str_etiquette.compareTo ("ISOUSC") == 0) teleinfo_isousc = TeleinfoConvertToLong (str_donnee, teleinfo_isousc);
+
           // instant current and active power
           else if ((str_etiquette.compareTo ("IINST") == 0) || (str_etiquette.compareTo ("IINST1") == 0))
           {
@@ -316,7 +332,7 @@ void TeleinfoEvery200ms ()
             teleinfo_current_set[1] = true;
             
             // save current and calculate active power
-            Energy.current[1]      = teleinfo_current[0];
+            Energy.current[1]      = teleinfo_current[1];
             Energy.active_power[1] = TELEINFO_VOLTAGE * Energy.current[1];
           }
 
