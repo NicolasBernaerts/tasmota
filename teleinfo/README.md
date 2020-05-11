@@ -14,7 +14,11 @@ This Tasmota firmware is based on sonoff original version **v8.1** modified with
   * standard energy MQTT message (IINST and PAPP)
   * warning MQTT message when max current reached (IMAX)
 
-Between your Energy meter and your Tasmota device, you'll need an adapter like the one described in https://hallard.me/demystifier-la-teleinfo/. You need to connect your adapter **output** to your Tasmota **Rx** port.
+Between your Energy meter and your Tasmota device, you'll need an adapter like this one :
+
+![Teleinfo adapter](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/teleinfo-serial-adapter.png)
+
+You need to connect your adapter output **Tx** to your Tasmota **Rx** port.
 
 Then, you need to declare in Tasmota :
   * **Serial Out** to **Serial Tx** (unused)
