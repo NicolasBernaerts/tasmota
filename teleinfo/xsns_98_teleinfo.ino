@@ -440,7 +440,7 @@ void TeleinfoWebPageGraph ()
   // display apparent power
   for (phase = 0; phase < teleinfo_phase; phase++)
   {
-    if (str_power.length () > 0) str_power += " - ";
+    if (str_power.length () > 0) str_power += " / ";
     str_power += PSTR ("<span class='") + String (arrColorPhase[phase]) + PSTR ("'>");
     str_power += String (Energy.apparent_power[phase], 0);
     str_power += PSTR ("</span>");
