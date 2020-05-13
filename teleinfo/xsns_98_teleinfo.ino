@@ -11,7 +11,8 @@
     05/02/2020 - v3.1 - Add support for 3 phases meters
     14/03/2020 - v3.2 - Add apparent power graph
     05/04/2020 - v3.3 - Add Timezone management
-    
+    13/05/2020 - v3.4 - Add overload management per phase
+
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
@@ -35,22 +36,25 @@
 \*********************************************/
 
 // web configuration page
-#define D_PAGE_TELEINFO_CONFIG        "teleinfo"
-#define D_PAGE_TELEINFO_GRAPH         "graph"
-#define D_CMND_TELEINFO_MODE          "mode"
-#define D_WEB_TELEINFO_CHECKED        "checked"
+#define D_PAGE_TELEINFO_CONFIG          "teleinfo"
+#define D_PAGE_TELEINFO_GRAPH           "graph"
+#define D_CMND_TELEINFO_MODE            "mode"
+#define D_WEB_TELEINFO_CHECKED          "checked"
 
 // graph data
-#define TELEINFO_GRAPH_STEP           5           // collect graph data every 5 mn
-#define TELEINFO_GRAPH_SAMPLE         288         // 24 hours if data is collected every 5mn
-#define TELEINFO_GRAPH_WIDTH          800      
-#define TELEINFO_GRAPH_HEIGHT         400 
-#define TELEINFO_GRAPH_PERCENT_START  10      
-#define TELEINFO_GRAPH_PERCENT_STOP   90
+#define TELEINFO_GRAPH_STEP             5           // collect graph data every 5 mn
+#define TELEINFO_GRAPH_SAMPLE           288         // 24 hours if data is collected every 5mn
+#define TELEINFO_GRAPH_WIDTH            800      
+#define TELEINFO_GRAPH_HEIGHT           400 
+#define TELEINFO_GRAPH_PERCENT_START    10      
+#define TELEINFO_GRAPH_PERCENT_STOP     90
+
+// colors
+#define TELEINFO_POWER_OVERLOAD         "style='color:#FF0000;font-weight:bold;'"
 
 // others
-#define TELEINFO_MAX_PHASE            3      
-#define TELEINFO_MESSAGE_BUFFER_SIZE  64
+#define TELEINFO_MAX_PHASE              3      
+#define TELEINFO_MESSAGE_BUFFER_SIZE    64
 
 // form strings
 const char INPUT_MODE_SELECT[] PROGMEM = "<input type='radio' name='%s' id='%d' value='%d' %s>%s";
@@ -96,11 +100,9 @@ void TeleinfoShowJSON (bool append)
       MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
     }
 
-    // reset teleinfo data
+    // reset teleinfo data and update status
     str_teleinfo_json = "";
-
-    // if overload was detected, reset the trigger
-    if (teleinfo_overload == TELEINFO_OVERLOAD_READY) teleinfo_overload = TELEINFO_OVERLOAD_NONE;
+    teleinfo_overload_json = false;
   }
 }
 
@@ -135,7 +137,7 @@ void TeleinfoEverySecond ()
   teleinfo_graph_counter = teleinfo_graph_counter % teleinfo_graph_refresh;
 
   // if overload has been detected, publish teleinfo data
-  if (teleinfo_overload == TELEINFO_OVERLOAD_READY) TeleinfoShowJSON (false);
+  if (teleinfo_overload_json == true) TeleinfoShowJSON (false);
 }
 
 void TeleinfoDataInit ()
@@ -212,7 +214,7 @@ void TeleinfoWebButton ()
 bool TeleinfoWebSensor ()
 {
   int    index;
-  String str_power;
+  String str_power, str_style;
 
   // display contract number
   WSContentSend_PD (PSTR("{s}%s{m}%s{e}"), D_TELEINFO_CONTRACT, str_teleinfo_contract.c_str());
@@ -220,8 +222,13 @@ bool TeleinfoWebSensor ()
   // display apparent power
   for (index = 0; index < teleinfo_phase; index++)
   {
+    // set display color according to overload
+    str_style = "";
+    if (teleinfo_overload_phase[index] == true) str_style = TELEINFO_POWER_OVERLOAD;
+
+    // append power
     if (str_power.length () > 0) str_power += " / ";
-    str_power += String (Energy.apparent_power[index], 0);
+    str_power += PSTR("<span ") + str_style + PSTR(">") + String (Energy.apparent_power[index], 0) + PSTR("</span>") ;
   }
   WSContentSend_PD (PSTR("<tr><th>%s{m}%s VA{e}"), D_TELEINFO_POWER, str_power.c_str ());
 

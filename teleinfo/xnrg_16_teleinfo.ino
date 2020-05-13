@@ -10,7 +10,8 @@
     02/01/2020 - v3.0 - Functions rewrite for Tasmota 8.x compatibility
     05/02/2020 - v3.1 - Add support for 3 phases meters
     14/03/2020 - v3.2 - Add power graph on /control page
-    
+    13/05/2020 - v3.4 - Add overload management per phase
+
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
@@ -48,20 +49,32 @@
 #define TELEINFO_VOLTAGE           220        // default voltage is 220V
 #define TELEINFO_CONTRACT          30         // default contract is 30A
 
+#define D_TELEINFO_MODE            "Teleinfo counter"
+#define D_TELEINFO_CONFIG          "Configure Teleinfo"
+#define D_TELEINFO_GRAPH           "Graph"
+#define D_TELEINFO_CONTRACT        "Contract n°"
+#define D_TELEINFO_DISABLED        "Disabled"
+#define D_TELEINFO_1200            "TIC Historique (1200 bauds)"
+#define D_TELEINFO_9600            "TIC Standard (9600 bauds)"
+#define D_TELEINFO_COUNTER         "Frames received"
+#define D_TELEINFO_POWER           "Apparent power"
+
 // overload states
+enum TeleinfoPhase { TELEINFO_PHASE_1, TELEINFO_PHASE_2, TELEINFO_PHASE_3, TELEINFO_PHASE_ALL };
 enum TeleinfoOverload { TELEINFO_OVERLOAD_NONE, TELEINFO_OVERLOAD_DETECTED, TELEINFO_OVERLOAD_READY };
 
 // teleinfo status
-bool    teleinfo_configured     = false;
-bool    teleinfo_enabled        = false;
-bool    teleinfo_message        = false;
-long    teleinfo_phase          = 1;
-long    teleinfo_framecount     = 0;
-uint8_t teleinfo_overload       = TELEINFO_OVERLOAD_NONE;
-float   teleinfo_current_total  = 0;
-float   teleinfo_current[3]     = { 0, 0, 0 };
-long    teleinfo_papp_total     = 0;
-bool    teleinfo_papp_set       = false;
+bool  teleinfo_configured        = false;
+bool  teleinfo_enabled           = false;
+long  teleinfo_phase             = 1;
+long  teleinfo_framecount        = 0;
+long  teleinfo_papp_total        = 0;
+bool  teleinfo_papp_set          = false;
+float teleinfo_current_total     = 0;
+float teleinfo_current[3]        = { 0, 0, 0 };
+bool  teleinfo_overload_json     = false;
+bool  teleinfo_overload_msg[3]   = { false, false, false };
+bool  teleinfo_overload_phase[3] = { false, false, false };
 
 // teleinfo counters
 long teleinfo_isousc  = TELEINFO_CONTRACT;
@@ -194,71 +207,73 @@ void TeleinfoEvery200ms ()
     {
       // 0x02 : Beginning of message 
       case 2:
-        // teleinfo message starts
-        teleinfo_message = true;
+        // reset overload message
+        teleinfo_overload_msg[0] = false;
+        teleinfo_overload_msg[1] = false;
+        teleinfo_overload_msg[2] = false;
 
         // reset JSON message buffer
         str_teleinfo_buffer = "";
+
         break;
           
       // Ox03 : End of message
       case 3:
-        if (teleinfo_message == true)
+        // set number of phases
+        Energy.phase_count = teleinfo_phase;
+
+        // loop thru phases to calculate total current
+        current_total = 0;
+        for (index = 0; index < Energy.phase_count; index++)
         {
-          // set number of phases
-          Energy.phase_count = teleinfo_phase;
-
-          // loop thru phases to calculate total current
-          current_total = 0;
-          for (index = 0; index < Energy.phase_count; index++)
-          {
-            Energy.current[index] = teleinfo_current[index];
-            Energy.active_power[index] = TELEINFO_VOLTAGE * teleinfo_current[index];
-            current_total += teleinfo_current[index];
-          }
-
-          // if apparent power not received, calculate according to previous value
-          if (teleinfo_papp_set == false)
-          {
-            if (teleinfo_current_total > 0) teleinfo_papp_total = teleinfo_papp_total * current_total / teleinfo_current_total;
-            else teleinfo_papp_total = 0;
-          }
-          teleinfo_papp_set = false;
-
-          // update total current with calculated value
-          teleinfo_current_total = current_total;
-
-          // loop thru phases to update apparent power
-          for (index = 0; index < Energy.phase_count; index++)
-          {
-            // update apparent power according to total current
-            if (teleinfo_current_total > 0) Energy.apparent_power[index] = teleinfo_papp_total * Energy.current[index] / teleinfo_current_total;
-            else Energy.apparent_power[index] = 0;
-
-            // add information to teleinfo message
-            str_power = String (Energy.apparent_power[index], 0);
-            str_power.trim ();
-            str_teleinfo_buffer += ",\"SINSTS" + String (index + 1) + "\":\"" + str_power + "\"";
-          }
-
-          // update total energy counter
-          teleinfo_newtotal = teleinfo_base + teleinfo_hchc + teleinfo_hchp;
-          teleinfo_newtotal += teleinfo_bbrhcjb + teleinfo_bbrhpjb + teleinfo_bbrhcjw + teleinfo_bbrhpjw + teleinfo_bbrhcjr + teleinfo_bbrhpjr;
-          teleinfo_newtotal += teleinfo_ejphn + teleinfo_ejphpm;
-          teleinfo_delta = teleinfo_newtotal - teleinfo_total;
-          teleinfo_total = teleinfo_newtotal;
-          Energy.kWhtoday += (unsigned long)(teleinfo_delta * 100);
-          EnergyUpdateToday ();
-
-          // generate final JSON and reset temporary JSON
-          str_teleinfo_json = PSTR("\"Teleinfo\":{") + str_teleinfo_buffer + PSTR("}");
-
-          // if overload detected, ready to be publushed
-          if (teleinfo_overload == TELEINFO_OVERLOAD_DETECTED) teleinfo_overload = TELEINFO_OVERLOAD_READY;
+          Energy.current[index] = teleinfo_current[index];
+          Energy.active_power[index] = TELEINFO_VOLTAGE * teleinfo_current[index];
+          current_total += teleinfo_current[index];
         }
 
-        // teleinfo message is over
-        teleinfo_message = false;
+        // if apparent power not received, calculate according to previous value
+        if (teleinfo_papp_set == false)
+        {
+          if (teleinfo_current_total > 0) teleinfo_papp_total = teleinfo_papp_total * current_total / teleinfo_current_total;
+          else teleinfo_papp_total = 0;
+        }
+        teleinfo_papp_set = false;
+
+        // update total current with calculated value
+        teleinfo_current_total = current_total;
+
+        // loop thru phases to update apparent power
+        for (index = 0; index < Energy.phase_count; index++)
+        {
+          // update apparent power according to total current
+          if (teleinfo_current_total > 0) Energy.apparent_power[index] = teleinfo_papp_total * Energy.current[index] / teleinfo_current_total;
+          else Energy.apparent_power[index] = 0;
+
+          // add information to teleinfo message
+          str_power = String (Energy.apparent_power[index], 0);
+          str_power.trim ();
+          str_teleinfo_buffer += ",\"SINSTS" + String (index + 1) + "\":\"" + str_power + "\"";
+        }
+
+        // update total energy counter
+        teleinfo_newtotal = teleinfo_base + teleinfo_hchc + teleinfo_hchp;
+        teleinfo_newtotal += teleinfo_bbrhcjb + teleinfo_bbrhpjb + teleinfo_bbrhcjw + teleinfo_bbrhpjw + teleinfo_bbrhcjr + teleinfo_bbrhpjr;
+        teleinfo_newtotal += teleinfo_ejphn + teleinfo_ejphpm;
+        teleinfo_delta = teleinfo_newtotal - teleinfo_total;
+        teleinfo_total = teleinfo_newtotal;
+        Energy.kWhtoday += (unsigned long)(teleinfo_delta * 100);
+        EnergyUpdateToday ();
+
+        // generate final JSON and reset temporary JSON
+        str_teleinfo_json = PSTR("\"Teleinfo\":{") + str_teleinfo_buffer + PSTR("}");
+
+        // loop thru phases to update overload status
+        for (index = 0; index < Energy.phase_count; index++)
+        {
+          // if overload in current message, ask for JSON update, else reset phase overload
+          if (teleinfo_overload_msg[index] == true) teleinfo_overload_json = true;
+          else teleinfo_overload_phase[index] = false;
+        }
 
         // increment frame counter
         teleinfo_framecount++;
@@ -333,10 +348,26 @@ void TeleinfoEvery200ms ()
           }
            
           // maximum power outage (ADPS / ADIR1..3)
-          else if (str_etiquette.compareTo ("ADPS") == 0)  teleinfo_overload = TELEINFO_OVERLOAD_DETECTED;
-          else if (str_etiquette.compareTo ("ADIR1") == 0) teleinfo_overload = TELEINFO_OVERLOAD_DETECTED;
-          else if (str_etiquette.compareTo ("ADIR2") == 0) teleinfo_overload = TELEINFO_OVERLOAD_DETECTED;
-          else if (str_etiquette.compareTo ("ADIR3") == 0) teleinfo_overload = TELEINFO_OVERLOAD_DETECTED;
+          else if (str_etiquette.compareTo ("ADPS")  == 0)
+          {
+            teleinfo_overload_msg[0]   = true;
+            teleinfo_overload_phase[0] = true;
+          }
+          else if (str_etiquette.compareTo ("ADIR1") == 0)
+          {
+            teleinfo_overload_msg[0]   = true;
+            teleinfo_overload_phase[0] = true;
+          }
+          else if (str_etiquette.compareTo ("ADIR2") == 0)
+          {
+            teleinfo_overload_msg[1]   = true;
+            teleinfo_overload_phase[1] = true;
+          }
+          else if (str_etiquette.compareTo ("ADIR3") == 0)
+          {
+            teleinfo_overload_msg[1]   = true;
+            teleinfo_overload_phase[1] = true;
+          }
 
           // Contract Base
           else if (str_etiquette.compareTo ("BASE") == 0) teleinfo_base = TeleinfoConvertToLong (str_donnee, teleinfo_base);
