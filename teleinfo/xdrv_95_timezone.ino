@@ -29,6 +29,16 @@
 
 #define D_PAGE_TIMEZONE_CONFIG    "tz"
 
+#define D_TIMEZONE                "Timezone"
+#define D_TIMEZONE_CONFIG         "Configure"
+#define D_TIMEZONE_TIME           "Time"
+#define D_TIMEZONE_STD            "Standard Time"
+#define D_TIMEZONE_DST            "Daylight Saving Time"
+#define D_TIMEZONE_OFFSET         "Offset to GMT (mn)"
+#define D_TIMEZONE_MONTH          "Month (1:jan ... 12:dec)"
+#define D_TIMEZONE_WEEK           "Week (0:last ... 4:fourth)"
+#define D_TIMEZONE_DAY            "Day of week (1:sun ... 7:sat)"
+
 #define D_CMND_TIMEZONE_STDO      "stdo"
 #define D_CMND_TIMEZONE_STDM      "stdm"
 #define D_CMND_TIMEZONE_STDW      "stdw"
