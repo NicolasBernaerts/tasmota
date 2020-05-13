@@ -36,7 +36,7 @@
 
 // web configuration page
 #define D_PAGE_TELEINFO_CONFIG        "teleinfo"
-#define D_PAGE_TELEINFO_CONTROL       "control"
+#define D_PAGE_TELEINFO_GRAPH         "graph"
 #define D_CMND_TELEINFO_MODE          "mode"
 #define D_WEB_TELEINFO_CHECKED        "checked"
 
@@ -60,10 +60,7 @@ const char INPUT_FIELDSET_START[] PROGMEM = "<fieldset><legend><b>&nbsp;%s&nbsp;
 const char INPUT_FIELDSET_STOP[] PROGMEM = "</fieldset><br />";
 
 // graph colors
-const char strColorPhase1[] PROGMEM = "phase1";
-const char strColorPhase2[] PROGMEM = "phase2";
-const char strColorPhase3[] PROGMEM = "phase3";
-const char *const arrColorPhase[] PROGMEM = {strColorPhase1, strColorPhase2, strColorPhase3};
+const char arrColorPhase[TELEINFO_MAX_PHASE][8] PROGMEM = { "phase1", "phase2", "phase3" };
 
 /*********************************************\
  *               Variables
@@ -167,17 +164,6 @@ void TeleinfoDataInit ()
 #ifdef USE_WEBSERVER
 
 // Teleinfo mode select combo
-void TeleinfoWebDisplayPhasis (String& strText)
-{
-  int phase;
-
-  // loop thru phasis
-  strText = "<span class='" + String (arrColorPhase[0]) + "'>" + String (Energy.apparent_power[0], 0) + "</span>";
-  for (phase = 1; phase < teleinfo_phase; phase++)
-    strText += " / <span class='" + String (arrColorPhase[phase]) + "'>" + String (Energy.apparent_power[phase], 0) + "</span>";
-}
-
-// Teleinfo mode select combo
 void TeleinfoWebSelectMode ()
 {
   uint16_t actual_mode;
@@ -200,7 +186,7 @@ void TeleinfoWebSelectMode ()
     WSContentSend_P (INPUT_MODE_SELECT, D_CMND_TELEINFO_MODE, 1200, 1200, str_checked.c_str (), D_TELEINFO_1200);
     WSContentSend_P (PSTR ("<br/>"));
 
-    // selection : no frost
+    // selection : 9600 baud
     str_checked = "";
     if (actual_mode == 9600) str_checked = D_WEB_TELEINFO_CHECKED;
     WSContentSend_P (INPUT_MODE_SELECT, D_CMND_TELEINFO_MODE, 9600, 9600, str_checked.c_str (), D_TELEINFO_9600);
@@ -208,11 +194,11 @@ void TeleinfoWebSelectMode ()
   }
 }
 
-// append Teleinfo control button to main page
+// append Teleinfo graph button to main page
 void TeleinfoWebMainButton ()
 {
-    // VMC control page button
-  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), D_PAGE_TELEINFO_CONTROL, D_TELEINFO_CONTROL);
+    // Teleinfo control page button
+  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), D_PAGE_TELEINFO_GRAPH, D_TELEINFO_GRAPH);
 }
 
 // append Teleinfo configuration button to configuration page
@@ -225,14 +211,19 @@ void TeleinfoWebButton ()
 // append Teleinfo state to main page
 bool TeleinfoWebSensor ()
 {
-  String strPower;
+  int    index;
+  String str_power;
 
   // display contract number
   WSContentSend_PD (PSTR("{s}%s{m}%s{e}"), D_TELEINFO_CONTRACT, str_teleinfo_contract.c_str());
 
   // display apparent power
-  TeleinfoWebDisplayPhasis (strPower);
-  WSContentSend_PD (PSTR("<tr><th>%s{m}%s VA{e}"), D_TELEINFO_POWER, strPower.c_str ());
+  for (index = 0; index < teleinfo_phase; index++)
+  {
+    if (str_power.length () > 0) str_power += " / ";
+    str_power += String (Energy.apparent_power[index], 0);
+  }
+  WSContentSend_PD (PSTR("<tr><th>%s{m}%s VA{e}"), D_TELEINFO_POWER, str_power.c_str ());
 
   // display frame counter
   WSContentSend_PD (PSTR("{s}%s{m}%d{e}"), D_TELEINFO_COUNTER, teleinfo_framecount);
@@ -387,16 +378,17 @@ void TeleinfoWebDisplayGraph ()
   WSContentSend_P (PSTR ("</svg>\n"));
 }
 
-// VMC public web page
-void TeleinfoWebPageControl ()
+// Graph public page
+void TeleinfoWebPageGraph ()
 {
+  int     phase;
   float   value, target;
-  String  str_display;
+  String  str_power;
 
   // beginning of form without authentification with 60 seconds auto refresh
-  WSContentStart_P (D_TELEINFO_CONTROL, false);
+  WSContentStart_P (D_TELEINFO_GRAPH, false);
   WSContentSend_P (PSTR ("</script>\n"));
-  WSContentSend_P (PSTR ("<meta http-equiv='refresh' content='%d;URL=/%s' />\n"), 60, D_PAGE_TELEINFO_CONTROL);
+  WSContentSend_P (PSTR ("<meta http-equiv='refresh' content='%d;URL=/%s' />\n"), 60, D_PAGE_TELEINFO_GRAPH);
   
   // page style
   WSContentSend_P (PSTR ("<style>\n"));
@@ -438,9 +430,15 @@ void TeleinfoWebPageControl ()
   // contract
   WSContentSend_P (PSTR ("<div class='contract'>%s %s</div>\n"), D_TELEINFO_CONTRACT, str_teleinfo_contract.c_str());
 
-  // power
-  TeleinfoWebDisplayPhasis (str_display);
-  WSContentSend_P (PSTR ("<div class='phase'>%s VA</div>\n"), str_display.c_str());
+  // display apparent power
+  for (phase = 0; phase < teleinfo_phase; phase++)
+  {
+    if (str_power.length () > 0) str_power += " - ";
+    str_power += PSTR ("<span class='") + String (arrColorPhase[phase]) + PSTR ("'>");
+    str_power += String (Energy.apparent_power[phase], 0);
+    str_power += PSTR ("</span>");
+  }
+  WSContentSend_P (PSTR ("<div class='phase'>%s VA</div>\n"), str_power.c_str());
 
   // display power graph
   WSContentSend_P (PSTR ("<div class='graph'>\n"));
@@ -478,7 +476,7 @@ bool Xsns98 (uint8_t function)
 #ifdef USE_WEBSERVER
     case FUNC_WEB_ADD_HANDLER:
       WebServer->on ("/" D_PAGE_TELEINFO_CONFIG, TeleinfoWebPageConfig);
-      WebServer->on ("/" D_PAGE_TELEINFO_CONTROL, TeleinfoWebPageControl);
+      WebServer->on ("/" D_PAGE_TELEINFO_GRAPH, TeleinfoWebPageGraph);
       break;
     case FUNC_WEB_ADD_BUTTON:
       TeleinfoWebButton ();
