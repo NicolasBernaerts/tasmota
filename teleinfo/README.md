@@ -45,4 +45,10 @@ MQTT result should look like that :
     test/sonoff/tele/SENSOR {"Teleinfo":{"ADPS":30}}
     test/sonoff/tele/STATE {"Time":"2019-06-03T07:16:53","Uptime":"0T00:03:34","Vcc":3.250,"SleepMode":"Dynamic","Sleep":50,"LoadAvg":19,"POWER":"OFF","Wifi":{"AP":1,"SSId":"bernaerts-nantes-front","BSSId":"58:EF:68:55:38:E4","Channel":11,"RSSI":80,"LinkCount":1,"Downtime":"0T00:00:04"}}
 
+If you want to comile the firmware, don't forget to uncomment following line in **my_user_config.h**
+
+    #define USE_CONFIG_OVERRIDE             // Uncomment to use user_config_override.h file. See README.md
+
+
 Complete setup guide is available at http://www.bernaerts-nicolas.fr/iot/...
+
