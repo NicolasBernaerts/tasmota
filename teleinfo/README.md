@@ -14,6 +14,11 @@ This Tasmota firmware is based on sonoff original version **v8.1** modified with
   * standard energy MQTT message (IINST and PAPP)
   * warning MQTT message when max current reached (IMAX)
 
+You'll get some extra Web pages on the device :
+  * **/graph** : 24h power consumption graph (updated every 5mn)
+  * **/msg** : last full Teleinfo message in raw format
+  * **/json** : last full Teleinfo message in JSON format
+
 Between your Energy meter and your Tasmota device, you'll need an adapter like this one :
 
 ![Teleinfo adapter](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/teleinfo-serial-adapter.png)
