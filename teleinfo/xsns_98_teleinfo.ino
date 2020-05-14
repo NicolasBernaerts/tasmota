@@ -12,6 +12,7 @@
     14/03/2020 - v3.2 - Add apparent power graph
     05/04/2020 - v3.3 - Add Timezone management
     13/05/2020 - v3.4 - Add overload management per phase
+    15/05/2020 - v3.5 - Add /msg and /json pages
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -38,6 +39,8 @@
 // web configuration page
 #define D_PAGE_TELEINFO_CONFIG          "teleinfo"
 #define D_PAGE_TELEINFO_GRAPH           "graph"
+#define D_PAGE_TELEINFO_JSON            "json"
+#define D_PAGE_TELEINFO_MSG             "msg"
 #define D_CMND_TELEINFO_MODE            "mode"
 #define D_WEB_TELEINFO_CHECKED          "checked"
 
@@ -84,26 +87,21 @@ int      arr_apparent_power[TELEINFO_MAX_PHASE][TELEINFO_GRAPH_SAMPLE];
 // Show JSON status (for MQTT)
 void TeleinfoShowJSON (bool append)
 {
-  // if JSON is ready
-  if (str_teleinfo_json.length () > 0)
-  {
-    // if we are in append mode, just append teleinfo data to current MQTT message
-    if (append == true) snprintf_P (mqtt_data, sizeof(mqtt_data), "%s,%s", mqtt_data, str_teleinfo_json.c_str ());
+  // if we are in append mode, just append teleinfo data to current MQTT message
+  if (append == true) snprintf_P (mqtt_data, sizeof(mqtt_data), "%s,%s", mqtt_data, str_teleinfo_json.c_str ());
 
-    // else publish teleinfo message right away 
-    else
-    { 
-      // create message { teleinfo }
-      snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("{%s}"), str_teleinfo_json.c_str ());
+  // else publish teleinfo message right away 
+  else
+  { 
+    // create message { teleinfo }
+    snprintf_P (mqtt_data, sizeof(mqtt_data), PSTR("{%s}"), str_teleinfo_json.c_str ());
 
-      // publish full sensor state
-      MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
-    }
-
-    // reset teleinfo data and update status
-    str_teleinfo_json = "";
-    teleinfo_overload_json = false;
+    // publish full sensor state
+    MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
   }
+
+  // reset teleinfo data and update status
+  teleinfo_overload_json = false;
 }
 
 // update graph history data
@@ -456,6 +454,22 @@ void TeleinfoWebPageGraph ()
   WSContentStop ();
 }
 
+// Serial message public page
+void TeleinfoPageMsg ()
+{
+  WSContentBegin(200, CT_HTML);
+  WSContentSend_P (str_teleinfo_msg.c_str ());
+  WSContentEnd();
+}
+
+// JSON public page
+void TeleinfoPageJson ()
+{
+  WSContentBegin(200, CT_HTML);
+  WSContentSend_P (PSTR ("{%s}\n"), str_teleinfo_json.c_str ());
+  WSContentEnd();
+}
+
 #endif  // USE_WEBSERVER
 
 /*******************************************\
@@ -484,6 +498,8 @@ bool Xsns98 (uint8_t function)
     case FUNC_WEB_ADD_HANDLER:
       WebServer->on ("/" D_PAGE_TELEINFO_CONFIG, TeleinfoWebPageConfig);
       WebServer->on ("/" D_PAGE_TELEINFO_GRAPH, TeleinfoWebPageGraph);
+      WebServer->on ("/" D_PAGE_TELEINFO_MSG, TeleinfoPageMsg);
+      WebServer->on ("/" D_PAGE_TELEINFO_JSON, TeleinfoPageJson);
       break;
     case FUNC_WEB_ADD_BUTTON:
       TeleinfoWebButton ();

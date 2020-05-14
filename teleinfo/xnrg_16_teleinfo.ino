@@ -11,6 +11,7 @@
     05/02/2020 - v3.1 - Add support for 3 phases meters
     14/03/2020 - v3.2 - Add power graph on /control page
     13/05/2020 - v3.4 - Add overload management per phase
+    15/05/2020 - v3.5 - Add /msg and /json pages
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -45,7 +46,8 @@
 #include <TasmotaSerial.h>
 
 // teleinfo constant
-#define TELEINFO_READ_TIMEOUT      200
+#define TELEINFO_MAX_STRING        800        // max size of strings
+#define TELEINFO_READ_TIMEOUT      150        // 150ms serial reading timeout
 #define TELEINFO_VOLTAGE           220        // default voltage is 220V
 #define TELEINFO_CONTRACT          30         // default contract is 30A
 
@@ -93,7 +95,8 @@ long teleinfo_ejphpm  = 0;
 
 // other variables
 TasmotaSerial *teleinfo_serial = NULL;
-String str_teleinfo_json, str_teleinfo_buffer, str_teleinfo_line, str_teleinfo_contract;
+String str_teleinfo_contract, str_teleinfo_msg, str_teleinfo_json;
+String str_teleinfo_line, str_teleinfo_msg_tmp, str_teleinfo_json_tmp; 
 
 /*******************************************\
  *               Accessor
@@ -207,14 +210,6 @@ void TeleinfoEvery200ms ()
     {
       // 0x02 : Beginning of message 
       case 2:
-        // reset overload message
-        teleinfo_overload_msg[0] = false;
-        teleinfo_overload_msg[1] = false;
-        teleinfo_overload_msg[2] = false;
-
-        // reset JSON message buffer
-        str_teleinfo_buffer = "";
-
         break;
           
       // Ox03 : End of message
@@ -252,7 +247,7 @@ void TeleinfoEvery200ms ()
           // add information to teleinfo message
           str_power = String (Energy.apparent_power[index], 0);
           str_power.trim ();
-          str_teleinfo_buffer += ",\"SINSTS" + String (index + 1) + "\":\"" + str_power + "\"";
+          str_teleinfo_json_tmp += ",\"SINSTS" + String (index + 1) + "\":\"" + str_power + "\"";
         }
 
         // update total energy counter
@@ -264,16 +259,24 @@ void TeleinfoEvery200ms ()
         Energy.kWhtoday += (unsigned long)(teleinfo_delta * 100);
         EnergyUpdateToday ();
 
-        // generate final JSON and reset temporary JSON
-        str_teleinfo_json = PSTR("\"Teleinfo\":{") + str_teleinfo_buffer + PSTR("}");
-
         // loop thru phases to update overload status
         for (index = 0; index < Energy.phase_count; index++)
         {
           // if overload in current message, ask for JSON update, else reset phase overload
           if (teleinfo_overload_msg[index] == true) teleinfo_overload_json = true;
           else teleinfo_overload_phase[index] = false;
+
+          // initialize message phase overload
+          teleinfo_overload_msg[index] = false;
         }
+
+        // generate final JSON and reset temporary JSON
+        str_teleinfo_json = PSTR("\"Teleinfo\":{") + str_teleinfo_json_tmp + PSTR("}");
+        str_teleinfo_json_tmp = "";
+
+        // generate final serial loag and reset temporary serial
+        str_teleinfo_msg = str_teleinfo_msg_tmp;
+        str_teleinfo_msg_tmp = "";
 
         // increment frame counter
         teleinfo_framecount++;
@@ -281,8 +284,6 @@ void TeleinfoEvery200ms ()
 
       // 0x0A : Beginning of line
       case 10:
-        // reset reception buffer
-        str_teleinfo_line = "";
         break;
 
       // 0x0D : End of line
@@ -389,15 +390,20 @@ void TeleinfoEvery200ms ()
           else if (str_etiquette.compareTo ("EJPHPM") == 0) teleinfo_ejphpm = TeleinfoConvertToLong (str_donnee, teleinfo_ejphpm);
 
           // add current data to JSON message
-          if (str_teleinfo_buffer.length () > 0) str_teleinfo_buffer += ",";
-          str_teleinfo_buffer += "\"" + str_etiquette + "\":\"" + str_donnee + "\"";
+          if (str_teleinfo_json_tmp.length () > 0) str_teleinfo_json_tmp += ",";
+          if (str_teleinfo_json_tmp.length () < TELEINFO_MAX_STRING) str_teleinfo_json_tmp += "\"" + str_etiquette + "\":\"" + str_donnee + "\"";
         }
+
+        // add line to serial buffer and reset line
+        if (str_teleinfo_msg_tmp.length () < TELEINFO_MAX_STRING) str_teleinfo_msg_tmp += str_teleinfo_line + "\n";
+        str_teleinfo_line = "";
         break;
 
       // if caracter is anything else : message body
       default:
         // if caracter printable or tab, add it to message buffer
         if ((isprint (recv_serial)) || (recv_serial == 9)) str_teleinfo_line += (char) recv_serial;
+        break;
       }
 
     // update timer
