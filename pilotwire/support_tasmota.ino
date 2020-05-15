@@ -418,17 +418,11 @@ void ExecuteCommandPower(uint32_t device, uint32_t state, uint32_t source)
 // Pilotwire - Start
 #ifdef USE_PILOTWIRE
 
-// if timer call
-if (source == SRC_TIMER)
-{
-  // call pilotwire timer function
-  PilotwireHandleTimer (state);
+// if timer, call pilotwire timer function
+if (source == SRC_TIMER) PilotwireHandleTimer (state);
 
-  return;
-}
-
-// else, il not pilotwire call
-else if (source != SRC_IGNORE) return;
+// if command doesn't come from pilotwire module, ignore it
+if (source != SRC_MAX) return;
 
 #endif  // USE_PILOTWIRE
 // Pilotwire - End

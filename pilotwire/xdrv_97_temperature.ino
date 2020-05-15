@@ -1,11 +1,11 @@
 /*
-  xdrv_97_temperature.ino - Retreive Temperature thru MQTT
+  xdrv_97_temperature.ino - Retreive Temperature thru MQTT (~2.5 kb)
   
   Copyright (C) 2020  Nicolas Bernaerts
     15/01/2020 - v5.0 - Separate temperature driver and add remote MQTT sensor
                       
   Settings are stored using weighting scale parameters :
-    - Settings.free_f03  = MQTT Instant temperature (powwer data|Temperature MQTT topic;Temperature JSON key)
+    - Settings.free_f03  = MQTT Instant temperature (power data|Temperature MQTT topic;Temperature JSON key)
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -39,6 +39,11 @@
 #define D_JSON_TEMPERATURE_VALUE    "State"
 #define D_JSON_TEMPERATURE_TOPIC    "Topic"
 #define D_JSON_TEMPERATURE_KEY      "Key"
+
+#define D_TEMPERATURE_CONFIGURE     "Configure Temperature"
+#define D_TEMPERATURE_REMOTE        "Temperature remote sensor"
+#define D_TEMPERATURE_TOPIC         "MQTT Topic"
+#define D_TEMPERATURE_KEY           "MQTT JSON Key"
 
 // temperature commands
 enum TemperatureCommands { CMND_TEMPERATURE_TOPIC, CMND_TEMPERATURE_KEY };
@@ -384,10 +389,6 @@ bool Xsns97 (uint8_t function)
   // main callback switch
   switch (function)
   { 
-    case FUNC_JSON_APPEND:
-      TemperatureShowJSON (true);
-      break;
-
 #ifdef USE_WEBSERVER
     case FUNC_WEB_ADD_HANDLER:
       WebServer->on ("/" D_PAGE_TEMPERATURE, TemperatureWebPage);
@@ -396,7 +397,6 @@ bool Xsns97 (uint8_t function)
       TemperatureWebButton ();
       break;
 #endif  // USE_WEBSERVER
-
   }
   
   return result;

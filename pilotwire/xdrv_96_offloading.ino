@@ -1,5 +1,5 @@
 /*
-  xdrv_96_offloading.ino - Offloading driver thru MQTT instant house power
+  xdrv_96_offloading.ino - Offloading driver thru MQTT instant house power (~4.2 kb)
   
   Copyright (C) 2019  Nicolas Bernaerts
     05/07/2019 - v3.0 - Add max power management with automatic offload
@@ -56,6 +56,22 @@
 #define D_JSON_OFFLOADING_POWER     "Power"
 #define D_JSON_OFFLOADING_TOPIC     "Topic"
 #define D_JSON_OFFLOADING_KEY       "Key"
+
+#define D_OFFLOADING                "Offload"
+#define D_OFFLOADING_POWER          "Power"
+#define D_OFFLOADING_MESSAGE        "Overload messages"
+#define D_OFFLOADING_UPDATE_BEFORE  "Before offloading (0:immediate)"
+#define D_OFFLOADING_UPDATE_AFTER   "Before removing offload (0:immediate)"
+#define D_OFFLOADING_CONF_METER     "Configure Offloading"
+#define D_OFFLOADING_DEVICE         "Device"
+#define D_OFFLOADING_SENSOR_BEFORE  "Offload active after"
+#define D_OFFLOADING_SENSOR_AFTER   "Offload removed after"
+#define D_OFFLOADING_SENSOR_UPDATE  "updates"
+#define D_OFFLOADING_ACTIVE         "Active"
+#define D_OFFLOADING_CONTRACT       "Contract"
+#define D_OFFLOADING_TOTAL_POWER    "Instant power"
+#define D_OFFLOADING_TOPIC          "MQTT Topic"
+#define D_OFFLOADING_KEY            "MQTT JSON Key"
 
 // offloading commands
 enum OffloadingCommands { CMND_OFFLOADING_DEVICE, CMND_OFFLOADING_CONTRACT, CMND_OFFLOADING_BEFORE, CMND_OFFLOADING_AFTER, CMND_OFFLOADING_TOPIC, CMND_OFFLOADING_KEY };
@@ -617,10 +633,6 @@ bool Xsns96 (uint8_t function)
   // main callback switch
   switch (function)
   { 
-    case FUNC_JSON_APPEND:
-      OffloadingShowJSON (true);
-      break;
-
 #ifdef USE_WEBSERVER
     case FUNC_WEB_ADD_HANDLER:
       WebServer->on ("/" D_PAGE_OFFLOADING_METER, OffloadingWebPage);
@@ -632,7 +644,6 @@ bool Xsns96 (uint8_t function)
       OffloadingWebSensor ();
       break;
 #endif  // USE_WEBSERVER
-
   }
   
   return result;
