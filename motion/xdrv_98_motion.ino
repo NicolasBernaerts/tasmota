@@ -6,6 +6,7 @@
     10/04/2020 - v1.1 - Add detector configuration for low/high level
     15/04/2020 - v1.2 - Add detection auto rearm flag management
     18/04/2020 - v1.3 - Handle Toggle button and display motion icon
+    15/05/2020 - v1.4 - Add /json page to get latest motion JSON
                    
   Input devices should be configured as followed :
    - Switch2 = Motion detector
@@ -33,39 +34,12 @@
 
 #ifdef USE_MOTION
 
-#define XDRV_98                   98
-#define XSNS_98                   98
+#define XDRV_98                      98
+#define XSNS_98                      98
 
-#define MOTION_BUTTON             1       // switch2
+#define MOTION_BUTTON                1       // switch2
 
-#define MOTION_BUFFER_SIZE        128
-
-#define D_PAGE_MOTION_CONFIG      "config"
-#define D_PAGE_MOTION_TOGGLE      "toggle"
-#define D_PAGE_MOTION_GRAPH       "graph"
-
-#define D_CMND_MOTION_ENABLE      "enable"
-#define D_CMND_MOTION_FORCE       "force"
-#define D_CMND_MOTION_LEVEL       "level"
-#define D_CMND_MOTION_REARM       "rearm"
-#define D_CMND_MOTION_TEMPO       "tempo"
-#define D_CMND_MOTION_MN          "mn"
-#define D_CMND_MOTION_SEC         "sec"
-
-#define D_JSON_MOTION             "Motion"
-#define D_JSON_MOTION_STATUS      "Status"
-#define D_JSON_MOTION_ENABLED     "Enabled"
-#define D_JSON_MOTION_LEVEL       "Level"
-#define D_JSON_MOTION_HIGH        "High"
-#define D_JSON_MOTION_LOW         "Low"
-#define D_JSON_MOTION_ON          "ON"
-#define D_JSON_MOTION_OFF         "OFF"
-#define D_JSON_MOTION_REARM       "Rearm"
-#define D_JSON_MOTION_FORCED      "Forced"
-#define D_JSON_MOTION_TIMELEFT    "Timeleft"
-#define D_JSON_MOTION_DETECTED    "Detected"
-#define D_JSON_MOTION_LIGHT       "Light"
-#define D_JSON_MOTION_TEMPO       "Tempo"
+#define MOTION_BUFFER_SIZE           128
 
 #define MOTION_JSON_UPDATE           5000        // update JSON every 5 sec
 #define MOTION_WEB_UPDATE            5           // update Graph Web page every 5 sec
@@ -77,26 +51,53 @@
 #define MOTION_GRAPH_PERCENT_START   10      
 #define MOTION_GRAPH_PERCENT_STOP    90      
 
-// xdrv_98_motion.ino
-#define D_MOTION              "Motion Detector"
-#define D_MOTION_CONFIG       "Configure"
-#define D_MOTION_DETECTION    "Detection"
-#define D_MOTION_GRAPH        "Graph"
-#define D_MOTION_TEMPO        "Temporisation"
-#define D_MOTION_MOTION       "Motion"
-#define D_MOTION_DETECTOR     "Detector"
-#define D_MOTION_REARM        "Rearm"
-#define D_MOTION_COMMAND      "Light"
-#define D_MOTION_ENABLE       "Enable"
-#define D_MOTION_ENABLED      "Enabled"
-#define D_MOTION_DISABLE      "Disable"
-#define D_MOTION_DISABLED     "Disabled"
-#define D_MOTION_ON           "On"
-#define D_MOTION_OFF          "Off"
-#define D_MOTION_LEVEL        "Level"
-#define D_MOTION_HIGH         "High"
-#define D_MOTION_LOW          "Low"
-#define D_MOTION_FORCED       "Forced"
+#define D_PAGE_MOTION_CONFIG         "config"
+#define D_PAGE_MOTION_TOGGLE         "toggle"
+#define D_PAGE_MOTION_GRAPH          "graph"
+#define D_PAGE_MOTION_JSON           "json"
+
+#define D_CMND_MOTION_ENABLE         "enable"
+#define D_CMND_MOTION_FORCE          "force"
+#define D_CMND_MOTION_LEVEL          "level"
+#define D_CMND_MOTION_REARM          "rearm"
+#define D_CMND_MOTION_TEMPO          "tempo"
+#define D_CMND_MOTION_MN             "mn"
+#define D_CMND_MOTION_SEC            "sec"
+
+#define D_JSON_MOTION                "Motion"
+#define D_JSON_MOTION_STATUS         "Status"
+#define D_JSON_MOTION_ENABLED        "Enabled"
+#define D_JSON_MOTION_LEVEL          "Level"
+#define D_JSON_MOTION_HIGH           "High"
+#define D_JSON_MOTION_LOW            "Low"
+#define D_JSON_MOTION_ON             "ON"
+#define D_JSON_MOTION_OFF            "OFF"
+#define D_JSON_MOTION_REARM          "Rearm"
+#define D_JSON_MOTION_FORCED         "Forced"
+#define D_JSON_MOTION_TIMELEFT       "Timeleft"
+#define D_JSON_MOTION_DETECTED       "Detected"
+#define D_JSON_MOTION_LIGHT          "Light"
+#define D_JSON_MOTION_TEMPO          "Tempo"
+
+#define D_MOTION                     "Motion Detector"
+#define D_MOTION_CONFIG              "Configure"
+#define D_MOTION_DETECTION           "Detection"
+#define D_MOTION_GRAPH               "Graph"
+#define D_MOTION_TEMPO               "Temporisation"
+#define D_MOTION_MOTION              "Motion"
+#define D_MOTION_DETECTOR            "Detector"
+#define D_MOTION_REARM               "Rearm"
+#define D_MOTION_COMMAND             "Light"
+#define D_MOTION_ENABLE              "Enable"
+#define D_MOTION_ENABLED             "Enabled"
+#define D_MOTION_DISABLE             "Disable"
+#define D_MOTION_DISABLED            "Disabled"
+#define D_MOTION_ON                  "On"
+#define D_MOTION_OFF                 "Off"
+#define D_MOTION_LEVEL               "Level"
+#define D_MOTION_HIGH                "High"
+#define D_MOTION_LOW                 "Low"
+#define D_MOTION_FORCED              "Forced"
 
 // offloading commands
 enum MotionCommands { CMND_MOTION_TEMPO, CMND_MOTION_REARM, CMND_MOTION_LEVEL, CMND_MOTION_ENABLE, CMND_MOTION_FORCE };
@@ -136,14 +137,15 @@ enum MotionStates { MOTION_OFF, MOTION_ON };
 enum MotionForce  { MOTION_FORCE_NONE, MOTION_FORCE_OFF, MOTION_FORCE_ON };
 
 // variables
-bool motion_updated   = false;                 // data has been updated, needs JSON update
-bool motion_enabled   = true;                  // is motion detection enabled
-bool motion_detected  = false;                 // is motion currently detected
-bool motion_active    = false;                 // is relay currently active
-bool motion_autorearm = false;                 // tempo automatically rearmed if motion detected
+bool    motion_updated   = false;              // data has been updated, needs JSON update
+bool    motion_enabled   = true;               // is motion detection enabled
+bool    motion_detected  = false;              // is motion currently detected
+bool    motion_active    = false;              // is relay currently active
+bool    motion_autorearm = false;              // tempo automatically rearmed if motion detected
 uint8_t motion_forced = MOTION_FORCE_NONE;     // relay state forced
 unsigned long motion_time_start  = 0;          // when tempo started
 unsigned long motion_time_update = 0;          // when JSON was last updated
+String   str_motion_json;
 
 // graph data
 int  motion_graph_index;
@@ -401,14 +403,10 @@ void MotionShowJSON (bool append)
   TIME_T  tempo_dst;
   uint8_t  motion_level;
   unsigned long time_total;
-  String   str_json, str_text;
-
-  // start message  -->  {  or message,
-  if (append == false) str_json = "{";
-  else str_json = ",";
+  String   str_json, str_mqtt, str_text;
 
   // Motion detection section  -->  "Motion":{"Level":"High","Enabled":"ON","Detected":"ON","Light":"ON","Tempo":120,"Timeout":240,"Status":"Timer","Timeleft":"2:15"}
-  str_json += "\"" + String (D_JSON_MOTION) + "\":{";
+  str_json = "\"" + String (D_JSON_MOTION) + "\":{";
 
   // detector active level (high or low)
   motion_level = MotionGetDetectionLevel ();
@@ -456,20 +454,19 @@ void MotionShowJSON (bool append)
   MotionGetTempoLeft (str_text);
   str_json += "\"" + String (D_JSON_MOTION_TIMELEFT) + "\":\"" + str_text + "\"}";
 
-  // if append mode, add json string to MQTT message
-  if (append == true) ResponseAppend_P (str_json.c_str ());
+  // save latest motion JSON
+  str_motion_json = str_json;
 
-  // else, add last bracket and directly publish message
-  else 
-  {
-    // publish JSON
-    str_json += "}";
-    Response_P (str_json.c_str ());
-    MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
+  // generate MQTT message according to append mode
+  if (append == true) str_mqtt = mqtt_data + String (",") + str_motion_json;
+  else str_mqtt = "{" + str_motion_json + "}";
 
-    // reset need for update
-    motion_updated = false;
-  } 
+  // place JSON back to MQTT data and publish it if not in append mode
+  snprintf_P (mqtt_data, sizeof(mqtt_data), str_mqtt.c_str ());
+  if (append == false) MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
+
+  // reset need for update
+  motion_updated = false;
 }
 
 // Handle detector MQTT commands
@@ -958,7 +955,7 @@ void MotionWebPageGraph ()
 
   WSContentSend_P (PSTR (".title {font-size:5vh;}\n"));
   WSContentSend_P (PSTR (".info {margin-top:10px; height:60px;}\n"));
-  WSContentSend_P (PSTR (".status {font-size:4vh; color:yellow;}\n"));
+  WSContentSend_P (PSTR (".status {color:yellow;}\n"));
   WSContentSend_P (PSTR (".time {font-size:20px;}\n"));
   WSContentSend_P (PSTR (".bold {font-weight:bold;}\n"));
 
@@ -993,7 +990,7 @@ void MotionWebPageGraph ()
   {
     // display tempo timeleft
     MotionGetTempoLeft (str_time);
-    WSContentSend_P (PSTR ("<div class='info status'>%s</div>\n"), str_time.c_str ());
+    WSContentSend_P (PSTR ("<div class='info title status'>%s</div>\n"), str_time.c_str ());
   } 
 
   // display graph
@@ -1003,6 +1000,14 @@ void MotionWebPageGraph ()
 
   // end of page
   WSContentStop ();
+}
+
+// JSON public page
+void MotionPageJson ()
+{
+  WSContentBegin(200, CT_HTML);
+  WSContentSend_P (PSTR ("{%s}\n"), str_motion_json.c_str ());
+  WSContentEnd();
 }
 
 #endif  // USE_WEBSERVER
@@ -1051,6 +1056,7 @@ bool Xsns98 (uint8_t function)
       WebServer->on ("/" D_PAGE_MOTION_CONFIG, MotionWebPageConfigure);
       WebServer->on ("/" D_PAGE_MOTION_TOGGLE, MotionWebPageToggle);
       WebServer->on ("/" D_PAGE_MOTION_GRAPH, MotionWebPageGraph);
+      WebServer->on ("/" D_PAGE_MOTION_JSON, MotionPageJson);
       break;
     case FUNC_WEB_ADD_MAIN_BUTTON:
       MotionWebMainButton ();

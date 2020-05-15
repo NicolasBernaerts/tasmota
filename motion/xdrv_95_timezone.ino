@@ -22,40 +22,40 @@
 
 #ifdef USE_TIMEZONE
 
-#define XDRV_95                   95
-#define XSNS_95                   95
+#define XDRV_95                  95
+#define XSNS_95                  95
 
-#define TIMEZONE_BUFFER_SIZE      128
+#define TIMEZONE_BUFFER_SIZE     128
 
-#define D_PAGE_TIMEZONE_CONFIG    "tz"
+#define D_PAGE_TIMEZONE_CONFIG   "tz"
 
-#define D_CMND_TIMEZONE_STDO      "stdo"
-#define D_CMND_TIMEZONE_STDM      "stdm"
-#define D_CMND_TIMEZONE_STDW      "stdw"
-#define D_CMND_TIMEZONE_STDD      "stdd"
-#define D_CMND_TIMEZONE_DSTO      "dsto"
-#define D_CMND_TIMEZONE_DSTM      "dstm"
-#define D_CMND_TIMEZONE_DSTW      "dstw"
-#define D_CMND_TIMEZONE_DSTD      "dstd"
+#define D_CMND_TIMEZONE_STDO     "stdo"
+#define D_CMND_TIMEZONE_STDM     "stdm"
+#define D_CMND_TIMEZONE_STDW     "stdw"
+#define D_CMND_TIMEZONE_STDD     "stdd"
+#define D_CMND_TIMEZONE_DSTO     "dsto"
+#define D_CMND_TIMEZONE_DSTM     "dstm"
+#define D_CMND_TIMEZONE_DSTW     "dstw"
+#define D_CMND_TIMEZONE_DSTD     "dstd"
 
-#define D_JSON_TIMEZONE           "Timezone"
-#define D_JSON_TIMEZONE_STD       "STD"
-#define D_JSON_TIMEZONE_DST       "DST"
-#define D_JSON_TIMEZONE_OFFSET    "Offset"
-#define D_JSON_TIMEZONE_MONTH     "Month"
-#define D_JSON_TIMEZONE_WEEK      "Week"
-#define D_JSON_TIMEZONE_DAY       "Day"
+#define D_JSON_TIMEZONE          "Timezone"
+#define D_JSON_TIMEZONE_STD      "STD"
+#define D_JSON_TIMEZONE_DST      "DST"
+#define D_JSON_TIMEZONE_OFFSET   "Offset"
+#define D_JSON_TIMEZONE_MONTH    "Month"
+#define D_JSON_TIMEZONE_WEEK     "Week"
+#define D_JSON_TIMEZONE_DAY      "Day"
 
 // xdrv_95_timezone.ino
-#define D_TIMEZONE            "Timezone"
-#define D_TIMEZONE_CONFIG     "Configure"
-#define D_TIMEZONE_TIME       "Time"
-#define D_TIMEZONE_STD        "Standard Time"
-#define D_TIMEZONE_DST        "Daylight Saving Time"
-#define D_TIMEZONE_OFFSET     "Offset to GMT (mn)"
-#define D_TIMEZONE_MONTH      "Month (1:jan ... 12:dec)"
-#define D_TIMEZONE_WEEK       "Week (0:last ... 4:fourth)"
-#define D_TIMEZONE_DAY        "Day of week (1:sun ... 7:sat)"
+#define D_TIMEZONE               "Timezone"
+#define D_TIMEZONE_CONFIG        "Configure"
+#define D_TIMEZONE_TIME          "Time"
+#define D_TIMEZONE_STD           "Standard Time"
+#define D_TIMEZONE_DST           "Daylight Saving Time"
+#define D_TIMEZONE_OFFSET        "Offset to GMT (mn)"
+#define D_TIMEZONE_MONTH         "Month (1:jan ... 12:dec)"
+#define D_TIMEZONE_WEEK          "Week (0:last ... 4:fourth)"
+#define D_TIMEZONE_DAY           "Day of week (1:sun ... 7:sat)"
 
 // offloading commands
 enum TimezoneCommands { CMND_TIMEZONE_STDO, CMND_TIMEZONE_STDM, CMND_TIMEZONE_STDW, CMND_TIMEZONE_STDD, CMND_TIMEZONE_DSTO, CMND_TIMEZONE_DSTM, CMND_TIMEZONE_DSTW, CMND_TIMEZONE_DSTD };
@@ -79,7 +79,6 @@ void TimezoneShowJSON (bool append)
 
   // Timezone section start -->  "Timezone":{
   str_json += "\"" + String (D_JSON_TIMEZONE) + "\":{";
-
 
   // STD section -->  "STD":{"Offset":60,"Month":10,"Week":0,"Day":1}
   str_json += "\"" + String (D_JSON_TIMEZONE_STD) + "\":{";
