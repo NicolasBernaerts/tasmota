@@ -24,11 +24,12 @@ In thermostat mode, if you use Tasmota standard timers, you'll be able to manage
 
 This Tasmota firmware is based on version **v8.1** modified to handle **Pilotwire** with :
   * Web configuration interface
-  * public page (**/control**)
   * extension of JSON MQTT status
   * new specific MQTT commands
   * automatic offload when global power is overloading your contract
   * timers management (ON = target temperature, OFF = night mode temperature)
+  * **/control** public page to control thermostat
+  * **/json** public page to get latest JSON
 
 MQTT JSON result should look like that :
 
@@ -44,6 +45,10 @@ MQTT JSON result should look like that :
 Pilotwire protocol is described at http://www.radiateur-electrique.org/fil-pilote-radiateur.php
 
 Pre-compiled version of Tasmota handling fil pilote is available : **tasmota.bin**
+
+If you want to comile the firmware, don't forget to uncomment following line in **my_user_config.h**
+
+    #define USE_CONFIG_OVERRIDE             // Uncomment to use user_config_override.h file. See README.md
 
 Complete setup guide will be available at http://www.bernaerts-nicolas.fr/iot/...
 
