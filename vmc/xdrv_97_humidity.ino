@@ -66,7 +66,7 @@ uint32_t humidity_last_update      = 0;            // last time (in millis) humi
 \**************************************************/
 
 // get current humidity MQTT topic (humidity topic;humidity key)
-const char* HumidityGetMqttTopic ()
+String HumidityGetMqttTopic ()
 {
   int    index;
   String str_setting, str_result;
@@ -76,11 +76,11 @@ const char* HumidityGetMqttTopic ()
   index = str_setting.indexOf (';');
   if (index != -1) str_result = str_setting.substring (0, index);
 
-  return str_result.c_str ();
+  return str_result;
 }
 
 // get current humidity JSON key (humidity topic;humidity key)
-const char* HumidityGetMqttKey ()
+String HumidityGetMqttKey ()
 {
   int    index;
   String str_setting, str_result;
@@ -90,38 +90,26 @@ const char* HumidityGetMqttKey ()
   index = str_setting.indexOf (';');
   if (index != -1) str_result = str_setting.substring (index + 1);
 
-  return str_result.c_str ();
+  return str_result;
 }
 
 // set current humidity MQTT topic (humidity topic;humidity key)
 void HumiditySetMqttTopic (char* str_topic)
 {
-  int    index;
   String str_setting;
 
-  // extract humidity topic from settings
-  str_setting = (char*)Settings.free_f03;
-  index = str_setting.indexOf (';');
-  if (index != -1) str_setting = str_topic + str_setting.substring (index);
-  else str_setting = str_topic + String (";");
-
-  // save the full settings
+  // generate and write settings
+  str_setting =  String (str_topic) + ";" + HumidityGetMqttKey ();
   strncpy ((char*)Settings.free_f03, str_setting.c_str (), 233);
 }
 
 // set current humidity JSON key (humidity topic;humidity key)
 void HumiditySetMqttKey (char* str_key)
 {
-  int    index;
   String str_setting;
 
-  // extract humidity topic from settings
-  str_setting = (char*)Settings.free_f03;
-  index = str_setting.indexOf (';');
-  if (index != -1) str_setting = str_setting.substring (0, index + 1) + str_key;
-  else str_setting = String (";") + str_key;
-
-  // save the full settings
+  // generate and write settings
+  str_setting = HumidityGetMqttTopic () + ";" + String (str_key);
   strncpy ((char*)Settings.free_f03, str_setting.c_str (), 233);
 }
 

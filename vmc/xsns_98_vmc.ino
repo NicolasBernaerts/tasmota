@@ -111,11 +111,11 @@ uint32_t vmc_graph_index;
 uint32_t vmc_graph_counter;
 uint8_t  vmc_humidity_source;         // humidity source
 float    vmc_current_temperature, vmc_graph_temperature;
-float    vmc_current_humidity, vmc_graph_humidity;
+uint8_t  vmc_current_humidity, vmc_graph_humidity;
 uint8_t  vmc_current_target, vmc_graph_target;
 uint8_t  vmc_graph_state;
 float    arr_temperature[VMC_GRAPH_SAMPLE];
-float    arr_humidity[VMC_GRAPH_SAMPLE];
+uint8_t  arr_humidity[VMC_GRAPH_SAMPLE];
 uint8_t  arr_target[VMC_GRAPH_SAMPLE];
 uint8_t  arr_state[VMC_GRAPH_SAMPLE];
 String   str_vmc_json;
@@ -227,9 +227,10 @@ float VmcGetTemperature ()
 }
 
 // get current humidity level
-float VmcGetHumidity ()
+uint8_t VmcGetHumidity ()
 {
-  float humidity = NAN;
+  uint8_t result   = UINT8_MAX;
+  float   humidity = NAN;
 
   // read humidity from local sensor
   vmc_humidity_source = VMC_SOURCE_LOCAL;
@@ -246,7 +247,10 @@ float VmcGetHumidity ()
     humidity = HumidityGetValue ();
   }
 
-  return humidity;
+  // convert to integer
+  if (isnan (humidity) == false) result = int (humidity);
+
+  return result;
 }
 
 // set target humidity
@@ -263,8 +267,6 @@ uint8_t VmcGetTargetHumidity ()
 
   // get target temperature
   target = (uint8_t) Settings.weight_max;
-
-  // check if within range
   if (target > VMC_TARGET_MAX) target = VMC_TARGET_DEFAULT;
   
   return target;
@@ -284,8 +286,6 @@ uint8_t VmcGetThreshold ()
 
   // get humidity threshold
   threshold = (uint8_t) Settings.weight_calibration;
-  
-  // check if within range
    if (threshold > VMC_THRESHOLD_MAX) threshold = VMC_THRESHOLD_DEFAULT;
 
   return threshold;
@@ -294,46 +294,55 @@ uint8_t VmcGetThreshold ()
 // Show JSON status (for MQTT)
 void VmcShowJSON (bool append)
 {
-  uint8_t state, mode;
-  float   value;
-  String  str_mqtt, str_label;
+  uint8_t humidity, value, mode;
+  float   temperature;
+  String  str_mqtt, str_text;
 
   // save MQTT data
   str_mqtt = mqtt_data;
 
   // get mode and humidity
-  mode      = VmcGetMode ();
-  str_label = VmcGetStateLabel (mode);
+  mode     = VmcGetMode ();
+  str_text = VmcGetStateLabel (mode);
 
   // vmc mode  -->  "VMC":{"Relay":2,"Mode":4,"Label":"Automatic","Humidity":70.5,"Target":50,"Temperature":18.4}
   str_vmc_json  = "\"" + String (D_JSON_VMC) + "\":{";
   str_vmc_json += "\"" + String (D_JSON_VMC_RELAY) + "\":" + String (devices_present) + ",";
   str_vmc_json += "\"" + String (D_JSON_VMC_MODE) + "\":" + String (mode) + ",";
-  str_vmc_json += "\"" + String (D_JSON_VMC_LABEL) + "\":\"" + str_label + "\",";
+  str_vmc_json += "\"" + String (D_JSON_VMC_LABEL) + "\":\"" + str_text + "\",";
 
-  // if temperature is available, add it to JSON
-  value = VmcGetTemperature ();
-  if (isnan(value) == false) str_vmc_json += "\"" + String (D_JSON_VMC_TEMPERATURE) + "\":" + String (value, 1) + ",";
+  // temperature
+  temperature = VmcGetTemperature ();
+  if (isnan(temperature) == false) str_text = String (temperature, 1);
+  else str_text = "n/a";
+  str_vmc_json += "\"" + String (D_JSON_VMC_TEMPERATURE) + "\":" + str_text + ",";
 
-  // if humidity level is available, add it to JSON
-  value = VmcGetHumidity ();
-  if (isnan(value) == false) str_vmc_json += "\"" + String (D_JSON_VMC_HUMIDITY) + "\":" + String (value, 1) + ",";
+  // humidity level
+  humidity = VmcGetHumidity ();
+  if (humidity != UINT8_MAX) str_text = String (humidity);
+  else str_text = "n/a";
+  str_vmc_json += "\"" + String (D_JSON_VMC_HUMIDITY) + "\":" + str_text + ",";
 
-  // add target and thresold to JSON
-  str_vmc_json += "\"" + String (D_JSON_VMC_TARGET) + "\":" + String (VmcGetTargetHumidity ()) + ",";
-  str_vmc_json += "\"" + String (D_JSON_VMC_THRESHOLD) + "\":" + String (VmcGetThreshold ()) + "}";
+  // target humidity
+  value = VmcGetTargetHumidity ();
+  str_vmc_json += "\"" + String (D_JSON_VMC_TARGET) + "\":" + String (value) + ",";
+
+  // humidity thresold
+  value = VmcGetThreshold ();
+  str_vmc_json += "\"" + String (D_JSON_VMC_THRESHOLD) + "\":" + String (value) + "}";
 
   // if VMC mode is enabled
   if (mode != VMC_DISABLED)
   {
     // get relay state and label
-    state     = VmcGetRelayState ();
-    str_label = VmcGetStateLabel (state);
+    mode     = VmcGetRelayState ();
+    str_text = VmcGetStateLabel (mode);
 
     // relay state  -->  ,"State":{"Mode":1,"Label":"On"}
-    str_vmc_json += ",\"" + String (D_JSON_VMC_STATE) + "\":{";
-    str_vmc_json += "\"" + String (D_JSON_VMC_MODE) + "\":" + String (state) + ",";
-    str_vmc_json += "\"" + String (D_JSON_VMC_LABEL) + "\":\"" + str_label + "\"}";
+    str_vmc_json += ",";
+    str_vmc_json += "\"" + String (D_JSON_VMC_STATE) + "\":{";
+    str_vmc_json += "\"" + String (D_JSON_VMC_MODE) + "\":" + String (mode) + ",";
+    str_vmc_json += "\"" + String (D_JSON_VMC_LABEL) + "\":\"" + str_text + "\"}";
   }
 
   // add remote humidity to JSON
@@ -372,10 +381,10 @@ bool VmcCommand ()
       VmcSetMode (XdrvMailbox.payload);
       break;
     case CMND_VMC_TARGET:     // set target humidity 
-      VmcSetTargetHumidity (atof (XdrvMailbox.data));
+      VmcSetTargetHumidity ((uint8_t) XdrvMailbox.payload);
       break;
     case CMND_VMC_THRESHOLD:  // set humidity threshold 
-      VmcSetThreshold (atof (XdrvMailbox.data));
+      VmcSetThreshold ((uint8_t) XdrvMailbox.payload);
       break;
     default:
       command_serviced = false;
@@ -399,7 +408,7 @@ void VmcUpdateHistory ()
 
   // init current values
   vmc_graph_temperature = NAN;
-  vmc_graph_humidity    = NAN;
+  vmc_graph_humidity    = UINT8_MAX;
   vmc_graph_target      = UINT8_MAX;
   vmc_graph_state       = VMC_DISABLED;
 
@@ -411,8 +420,8 @@ void VmcUpdateHistory ()
 void VmcEverySecond ()
 {
   bool    need_update = false;
-  uint8_t mode, target_value, actual_state, target_state;
-  float   temperature, humidity, target, threshold;
+  uint8_t humidity, threshold, mode, target, actual_state, target_state;
+  float   temperature;
 
   // update current temperature
   temperature = VmcGetTemperature ( );
@@ -429,28 +438,28 @@ void VmcEverySecond ()
 
   // update current humidity
   humidity = VmcGetHumidity ( );
-  if (isnan(humidity) == false)
+  if (humidity != UINT8_MAX)
   {
     // save current value and ask for JSON update if any change
     if (vmc_current_humidity != humidity) need_update = true;
     vmc_current_humidity = humidity;
 
     // update graph value
-    if (isnan(vmc_graph_humidity) == false) vmc_graph_humidity = max (vmc_graph_humidity, humidity);
+    if (vmc_graph_humidity != UINT8_MAX) vmc_graph_humidity = max (vmc_graph_humidity, humidity);
     else vmc_graph_humidity = humidity;
   }
 
   // update target humidity
-  target_value = VmcGetTargetHumidity ();
-  if (target_value != UINT8_MAX)
+  target = VmcGetTargetHumidity ();
+  if (target != UINT8_MAX)
   {
     // save current value and ask for JSON update if any change
-    if (vmc_current_target != target_value) need_update = true;
-    vmc_current_target = target_value;
+    if (vmc_current_target != target) need_update = true;
+    vmc_current_target = target;
 
     // update graph value
-    if (vmc_graph_target != UINT8_MAX) vmc_graph_target = min (vmc_graph_target, target_value);
-    else vmc_graph_target = target_value;
+    if (vmc_graph_target != UINT8_MAX) vmc_graph_target = min (vmc_graph_target, target);
+    else vmc_graph_target = target;
   } 
 
   // update relay state
@@ -467,8 +476,7 @@ void VmcEverySecond ()
   if (mode == VMC_AUTO)
   {
     // get current and target humidity
-    target    = float (target_value);
-    threshold = float (VmcGetThreshold ());
+    threshold = VmcGetThreshold ();
 
     // if humidity is low enough, target VMC state is low speed
     if (humidity < (target - threshold)) target_state = VMC_LOW;
@@ -504,9 +512,12 @@ void VmcInit ()
   int    index;
 
   // init default values
-  vmc_humidity_source   = VMC_SOURCE_NONE;
+  vmc_humidity_source     = VMC_SOURCE_NONE;
+  vmc_current_temperature = NAN;
+  vmc_current_humidity    = UINT8_MAX;
+  vmc_current_target      = UINT8_MAX;
   vmc_graph_temperature = NAN;
-  vmc_graph_humidity    = NAN;
+  vmc_graph_humidity    = UINT8_MAX;
   vmc_graph_target      = UINT8_MAX;
   vmc_graph_state       = VMC_LOW;
   vmc_graph_index       = 0;
@@ -517,7 +528,7 @@ void VmcInit ()
   for (index = 0; index < VMC_GRAPH_SAMPLE; index++)
   {
     arr_temperature[index] = NAN;
-    arr_humidity[index] = NAN;
+    arr_humidity[index] = UINT8_MAX;
     arr_target[index] = UINT8_MAX;
     arr_state[index] = VMC_LOW;
   }
@@ -532,13 +543,12 @@ void VmcInit ()
 // VMC mode select combo
 void VmcWebSelectMode (bool autosubmit)
 {
-  uint8_t actual_mode;
-  float   actual_humidity;
+  uint8_t mode, humidity;
   char    argument[VMC_BUFFER_SIZE];
 
   // get mode and humidity
-  actual_mode     = VmcGetMode ();
-  actual_humidity = VmcGetHumidity ();
+  mode     = VmcGetMode ();
+  humidity = VmcGetHumidity ();
 
   // selection : beginning
   WSContentSend_P (PSTR ("<select name='%s'"), D_CMND_VMC_MODE);
@@ -546,24 +556,24 @@ void VmcWebSelectMode (bool autosubmit)
   WSContentSend_P (PSTR (">"));
   
   // selection : disabled
-  if (actual_mode == VMC_DISABLED) strcpy (argument, "selected"); 
+  if (mode == VMC_DISABLED) strcpy (argument, "selected"); 
   else strcpy (argument, "");
   WSContentSend_P (PSTR ("<option value='%d' %s>%s</option>"), VMC_DISABLED, argument, D_VMC_DISABLED);
 
   // selection : low speed
-  if (actual_mode == VMC_LOW) strcpy (argument, "selected");
+  if (mode == VMC_LOW) strcpy (argument, "selected");
   else strcpy (argument, "");
   WSContentSend_P (PSTR ("<option value='%d' %s>%s</option>"), VMC_LOW, argument, D_VMC_LOW);
 
   // selection : high speed
-  if (actual_mode == VMC_HIGH) strcpy (argument, "selected");
+  if (mode == VMC_HIGH) strcpy (argument, "selected");
   else strcpy (argument, "");
   WSContentSend_P (PSTR ("<option value='%d' %s>%s</option>"), VMC_HIGH, argument, D_VMC_HIGH);
 
   // selection : automatic
-  if (actual_humidity != 0) 
+  if (humidity != UINT8_MAX) 
   {
-    if (actual_mode == VMC_AUTO) strcpy (argument, "selected");
+    if (mode == VMC_AUTO) strcpy (argument, "selected");
     else strcpy (argument, "");
     WSContentSend_P (PSTR("<option value='%d' %s>%s</option>"), VMC_AUTO, argument, D_VMC_AUTO);
   }
@@ -589,9 +599,8 @@ void VmcWebConfigButton ()
 // append VMC state to main page
 bool VmcWebSensor ()
 {
-  uint8_t  mode, state;
-  float    humidity;
-  String   str_title, str_text, str_color;
+  uint8_t  mode, state, humidity, target;
+  String   str_title, str_text, str_value, str_source, str_color;
 
   // display mode
   mode     = VmcGetMode ();
@@ -621,27 +630,30 @@ bool VmcWebSensor ()
   // if automatic mode, display humidity and target humidity
   if (mode == VMC_AUTO)
   {
-    // read humidity and handle sensor source
-    humidity  = VmcGetHumidity ();
+    // read current and target humidity
+    humidity = VmcGetHumidity ();
+    target   = VmcGetTargetHumidity ();
+
+    // handle sensor source
     switch (vmc_humidity_source)
     {
       case VMC_SOURCE_NONE:  // no humidity source available 
-        str_title = D_VMC_HUMIDITY;
-        str_text  = "<b>---</b>";
+        str_value  = "--";
         break;
       case VMC_SOURCE_LOCAL:  // local humidity source used 
-        str_title = D_VMC_LOCAL + String (" ") + D_VMC_SENSOR;
-        str_text  = "<b>" + String (humidity, 1) + "</b>";
+        str_source = D_VMC_LOCAL;
+        str_value  = String (humidity);
         break;
       case VMC_SOURCE_REMOTE:  // remote humidity source used 
-        str_title = D_VMC_REMOTE + String (" ") + D_VMC_SENSOR;
-        str_text  = "<b>" + String (humidity, 1) + "</b>";
+        str_source = D_VMC_REMOTE;
+        str_value  = String (humidity);
         break;
     }
 
-    // add target humidity
-    humidity = VmcGetTargetHumidity ();
-    str_text += " / " + String (humidity, 0) + "%";
+    // set title and text
+    str_title = D_VMC_HUMIDITY;
+    if (str_source.length() > 0) str_title += " (" + str_source + ")";
+    str_text  = "<b>" + str_value + "</b> / " + String (target) + "%";
 
     // display
     WSContentSend_PD (PSTR("{s}%s{m}%s{e}"), str_title.c_str(), str_text.c_str());
@@ -666,11 +678,11 @@ void VmcWebPageConfig ()
 
     // get VMC target humidity according to TARGET parameter
     WebGetArg (D_CMND_VMC_TARGET, argument, VMC_BUFFER_SIZE);
-    if (strlen(argument) > 0) VmcSetTargetHumidity (atof (argument));
+    if (strlen(argument) > 0) VmcSetTargetHumidity ((uint8_t) atoi (argument));
 
     // get VMC humidity threshold according to THRESHOLD parameter
     WebGetArg (D_CMND_VMC_THRESHOLD, argument, VMC_BUFFER_SIZE);
-    if (strlen(argument) > 0) VmcSetThreshold (atof (argument));
+    if (strlen(argument) > 0) VmcSetThreshold ((uint8_t) atoi (argument));
   }
 
   // beginning of form
@@ -713,8 +725,8 @@ void VmcWebDisplayGraph ()
   uint32_t current_time;
   int      index, array_idx;
   int      graph_x, graph_y, graph_x1, graph_x2, graph_left, graph_right, graph_width, graph_pos, graph_hour;
-  uint8_t  target, state_curr, state_prev;
-  float    humidity, temperature, temp_min, temp_max, temp_scope;
+  uint8_t  humidity, target, state_curr, state_prev;
+  float    temperature, temp_min, temp_max, temp_scope;
   char     str_hour[4];
   String   str_value;
 
@@ -867,14 +879,14 @@ void VmcWebDisplayGraph ()
     // if temperature value is defined
     array_idx = (index + vmc_graph_index) % VMC_GRAPH_SAMPLE;
     humidity  = arr_humidity[array_idx];
-    if (isnan (humidity) == false)
+    if (humidity != UINT8_MAX)
     {
       // adjust current temperature to acceptable range
-      humidity = min (max (humidity, float (0)), float (100));
+      humidity = min (max ((int) humidity, 0), 100);
 
       // calculate current position
       graph_x = graph_left + (graph_width * index / VMC_GRAPH_SAMPLE);
-      graph_y = VMC_GRAPH_HEIGHT - int (humidity * VMC_GRAPH_HEIGHT / 100);
+      graph_y = VMC_GRAPH_HEIGHT - (humidity * VMC_GRAPH_HEIGHT / 100);
 
       // add the point to the line
       WSContentSend_P (PSTR("%d,%d "), graph_x, graph_y);
@@ -968,7 +980,7 @@ void VmcWebPageGraph ()
   if (isnan (value) == false) WSContentSend_P (PSTR ("<div class='title bold yellow'>%s °C</div>\n"), String (VmcGetTemperature (), 1).c_str());
 
   // humidity
-  WSContentSend_P (PSTR ("<div class='title bold orange'>%s %%</div>\n"), String (VmcGetHumidity (), 1).c_str());
+  WSContentSend_P (PSTR ("<div class='title bold orange'>%d %%</div>\n"), VmcGetHumidity ());
 
   // display temperature graph
   WSContentSend_P (PSTR ("<div class='graph'>\n"));
