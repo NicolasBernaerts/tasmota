@@ -26,7 +26,7 @@ MQTT result should look like that :
     {"VMC":{"Relay":1,"Mode":3,"Label":"Automatic","Temperature":22.2,"Humidity":71.7,"Target":60,"Threshold":2},"State":{"Mode":2,"Label":"High speed"},"Humidity":{"State":nan,"Topic":"","Key":""}}
     {"VMC":{"Relay":1,"Mode":3,"Label":"Automatic","Temperature":22.2,"Humidity":71.8,"Target":60,"Threshold":2},"State":{"Mode":2,"Label":"High speed"},"Humidity":{"State":nan,"Topic":"","Key":""}}
 
-If you want to comile the firmware, don't forget to uncomment following line in **my_user_config.h**
+If you want to compile the firmware, don't forget to uncomment following line in **my_user_config.h**
 
     #define USE_CONFIG_OVERRIDE             // Uncomment to use user_config_override.h file. See README.md
 
