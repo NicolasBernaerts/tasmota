@@ -1,9 +1,7 @@
 Tasmota firmware modified to control VMC
 =============
 
-This evolution of Tasmota firmware has been enhanced to handle a Motor Controled Ventilator according to ambient humidity level.
-
-VMC is :
+This evolution of Tasmota firmware has been enhanced to handle a Motor Controled Ventilator according to current humidity level. VMC is :
   * started as soon as humidity goes beyond a target value
   * stopped as soon as humidity goes below this target value.
 
