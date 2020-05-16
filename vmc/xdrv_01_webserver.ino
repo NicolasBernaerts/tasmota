@@ -477,7 +477,10 @@ const char HTTP_COUNTER[] PROGMEM =
   "<br><div id='t' style='text-align:center;'></div>";
 
 const char HTTP_END[] PROGMEM =
-  "<div style='text-align:right;font-size:11px;'><hr/><a href='https://bit.ly/tasmota' target='_blank' style='color:#aaa;'>Tasmota %s " D_BY " Theo Arends</a><br />VMC 2.4 by Nicolas Bernaerts</div>"
+  "<div style='text-align:right;font-size:11px;'><hr/><a href='https://bit.ly/tasmota' target='_blank' style='color:#aaa;'>Tasmota %s " D_BY " Theo Arends</a></div>"
+#ifdef USE_VMC
+  "<div style='text-align:right;font-size:10px;padding-top:0px;'>VMC 2.5 by Nicolas Bernaerts</div>"
+#endif // USE_VMC
   "</div>"
   "</body>"
   "</html>";

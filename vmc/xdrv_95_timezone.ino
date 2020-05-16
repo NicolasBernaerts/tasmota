@@ -46,6 +46,16 @@
 #define D_JSON_TIMEZONE_WEEK      "Week"
 #define D_JSON_TIMEZONE_DAY       "Day"
 
+#define D_TIMEZONE                "Timezone"
+#define D_TIMEZONE_CONFIG         "Configure"
+#define D_TIMEZONE_TIME           "Time"
+#define D_TIMEZONE_STD            "Standard Time"
+#define D_TIMEZONE_DST            "Daylight Saving Time"
+#define D_TIMEZONE_OFFSET         "Offset to GMT (mn)"
+#define D_TIMEZONE_MONTH          "Month (1:jan ... 12:dec)"
+#define D_TIMEZONE_WEEK           "Week (0:last ... 4:fourth)"
+#define D_TIMEZONE_DAY            "Day of week (1:sun ... 7:sat)"
+
 // offloading commands
 enum TimezoneCommands { CMND_TIMEZONE_STDO, CMND_TIMEZONE_STDM, CMND_TIMEZONE_STDW, CMND_TIMEZONE_STDD, CMND_TIMEZONE_DSTO, CMND_TIMEZONE_DSTM, CMND_TIMEZONE_DSTW, CMND_TIMEZONE_DSTD };
 const char kTimezoneCommands[] PROGMEM = D_CMND_TIMEZONE_STDO "|" D_CMND_TIMEZONE_STDM "|" D_CMND_TIMEZONE_STDW "|" D_CMND_TIMEZONE_STDD "|" D_CMND_TIMEZONE_DSTO "|" D_CMND_TIMEZONE_DSTM "|" D_CMND_TIMEZONE_DSTW "|" D_CMND_TIMEZONE_DSTD;
@@ -60,41 +70,36 @@ const char TIMEZONE_TOPIC_STYLE[] PROGMEM = "style='float:right;font-size:0.7rem
 // Show JSON status (for MQTT)
 void TimezoneShowJSON (bool append)
 {
-  String  str_json;
-
-  // start message  -->  {  or message,
-  if (append == false) str_json = "{";
-  else str_json = ",";
+  String str_mqtt, str_json;
 
   // Timezone section start -->  "Timezone":{
-  str_json += "\"" + String (D_JSON_TIMEZONE) + "\":{";
-
+  str_json = "\"" + String (D_JSON_TIMEZONE) + "\":{";
 
   // STD section -->  "STD":{"Offset":60,"Month":10,"Week":0,"Day":1}
   str_json += "\"" + String (D_JSON_TIMEZONE_STD) + "\":{";
   str_json += "\"" + String (D_JSON_TIMEZONE_OFFSET) + "\":" + String (Settings.toffset[0]) + ",";
   str_json += "\"" + String (D_JSON_TIMEZONE_MONTH) + "\":" + String (Settings.tflag[0].month) + ",";
   str_json += "\"" + String (D_JSON_TIMEZONE_WEEK) + "\":" + String (Settings.tflag[0].week) + ",";
-  str_json += "\"" + String (D_JSON_TIMEZONE_DAY) + "\":" + String (Settings.tflag[0].dow) + "}";
-  str_json += ",";
+  str_json += "\"" + String (D_JSON_TIMEZONE_DAY) + "\":" + String (Settings.tflag[0].dow) + "},";
 
   // DST section -->  "DST":{"Offset":60,"Month":10,"Week":0,"Day":1}
   str_json += "\"" + String (D_JSON_TIMEZONE_DST) + "\":{";
   str_json += "\"" + String (D_JSON_TIMEZONE_OFFSET) + "\":" + String (Settings.toffset[1]) + ",";
   str_json += "\"" + String (D_JSON_TIMEZONE_MONTH) + "\":" + String (Settings.tflag[1].month) + ",";
   str_json += "\"" + String (D_JSON_TIMEZONE_WEEK) + "\":" + String (Settings.tflag[1].week) + ",";
-  str_json += "\"" + String (D_JSON_TIMEZONE_DAY) + "\":" + String (Settings.tflag[1].dow) + "}";
-  str_json += "}";
+  str_json += "\"" + String (D_JSON_TIMEZONE_DAY) + "\":" + String (Settings.tflag[1].dow) + "}}";
 
-  // if append mode, add json string to MQTT message
-  if (append == true) ResponseAppend_P (str_json.c_str ());
-
-  // else, add last bracket and directly publish message
-  else 
+  // generate MQTT message according to publish state and publish if needed
+  if (append == false) 
   {
-    str_json += "}";
-    Response_P (str_json.c_str ());
+    str_mqtt = "{" + str_json + "}";
+    snprintf_P(mqtt_data, sizeof(mqtt_data), str_mqtt.c_str());
     MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
+  }
+  else
+  {
+    str_mqtt = String (mqtt_data) + "," + str_json;
+    snprintf_P(mqtt_data, sizeof(mqtt_data), str_mqtt.c_str());
   }
 }
 
@@ -146,7 +151,7 @@ bool TimezoneMqttCommand ()
       command_handled = false;
   }
 
-  // if needed, send updated status
+  // if command handled, publish JSON
   if (command_handled == true) TimezoneShowJSON (false);
 
   return command_handled;

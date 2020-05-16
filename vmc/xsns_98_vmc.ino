@@ -9,6 +9,7 @@
     13/03/2020 - v2.2 - Add time on graph
     17/03/2020 - v2.3 - Handle Sonoff Dual and remote humidity sensor
     05/04/2020 - v2.4 - Add Timezone management
+    15/05/2020 - v2.5 - Add /json page
 
   Settings are stored using weighting scale parameters :
     - Settings.weight_reference   = VMC mode
@@ -37,8 +38,8 @@
 
 // web configuration page
 #define D_PAGE_VMC_CONFIG       "vmc"
-#define D_PAGE_VMC_CONTROL      "control"
 #define D_PAGE_VMC_GRAPH        "graph"
+#define D_PAGE_VMC_JSON         "json"
 #define D_CMND_VMC_MODE         "mode"
 #define D_CMND_VMC_TARGET       "target"
 #define D_CMND_VMC_THRESHOLD    "thres"
@@ -53,6 +54,23 @@
 #define D_JSON_VMC_TEMPERATURE  "Temperature"
 #define D_JSON_VMC_THRESHOLD    "Threshold"
 #define D_JSON_VMC_RELAY        "Relay"
+
+#define D_VMC_MODE              "VMC Mode"
+#define D_VMC_STATE             "VMC State"
+#define D_VMC_GRAPH             "Daily Graph"
+#define D_VMC_LOCAL             "Local"
+#define D_VMC_REMOTE            "Remote"
+#define D_VMC_HUMIDITY          "Humidity"
+#define D_VMC_SENSOR            "Sensor"
+#define D_VMC_DISABLED          "Disabled"
+#define D_VMC_LOW               "Low speed"
+#define D_VMC_HIGH              "High speed"
+#define D_VMC_AUTO              "Automatic"
+#define D_VMC_PARAMETERS        "VMC Parameters"
+#define D_VMC_TARGET            "Target Humidity"
+#define D_VMC_THRESHOLD         "Humidity Threshold"
+#define D_VMC_CONFIGURE         "Configure VMC"
+#define D_VMC_TIME              "Time"
 
 // graph data
 #define VMC_GRAPH_STEP          5           // collect graph data every 5 mn
@@ -92,14 +110,15 @@ int      vmc_graph_refresh;
 uint32_t vmc_graph_index;
 uint32_t vmc_graph_counter;
 uint8_t  vmc_humidity_source;         // humidity source
-float    vmc_current_temperature;
-float    vmc_current_humidity;
-uint8_t  vmc_current_target;
-uint8_t  vmc_current_state;
+float    vmc_current_temperature, vmc_graph_temperature;
+float    vmc_current_humidity, vmc_graph_humidity;
+uint8_t  vmc_current_target, vmc_graph_target;
+uint8_t  vmc_graph_state;
 float    arr_temperature[VMC_GRAPH_SAMPLE];
 float    arr_humidity[VMC_GRAPH_SAMPLE];
 uint8_t  arr_target[VMC_GRAPH_SAMPLE];
 uint8_t  arr_state[VMC_GRAPH_SAMPLE];
+String   str_vmc_json;
 
 /**************************************************\
  *                  Accessors
@@ -277,36 +296,32 @@ void VmcShowJSON (bool append)
 {
   uint8_t state, mode;
   float   value;
-  String  str_json, str_label;
+  String  str_mqtt, str_label;
+
+  // save MQTT data
+  str_mqtt = mqtt_data;
 
   // get mode and humidity
   mode      = VmcGetMode ();
   str_label = VmcGetStateLabel (mode);
 
-  // start message  -->  {  or message,
-  if (append == false) str_json = "{";
-  else str_json = String (mqtt_data) + ",";
-
   // vmc mode  -->  "VMC":{"Relay":2,"Mode":4,"Label":"Automatic","Humidity":70.5,"Target":50,"Temperature":18.4}
-  str_json += "\"" + String (D_JSON_VMC) + "\":{";
-  str_json += ",\"" + String (D_JSON_VMC_RELAY) + "\":" + String (devices_present);
-  str_json += ",\"" + String (D_JSON_VMC_MODE) + "\":" + String (mode);
-  str_json += ",\"" + String (D_JSON_VMC_LABEL) + "\":" + str_label + "\"";
+  str_vmc_json  = "\"" + String (D_JSON_VMC) + "\":{";
+  str_vmc_json += "\"" + String (D_JSON_VMC_RELAY) + "\":" + String (devices_present) + ",";
+  str_vmc_json += "\"" + String (D_JSON_VMC_MODE) + "\":" + String (mode) + ",";
+  str_vmc_json += "\"" + String (D_JSON_VMC_LABEL) + "\":\"" + str_label + "\",";
 
   // if temperature is available, add it to JSON
   value = VmcGetTemperature ();
-  if (isnan(value) == false) str_json += ",\"" + String (D_JSON_VMC_TEMPERATURE) + "\":" + String (value, 1);
+  if (isnan(value) == false) str_vmc_json += "\"" + String (D_JSON_VMC_TEMPERATURE) + "\":" + String (value, 1) + ",";
 
   // if humidity level is available, add it to JSON
   value = VmcGetHumidity ();
-  if (isnan(value) == false) str_json += ",\"" + String (D_JSON_VMC_HUMIDITY) + "\":" + String (value, 1);
+  if (isnan(value) == false) str_vmc_json += "\"" + String (D_JSON_VMC_HUMIDITY) + "\":" + String (value, 1) + ",";
 
   // add target and thresold to JSON
-  str_json += ",\"" + String (D_JSON_VMC_TARGET) + "\":" + String (VmcGetTargetHumidity ());
-  str_json += ",\"" + String (D_JSON_VMC_THRESHOLD) + "\":" + String (VmcGetThreshold ());
-  
-  // end of section
-  str_json += "}";
+  str_vmc_json += "\"" + String (D_JSON_VMC_TARGET) + "\":" + String (VmcGetTargetHumidity ()) + ",";
+  str_vmc_json += "\"" + String (D_JSON_VMC_THRESHOLD) + "\":" + String (VmcGetThreshold ()) + "}";
 
   // if VMC mode is enabled
   if (mode != VMC_DISABLED)
@@ -316,19 +331,28 @@ void VmcShowJSON (bool append)
     str_label = VmcGetStateLabel (state);
 
     // relay state  -->  ,"State":{"Mode":1,"Label":"On"}
-    str_json += ",\"" + String (D_JSON_VMC_STATE) + "\":{";
-    str_json += ",\"" + String (D_JSON_VMC_MODE) + "\":" + String (state);
-    str_json += ",\"" + String (D_JSON_VMC_LABEL) + "\":" + str_label + "\"}";
+    str_vmc_json += ",\"" + String (D_JSON_VMC_STATE) + "\":{";
+    str_vmc_json += "\"" + String (D_JSON_VMC_MODE) + "\":" + String (state) + ",";
+    str_vmc_json += "\"" + String (D_JSON_VMC_LABEL) + "\":\"" + str_label + "\"}";
   }
 
-  // if not in append mode, add last bracket 
-  if (append == false) str_json += "}";
+  // add remote humidity to JSON
+  snprintf_P(mqtt_data, sizeof(mqtt_data), str_vmc_json.c_str());
+  HumidityShowJSON (true);
+  str_vmc_json = mqtt_data;
 
-  // add json string to MQTT message
-  snprintf_P (mqtt_data, sizeof(mqtt_data), str_json.c_str ());
-
-  // if not in append mode, publish message 
-  if (append == false) MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
+  // generate MQTT message and publish if needed
+  if (append == false) 
+  {
+    str_mqtt = "{" + str_vmc_json + "}";
+    snprintf_P(mqtt_data, sizeof(mqtt_data), str_mqtt.c_str());
+    MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
+  }
+  else
+  {
+    str_mqtt += "," + str_vmc_json;
+    snprintf_P(mqtt_data, sizeof(mqtt_data), str_mqtt.c_str());
+  }
 }
 
 // Handle VMC MQTT commands
@@ -358,7 +382,7 @@ bool VmcCommand ()
       break;
   }
 
-  // if command processed, update JSON
+  // if command processed, publish JSON
   if (command_serviced == true) VmcShowJSON (false);
 
   return command_serviced;
@@ -368,16 +392,16 @@ bool VmcCommand ()
 void VmcUpdateHistory ()
 {
   // set indexed graph values with current values
-  arr_temperature[vmc_graph_index] = vmc_current_temperature;
-  arr_humidity[vmc_graph_index] = vmc_current_humidity;
-  arr_target[vmc_graph_index] = vmc_current_target;
-  arr_state[vmc_graph_index] = vmc_current_state;
+  arr_temperature[vmc_graph_index] = vmc_graph_temperature;
+  arr_humidity[vmc_graph_index] = vmc_graph_humidity;
+  arr_target[vmc_graph_index] = vmc_graph_target;
+  arr_state[vmc_graph_index] = vmc_graph_state;
 
   // init current values
-  vmc_current_temperature = NAN;
-  vmc_current_humidity    = NAN;
-  vmc_current_target      = UINT8_MAX;
-  vmc_current_state       = VMC_DISABLED;
+  vmc_graph_temperature = NAN;
+  vmc_graph_humidity    = NAN;
+  vmc_graph_target      = UINT8_MAX;
+  vmc_graph_state       = VMC_DISABLED;
 
   // increase temperature data index and reset if max reached
   vmc_graph_index ++;
@@ -386,6 +410,7 @@ void VmcUpdateHistory ()
 
 void VmcEverySecond ()
 {
+  bool    need_update = false;
   uint8_t mode, target_value, actual_state, target_state;
   float   temperature, humidity, target, threshold;
 
@@ -393,34 +418,44 @@ void VmcEverySecond ()
   temperature = VmcGetTemperature ( );
   if (isnan(temperature) == false)
   {
-    if (isnan(vmc_current_temperature) == false) vmc_current_temperature = min (vmc_current_temperature, temperature);
-    else vmc_current_temperature = temperature;
+    // save current value and ask for JSON update if any change
+    if (vmc_current_temperature != temperature) need_update = true;
+    vmc_current_temperature = temperature;
+
+    // update graph value
+    if (isnan(vmc_graph_temperature) == false) vmc_graph_temperature = min (vmc_graph_temperature, temperature);
+    else vmc_graph_temperature = temperature;
   }
 
   // update current humidity
   humidity = VmcGetHumidity ( );
   if (isnan(humidity) == false)
   {
-    if (isnan(vmc_current_humidity) == false) vmc_current_humidity = max (vmc_current_humidity, humidity);
-    else vmc_current_humidity = humidity;
+    // save current value and ask for JSON update if any change
+    if (vmc_current_humidity != humidity) need_update = true;
+    vmc_current_humidity = humidity;
+
+    // update graph value
+    if (isnan(vmc_graph_humidity) == false) vmc_graph_humidity = max (vmc_graph_humidity, humidity);
+    else vmc_graph_humidity = humidity;
   }
 
   // update target humidity
   target_value = VmcGetTargetHumidity ();
   if (target_value != UINT8_MAX)
   {
-    if (vmc_current_target != UINT8_MAX) vmc_current_target = min (vmc_current_target, target_value);
-    else vmc_current_target = target_value;
+    // save current value and ask for JSON update if any change
+    if (vmc_current_target != target_value) need_update = true;
+    vmc_current_target = target_value;
+
+    // update graph value
+    if (vmc_graph_target != UINT8_MAX) vmc_graph_target = min (vmc_graph_target, target_value);
+    else vmc_graph_target = target_value;
   } 
 
   // update relay state
   actual_state = VmcGetRelayState ();
-  if (vmc_current_state != VMC_HIGH) vmc_current_state = actual_state;
-
-  // increment delay counter and if delay reached, update history data
-  if (vmc_graph_counter == 0) VmcUpdateHistory ();
-  vmc_graph_counter ++;
-  vmc_graph_counter = vmc_graph_counter % vmc_graph_refresh;
+  if (vmc_graph_state != VMC_HIGH) vmc_graph_state = actual_state;
 
   // get VMC mode
   mode = VmcGetMode ();
@@ -448,15 +483,20 @@ void VmcEverySecond ()
   // else, set target mode
   else target_state = mode;
 
-  // if VMC state is different than target state, change state
+  // if VMC state is different than target state, set relay
   if (actual_state != target_state)
   {
-    // set relays
     VmcSetRelayState (target_state);
-
-    // publish new state
-    VmcShowJSON (false);
+    need_update = true;
   }
+  
+  // if JSON update needed, publish
+  if (need_update == true) VmcShowJSON (false);
+
+  // increment delay counter and if delay reached, update history data
+  if (vmc_graph_counter == 0) VmcUpdateHistory ();
+  vmc_graph_counter ++;
+  vmc_graph_counter = vmc_graph_counter % vmc_graph_refresh;
 }
 
 void VmcInit ()
@@ -464,14 +504,14 @@ void VmcInit ()
   int    index;
 
   // init default values
-  vmc_humidity_source     = VMC_SOURCE_NONE;
-  vmc_current_temperature = NAN;
-  vmc_current_humidity    = NAN;
-  vmc_current_target      = UINT8_MAX;
-  vmc_current_state       = VMC_LOW;
-  vmc_graph_index         = 0;
-  vmc_graph_counter       = 0;
-  vmc_graph_refresh       = 60 * VMC_GRAPH_STEP;
+  vmc_humidity_source   = VMC_SOURCE_NONE;
+  vmc_graph_temperature = NAN;
+  vmc_graph_humidity    = NAN;
+  vmc_graph_target      = UINT8_MAX;
+  vmc_graph_state       = VMC_LOW;
+  vmc_graph_index       = 0;
+  vmc_graph_counter     = 0;
+  vmc_graph_refresh     = 60 * VMC_GRAPH_STEP;
 
   // initialise graph data
   for (index = 0; index < VMC_GRAPH_SAMPLE; index++)
@@ -536,7 +576,7 @@ void VmcWebSelectMode (bool autosubmit)
 void VmcWebMainButton ()
 {
     // VMC control page button
-  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), D_PAGE_VMC_CONTROL, D_VMC_CONTROL);
+  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), D_PAGE_VMC_GRAPH, D_VMC_GRAPH);
 }
 
 // append VMC configuration button to configuration page
@@ -880,14 +920,14 @@ void VmcWebDisplayGraph ()
 }
 
 // VMC public web page
-void VmcWebPageControl ()
+void VmcWebPageGraph ()
 {
   float value;
 
   // beginning of form without authentification with 60 seconds auto refresh
-  WSContentStart_P (D_VMC_CONTROL, false);
+  WSContentStart_P (D_VMC_GRAPH, false);
   WSContentSend_P (PSTR ("</script>\n"));
-  WSContentSend_P (PSTR ("<meta http-equiv='refresh' content='%d;URL=/%s' />\n"), 60, D_PAGE_VMC_CONTROL);
+  WSContentSend_P (PSTR ("<meta http-equiv='refresh' content='%d;URL=/%s' />\n"), 60, D_PAGE_VMC_GRAPH);
   
   // page style
   WSContentSend_P (PSTR ("<style>\n"));
@@ -939,6 +979,14 @@ void VmcWebPageControl ()
   WSContentStop ();
 }
 
+// JSON public page
+void VmcPageJson ()
+{
+  WSContentBegin(200, CT_HTML);
+  WSContentSend_P (PSTR ("{%s}\n"), str_vmc_json.c_str ());
+  WSContentEnd();
+}
+
 #endif  // USE_WEBSERVER
 
 /*******************************************************\
@@ -968,7 +1016,8 @@ bool Xsns98 (byte callback_id)
 #ifdef USE_WEBSERVER
     case FUNC_WEB_ADD_HANDLER:
       WebServer->on ("/" D_PAGE_VMC_CONFIG,  VmcWebPageConfig);
-      WebServer->on ("/" D_PAGE_VMC_CONTROL, VmcWebPageControl);
+      WebServer->on ("/" D_PAGE_VMC_GRAPH, VmcWebPageGraph);
+      WebServer->on ("/" D_PAGE_VMC_JSON, VmcPageJson);
       break;
     case FUNC_WEB_SENSOR:
       VmcWebSensor ();

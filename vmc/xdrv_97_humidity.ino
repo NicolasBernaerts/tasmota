@@ -40,6 +40,11 @@
 #define D_JSON_HUMIDITY_TOPIC    "Topic"
 #define D_JSON_HUMIDITY_KEY      "Key"
 
+#define D_HUMIDITY_CONFIGURE     "Remote Humidity Sensor"
+#define D_HUMIDITY_REMOTE        "Humidity remote sensor"
+#define D_HUMIDITY_TOPIC         "MQTT Topic"
+#define D_HUMIDITY_KEY           "MQTT JSON Key"
+
 // humidity commands
 enum HumidityCommands { CMND_HUMIDITY_TOPIC, CMND_HUMIDITY_KEY };
 const char kHumidityCommands[] PROGMEM = D_CMND_HUMIDITY_TOPIC "|" D_CMND_HUMIDITY_KEY;
@@ -61,29 +66,31 @@ uint32_t humidity_last_update      = 0;            // last time (in millis) humi
 \**************************************************/
 
 // get current humidity MQTT topic (humidity topic;humidity key)
-void HumidityGetMqttTopic (String& str_topic)
+const char* HumidityGetMqttTopic ()
 {
   int    index;
-  String str_setting;
+  String str_setting, str_result;
 
   // extract humidity topic from settings
   str_setting = (char*)Settings.free_f03;
   index = str_setting.indexOf (';');
-  if (index != -1) str_topic = str_setting.substring (0, index);
-  else str_topic = "";
+  if (index != -1) str_result = str_setting.substring (0, index);
+
+  return str_result.c_str ();
 }
 
 // get current humidity JSON key (humidity topic;humidity key)
-void HumidityGetMqttKey (String& str_key)
+const char* HumidityGetMqttKey ()
 {
   int    index;
-  String str_setting;
+  String str_setting, str_result;
 
   // extract temperature topic from settings
   str_setting = (char*)Settings.free_f03;
   index = str_setting.indexOf (';');
-  if (index != -1) str_key = str_setting.substring (index + 1);
-  else str_key = "";
+  if (index != -1) str_result = str_setting.substring (index + 1);
+
+  return str_result.c_str ();
 }
 
 // set current humidity MQTT topic (humidity topic;humidity key)
@@ -143,35 +150,35 @@ void HumiditySetValue (float new_humidity)
   humidity_last_update = millis ();
 }
 
-// Show JSON status (for MQTT)
+// generate JSON status (for MQTT)
 void HumidityShowJSON (bool append)
 {
-  String str_json, str_topic, str_key;
+  String str_mqtt, str_json, str_topic, str_key;
   float  humidity;
 
   // read data
-  HumidityGetMqttTopic (str_topic);
-  HumidityGetMqttKey (str_key);
-  humidity = HumidityGetValue ();
-
-  // start message  -->  {  or message,
-  if (append == false) str_json = "{";
-  else str_json = String (mqtt_data) + ",";
+  str_topic = HumidityGetMqttTopic ();
+  str_key   = HumidityGetMqttKey ();
+  humidity  = HumidityGetValue ();
 
   // humidity  -->  "Humidity":{"Value":18.5,"Topic":"mqtt/topic/of/temperature","Key":"Temp"}
-  str_json += "\"" + String (D_JSON_HUMIDITY) + "\":{";
+  str_json =  "\"" + String (D_JSON_HUMIDITY) + "\":{";
   str_json += "\"" + String (D_JSON_HUMIDITY_VALUE) + "\":" + String (humidity, 1) + ",";
   str_json += "\"" + String (D_JSON_HUMIDITY_TOPIC) + "\":\"" + str_topic + "\",";
   str_json += "\"" + String (D_JSON_HUMIDITY_KEY) + "\":\"" + str_key + "\"}";
 
-  // if not in append mode, add last bracket 
-  if (append == false) str_json += "}";
-
-  // add json string to MQTT message
-  snprintf_P (mqtt_data, sizeof(mqtt_data), str_json.c_str ());
-
-  // if not in append mode, publish message 
-  if (append == false) MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
+  // generate MQTT message according to publish state and publish if needed
+  if (append == false) 
+  {
+    str_mqtt = "{" + str_json + "}";
+    snprintf_P(mqtt_data, sizeof(mqtt_data), str_mqtt.c_str());
+    MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
+  }
+  else
+  {
+    str_mqtt = String (mqtt_data) + "," + str_json;
+    snprintf_P(mqtt_data, sizeof(mqtt_data), str_mqtt.c_str());
+  }
 }
 
 // Handle humidity MQTT commands
@@ -210,7 +217,7 @@ void HumidityCheckMqttConnexion ()
   String str_topic;
 
   // get temperature MQTT topic
-  HumidityGetMqttTopic (str_topic);
+  str_topic = HumidityGetMqttTopic ();
 
   // if topic defined, check MQTT connexion
   if (str_topic.length () > 0)
@@ -248,8 +255,8 @@ bool HumidityMqttData ()
 
   // get topics to compare
   str_mailbox_topic = XdrvMailbox.topic;
-  HumidityGetMqttKey (str_key);
-  HumidityGetMqttTopic (str_topic);
+  str_key   = HumidityGetMqttKey ();
+  str_topic = HumidityGetMqttTopic ();
 
   // get humidity (removing SPACE and QUOTE)
   str_mailbox_data  = XdrvMailbox.data;
@@ -325,11 +332,11 @@ void HumidityWebPage ()
   WSContentSend_P (PSTR("<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n"), D_HUMIDITY_REMOTE);
 
   // remote sensor mqtt topic
-  HumidityGetMqttTopic (str_topic);
+  str_topic = HumidityGetMqttTopic ();
   WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input name='%s' value='%s'></p>\n"), D_HUMIDITY_TOPIC, HUMIDITY_TOPIC_STYLE, D_CMND_HUMIDITY_TOPIC, D_CMND_HUMIDITY_TOPIC, str_topic.c_str ());
 
   // remote sensor json key
-  HumidityGetMqttKey (str_key);
+  str_key = HumidityGetMqttKey ();
   WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br/><input name='%s' value='%s'><br/>\n"), D_HUMIDITY_KEY, HUMIDITY_TOPIC_STYLE, D_CMND_HUMIDITY_KEY, D_CMND_HUMIDITY_KEY, str_key.c_str ());
   WSContentSend_P (PSTR("</fieldset></p>\n"));
 
@@ -381,10 +388,6 @@ bool Xsns97 (uint8_t function)
   // main callback switch
   switch (function)
   { 
-    case FUNC_JSON_APPEND:
-      HumidityShowJSON (true);
-      break;
-
 #ifdef USE_WEBSERVER
     case FUNC_WEB_ADD_HANDLER:
       WebServer->on ("/" D_PAGE_HUMIDITY, HumidityWebPage);
@@ -393,7 +396,6 @@ bool Xsns97 (uint8_t function)
       HumidityWebButton ();
       break;
 #endif  // USE_WEBSERVER
-
   }
   
   return result;
