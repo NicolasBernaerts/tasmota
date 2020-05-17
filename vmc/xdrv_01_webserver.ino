@@ -479,7 +479,7 @@ const char HTTP_COUNTER[] PROGMEM =
 const char HTTP_END[] PROGMEM =
   "<div style='text-align:right;font-size:11px;'><hr/><a href='https://bit.ly/tasmota' target='_blank' style='color:#aaa;'>Tasmota %s " D_BY " Theo Arends</a></div>"
 #ifdef USE_VMC
-  "<div style='text-align:right;font-size:10px;padding-top:0px;'>VMC 2.5 by Nicolas Bernaerts</div>"
+  "<div style='text-align:right;font-size:11px;'>" VMC_NAME " " VMC_VERSION " " D_BY " " VMC_AUTHOR "</div>"
 #endif // USE_VMC
   "</div>"
   "</body>"
