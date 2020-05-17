@@ -479,7 +479,7 @@ const char HTTP_COUNTER[] PROGMEM =
 const char HTTP_END[] PROGMEM =
   "<div style='text-align:right;font-size:11px;'><hr/><a href='https://bit.ly/tasmota' target='_blank' style='color:#aaa;'>Tasmota %s " D_BY " Theo Arends</a></div>"
 #ifdef USE_PILOTWIRE
-  "<div style='text-align:right;font-size:10px;padding-top:0px;'>Pilotwire 6.1 by Nicolas Bernaerts</div>"
+  "<div style='text-align:right;font-size:11px;'>" PILOTWIRE_NAME " " PILOTWIRE_VERSION " " D_BY " " PILOTWIRE_AUTHOR "</div>"
 #endif // USE_PILOTWIRE
   "</div>"
   "</body>"
