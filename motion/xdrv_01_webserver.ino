@@ -479,7 +479,7 @@ const char HTTP_COUNTER[] PROGMEM =
 const char HTTP_END[] PROGMEM =
   "<div style='text-align:right;font-size:11px;'><hr/><a href='https://bit.ly/tasmota' target='_blank' style='color:#aaa;'>Tasmota %s " D_BY " Theo Arends</a></div>"
 #ifdef USE_MOTION
-  "<div style='text-align:right;font-size:11px;'>Motion 1.4 by Nicolas Bernaerts</div>"
+  "<div style='text-align:right;font-size:11px;'>" MOTION_NAME " " MOTION_VERSION " " D_BY " " MOTION_AUTHOR "</div>"
 #endif // USE_MOTION
   "</div>"
   "</body>"
