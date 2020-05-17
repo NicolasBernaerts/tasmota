@@ -48,6 +48,10 @@
 #define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_TELEINFO                          // Add support for France Teleinfo Energy monitor as used in Linky (+1k1 code)
 
+#define TELEINFO_VERSION "3.5.1"              // version
+#define TELEINFO_NAME "Teleinfo"              // name
+#define TELEINFO_AUTHOR "Nicolas Bernaerts"   // author
+
 #undef APP_SLEEP
 #define APP_SLEEP 1                           // Default to sleep = 1
 
