@@ -30,3 +30,5 @@ If you want to compile the firmware, don't forget to uncomment following line in
 
 
 Complete setup guide is available at http://www.bernaerts-nicolas.fr/iot/...
+
+![Graph page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/vmc/tasmota-vmc-graph.png)
