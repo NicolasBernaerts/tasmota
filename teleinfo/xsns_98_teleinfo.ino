@@ -13,6 +13,7 @@
     05/04/2020 - v3.3 - Add Timezone management
     13/05/2020 - v3.4 - Add overload management per phase
     15/05/2020 - v3.5 - Add /msg and /json pages
+    19/05/2020 - v3.6 - Add configuration for first NTP server
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -304,9 +305,9 @@ void TeleinfoWebDisplayGraph ()
   WSContentSend_P (PSTR ("<rect x='%d%%' y='0%%' width='%d%%' height='100%%' rx='10' />\n"), TELEINFO_GRAPH_PERCENT_START, TELEINFO_GRAPH_PERCENT_STOP - TELEINFO_GRAPH_PERCENT_START);
 
   // graph separation lines
-  WSContentSend_P (PSTR ("<line class='dash' x1='%d%%' y1='25%%' x2='%d%%' y2='25%%' />\n"), TELEINFO_GRAPH_PERCENT_START, TELEINFO_GRAPH_PERCENT_STOP);
-  WSContentSend_P (PSTR ("<line class='dash' x1='%d%%' y1='50%%' x2='%d%%' y2='50%%' />\n"), TELEINFO_GRAPH_PERCENT_START, TELEINFO_GRAPH_PERCENT_STOP);
-  WSContentSend_P (PSTR ("<line class='dash' x1='%d%%' y1='75%%' x2='%d%%' y2='75%%' />\n"), TELEINFO_GRAPH_PERCENT_START, TELEINFO_GRAPH_PERCENT_STOP);
+  WSContentSend_P (PSTR ("<line class='dash' x1='%d%%' y1='%d%%' x2='%d%%' y2='%d%%' />\n"), TELEINFO_GRAPH_PERCENT_START, 25, TELEINFO_GRAPH_PERCENT_STOP, 25);
+  WSContentSend_P (PSTR ("<line class='dash' x1='%d%%' y1='%d%%' x2='%d%%' y2='%d%%' />\n"), TELEINFO_GRAPH_PERCENT_START, 50, TELEINFO_GRAPH_PERCENT_STOP, 50);
+  WSContentSend_P (PSTR ("<line class='dash' x1='%d%%' y1='%d%%' x2='%d%%' y2='%d%%' />\n"), TELEINFO_GRAPH_PERCENT_START, 75, TELEINFO_GRAPH_PERCENT_STOP, 75);
 
   // power units
   WSContentSend_P (PSTR ("<text class='unit' x='%d%%' y='%d%%'>VA</text>\n"), TELEINFO_GRAPH_PERCENT_STOP + 2, 5, 100);
@@ -315,7 +316,6 @@ void TeleinfoWebDisplayGraph ()
   WSContentSend_P (PSTR ("<text class='power' x='%d%%' y='%d%%'>%d</text>\n"), 1, 52, power_max / 2);
   WSContentSend_P (PSTR ("<text class='power' x='%d%%' y='%d%%'>%d</text>\n"), 1, 77, power_max / 4);
   WSContentSend_P (PSTR ("<text class='power' x='%d%%' y='%d%%'>%d</text>\n"), 1, 99, 0);
-
 
   // --------------------
   //   Apparent power
