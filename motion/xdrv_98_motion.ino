@@ -7,6 +7,7 @@
     15/04/2020 - v1.2 - Add detection auto rearm flag management
     18/04/2020 - v1.3 - Handle Toggle button and display motion icon
     15/05/2020 - v1.4 - Add /json page to get latest motion JSON
+    20/05/2020 - v1.5 - Add configuration for first NTP server
                    
   Input devices should be configured as followed :
    - Switch2 = Motion detector

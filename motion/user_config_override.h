@@ -49,7 +49,7 @@
 #define USE_TIMEZONE                          // Add support for timezone management
 #define USE_MOTION                            // Add support for motion detector
 
-#define MOTION_VERSION "1.4.1"                // version
+#define MOTION_VERSION "1.5"                  // version
 #define MOTION_NAME "Motion"                  // name
 #define MOTION_AUTHOR "Nicolas Bernaerts"     // author
 
