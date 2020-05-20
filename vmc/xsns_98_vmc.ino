@@ -10,6 +10,7 @@
     17/03/2020 - v2.3 - Handle Sonoff Dual and remote humidity sensor
     05/04/2020 - v2.4 - Add Timezone management
     15/05/2020 - v2.5 - Add /json page
+    20/05/2020 - v2.6 - Add configuration for first NTP server
 
   Settings are stored using weighting scale parameters :
     - Settings.weight_reference   = VMC mode

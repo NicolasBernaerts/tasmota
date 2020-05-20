@@ -3,6 +3,7 @@
   
   Copyright (C) 2020  Nicolas Bernaerts
     04/04/2020 - v1.0 - Creation 
+    19/05/2020 - v1.1 - Add configuration for first NTP server 
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -29,6 +30,18 @@
 
 #define D_PAGE_TIMEZONE_CONFIG    "tz"
 
+#define D_TIMEZONE                "Timezone"
+#define D_TIMEZONE_CONFIG         "Configure"
+#define D_TIMEZONE_NTP            "First time server"
+#define D_TIMEZONE_TIME           "Time"
+#define D_TIMEZONE_STD            "Standard Time"
+#define D_TIMEZONE_DST            "Daylight Saving Time"
+#define D_TIMEZONE_OFFSET         "Offset to GMT (mn)"
+#define D_TIMEZONE_MONTH          "Month (1:jan ... 12:dec)"
+#define D_TIMEZONE_WEEK           "Week (0:last ... 4:fourth)"
+#define D_TIMEZONE_DAY            "Day of week (1:sun ... 7:sat)"
+
+#define D_CMND_TIMEZONE_NTP       "ntp"
 #define D_CMND_TIMEZONE_STDO      "stdo"
 #define D_CMND_TIMEZONE_STDM      "stdm"
 #define D_CMND_TIMEZONE_STDW      "stdw"
@@ -46,19 +59,9 @@
 #define D_JSON_TIMEZONE_WEEK      "Week"
 #define D_JSON_TIMEZONE_DAY       "Day"
 
-#define D_TIMEZONE                "Timezone"
-#define D_TIMEZONE_CONFIG         "Configure"
-#define D_TIMEZONE_TIME           "Time"
-#define D_TIMEZONE_STD            "Standard Time"
-#define D_TIMEZONE_DST            "Daylight Saving Time"
-#define D_TIMEZONE_OFFSET         "Offset to GMT (mn)"
-#define D_TIMEZONE_MONTH          "Month (1:jan ... 12:dec)"
-#define D_TIMEZONE_WEEK           "Week (0:last ... 4:fourth)"
-#define D_TIMEZONE_DAY            "Day of week (1:sun ... 7:sat)"
-
 // offloading commands
-enum TimezoneCommands { CMND_TIMEZONE_STDO, CMND_TIMEZONE_STDM, CMND_TIMEZONE_STDW, CMND_TIMEZONE_STDD, CMND_TIMEZONE_DSTO, CMND_TIMEZONE_DSTM, CMND_TIMEZONE_DSTW, CMND_TIMEZONE_DSTD };
-const char kTimezoneCommands[] PROGMEM = D_CMND_TIMEZONE_STDO "|" D_CMND_TIMEZONE_STDM "|" D_CMND_TIMEZONE_STDW "|" D_CMND_TIMEZONE_STDD "|" D_CMND_TIMEZONE_DSTO "|" D_CMND_TIMEZONE_DSTM "|" D_CMND_TIMEZONE_DSTW "|" D_CMND_TIMEZONE_DSTD;
+enum TimezoneCommands { CMND_TIMEZONE_NTP, CMND_TIMEZONE_STDO, CMND_TIMEZONE_STDM, CMND_TIMEZONE_STDW, CMND_TIMEZONE_STDD, CMND_TIMEZONE_DSTO, CMND_TIMEZONE_DSTM, CMND_TIMEZONE_DSTW, CMND_TIMEZONE_DSTD };
+const char kTimezoneCommands[] PROGMEM = D_CMND_TIMEZONE_NTP "|" D_CMND_TIMEZONE_STDO "|" D_CMND_TIMEZONE_STDM "|" D_CMND_TIMEZONE_STDW "|" D_CMND_TIMEZONE_STDD "|" D_CMND_TIMEZONE_DSTO "|" D_CMND_TIMEZONE_DSTM "|" D_CMND_TIMEZONE_DSTW "|" D_CMND_TIMEZONE_DSTD;
 
 // form topic style
 const char TIMEZONE_TOPIC_STYLE[] PROGMEM = "style='float:right;font-size:0.7rem;'";
@@ -123,6 +126,9 @@ bool TimezoneMqttCommand ()
   // handle command
   switch (command_code)
   {
+    case CMND_TIMEZONE_NTP:  // set 1st NTP server
+      SettingsUpdateText(SET_NTPSERVER1, XdrvMailbox.data);
+      break;
     case CMND_TIMEZONE_STDO:  // set timezone STD offset
       Settings.toffset[0] = atoi (XdrvMailbox.data);
       break;
@@ -192,6 +198,10 @@ void TimezoneWebPageConfigure ()
   // page comes from save button on configuration page
   if (WebServer->hasArg("save"))
   {
+    // set first time server
+    WebGetArg (D_CMND_TIMEZONE_NTP, argument, TIMEZONE_BUFFER_SIZE);
+    if (strlen(argument) > 0) SettingsUpdateText(SET_NTPSERVER1, argument);
+
     // set timezone STD offset according to 'stdo' parameter
     WebGetArg (D_CMND_TIMEZONE_STDO, argument, TIMEZONE_BUFFER_SIZE);
     if (strlen(argument) > 0) Settings.toffset[0] = atoi (argument);
@@ -229,6 +239,12 @@ void TimezoneWebPageConfigure ()
   WSContentStart_P (D_TIMEZONE_CONFIG);
   WSContentSendStyle ();
   WSContentSend_P (PSTR("<form method='get' action='%s'>\n"), D_PAGE_TIMEZONE_CONFIG);
+
+  // NTP server section  
+  // ---------------------
+  WSContentSend_P (PSTR("<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>"), D_TIMEZONE_NTP);
+  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input type='text' name='%s' value='%s'></p>\n"), D_TIMEZONE_NTP, TIMEZONE_TOPIC_STYLE, D_CMND_TIMEZONE_NTP, D_CMND_TIMEZONE_NTP, SettingsText(SET_NTPSERVER1));
+  WSContentSend_P (PSTR("</fieldset></p>\n"));
 
   // Standard Time section  
   // ---------------------
