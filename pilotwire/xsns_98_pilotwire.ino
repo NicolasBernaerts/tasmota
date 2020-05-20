@@ -24,6 +24,7 @@
     05/04/2020 - v5.7 - Add timezone management
     18/04/2020 - v6.0 - Handle direct connexion of heater in addition to pilotwire
     16/05/2020 - v6.1 - Add /json page and outside mode in JSON
+    20/05/2020 - v6.2 - Add configuration for first NTP server
 
   Settings are stored using weighting scale parameters :
     - Settings.weight_reference             = Fil pilote mode
@@ -51,7 +52,7 @@
 #define XSNS_98                         98
 
 /*************************************************\
- *               Variables
+ *               Constants
 \*************************************************/
 
 #define PILOTWIRE_BUFFER_SIZE           128
@@ -624,10 +625,18 @@ float PilotwireGetCurrentTarget ()
   return temp_target;
 }
 
+/*
 void PilotwireHandleTimer (uint32_t state)
 {
   // set outside mode according to timer state (OFF = outside mode)
   pilotwire_outside_mode = (state == POWER_OFF);
+}
+*/
+
+void PilotwireHandleTimer (uint8_t state)
+{
+  // set outside mode according to timer state (OFF = outside mode)
+  pilotwire_outside_mode = (state == 0);
 }
 
 // Show JSON status (for MQTT)

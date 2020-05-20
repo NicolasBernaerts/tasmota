@@ -50,7 +50,7 @@
 #define USE_TEMPERATURE_MQTT                  // Add support for MQTT temperature sensor
 #define USE_PILOTWIRE                         // Add support for France Pilotwire protocol for electrical heaters
 
-#define PILOTWIRE_VERSION "6.1.1"             // version
+#define PILOTWIRE_VERSION "6.2"               // version
 #define PILOTWIRE_NAME "Pilotwire"            // name
 #define PILOTWIRE_AUTHOR "Nicolas Bernaerts"  // author
 
