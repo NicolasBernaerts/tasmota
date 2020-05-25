@@ -46,12 +46,13 @@
  *    Motion : configuration starts
 \********************************************/
 
+#define USE_VERSION                           // Add support for Version page
 #define USE_TIMEZONE                          // Add support for timezone management
 #define USE_MOTION                            // Add support for motion detector
 
-#define MOTION_VERSION "1.5"                  // version
-#define MOTION_NAME "Motion"                  // name
-#define MOTION_AUTHOR "Nicolas Bernaerts"     // author
+#define EXTENSION_VERSION "1.5"               // version
+#define EXTENSION_NAME "Motion"               // name
+#define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 
 #undef APP_SLEEP
 #define APP_SLEEP 1                           // Default to sleep = 1

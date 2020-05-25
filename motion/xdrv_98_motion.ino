@@ -38,7 +38,7 @@
 #define XDRV_98                      98
 #define XSNS_98                      98
 
-#define MOTION_BUTTON                1       // switch2
+#define MOTION_BUTTON                1           // switch2
 
 #define MOTION_BUFFER_SIZE           128
 
