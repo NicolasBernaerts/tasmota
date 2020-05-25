@@ -45,14 +45,15 @@
  *    Pilotwire firmware configuration
 \********************************************/
 
+#define USE_VERSION                           // Add support for Version page
 #define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_OFFLOADING_MQTT                   // Add support for MQTT maximum power offloading
 #define USE_TEMPERATURE_MQTT                  // Add support for MQTT temperature sensor
 #define USE_PILOTWIRE                         // Add support for France Pilotwire protocol for electrical heaters
 
-#define PILOTWIRE_VERSION "6.2"               // version
-#define PILOTWIRE_NAME "Pilotwire"            // name
-#define PILOTWIRE_AUTHOR "Nicolas Bernaerts"  // author
+#define EXTENSION_VERSION "6.2"               // version
+#define EXTENSION_NAME "Pilotwire"            // name
+#define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 
 #undef APP_SLEEP
 #define APP_SLEEP 1                           // Default to sleep = 1

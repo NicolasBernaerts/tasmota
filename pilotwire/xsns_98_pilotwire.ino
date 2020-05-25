@@ -625,14 +625,6 @@ float PilotwireGetCurrentTarget ()
   return temp_target;
 }
 
-/*
-void PilotwireHandleTimer (uint32_t state)
-{
-  // set outside mode according to timer state (OFF = outside mode)
-  pilotwire_outside_mode = (state == POWER_OFF);
-}
-*/
-
 void PilotwireHandleTimer (uint8_t state)
 {
   // set outside mode according to timer state (OFF = outside mode)
