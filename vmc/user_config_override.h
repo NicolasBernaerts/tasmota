@@ -45,13 +45,14 @@
  *    VMV : configuration starts
 \***********************************/
 
+#define USE_VERSION                           // Add support for Version page
 #define USE_HUMIDITY_MQTT                     // Add support for MQTT humidity sensor
 #define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_VMC                               // Add support for Ventilation Motor Controled according to humidity level (+??k code)
 
-#define VMC_VERSION "2.6"                     // version
-#define VMC_NAME "VMC"                        // name
-#define VMC_AUTHOR "Nicolas Bernaerts"        // author
+#define EXTENSION_VERSION "2.6"               // version
+#define EXTENSION_NAME "VMC"                  // name
+#define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 
 #undef APP_SLEEP
 #define APP_SLEEP 1                           // Default to sleep = 1
