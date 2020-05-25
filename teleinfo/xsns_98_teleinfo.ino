@@ -40,8 +40,8 @@
 // web configuration page
 #define D_PAGE_TELEINFO_CONFIG          "teleinfo"
 #define D_PAGE_TELEINFO_GRAPH           "graph"
-#define D_PAGE_TELEINFO_JSON            "json"
-#define D_PAGE_TELEINFO_MSG             "msg"
+#define D_PAGE_TELEINFO_JSON            "tele.json"
+#define D_PAGE_TELEINFO_TEXT            "tele.text"
 #define D_CMND_TELEINFO_MODE            "mode"
 #define D_WEB_TELEINFO_CHECKED          "checked"
 
@@ -455,7 +455,7 @@ void TeleinfoWebPageGraph ()
 }
 
 // Serial message public page
-void TeleinfoPageMsg ()
+void TeleinfoPageText ()
 {
   WSContentBegin(200, CT_HTML);
   WSContentSend_P (str_teleinfo_msg.c_str ());
@@ -498,7 +498,7 @@ bool Xsns98 (uint8_t function)
     case FUNC_WEB_ADD_HANDLER:
       WebServer->on ("/" D_PAGE_TELEINFO_CONFIG, TeleinfoWebPageConfig);
       WebServer->on ("/" D_PAGE_TELEINFO_GRAPH, TeleinfoWebPageGraph);
-      WebServer->on ("/" D_PAGE_TELEINFO_MSG, TeleinfoPageMsg);
+      WebServer->on ("/" D_PAGE_TELEINFO_TEXT, TeleinfoPageText);
       WebServer->on ("/" D_PAGE_TELEINFO_JSON, TeleinfoPageJson);
       break;
     case FUNC_WEB_ADD_BUTTON:
