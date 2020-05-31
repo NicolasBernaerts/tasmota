@@ -46,11 +46,11 @@
  *    Intercom : configuration starts
 \********************************************/
 
-#define USE_VERSION                           // Add support for Version page
+#define USE_INFOJSON                          // Add support for Information JSON page
 #define USE_TIMEZONE                          // Add support for timezone management
 #define USE_INTERCOM                          // Add support for intercom management
 
-#define EXTENSION_VERSION "1.0"               // version
+#define EXTENSION_VERSION "1.3"               // version
 #define EXTENSION_NAME "Intercom"             // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 

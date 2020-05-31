@@ -3,15 +3,19 @@
   
   Copyright (C) 2020  Nicolas Bernaerts
     21/05/2020 - v1.0 - Creation
+    26/05/2020 - v1.1 - Add Information JSON page
+    28/05/2020 - v1.2 - Define number of rings before opening gate
+    30/05/2020 - v1.3 - Separate Intercom and Gate in JSON
                    
   Input devices should be configured as followed :
    - Serial Out = Switch2
    - Serial In  = Relay2
 
   Settings are stored using weighting scale parameters :
-   - Settings.energy_voltage_calibration = Delay between ring and gate opening
-   - Settings.energy_current_calibration = Gate opening signal duration
-   - Settings.energy_power_calibration   = Timeout before disabling intercom
+   - Settings.energy_power_calibration   = Global activation timeout (seconds)
+   - Settings.energy_kWhtoday            = Number of rings to open
+   - Settings.energy_voltage_calibration = Maximum time to pulse the rings (seconds)
+   - Settings.energy_current_calibration = Latch opening duration (seconds)
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -37,49 +41,61 @@
 #define INTERCOM_BUTTON              1       // switch2
 #define INTERCOM_RELAY               2       // relay2
 
+#define INTERCOM_MAX_RING            5       // max number of rings
+
+#define INTERCOM_TIMEOUT_ACT         120     // max time value (seconds or minutes)
+#define INTERCOM_TIMEOUT_RING        60      // max timeout for rings (seconds)
+#define INTERCOM_TIMEOUT_LATCH       10      // max timeout for latch pressed
+#define INTERCOM_TIMEOUT_UPDATE      5       // update period if active (seconds) 
+#define INTERCOM_DELAY_WILLOPEN      2       // delay once ring is detected
+#define INTERCOM_DELAY_OPENED        10      // delay once gate is opened
+
 #define INTERCOM_BUFFER_SIZE         128
-#define INTERCOM_MAX_TIME            120     // max time value (seconds or minutes)
-#define INTERCOM_UPDATE              5       // update period if active (seconds) 
 
 #define D_PAGE_INTERCOM_CONFIG       "config"
 
 #define D_CMND_INTERCOM_ACTIVE       "active"
-#define D_CMND_INTERCOM_STATE        "state"
-#define D_CMND_INTERCOM_DELAY        "delay"
-#define D_CMND_INTERCOM_GATE         "gate"
-#define D_CMND_INTERCOM_TIMEOUT      "timeout"
+#define D_CMND_INTERCOM_TACT         "tact"
+#define D_CMND_INTERCOM_TRING        "tring"
+#define D_CMND_INTERCOM_TLATCH       "tlatch"
+#define D_CMND_INTERCOM_NRING        "nring"
 
 #define D_JSON_INTERCOM              "Intercom"
 #define D_JSON_INTERCOM_ACTIVE       "Active"
-#define D_JSON_INTERCOM_STATE        "State"
-#define D_JSON_INTERCOM_LABEL        "Label"
-#define D_JSON_INTERCOM_DELAY        "Delay"
-#define D_JSON_INTERCOM_DURATION     "Duration"
-#define D_JSON_INTERCOM_TIMEOUT      "Timeout"
-#define D_JSON_INTERCOM_TIMELEFT     "Timeleft"
+#define D_JSON_INTERCOM_TACT         "Timeout"
+#define D_JSON_INTERCOM_TRING        "Ringing"
+#define D_JSON_INTERCOM_TLATCH       "Latch"
+#define D_JSON_INTERCOM_NRING        "NumRing"
 #define D_JSON_INTERCOM_ON           "ON"
 #define D_JSON_INTERCOM_OFF          "OFF"
+#define D_JSON_INTERCOM_GATE         "Gate"
+#define D_JSON_INTERCOM_STATE        "State"
+#define D_JSON_INTERCOM_LABEL        "Label"
+#define D_JSON_INTERCOM_TIMELEFT     "Timeleft"
 
 #define D_INTERCOM                   "Intercom"
-#define D_INTERCOM_DISABLED          "Disabled"
-#define D_INTERCOM_WAITING           "Waiting"
-#define D_INTERCOM_RINGING           "Ringing"
-#define D_INTERCOM_GATE              "Gate open"
-#define D_INTERCOM_DISABLED          "Disabled"
-#define D_INTERCOM_OFF               "Off"
-#define D_INTERCOM_DELAY             "Delay after ring (sec)"
-#define D_INTERCOM_DURATION          "Duration of gate open (sec)"
-#define D_INTERCOM_TIMEOUT           "Ringing timeout  (mn)"
-#define D_INTERCOM_TEMPO             "Temporisation"
-#define D_INTERCOM_STATE             "State"
+#define D_INTERCOM_GATE              "Gate"
 #define D_INTERCOM_BELL              "Bell"
+#define D_INTERCOM_ACTIVE            "Active"
+#define D_INTERCOM_TACT              "Activation timeout (mn)"
+#define D_INTERCOM_NRING             "Number of rings"
+#define D_INTERCOM_TRING             "Ring timeout (sec)"
+#define D_INTERCOM_TLATCH            "Latch open (sec)"
+#define D_INTERCOM_STATE             "State"
+#define D_INTERCOM_RINGING           "Ringing"
 #define D_INTERCOM_TIMELEFT          "Time left"
 #define D_INTERCOM_CONFIG            "Configure"
 
+#define D_GATE_DISABLED              "Disabled"
+#define D_GATE_WAITING               "Waiting"
+#define D_GATE_RINGING               "Ringing"
+#define D_GATE_WILLOPEN              "Will open"
+#define D_GATE_LATCH                 "Latch On"
+#define D_GATE_OPENED                "Opened"
 
 // intercom commands
-enum IntercomCommands { CMND_INTERCOM_ACTIVE, CMND_INTERCOM_DELAY, CMND_INTERCOM_GATE, CMND_INTERCOM_TIMEOUT };
-const char kIntercomCommands[] PROGMEM = D_CMND_INTERCOM_ACTIVE "|" D_CMND_INTERCOM_DELAY "|" D_CMND_INTERCOM_GATE "|" D_CMND_INTERCOM_TIMEOUT;
+enum IntercomCommands { CMND_INTERCOM_ACTIVE, CMND_INTERCOM_TACT, CMND_INTERCOM_TRING, CMND_INTERCOM_TLATCH, CMND_INTERCOM_NRING };
+const char kIntercomCommands[] PROGMEM = D_CMND_INTERCOM_ACTIVE "|" D_CMND_INTERCOM_TACT "|" D_CMND_INTERCOM_TRING "|" D_CMND_INTERCOM_TLATCH "|" D_CMND_INTERCOM_NRING;
 
 // form topic style
 const char INTERCOM_TOPIC_STYLE[] PROGMEM = "style='float:right;font-size:0.7rem;'";
@@ -88,166 +104,178 @@ const char INTERCOM_TOPIC_STYLE[] PROGMEM = "style='float:right;font-size:0.7rem
  *               Variables
 \*************************************************/
 
-// intercom states
-enum IntercomStates { INTERCOM_DISABLED, INTERCOM_WAITING, INTERCOM_RINGING, INTERCOM_GATE };
+// intercom gate states
+enum IntercomGateStates { GATE_DISABLED, GATE_WAITING, GATE_RINGING, GATE_WILLOPEN, GATE_LATCH, GATE_OPENED };
 
 // variables
-bool          intercom_updated    = false;               // intercom state is updated
-uint8_t       intercom_state      = INTERCOM_DISABLED;   // intercom state is disabled
-unsigned long intercom_start      = 0;
-unsigned long intercom_lastupdate = 0;
+bool     intercom_updated = false;               // intercom data has been updated
+uint8_t  gate_state       = GATE_DISABLED;       // gate opening is disabled
+uint8_t  gate_last_state  = GATE_DISABLED;       // previous recorded state
+uint8_t  gate_rings       = 0;                   // number of time ring has been pressed
+unsigned long gate_time_enabled = 0;             // time when gate was enabled (for timeout)
+unsigned long gate_time_changed = 0;             // time of last state change
+unsigned long gate_time_updated = 0;             // time of last JSON update
+unsigned long gate_time_timeout = 0;             // timeout of current status
 
 /**************************************************\
  *                  Accessors
 \**************************************************/
 
 // Enable intercom opening
-String IntercomGetStateLabel ()
+String IntercomGateStateLabel ()
 {
   String str_label;
 
   // handle command
-  switch (intercom_state)
+  switch (gate_state)
   {
-    case INTERCOM_DISABLED:  // intercom disabled
-      str_label = D_INTERCOM_DISABLED;
+    case GATE_DISABLED:  // gate disabled
+      str_label = D_GATE_DISABLED;
       break;
-    case INTERCOM_WAITING:   // intercom waiting for ring
-      str_label = D_INTERCOM_WAITING;
+    case GATE_WAITING:   // waiting for ring
+      str_label = D_GATE_WAITING + String (" (") + IntercomGetTimeLeft (gate_time_enabled, 60000 * IntercomGetActiveTimeout ()) + ")";
       break;
-    case INTERCOM_RINGING:   // intercom ringing
-      str_label = D_INTERCOM_RINGING;
+    case GATE_RINGING:   // actually ringing
+      str_label = D_GATE_RINGING + String (" (") + String (gate_rings) + "/" + String (IntercomGetNumberRing ()) + ")";
       break;
-    case INTERCOM_GATE:      // gate open
-      str_label = D_INTERCOM_GATE;
+    case GATE_WILLOPEN:  // rings detected, will open latch
+      str_label = D_GATE_WILLOPEN;
+      break;
+    case GATE_LATCH:     // opening latch
+      str_label = D_GATE_LATCH;
+      break;
+    case GATE_OPENED:     // gate opened
+      str_label = D_GATE_OPENED;
       break;
   }
 
   return str_label;
 }
 
-// get delay between ring and gate opening (seconds)
-int IntercomGetDelay ()
+// get number of rings to open gate
+int IntercomGetNumberRing ()
 {
-  return min (INTERCOM_MAX_TIME, int (Settings.energy_voltage_calibration));
+  return max (1, min (INTERCOM_MAX_RING, int (Settings.energy_kWhtoday)));
 }
 
-// set delay between ring and gate opening (seconds)
-void IntercomSetDelay (int delay)
+// set number of rings to open gate
+void IntercomSetNumberRing (int count)
 {
-  Settings.energy_voltage_calibration = (unsigned long) min (INTERCOM_MAX_TIME, delay);
-}
-
-// get gate opening signal duration (seconds)
-int IntercomGetGateDuration ()
-{
-  return min (INTERCOM_MAX_TIME, int (Settings.energy_current_calibration));
-}
-
-// set gate opening signal duration (seconds)
-void IntercomSetGateDuration (int duration)
-{
-  Settings.energy_current_calibration = (unsigned long) min (INTERCOM_MAX_TIME, duration);
+  Settings.energy_kWhtoday = max (1, min (INTERCOM_MAX_RING, count));
 }
 
 // get timeout after intercom enabling (minutes)
-int IntercomGetTimeout ()
+int IntercomGetActiveTimeout ()
 {
-  return min (INTERCOM_MAX_TIME, int (Settings.energy_power_calibration));
+  return min (INTERCOM_TIMEOUT_ACT, int (Settings.energy_power_calibration));
 }
 
 // set timeout after intercom enabling (seconds)
-void IntercomSetTimeout (int timeout)
+void IntercomSetActiveTimeout (int timeout)
 {
-  Settings.energy_power_calibration = (unsigned long) min (INTERCOM_MAX_TIME, timeout);
+  Settings.energy_power_calibration = (unsigned long) min (INTERCOM_TIMEOUT_ACT, timeout);
+}
+
+// get timeout between first and last ring (seconds)
+int IntercomGetRingingTimeout ()
+{
+  return min (INTERCOM_TIMEOUT_RING, int (Settings.energy_voltage_calibration));
+}
+
+// set delay between ring and gate opening (seconds)
+void IntercomSetRingingTimeout (int timeout)
+{
+  Settings.energy_voltage_calibration = (unsigned long) min (INTERCOM_TIMEOUT_RING, timeout);
+}
+
+// get gate opening signal duration (seconds)
+int IntercomGetLatchTimeout ()
+{
+  return min (INTERCOM_TIMEOUT_LATCH, int (Settings.energy_current_calibration));
+}
+
+// set gate opening signal duration (seconds)
+void IntercomSetLatchTimeout (int timeout)
+{
+  Settings.energy_current_calibration = (unsigned long) min (INTERCOM_TIMEOUT_LATCH, timeout);
 }
 
 /**************************************************\
  *                  Functions
 \**************************************************/
 
-// Enable or disable intercom gate opening
-void IntercomSetState (const char* str_string)
+// get intercom status
+bool IntercomIsEnabled ()
 {
+  return (gate_state != GATE_DISABLED);
+}
+
+// Activate / deactivate intercom gate opening
+void IntercomSetActive (const char* str_string)
+{
+  bool   is_enabled, ask_enable, ask_disable;
   String str_command = str_string;
 
-  // if intercom should be enabled
-  if (str_command.equals ("1") || str_command.equalsIgnoreCase (D_JSON_INTERCOM_ON))
-  {
-    if (intercom_state == INTERCOM_DISABLED)
-    {
-      // switch to waiting state
-      intercom_start   = millis ();
-      intercom_state   = INTERCOM_WAITING;
-      intercom_updated = true;
-    }
-  }
+  // check for actual state and asked state
+  is_enabled  = IntercomIsEnabled ();
+  ask_enable  =  (str_command.equals ("1") || str_command.equalsIgnoreCase (D_JSON_INTERCOM_ON));
+  ask_disable =  (str_command.equals ("0") || str_command.equalsIgnoreCase (D_JSON_INTERCOM_OFF));
 
-  // else if intercom should be disabled
-  else if (str_command.equals ("0") || str_command.equalsIgnoreCase (D_JSON_INTERCOM_OFF))
+  // enable or disable intercom
+  if ((ask_enable == true) && (is_enabled == false))
   {
-    // close gate
-    IntercomGateClose ();
-
-    // switch to waiting state
-    intercom_state   = INTERCOM_DISABLED;
-    intercom_updated = true;
+    gate_state = GATE_WAITING;
+    gate_time_enabled = millis ();
   }
+  else if ((ask_disable == true) && (is_enabled == true)) gate_state = GATE_DISABLED;
+
+  // ask for update
+  intercom_updated = true;
 }
 
 // Toggle intercom gate opening
 void IntercomToggleState ()
 {
   // toggle intercom state
-  if (intercom_state == INTERCOM_DISABLED) IntercomSetState (D_JSON_INTERCOM_ON);
-  else IntercomSetState (D_JSON_INTERCOM_OFF);
+  if (IntercomIsEnabled () == false) IntercomSetActive (D_JSON_INTERCOM_ON);
+  else IntercomSetActive (D_JSON_INTERCOM_OFF);
 }
 
 // Open gate
 void IntercomGateOpen ()
 {
-  // open gate
   ExecuteCommandPower (INTERCOM_RELAY, POWER_ON, SRC_MAX);
 }
 
 // Close gate
 void IntercomGateClose ()
 {
-  // close gate
   ExecuteCommandPower (INTERCOM_RELAY, POWER_OFF, SRC_MAX);
 }
 
 // get temporisation left in readable format
-String IntercomGetTimeLeft ()
+String IntercomGetTimeLeft (unsigned long time_start, unsigned long timeout)
 {
   TIME_T        time_dst;
-  unsigned long time_now, time_out, time_left;
+  unsigned long time_now, time_left;
   char          str_number[8];
   String        str_timeleft;
 
-  // if timeout has started
-  if (intercom_state != INTERCOM_DISABLED)
+  // get current time
+  time_now = millis ();
+
+  // if temporisation is not over
+  if (time_now - time_start < timeout)
   {
-    // get current time
-    time_now = millis ();
-
-    // get temporisation according to gate status
-    if (intercom_state == INTERCOM_GATE) time_out = 1000 * IntercomGetGateDuration ();
-    else time_out = 60 * 1000 * IntercomGetTimeout ();
-
-    // if temporisation is not over
-    if (time_now - intercom_start < time_out)
-    {
-      // convert to readable format
-      time_left = (intercom_start + time_out - time_now) / 1000;
-      BreakTime ((uint32_t) time_left, time_dst);
-      sprintf (str_number, "%02d", time_dst.minute);
-      str_timeleft = str_number + String (":");
-      sprintf (str_number, "%02d", time_dst.second);
-      str_timeleft += str_number;
-    }
-    else str_timeleft = "---";
+    // convert to readable format
+    time_left = (time_start + timeout - time_now) / 1000;
+    BreakTime ((uint32_t) time_left, time_dst);
+    sprintf (str_number, "%02d", time_dst.minute);
+    str_timeleft = str_number + String (":");
+    sprintf (str_number, "%02d", time_dst.second);
+    str_timeleft += str_number;
   }
+  else str_timeleft = "---";
 
   return str_timeleft;
 }
@@ -255,43 +283,55 @@ String IntercomGetTimeLeft ()
 // Show JSON status (for MQTT)
 void IntercomShowJSON (bool append)
 {
-  TIME_T  tempo_dst;
+  bool     show_intercom = false;
+  bool     show_gate = false;
+  TIME_T   tempo_dst;
   uint8_t  motion_level;
   unsigned long value, time_total;
   String   str_json, str_mqtt, str_text;
 
-  // Intercom section  -->  "Intercom":{"Enabled":0,"State":1,"Label":"Disabled","Delay":3,"Duration":5,"Timeout":5,"Timeleft":"2:15"}
+
+  // Intercom section
+  //   "Intercom":{"Active":"OFF","ActiveTimeout":5,"RingTimeout":3,"LatchTimeout":2,"NumRing":3}
+  // ----------------
   str_json = "\"" + String (D_JSON_INTERCOM) + "\":{";
 
   // enabled
-  if (intercom_state == INTERCOM_DISABLED) str_text = D_JSON_INTERCOM_OFF;
-  else str_text = D_JSON_INTERCOM_ON;
+  if (IntercomIsEnabled ()) str_text = D_JSON_INTERCOM_ON;
+  else str_text = D_JSON_INTERCOM_OFF;
   str_json += "\"" + String (D_JSON_INTERCOM_ACTIVE) + "\":\"" + str_text + "\",";
 
-  // state
-  str_text = IntercomGetStateLabel ();
-  str_json += "\"" + String (D_JSON_INTERCOM_STATE) + "\":" + String (intercom_state) + ",";
-  str_json += "\"" + String (D_JSON_INTERCOM_LABEL) + "\":\"" + str_text + "\",";
-  
-  // delay
-  value = IntercomGetDelay ();
-  str_json += "\"" + String (D_JSON_INTERCOM_DELAY) + "\":" + String (value) + ",";
+  // global timeout
+  value = IntercomGetActiveTimeout ();
+  str_json += "\"" + String (D_JSON_INTERCOM_TACT) + "\":" + String (value) + ",";
 
-  // duration
-  value = IntercomGetGateDuration ();
-  str_json += "\"" + String (D_JSON_INTERCOM_DURATION) + "\":" + String (value) + ",";
+  // ringing timeout
+  value = IntercomGetRingingTimeout ();
+  str_json += "\"" + String (D_JSON_INTERCOM_TRING) + "\":" + String (value) + ",";
 
   // timeout
-  value = IntercomGetTimeout ();
-  str_json += "\"" + String (D_JSON_INTERCOM_TIMEOUT) + "\":" + String (value);
+  value = IntercomGetLatchTimeout ();
+  str_json += "\"" + String (D_JSON_INTERCOM_TLATCH) + "\":" + String (value) + ",";
 
-  // time left
-  if (intercom_state != INTERCOM_DISABLED)
-  {
-    str_text = IntercomGetTimeLeft ();
-    str_json += ",\"" + String (D_JSON_INTERCOM_TIMELEFT) + "\":\"" + str_text + "\"";
-  }
-  str_json += "}";
+  // number of rings
+  value = IntercomGetNumberRing ();
+  str_json += "\"" + String (D_JSON_INTERCOM_NRING) + "\":" + String (value) + "}";
+
+
+  // Gate section
+  //   "Gate":{"State":1,"Label":"Waiting","Timeleft":"02:18"}
+  // ----------------
+  str_json += ",\"" + String (D_JSON_INTERCOM_GATE) + "\":{";
+
+  // status
+  str_json += "\"" + String (D_JSON_INTERCOM_STATE) + "\":" + String (gate_state) + ",";
+
+  // label
+  str_text = IntercomGateStateLabel ();
+  str_json += "\"" + String (D_JSON_INTERCOM_LABEL) + "\":\"" + str_text + "\"}";
+
+  // Publish message
+  // ----------------
 
   // generate MQTT message according to append mode
   if (append == true) str_mqtt = mqtt_data + String (",") + str_json;
@@ -300,6 +340,10 @@ void IntercomShowJSON (bool append)
   // place JSON back to MQTT data and publish it if not in append mode
   snprintf_P (mqtt_data, sizeof(mqtt_data), str_mqtt.c_str ());
   if (append == false) MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
+
+  // reset updated flag
+  intercom_updated  = false;
+  gate_time_updated = millis ();
 }
 
 // Handle detector MQTT commands
@@ -315,17 +359,20 @@ bool IntercomMqttCommand ()
   // handle command
   switch (command_code)
   {
-    case CMND_INTERCOM_ACTIVE:    // enable/disable intercom
-      IntercomSetState (XdrvMailbox.data);
+    case CMND_INTERCOM_ACTIVE:       // enable/disable intercom
+      IntercomSetActive (XdrvMailbox.data);
       break;
-    case CMND_INTERCOM_DELAY:       // set delay after ring
-      IntercomSetDelay (XdrvMailbox.payload);
+    case CMND_INTERCOM_TACT:        // timeout to disable intercom
+      IntercomSetActiveTimeout (XdrvMailbox.payload);
       break;
-    case CMND_INTERCOM_GATE:    // set gate open duration
-      IntercomSetGateDuration (XdrvMailbox.payload);
+    case CMND_INTERCOM_TRING:       // set delay after ring
+      IntercomSetRingingTimeout (XdrvMailbox.payload);
       break;
-    case CMND_INTERCOM_TIMEOUT:     // timeout to disable intercom
-      IntercomSetTimeout (XdrvMailbox.payload);
+    case CMND_INTERCOM_TLATCH:      // set gate open duration
+      IntercomSetLatchTimeout (XdrvMailbox.payload);
+      break;
+    case CMND_INTERCOM_NRING:       // number of rings before opening gate
+      IntercomSetNumberRing (XdrvMailbox.payload);
       break;
     default:
       command_handled = false;
@@ -337,111 +384,123 @@ bool IntercomMqttCommand ()
   return command_handled;
 }
 
-// update intercom state
-void IntercomEvery250ms ()
-{
-  uint8_t  prev_state;
-  unsigned long time_now, time_over;
-
-  // save current state and get current time
-  prev_state = intercom_state;
-  time_now   = millis ();
-
-  // if intercom gate opening is disabled, reset update time reference
-  if ((intercom_state == INTERCOM_DISABLED) && (intercom_lastupdate != 0)) intercom_lastupdate = 0;
-
-  // if gate opening is enabled
-  if (intercom_state != INTERCOM_DISABLED)
-  {
-    // check if update timeout is reached
-    if (intercom_lastupdate == 0) intercom_lastupdate = time_now;
-    time_over = INTERCOM_UPDATE * 1000;
-    if (time_now - intercom_lastupdate > time_over)
-    {
-      // reset update tiem reference and ask for update
-      intercom_lastupdate = time_now;
-      intercom_updated    = true;
-    }
-
-    // check if timeout is reached
-    time_over = 60 * 1000 * IntercomGetTimeout ();
-    if (time_now - intercom_start > time_over)
-    {
-      // if gate is opened, close it
-      if (intercom_state == INTERCOM_GATE) IntercomGateClose ();
-
-      // intercom is disabled
-      intercom_state   = INTERCOM_DISABLED;
-      intercom_updated = true;
-    }
-  }
-
-  // handle action according to intercom state
-  switch (intercom_state)
-  {
-    // intercom is ringing
-    case INTERCOM_RINGING:       
-      // check if delay is reached
-      time_over = 1000 * IntercomGetDelay ();
-      if (time_now - intercom_start > time_over)
-      {
-        // open gate
-        IntercomGateOpen ();
-
-        // switch to gate open state
-        intercom_start = time_now;
-        intercom_state = INTERCOM_GATE;
-      }
-      break;
-
-    // gate is open
-    case INTERCOM_GATE:    
-      // check if duration is reached
-      time_over = 1000 * IntercomGetGateDuration ();
-      if (time_now - intercom_start > time_over)
-      {
-        // close gate
-        IntercomGateClose ();
-
-        // switch to disabled state
-        intercom_state = INTERCOM_DISABLED;
-      }
-      break;
-  }
-
-  // if state changed, intercom updated
-  if (prev_state != intercom_state) intercom_updated = true;
-
-  // if some important data have been updated, publish JSON
-  if (intercom_updated == true)
-  {
-    IntercomShowJSON (false);
-    intercom_updated = false;
-  }
-}
-
 // called when bell button is pressed
-bool IntercomBellPressed(void)
+bool IntercomBellPressed ()
 {
   bool served = false;
 
   if ((XdrvMailbox.index == INTERCOM_BUTTON) && (XdrvMailbox.payload == PRESSED) && (Button.last_state[INTERCOM_BUTTON] == NOT_PRESSED))
   {
-    // if intercom is in waiting state
-    if (intercom_state == INTERCOM_WAITING)
-      {
-        // switch to ringing state
-        intercom_start   = millis ();
-        intercom_state   = INTERCOM_RINGING;
-        intercom_updated = true;
-      }
+    // log
+    AddLog_P (LOG_LEVEL_INFO, D_INTERCOM_RINGING);
 
-    // log 
-    AddLog_P(LOG_LEVEL_INFO, PSTR("Bell ringing"));
+    // if intercom is enabled, increment rings number
+    if (IntercomIsEnabled ()) gate_rings ++;
+
+    // notification served
     served = true;
   }
 
   return served;
+}
+
+// called when bell button is pressed
+bool IntercomBellIsPressed ()
+{
+  return (Button.last_state[INTERCOM_BUTTON] == PRESSED);
+}
+
+// update intercom state
+void IntercomEvery250ms ()
+{
+  unsigned long time_now, time_over;
+
+  // get current time
+  time_now   = millis ();
+
+  // check for timeout (GATE_WAITING till GATE_WILLOPEN)
+  if ((gate_state > GATE_DISABLED) && (gate_state < GATE_LATCH))
+  {
+    // if timeout is reached, disable intercom
+    time_over = 60000 * IntercomGetActiveTimeout ();
+    if (time_now - gate_time_enabled > time_over) gate_state = GATE_DISABLED;
+
+    // if JSON update timeout is reached, force update
+    time_over = 1000 * INTERCOM_TIMEOUT_UPDATE;
+    if (time_now - gate_time_updated > time_over) intercom_updated = true;
+  }
+
+  // handle states transition
+  switch (gate_state)
+  {
+    // waiting for ring
+    case GATE_WAITING: 
+       // if at least one ring 
+      if (gate_rings > 0) gate_state = GATE_RINGING;
+      break;
+
+    // ringing
+    case GATE_RINGING:       
+      // if number of rings reached 
+      if (gate_rings >= IntercomGetNumberRing ())
+      {
+        gate_state = GATE_WILLOPEN;
+        gate_rings = 0;
+      }
+
+      // else, check for ringing timeout
+      else
+      {
+        // if timeout is reached, switch back to waiting state
+        time_over = 1000 * IntercomGetRingingTimeout ();
+        if (time_now - gate_time_changed > time_over)
+        {
+          gate_state = GATE_WAITING;
+          gate_rings = 0;
+        }
+      }
+      break;
+
+    // time between ring and gate open
+    case GATE_WILLOPEN:       
+      // check for delay before opening latch
+      time_over = 1000 * INTERCOM_DELAY_WILLOPEN;
+      if (time_now - gate_time_changed > time_over)
+      {
+        gate_state = GATE_LATCH;
+        IntercomGateOpen ();
+      }
+      break;
+
+    // latch is opened
+    case GATE_LATCH:    
+      // check for latch opened timeout
+      time_over = 1000 * IntercomGetLatchTimeout ();
+      if (time_now - gate_time_changed > time_over)
+      {
+        gate_state = GATE_OPENED;
+        IntercomGateClose ();
+      }
+      break;
+
+    // latch has been opened
+    case GATE_OPENED:    
+      // check for post latch delay
+      time_over = 1000 * INTERCOM_DELAY_OPENED;
+      if (time_now - gate_time_changed > time_over) gate_state = GATE_DISABLED;
+      break;
+  }
+
+  // if state changed, reset current state
+  if (gate_state != gate_last_state)
+  {
+    gate_last_state   = gate_state;
+    gate_time_changed = time_now;
+    intercom_updated  = true;
+  }
+
+  // if some important data have been updated, publish JSON
+  if (intercom_updated == true) IntercomShowJSON (false);
 }
 
 /***********************************************\
@@ -459,20 +518,7 @@ void IntercomWebConfigButton ()
 // append detector state to main page
 bool IntercomWebSensor ()
 {
-  String str_bell, str_state, str_timeleft;
-
-  // get ring status
-  if (Button.last_state[INTERCOM_BUTTON] == PRESSED) str_bell = D_INTERCOM_RINGING;
-  else str_bell = D_INTERCOM_OFF;
-
-  // read status and timeleft
-  str_state    = IntercomGetStateLabel ();
-  str_timeleft = IntercomGetTimeLeft ();
-
-  // display result
-  WSContentSend_PD (PSTR ("{s}%s{m}%s{e}"), D_INTERCOM_BELL, str_bell.c_str ());
-  WSContentSend_PD (PSTR ("{s}%s{m}%s{e}"), D_INTERCOM_STATE, str_state.c_str ());
-  if (str_timeleft.length() > 0) WSContentSend_PD (PSTR ("{s}%s{m}%s{e}"), D_INTERCOM_TIMELEFT, str_timeleft.c_str ());
+  WSContentSend_PD (PSTR ("{s}%s{m}%s{e}"), D_INTERCOM_STATE, IntercomGateStateLabel ().c_str ());
 }
 
 // Motion config web page
@@ -487,17 +533,21 @@ void IntercomWebPageConfigure ()
   // page comes from save button on configuration page
   if (WebServer->hasArg ("save"))
   {
-    // set delay according to 'delay' parameter
-    WebGetArg (D_CMND_INTERCOM_DELAY, argument, INTERCOM_BUFFER_SIZE);
-    if (strlen(argument) > 0) IntercomSetDelay (atoi (argument));
+    // set gate timeout according to 'tact' parameter
+    WebGetArg (D_CMND_INTERCOM_TACT, argument, INTERCOM_BUFFER_SIZE);
+    if (strlen(argument) > 0) IntercomSetActiveTimeout (atoi (argument));
+
+    // set ringing timeout according to 'tring' parameter
+    WebGetArg (D_CMND_INTERCOM_TRING, argument, INTERCOM_BUFFER_SIZE);
+    if (strlen(argument) > 0) IntercomSetRingingTimeout (atoi (argument));
     
-    // set gate open duration according to 'gate' parameter
-    WebGetArg (D_CMND_INTERCOM_GATE, argument, INTERCOM_BUFFER_SIZE);
-    if (strlen(argument) > 0) IntercomSetGateDuration (atoi (argument));
-    
-    // set gate open duration according to 'gate' parameter
-    WebGetArg (D_CMND_INTERCOM_TIMEOUT, argument, INTERCOM_BUFFER_SIZE);
-    if (strlen(argument) > 0) IntercomSetTimeout (atoi (argument));
+    // set gate open timeout according to 'tlatch' parameter
+    WebGetArg (D_CMND_INTERCOM_TLATCH, argument, INTERCOM_BUFFER_SIZE);
+    if (strlen(argument) > 0) IntercomSetLatchTimeout (atoi (argument));
+
+    // set number of rings according to 'nring' parameter
+    WebGetArg (D_CMND_INTERCOM_NRING, argument, INTERCOM_BUFFER_SIZE);
+    if (strlen(argument) > 0) IntercomSetNumberRing (atoi (argument));
   }
 
   // beginning of form
@@ -505,14 +555,20 @@ void IntercomWebPageConfigure ()
   WSContentSendStyle ();
   WSContentSend_P (PSTR ("<form method='get' action='%s'>\n"), D_PAGE_INTERCOM_CONFIG);
 
-  // temporisation
-  WSContentSend_P (PSTR ("<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>"), D_INTERCOM_TEMPO);
-  value = IntercomGetDelay ();
-  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input type='number' name='%s' min='0' max='%d' step='1' value='%d'></p>\n"), D_INTERCOM_DELAY, INTERCOM_TOPIC_STYLE, D_CMND_INTERCOM_DELAY, D_CMND_INTERCOM_DELAY, INTERCOM_MAX_TIME, value);
-  value = IntercomGetGateDuration ();
-  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input type='number' name='%s' min='0' max='%d' step='1' value='%d'></p>\n"), D_INTERCOM_DURATION, INTERCOM_TOPIC_STYLE, D_CMND_INTERCOM_GATE, D_CMND_INTERCOM_GATE, INTERCOM_MAX_TIME, value);
-  value = IntercomGetTimeout ();
-  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input type='number' name='%s' min='0' max='%d' step='1' value='%d'></p>\n"), D_INTERCOM_TIMEOUT, INTERCOM_TOPIC_STYLE, D_CMND_INTERCOM_TIMEOUT, D_CMND_INTERCOM_TIMEOUT, INTERCOM_MAX_TIME, value);
+  // gate
+  WSContentSend_P (PSTR ("<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>"), D_INTERCOM_GATE);
+  value = IntercomGetActiveTimeout ();
+  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input type='number' name='%s' min='0' max='%d' step='1' value='%d'></p>\n"), D_INTERCOM_TACT, INTERCOM_TOPIC_STYLE, D_CMND_INTERCOM_TACT, D_CMND_INTERCOM_TACT, INTERCOM_TIMEOUT_ACT, value);
+  value = IntercomGetLatchTimeout ();
+  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input type='number' name='%s' min='0' max='%d' step='1' value='%d'></p>\n"), D_INTERCOM_TLATCH, INTERCOM_TOPIC_STYLE, D_CMND_INTERCOM_TLATCH, D_CMND_INTERCOM_TLATCH, INTERCOM_TIMEOUT_LATCH, value);
+  WSContentSend_P (PSTR ("</fieldset></p>\n"));
+
+  // bell
+  WSContentSend_P (PSTR ("<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>"), D_INTERCOM_BELL);
+  value = IntercomGetRingingTimeout ();
+  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input type='number' name='%s' min='0' max='%d' step='1' value='%d'></p>\n"), D_INTERCOM_TRING, INTERCOM_TOPIC_STYLE, D_CMND_INTERCOM_TRING, D_CMND_INTERCOM_TRING, INTERCOM_TIMEOUT_RING, value);
+  value = IntercomGetNumberRing ();
+  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input type='number' name='%s' min='0' max='%d' step='1' value='%d'></p>\n"), D_INTERCOM_NRING, INTERCOM_TOPIC_STYLE, D_CMND_INTERCOM_NRING, D_CMND_INTERCOM_NRING, INTERCOM_MAX_RING, value);
   WSContentSend_P (PSTR ("</fieldset></p>\n"));
 
   // save button  
