@@ -1,4 +1,6 @@
-Tasmota firmware modified to control building gate
+Tasmota firmware to control your flat intercom
 =============
 
-This evolution of Tasmota firmware has been enhanced to remotely control a building gate opening thru the flat intercom.
+This evolution of Tasmota firmware provide a simple way to control your building entrance door directly from your smartphone.
+
+It connects directly to your 2 wires private intercom and is totally non intrusive for the common infrastructure.
