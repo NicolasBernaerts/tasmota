@@ -1,0 +1,11 @@
+--- /home/nicolas/sources/Tasmota-master/tasmota/xdrv_01_webserver.ino	2020-05-18 15:32:45.000000000 +0200
++++ /home/nicolas/sources/intercom/tasmota/xdrv_01_webserver.ino	2020-05-31 12:41:01.714549046 +0200
+@@ -498,6 +498,8 @@
+ 
+ const char HTTP_END[] PROGMEM =
+   "<div style='text-align:right;font-size:11px;'><hr/><a href='https://bit.ly/tasmota' target='_blank' style='color:#aaa;'>Tasmota %s " D_BY " Theo Arends</a></div>"
++  "<div style='text-align:right;font-size:11px;'>" EXTENSION_NAME " " EXTENSION_VERSION " " D_BY " " EXTENSION_AUTHOR "</div>"
++
+   "</div>"
+   "</body>"
+   "</html>";

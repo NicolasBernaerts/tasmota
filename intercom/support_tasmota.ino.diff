@@ -1,0 +1,21 @@
+--- /home/nicolas/sources/Tasmota-master/tasmota/support_tasmota.ino	2020-05-18 15:32:45.000000000 +0200
++++ /home/nicolas/sources/intercom/tasmota/support_tasmota.ino	2020-05-31 12:42:22.904071954 +0200
+@@ -486,6 +486,18 @@
+ 
+ //  ShowSource(source);
+ 
++// Intercom - Start
++#ifdef USE_INTERCOM
++
++// handle toggle command
++if (state == POWER_TOGGLE) IntercomToggleState ();
++
++// if command doesn't come from intercom module, ignore it
++if (source != SRC_MAX) return;
++
++#endif  // USE_INTERCOM
++// Intercom - End
++
+ #ifdef USE_SONOFF_IFAN
+   if (IsModuleIfan()) {
+     blink_mask &= 1;                 // No blinking on the fan relays
