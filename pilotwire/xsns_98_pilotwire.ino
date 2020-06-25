@@ -25,6 +25,7 @@
     18/04/2020 - v6.0 - Handle direct connexion of heater in addition to pilotwire
     16/05/2020 - v6.1 - Add /json page and outside mode in JSON
     20/05/2020 - v6.2 - Add configuration for first NTP server
+    26/05/2020 - v6.3 - Add Information JSON page
 
   Settings are stored using weighting scale parameters :
     - Settings.weight_reference             = Fil pilote mode
