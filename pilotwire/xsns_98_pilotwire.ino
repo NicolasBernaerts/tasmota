@@ -26,6 +26,7 @@
     16/05/2020 - v6.1 - Add /json page and outside mode in JSON
     20/05/2020 - v6.2 - Add configuration for first NTP server
     26/05/2020 - v6.3 - Add Information JSON page
+    07/07/2020 - v6.3.1 - Enable discovery (mDNS)
 
   Settings are stored using weighting scale parameters :
     - Settings.weight_reference             = Fil pilote mode
@@ -141,24 +142,28 @@
 #define PILOTWIRE_GRAPH_PERCENT_START   15      
 #define PILOTWIRE_GRAPH_PERCENT_STOP    85      
 
-// english flag icon coded in base64
-const char strFlagEn0[] PROGMEM = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgBAMAAACBVGfHAAAMtnpUWHRSYXcgcHJvZmlsZSB0eXBlIGV4aWYAAHjazZlbcuRIrkT/YxWzhHg/lhMvmN0dzPLnIMhkpjSq6uq2+zHKkpiimEGEO+BwsMz+9/+J+RdfoaVsYio1t5wtX7HF5jtvqr2+rqOz8fw8X/7+E79/OW+eP3hOBY7h+jXv+/rO+fT+QIn3+fH1vCnzXqfeCzn75dZB76zv1x3kvVDw13l3/27a/YGeP7Zzf/t5L/va1rffYwGMlVgveON3cMGen/66UyCK0ELXM+dn5UJ7v0/89OEH/MwD3Q8APu++4WdfkYU3HNdCr23lbzjd5136dj48t/FfInL+ubP/jCgNu+3n1wd+IquK7Gt3PZJHLeZ7U6+tnHdcOIAznI9lXoXvxPtyXo1Xtd1OWFtsdRg7+KU5D+LioluuO3H7HKebhBj99oWj99OHc66G4pufh5SoLye+GPhZocLEhLnAaf/E4s59m96Pm1XuvBxXesdiyuiXl/l+4p++viwkomnunK0PVsTlNb8IQ5nTn1wFIU5uTNPB15nrYL9/KbEBBtOBubLBbse1xEjunVvh8BxsMlwa7VUvrqx7ASDi3olgXIABm0lpl50t3hfnwLHCTydyH6IfMOCSSX4RpY8hZMihGrg3nynuXOuTv04jLxCRQg4FaiggyIoxxUy9VVKomxRSTCnlVFJNLfUccswp";
-const char strFlagEn1[] PROGMEM = "51yy6lQvocSSSi6l1NJKr6HGmmqupdbaam++BWQsmZZbabW11js37bGzVuf6zonhRxhxpJFHGXW00SfpM+NMM88y62yzL7/CQgLMyqusutrq221Saceddt5l1912F3JNgkRJkqVIlSb9Ye1m9Str35n7PWvuZs0fovS68maN06W8lnAqJ0k5gzEfHYwXZYCE9sqZrS5Gr8wpZ7b5YEJIniiTkrOcMgaDcTufxD3cvZn7JW8GdP8ub/4n5oxS9//BnFHqPpj7b95+YG31I7fhEKRVCKYoZKD8wKR2/kmYskq8ftEe9dNR4vB7jrFHm2tL6ivvZgpvdx7DSRhNdhGWXc3tKVLKlCllsysu3lFGTY7O3B2IpTxRspaGgNsQFpLp2DJ6mGWvLFwNIDKW7qBx43g+3Hapvszhrl8tW1xnWaTWSQrL6Pu0ZtmxXtedG7a9OMbiowCyrK0hJY3WRil9iONefpS9PdBtvo3kft/F7RxaKStKY7+DLcMG0c0lJawxawi0jVUkNwGguOMoSS8r4tMy9YVylO5tP7/Zv3EcCwiBxoB98amDbmmiN1jSmzRtKTkrTgGc1iQjNCcGsQL7GPbgk/amqivHalLaZfAmpRnqlBEkhCHkRB6A8gH3hErSyM9riemVzgsVzM4yUa7ripPm3Q7vhfVIjDUIR9qVnQBIsLKre30GE3ACW8MkZKikCJrFZ80YkRhI6JokwMfcGtqm3uiKLEsN0A3XFOcP";
-const char strFlagEn2[] PROGMEM = "ToBeSeHqzW9zmOPYVJ20DKriR+4R3gKbrlqgg+xI1Ewo21QKmw2vQlgk7Aq9Tei3QslGKu7KLY2ktlRWzihQAHChsinanXFLBJ7NItO2e0DRY6N3UyJz0rr/GHTzQv0fg65IIzuGjsft/erkRA6UCdcTBN82EYkf0+6xQx6rUNto2Ua4ED5HwjVZovVMHylmTs3rMvvum8/GLgSXPP3Dk1RaTWi+JzVxRq+aRXlXtHfJ3kf06IHS6Q7ox4gYzJdTRCwACDE06jRSZhXyWRtFzVrCuaMTA3ayCcqqhk/NEE1RYUNTWFuLb/bAmtlN2ZSIUCO8aCqoqsbHKYQ60n68GSHNTrLIbJQ7UaCvbecvSZHeScHhTopDhC7oG+tFI5oVV1I0usXJCdGUKIP2pKwIFGjK/FrU9K15iVpdLzlLGo2w5kRc7SZ/244rX3Tmb3Sy2YtOMpvekVyLBYYU4oUkatcI9pDpR6cD4YXYTOt8RFJFvumm+pb+conYNi6PvtsKbIWqmpumlm2/axL5BNuxNf1l3WobgbccCksJohSO1pdKLZkJ1FLs13r+dev5qfOY37ceoNZWSSs8lbC9kqjG26pSEiMsYBSwCeaQlJSkzSzplmYnWEpdRBNapieBLCVBSgI9KNI3UH3wAR0th520NMxUJIlQkYSNVBRJ0mmAY0R2gXqD4+gKO2Bq89j1gBleYHhfBet3gbFdoEBe7SGonJ2LRgU/WrqmPftjFO1P";
-const char strFlagEn3[] PROGMEM = "/dJgn/I17/qlfFUF64nX14ji5AwhsrLOGZPrIGGFeXgAQy7rZAoVwfaZRUjx6rU1HcpGsKtmygs1pDGi1s7VKhnHQurce+l1v95uHxh1xjCaPANeT5VlzZUscDpwN67JqXBQjrIIlgY4NKN0TyTFJWtaca15k7g71IZ490aodYPqRNxmSHRs2CIe7E7WrPLaW7lO6Stap5Y8DlS7EWpoW8zGuPwDKUuboLlLpXrIX3Crl2Vhce3P2HyPIDmsAEGwjdCpdRPVq2mvnnv3L8K03sI00u+EqQVCMHHFFFqa28+8rNo+crLdDgWKW/8rAbn0g+rXBVmZbGVnbebG1Euy7KCysqkqf/cdPCEKRy1pz/E7eQTldDtFxGicrhcaCfmyEbdaMSBaRVpHLHWIUZl8sKN8JTm1V1QZaiBhdaR22a4fhXLYmNr3lYTvHBzRw4YvsksJRRW0V+OQHNnAwGawD2jgyT5Vm0VJkAOPxbV/4XCfozlvSL+KVXeEFeJHK/Zv/6OdOHO/ejXjQM3eyV293sz8yd2s/Fzan0fzNy3jL4//4wt9l7M/JMwqWWYo5KTS/N5M57sWUIZcH/cEYal8EnYWM39CmCbtuHUk+KiZT1s91nVoxW3KyXRRQ17VWR4bu/opnXTl9NALTzHgjhBNLtIi0Yco4ZTEKQ/NYaNpzp+5NT3liJWewVW9ljsNbQ5GzjKsTh+0ZVyFdrXjPaj+pUaL+mU87jq2UC2xMmCi";
-const char strFlagEn4[] PROGMEM = "ATR4pKVSprH3VLFwNVvMxB1cn5eAMHnk25eaH6aBr76URTc9cx8jRZUkj3lfntuhQvwlqDux3ahdUNcx2ArASncLmcafINk0ITnjVkCzJ73talVT1arRbawOuqq12w/jHDJb2Rdie2n7oQcLR7O68cNBosBHZqDDukugVKuixs9VAzcCrm8yzvD8kM2iHimvDIt4mNOIhDAI0sKX5gCRYaewrNus+QyQ9Keq5rjRcLQ50RNvw6MDJCbZXgMknWWeAVIzFYGVkFa9E1IGMuqqvdyVergZ6XAo/dnzbjMgq+uMANqX1VNwZcOk0jrIBGcwi64u/nbalbaj5kvAQ8XSUlZ/Un90hL2mrOVVApfwCUP/4k6049F0WAPj0txJMf5N+aWofS9wc644/mflnuj4OpPNnEogRAhT9raGu2ObfpcFlkktStJRZB4sYWsyZRPk6U4kjwZLdIs8YGKku65aiJU+QbsvxNrUIH2Mb+0Z38yx6rvQztRIu+uhzKX/dP5wT9OYxIaVYW/M28J8qN54KGOM/FCNP/J26iTmqWIcX2AOI1Y10RC/Hqc78c/1MljrmsIqxaJ1u89DCn0SAZwT7OmaZxbGQhJoUDL21A8V0nrfJQ4G41XhbmZtSHTuqliaA+KeN4g6tYbPee7xg5RiJ+XdBNqoTVvNiU5CGhFFbxiFcCfU9TOJLB8FGz3DGW1mSm4yX+RTDe492jLmk23PaGt+KyE62r4mKZ1sddIJ";
-const char strFlagEn5[] PROGMEM = "OrQMXVMnHW4BQciracfm3LMZ9ndFjEvLZx4N5LvGqj5eT+h7j9HHozJJom5F57zLepnHe8XjbM9jgvRoU/hZmjRRn+c0+HfMrYFErNpZ9JpOpC0yseJMBuUmalp4YXXDa5Z55ZaP7PEWD9zIJz7p3ghix+xQdFQYy2/XdaTStBAVj/Nc603mOGSas3sPmT8U7+XsFPtTC0qlv8bUqxQOmbnpTElfe56oIeyvB0h5WuY8aYD5Hm3Zydi/dKbmizX9OtrqEV95dHFWAHaLLYJk/3xW0POZ3sw9vp2nGScpzjT8JSfYb/K0L8QR3vf3pNCkLLjahHg4DCYDA1iwFaZ8NiXprldUov+1pdPHPq9BuC8SkXaCST7lrwDtGOYZwZW2oc8cm87Co6ennC/EBoZ96pY/MC/29fwIk/zHoJsf54E/B/31GRLyg4Dz3C7pf5x5rcOlqfd6cod3obOqWdezXvTFdMtmtatd1o/YPSK6/5mFJPUZIINx2uORBqR6MR6CIW1PdYhvaRaUhyYpaqoDpE72Oq0zks/nwZw+5Esmz/Owgk5RlIfjxc5TaUfRn2njeibN8VTZGm88mYGYV/7UH93P7e751el923kgXYrOti/jYVSauDmGQbh1OrZE/8vvVtDyuy7E4elB5s+a0I/ZTGjY4v8AUAVtuWPsRrQAAAGFaUNDUElDQyBwcm9maWxlAAB4nH2RPUjDUBSFT1OLIhVBO4g4ZKhOFkRFHbUK";
-const char strFlagEn6[] PROGMEM = "RagQaoVWHUxe+gdNGpIUF0fBteDgz2LVwcVZVwdXQRD8AXFxdVJ0kRLvSwotYrzweB/n3XN47z5AqJeZZnWMAZpum6lEXMxkV8XOV4TRhwBCmJaZZcxJUhK+9XVPnVR3MZ7l3/dn9ag5iwEBkXiWGaZNvEE8tWkbnPeJI6woq8TnxKMmXZD4keuKx2+cCy4LPDNiplPzxBFisdDGShuzoqkRTxJHVU2nfCHjscp5i7NWrrLmPfkLwzl9ZZnrtIaQwCKWIEGEgipKKMNGjHadFAspOo/7+Addv0QuhVwlMHIsoAINsusH/4Pfs7XyE+NeUjgOhF4c52MY6NwFGjXH+T52nMYJEHwGrvSWv1IHZj5Jr7W06BHQuw1cXLc0ZQ+43AEGngzZlF0pSEvI54H3M/qmLNB/C3SveXNrnuP0AUjTrJI3wMEhMFKg7HWfd3e1z+3fnub8fgBK4XKXYFI09AAAABtQTFRFYQAA2QAmAFO2cobC3XN4prHT5bG16tbZ7+vp9gGK9QAAAAF0Uk5TAEDm2GYAAAABYktHRACIBR1IAAAACXBIWXMAAC4jAAAuIwF4pT92AAAAB3RJTUUH4wwSAQ8U/2QTHAAAANRJREFUKM+dkr0KAjEQhKMiWJomtUSuFw9fQVuJcKQNeHAPYGFpk7s8tjP5UTRWbpPsl8ntZvaEiBGkDOId8y3BfvPKdQK6EFNAk/KVL6BbR6CCSaBxA/OlG3wCnQpnAI31";
-const char strFlagEn7[] PROGMEM = "QnDAiSaA0hPgwGjWpISAAlQGgITgCAHAom3b7kRw99juREgBkCKDScp7BvIr/gHVR6uybMxOBLc+NsbWw5VgVCa/xY4qXnE9AZ6PHYGlhH5gkwyihBZiTRbihBYKKLPJwUXXZ30Zg338HlQ9ymrYH7/DE1YIbsUViqSPAAAAAElFTkSuQmCC";
-const char *const arrFlagEnBase64[] PROGMEM = {strFlagEn0, strFlagEn1, strFlagEn2, strFlagEn3, strFlagEn4, strFlagEn5, strFlagEn6, strFlagEn7};
-
 // french flag icon coded in base64
-const char strFlagFr0[] PROGMEM = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgBAMAAACBVGfHAAAHdXpUWHRSYXcgcHJvZmlsZSB0eXBlIGV4aWYAAHjarVdbkisrDvzXKmYJvIRgObwUcXcwy58UlN3dbrtP3zO2w1UYlwFlJkpE67//KP0Hr+hCpsRScs3Z4ZVqqqGhUdx5nbt3aV/3K1w/4fuXfrr/ENAVcY/na17X8w39/PEHSVd//9pPMq5xyjXQ9cNtwGgz22zzWuQ1UAyn31/fqV5LavlTONcnyonk9vDj9yQAYzI6Y6CwogdYdg1npohVxBqb9exrwYPuaidcOcbv+NEduicA3lsP+Llx9ccPOM5At7DyA05Xv+fn+G2UPq/Ih/vM4fOKenPNfX59wk91FtV1omsJOqopX0HdQtktPNgB50Ej4y34MNqy3xXvgmkGgJ8ItZPr+FJ9AOLqk5++efVr34cfWGIKKwjuIYwQd1+JEmoYm5Rkb69BCPzMWMDJAHMR3eG+Fr/nrTYfJiuYeXo8GTwGM0a/vOmx42/fXwZSNZl778odK6wrmL6wDGPOrngKhHi9MOWNr6dzc48vIzaCQd4wFwTYXD9DdPYf2oqb5+iY8GhyR/Je5jUAIMLcjMX4CAZc9pF99k5CEO+BYwE/DSsPMYUOBjwTh4lVhhRjBjnYDZgb/xG/nw0cTjfSC4jgmKOAGmwgkJUSp4z9ViChRhw5MXNm4cKVW445Zc45S7Y81SRKEpYsIkWq";
-const char strFlagFr1[] PROGMEM = "tBJLKlxykVJKLa2GGpHGmGquUkuttTVM2lLDWA3PN3T00GNPnXvu0kuvvQ3IZ6TBIw8ZZdTRZphxIgXQzFNmmXW25RektNLilZessupqCq1p1KSsWUWLVm131i5Wv7L2yNzPrPmLtbCJsufkgzV0i9yG8JZO2DgDYyF5MC7GAAQdjDNXfErBmDPOXA2RYuSAVbKRM70xBgbT8oHV37n7YO4lbwR0/y1v4RlzZNS9gzky6j4x9523J6zNttNt3ATZLgSmyJAR22+5VVooTVuPQ5w14U9P79hHcIKCdWubrdfouWB46hMLn2OGkuJsUxuXcMasC5nq1ZhYN3DoqzMeLKt3Wj0Lr7HmQkC6RHd6WGO0XvClp1hVpY4+el5VJp7JvfsyE+fOOU38mzEWyZRY+5wYes6sfeqokmMYS0PSNbpm0T4AWu6a7KmsUea4lp2KumRtKs3s2jp/ca+a2GwWF7t7D5LyZEw5abcWZIOpIyJryPvFa8evOtM1b3BLXzOwQaIFHexW6b5qTqB3+WRIARDVvGBec8Qz4gLIw4UeAE+zwHrQMeJqMgggA8AMzCeGSNrr8hBxDaIQZY86lwQNRudS6VLbGoDYYoO2hqw0dpzEdriwmJ/cLXuiEX0/PeEWDg4UW0Qr1dMYjcaUBamr2jkD4swdbLay4eQFx1yv59FoaMdqDZric0TkFbtggBZg3IHKNJRmL/mMOBz20I0sZ/IBSpioZtOQzKS0NTTx";
-const char strFlagFr2[] PROGMEM = "zwwpQUMq8NxLRPj9iAi0mogMTI08sVN3jH3hIDFq+a4jbHssFYmr3CafBxX/TDpflEP/h3S+KIc+SWcLx86zdv0mnkeVP4iJtpreICbaX/Jeb+a4ak1u3GbN8wBTbh0WT8+IB6vZDaRP1u6R+2gipQ2HpIfIVjsakeqQn+9kP95lDGFFHt2NwWVoD5ZGAKro6ICmixyUfD0jwgfzS+VbcEgrXLGqTBMLyV4ZGUclQ2fCGFI08NaIxj5qxIw6qy5F6sKmQLIH0H1MRVbunnm1QSwtCdwlAB0FTB8TxnyQSbcOmJJyR0C2BGvAf5odbjEFMiQOtbKmIBXy0UkfBct4mdz6yrZl5TRWGFlmjYu6Fo6KjSo4g3ZDqIsbZ8TitLvXqsRGmdmu2tIiv04Sq1vWWtKK+fTgsGhetiaM5dpa1WnJHzopn3RCvxbKH3RCvxbKF50YAGKJ+K4T+kkotzv7ExrMB7bcn8ZG/k2xkf+72L7tAXJvio3mm2Ij9u/hjeRNsVF+U2yU+D28Ef8uNiQx7LimyMpXfA3pZRz3so1Meyf/xtzv3m5l6nd3p39h79/cHdnp5u+TXtn74/3YvZ0ZZxCnBtTYmMtAMdiF0FGOKpDV8rxysB2UU1ze9TsQf7Bxeubjf2Pj9MzH/8bG6dHPz2nF7BwwbjdXNjev281xfq6KVA87PxMcQ58aaDv6PI4e1rjkahYVIJxshVOY7l4BvBQK/V4pPwuFfq+Un4VC";
-const char strFlagFr3[] PROGMEM = "u2HyaAxVsF7m3cy80zZvO+thx8M0bYcd7156vDsf78aBkdy30+Bn+CvAxxbj5vIfHJweLPyvHZweLPzRwX/ybzPrdAmlU91KASSfirFz7rNKBBltywSVNRu3hhymu8iTiXxXo3ttR9dd2znsfETyOn2SvunsR3/y9Fv6tAPeqRiA3i461y46wy46p1A+FUPs97Kzn7KTT9kZPsrOnqOG/GL70w8HqZ2GAEy6pV2rq3d5nrUNTNS5WHUOibJSmwOP5V9U6FfC8VDowl8qgkqWDo1IURo+9hggJIfYrFy/yO5tdgRoXJ8Ua4jtylzsZLcxsqIq7KJqKkm8QXQVVf0UVXyKKjslP1bmzxSuhG1d6X+N3icafyleCgAAAYVpQ0NQSUNDIHByb2ZpbGUAAHicfZE9SMNQFIVPU4siFUE7iDhkqE4WREUdtQpFqBBqhVYdTF76B00akhQXR8G14ODPYtXBxVlXB1dBEPwBcXF1UnSREu9LCi1ivPB4H+fdc3jvPkCol5lmdYwBmm6bqURczGRXxc5XhNGHAEKYlpllzElSEr71dU+dVHcxnuXf92f1qDmLAQGReJYZpk28QTy1aRuc94kjrCirxOfEoyZdkPiR64rHb5wLLgs8M2KmU/PEEWKx0MZKG7OiqRFPEkdVTad8IeOxynmLs1ausuY9+QvDOX1lmeu0hpDAIpYgQYSCKkoow0aMdp0UCyk6j/v4B12/RC6FXCUwciygAg2y";
-const char strFlagFr4[] PROGMEM = "6wf/g9+ztfIT415SOA6EXhznYxjo3AUaNcf5PnacxgkQfAau9Ja/UgdmPkmvtbToEdC7DVxctzRlD7jcAQaeDNmUXSlIS8jngfcz+qYs0H8LdK95c2ue4/QBSNOskjfAwSEwUqDsdZ93d7XP7d+e5vx+AErhcpdgUjT0AAAAG1BMVEVQW5geR5oRS5whSZwkS57vGSApTqHwHCj4+vdcwbDgAAAAAXRSTlMAQObYZgAAAAFiS0dEAIgFHUgAAAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElNRQfjDBIBDjdEGFMvAAAAXElEQVQoz2NgAIMOIGBAAGYNkEB7AJxvDBEIhYkYwwRCIXwWhABEiQtCAKyEBVkApCQFWSAUiwAbqkAAEQJpqAKhAyVAhtMJhwdmEGIEMmY0YEQUZlRiRDZKcgAALEaZ0815i7UAAAAASUVORK5CYII=";
-const char *const arrFlagFrBase64[] PROGMEM = {strFlagFr0, strFlagFr1, strFlagFr2, strFlagFr3, strFlagFr4};
+const char flag_fr_0[] PROGMEM = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgBAMAAACBVGfHAAAGfnpUWHRSYXcgcHJvZmlsZSB0eXBlIGV4aWYAAHjarVdbluMoDP3XKmYJBiEEy+Glc2YHs/y5gOOqpJOq6u7YscEEC6GrxzWN//41+geH13BQEE0xx3jgCDlkX9BJxz52646w7uvw5194vhun6w+PIUbL+zGOc37BuHy8oOEcr/fjpO2Uk05B7rhbmufKs99PJU9B7Pe4O58pny+U+Gk75+XbKfa2rYfnoDBGF8hjT36w42Pd/V6J91VwRdw9Kybi39WXdX9iP7pM98SAV+/BfsdNM/4wxxZ021Z8sNM57uRhnK9l/J1Gzl8r+88a5Xbk4/PxyX5mPZmNvbsSIsFc8dzUbSurh4kV5uT1WsSpuAR9XWfGmY5yNKDWsdVKR8VDdh4WNxdcd8WZG6ttrkHF4IeHub33zfMaSzB/9o0nBGGezrwSZ+6cgEQDcoxhf+ni1rp5rofFElbuDjO9g7CJ4t1JjwN/et4JMptu7tyRLltBLz/9C2pM5OYdswCIs9OmsuzraDfH4zGBZSAoy8wJGyxH3SKquA/f4oUzH0KYGo4dL077KQAmwtoCZRwDgSM6Fhfdod6rc7BjAj4FmnsOvgIBJyS+Q0sfmCPASX6ujXfUrble/B5GegEQgqBRQJO5AKwQJETEW4ILFRKWICJRVJJkKZFjiBJj1DjzVFHWoKJRVZNmLYlTSJJi0pRSTiX7zEhjQjlmzSnnXAoWLaFAVsH8goHqK9dQpcaqNdVcS4P7tNCkxaYttdxK9507UgD12LWnnnsZbsCVRhgy4tCRRh7";
+const char flag_fr_1[] PROGMEM = "F4GvGFkwsmlqybOVC7UT1HrVH5L5GzZ2o+QXUnKcfqGFY9SbCzXQiEzMg5oMD4joRgEP7idmRXAh+IjcxO7JnYhYPLWWC091EDAiG4byYu7D7QO4lbgTr/i5u/hlyNKF7B3I0ofuE3K+4PUGtl5VueQE0oxA2RYZkhJ95KT4VX8dAP8xuKrNGvWwNRaB2XI01NzMIUoa32EyEqj20KbT2gUSwX7Mj9fRKoqU8MKVGT7W1UXuXKfWz0MjBDm7Yj1Z0hjL07Qc0sFGhTW+tjlpbHwO7951q6XNq9qMpgAKuajEid1ZrvXUdOfbSR7SaxAVxMgoi4Fh9uN/V0uPA160zeIYWXDn31Tau3EcLBFKwzJxda2uyzHr+0AJFlZHzbEN3SPI6ypS1dQzAkvSAdIP0Yw7lITVn2BwO07GhAe+BC3XFXnszx5xbrgbHQs0wuIlUC3XAN4gFhY7tBn6zVtMP0P+lpQXi5RMTQbSoaxnLgDecxkkjbgugxv7SGnMxCm11Ity4sQlD1nYfHwy2uBZdsPflisE2+EUW+AhiqYU6gsgyj6EItjZCRwBIgz7wpukfVgTuobnAPWDLZV1DBA+5x4aegfTQanf5htlq7YAttTrXTzMFZXrtOZeroGUkneGs5In/nKHZw1c/KUWXp6jJSHMKHASwi4mHP6vmmktHfqhiLZvODDLURxvdj4AIQgaK1j1Z7QgYjQir08q1svnxGqT7lkcCXKHRBm9il2DC2lNaeuHnOb/2qMtT0GYkQyR/62HKWg7ZMpLYS2W20ham5yC/IVdWBfMo0wMq0gjOOKoiBY1Qq8Om/yQJ0G8G+csYp98Mcn";
+const char flag_fr_2[] PROGMEM = "3lLvQR/KvtyODwhFY7tggpLZhL08tbzWYoJLMf+3EGOfJqyuuBfoDsj4ClHyD7I2DpGcLTLWEgUIb2XSq6MhD9RQq6y0D0RQp6pcQtn2KLqF68xdObbH3Qm2w9c/ZbbN3oTbY2epOtE73J1ttGb7B1otum7SNjFR1ukZyMGPVTDlgQuz3Ctrjb6GWrhTDPhu9GekcpOmRXkb8uRbOlu7ymtgspeO7kGbsg1V2Q/CpIYGWzxqAiYUdnReJZkch6XBUJmfrMVj2gdv20Cl2Y0l9WoQtT+qYKbTgn/ai6uafp5BZ1cQtb3GKxD8KWe4Yo0JHJT6xMeqKTntzg7Rnp+1uSSX9egO7rD/1mAdolR09U+0YVj526B2i2aUQ4UYUlFqqA3RYPqZOHHF/yTPp5xvk64dDPM87ThLOpJbdKOmni4hN904m86EQEnRh+sokVvptP5M0n6uIT4eITi1KStO8o5LfxjOzWHclwdZF5g49bcwzaG7nmMZnvAN+vpz+lEL+D3xhwyxjlTqArmgYYE6jg+iq7YhqKPAlpumK6zu8MzN3fGW1/Z8j6zvBy+/QzOcx98QmBKKH/AV/yd3T3AHXYAAABhWlDQ1BJQ0MgcHJvZmlsZQAAeJx9kT1Iw0AcxV9TtVYqDnYQdchQnSyIiuimVShChVArtOpgcumH0KQhSXFxFFwLDn4sVh1cnHV1cBUEwQ8QJ0cnRRcp8X9JoUWsB8f9eHfvcfcOEKpFpllto4Cm22YyHhPTmRUx8IoODCCIaQRlZhmzkpRAy/F1Dx9f76I8q/W5P0e3mrUY4BOJZ5hh2sTrxJObtsF5nzjMCrJKfE48Y";
+const char flag_fr_3[] PROGMEM = "tIFiR+5rnj8xjnvssAzw2YqOUccJhbzTaw0MSuYGvEEcUTVdMoX0h6rnLc4a8Uyq9+TvzCU1ZeXuE5zEHEsYBESRCgoYwNF2IjSqpNiIUn7sRb+ftcvkUsh1wYYOeZRggbZ9YP/we9urdz4mJcUigHtL47zMQQEdoFaxXG+jx2ndgL4n4ErveEvVYGpT9IrDS1yBPRsAxfXDU3ZAy53gL4nQzZlV/LTFHI54P2MvikD9N4CXateb/V9nD4AKeoqcQMcHALDecpea/Huzube/j1T7+8HeENyqd9jlV0AAAAPUExURfZVAAMile0pOs2ktv3//KPDeLIAAAABdFJOUwBA5thmAAAAAWJLR0QAiAUdSAAAAAlwSFlzAAAuIwAALiMBeKU/dgAAAAd0SU1FB+QGGwoZFisaT5UAAABbSURBVCjPY2AAAxcgYEAARhOQgLMCnC8IEVCCiQjCBJRgCuACClAFcAElqAKEgAJEAUJACYsAI6qAAhECgqgCSgMlQIbTCYcHZhBiBDJmNGBEFGZUYkQ2SnIAAEjVRhNKZ4XRAAAAAElFTkSuQmCC";
+//const char *const arr_flag_fr_base64[] PROGMEM = {flag_fr_0, flag_fr_1, flag_fr_2, flag_fr_3};
+
+// english flag icon coded in base64
+const char flag_en_0[] PROGMEM = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgBAMAAACBVGfHAAAKB3pUWHRSYXcgcHJvZmlsZSB0eXBlIGV4aWYAAHjarZlpduM6DoX/cxW9BM7Dcjie0zvo5fcHUnKcwZWk3ovLlkSTIIALXIAuNf/336X+w5+LxSofUo4lRs2fL77Yyk3W5+9cjfb7c//Z6yue342rxxeWIcfVncc4r/mV8fC2IPlrvL0fV6lfcvIlyOh3WzvZWe7HpeQlyNkzbq5nVa4FNT6Zc71tv8TeZn149glnjIA8Z5Wdzji9P+3ZyZ135R35tC4xkW/3vYw4Zz77Tz1c94UDH3cf/KdvzdybO46g26z4wU/XuAkfxt1jG/tOI2MfO9tnjYK7XfzZf2uNvNY81lUfFe6Kl1G3KfuOiQ13ur0s8kq8A/dpvwqvrKvuoDYwtSndeCjG4vFlvBmmmmXmvnbTUdHbaXG3tbZbt8cy7i+2O4HAy8ssm5QrbrgMHh3kHMP2oYvZ+xbZj80yOw/DTGsQJii+e6mPA3/7eidoLQlzY3R++Aq9rMQXaghy8sksADHr8mnY/jXqXPTHPwHWgWDYbs4YWHU7Ilowb7HlNs5OB8VUr0++mDQuAbiIvQPKGAcCOhoXTDQ6WZuMwY8ZfCqaW+dtAwETVLADLa13LgJOtrI3a5LZc22wZxh6AYhAiiSgKa4ClvfBR/ItE0JVBRd8CCGGFHIooUYXfQwxxhSFp2pyyaeQYkopp5JqdtnnkGNOOeeSa7HFQWNBlVhSyaWUWtm0+oqsyvzKQLPNNd9Ciy213EqrnfDpvocee+q5l16HHW5AAWrEkUYeZdRpJqE";
+const char flag_en_1[] PROGMEM = "0/QwzzjTzLLMuYm255VdYcaWVV1n1gdqF6nvUPiL3Z9TMhZrdQMm89IYawyndIozQSRDMQMx6A+JJECCgrWCms/HeCnKCmS7WKeeCRcsg4AwjiIGgn8aGZR7YvSH3EjeFd3+Lm/0KOSXQ/RvIKYHuCbnPuH2B2qibbt0GSLIQn8KQjvRbrlSbq20jOaf3LSz41XXOWByOL52sCXOlMDU2DeVq6Yskq8Wn4rewVuowrRmb9KAQtzFStiEmP/HXWN7WYGa4xTYfZ8fZHwR/L3e4FpYD5uBrXbhv5gDKqlfjA/8isRb2rf75NbYRkZ2ICmWj8wlcMMGG24SEVnb6VrzoDgh9WwGKKFZKnwMretlWuDNd2fqr+S+nq+/m5yhOHQH+0rff97XakXS3RJebOQ4lriaw0tqeSgTm964RpwCSXMjGHEAhqBsw42PqA1US0LowG0E+TRXMSIGmediLL6X8MGUhjrxbttTlVbjcHhc5jqaYslKrizqcaTzEuHnJzrdTxsxM3Io89FBHEdOn6xU0TSgmjD5CG5igt1JjztaNxVd9lTpd6YSY7Iboxi7EWs8KgWvoVeOaPaxJX0Dh0n6RvG1GWxvOI3qbSbPPVWGkLqm7yMe0p1JxJBSVeLjp1Hv+xqeFCN5WoK8YhVNNb+JUO6Ou6oJYTJ/RfzP7mgz2w/pMFl1BzF5K9iSYfzr/5XT18/m2ERSWTwLVk1NLWKcRukBcA6iNgWt7TaUJSYy+iM6p6ZGWuA/XBTcZxFbJ9dUa/Ea34bqblRhoC6hhyJxqmT2uGuZEVsnwQiu9QZ9puTHHLPR4F7kJ75FC+zbMTXD1MkTZcK";
+const char flag_en_2[] PROGMEM = "InuJxs6K0Qg9QciWgriVkjhtSH2XuyVJleJCFXySdIs6ozkb+so0rdmUvEkwNHcv2hZPVJ9F9KVs+iSTv4WAujBVdCXzXFRogvV3c6dPYZsE8ZNKuhT8GB2lk0BUeJBuI82tVMfIcnVk71jZbj9mE+VONCbYmKfLHDznRVVs76zvetb87ejVKCLYl2eKeI35meKOL25pGd2tR/zMda31TJz3KJkUy/fNL9cIY1ekUpGaF3Ecf6zUyB1oSUOjRC0uIa37dcuLXdLodEqsiiIqUJoVihr8civnZb7TyD3Z7PVT2sKgO6xht2V7R2US9HBhx0Kpac8q5roEouTmrA2exc+FTZRYaU3oVZIJmx9p1/ZC7RbCCG1InwzQhXHVu0SBfHbMZQQpO6AM0pxO/8c9yen92TqtnBctborf02St1YHZ+aJ6jCxU3++Mn+eR/FRnXdZY3IcCvSjz02uvfhgEUBMw/lPq1RHxZl8TotUpvcCIryDeUo1RPiMdSCp+DzfhHGksqYnSKJQm6rjkVqJXFl5TTFmJstTf+YCF5Rn2n0zOOtfZCepsykqiPvgIZdsb25KozTyk7PTZXzXkFrB412cjrXFf22oFzTg1W/nP9yuvrl/JfT1av5QvMX1pK/sC65KY2sJC3t9HJZmhgHSMR+GkT2irzTrplrZZsgG6RSw2GnFcfk7DuAY8iM7qgLZdF3myMKOovLkhPq1Gmt7/IrtRrt2ZweYjRYK+2dtJa95EpcS22aByQHkgkkiaPZG6lW5rZmf81ZPIRGGAyabCcdwP2F4E5x/2KJ+os1Xy5Rf7HmyyXqn5jzvES50ylRB6RfGisiB";
+const char flag_en_3[] PROGMEM = "ODwMJU2OdJhQW4bw4OnkZYT9DjlrFau8k2KPKTkLQOoobtHA3CiZcMN0DwC9KiLZJ1uoyyVCJDdVMghyRkewaG6343cIgIsARE8Zg4d91T2akTei2nqh/O+naZ+te0fpqm/sOLLaeqLeV1ftaatQF+e1yicHMnMGiRhCINV0rxOVQkOGHT/6rcnq1fXbwUdxTzpaXtrc6TOI3HjNvyoRl9Ho27VDlK6I2ybvRIKo4YmMykOlJ+T4zCCRCvVhMPvbmeksfG0ADxJMzOzmts5PFJOAgd8FElanvolQPz5avXTYvWPVj8tVj9Yvc8kyFjQtJBmomp14et49boRilRJ+u4DOESXc+XwEgcnKYqcjoGkpYNwSX6L4GTZpBuEvkWslpUFn7IOPiLN4ybSdhPpadJ3v27m4DBEpjua9bEyQWSexJDnZVM6pyU15jqMPufuh9ImdL8JHVahuXqweRKqpt8XMq+HzNHhaEDD/ncKfNpffa3Aq+1fu0D9tQofNFBf+EDOPHQ9swidTt5mRrgT/Mqyi9MueRtpdPaC+6ijzlknV/l/iHOVPlTaTGn7O31R9oROlLNYzDEJry/6z7W3f6NzJXwOWQuht498fOrtqb2Ow1bJzzXhWYwZ6quysH+ueqouP6kL6lNh+LMaL0uTeq5N/6Q0qd/64vyaNXwjEKiwtRhHDpakdrd/jDqwLXrOUv74gx1X4Nm9DV3NgZcmovk0Cka4mOWEcthQqoG0dej1s/qi/qWyttSP5sF9QuuNDiQY8gZmm77U6zdEKQxOme+88fm6qwqWx+4PsvJSWU5cq0uKpQ4vkpyR/BJcPaFBx1qlFEKS";
+const char flag_en_4[] PROGMEM = "wrE3+9hUKUJt7SPZ7kHVDjL5nSPvigNvfEq+p+uWWQmuMt74gBK1hnqWegvd1TjIOV+i1sAA4EfvHanfiVTHRxgEy0fIp/WS5PejrUnF1f6VIov9Uf3/nufB/WXA79gAAAGFaUNDUElDQyBwcm9maWxlAAB4nH2RPUjDQBzFX1O1VioOdhB1yFCdLIiK6KZVKEKFUCu06mBy6YfQpCFJcXEUXAsOfixWHVycdXVwFQTBDxAnRydFFynxf0mhRawHx/14d+9x9w4QqkWmWW2jgKbbZjIeE9OZFTHwig4MIIhpBGVmGbOSlEDL8XUPH1/vojyr9bk/R7eatRjgE4lnmGHaxOvEk5u2wXmfOMwKskp8Tjxi0gWJH7muePzGOe+ywDPDZio5RxwmFvNNrDQxK5ga8QRxRNV0yhfSHquctzhrxTKr35O/MJTVl5e4TnMQcSxgERJEKChjA0XYiNKqk2IhSfuxFv5+1y+RSyHXBhg55lGCBtn1g//B726t3PiYlxSKAe0vjvMxBAR2gVrFcb6PHad2AvifgSu94S9VgalP0isNLXIE9GwDF9cNTdkDLneAvidDNmVX8tMUcjng/Yy+KQP03gJdq15v9X2cPgAp6ipxAxwcAsN5yl5r8e7O5t7+PVPv7wd4Q3Kp32OVXQAAABtQTFRFYQAANDRpsRouT0p4b26UwK6+4aav5NDX/Pr3wBAfiwAAAAF0Uk5TAEDm2GYAAAABYktHRACIBR1IAAAACXBIWXMAAC4jAAAuIwF4pT92AAAAB3RJTUUH5AYbChofeeuk8gAAALdJREFUKM9lkcENwyAMRd00Us4IBojYAKU";
+const char flag_en_5[] PROGMEM = "LoCxQX5pOwJkbHYGxa1wSMP3/xMd+WAaApUjQNKMpjuf5vu1s/6yB+RWgetcG//Ab+4iiwKC1HbG0WLuWAm+8ZrtXCBRga/nk3N4kuyOlCDfTMwgye8PWqJEDOvB1CQgaQHUtBM2gJTR1c5ZJaVblmjlIgyAPgjAIJiu0/geLZNLOBiYMVAomiSD1AW99EcgigeSSk3h97tQRqy4gfAGw0HAXNQXCvAAAAABJRU5ErkJggg==";
+//const char *const arr_flag_en_base64[] PROGMEM = {flag_en_0, flag_en_1, flag_en_2, flag_en_3, flag_en_4, flag_en_5};
+
+// icons
+enum IntercomIcons { ICON_FRENCH, ICON_ENGLISH };
+const char* pilotwire_icon[][6] PROGMEM = { 
+  {flag_fr_0, flag_fr_1, flag_fr_2, flag_fr_3, NULL,      NULL      },
+  {flag_en_0, flag_en_1, flag_en_2, flag_en_3, flag_en_4, flag_en_5 }
+};
 
 // control page texts
 const char *const arrControlTemp[]   PROGMEM = {"Target", "Thermostat"};
@@ -210,8 +215,10 @@ String   str_pilotwire_json;                       // last pilotwire data JSON
 \**************************************************/
 
 // get state label
-void PilotwireGetStateLabel (uint8_t state, String& str_label)
+String PilotwireGetStateLabel (uint8_t state)
 {
+  String str_label;
+
   // get label
   switch (state)
   {
@@ -234,11 +241,15 @@ void PilotwireGetStateLabel (uint8_t state, String& str_label)
      str_label = D_PILOTWIRE_THERMOSTAT;
      break;
   }
+
+  return str_label;
 }
 
 // get state color
-void PilotwireGetStateColor (uint8_t state, String& str_color)
+String PilotwireGetStateColor (uint8_t state)
 {
+  String str_color;
+  
   // set color according to state
   switch (state)
   {
@@ -258,6 +269,8 @@ void PilotwireGetStateColor (uint8_t state, String& str_color)
     default:
       str_color = "white";
   }
+
+  return str_color;
 }
 
 // get pilot wire state from relays state
@@ -644,8 +657,8 @@ void PilotwireShowJSON (bool append)
 
   // get temperature and mode
   actual_temperature = PilotwireGetTemperature ();
-  actual_mode  = PilotwireGetMode ();
-  PilotwireGetStateLabel (actual_mode, str_label);
+  actual_mode = PilotwireGetMode ();
+  str_label   = PilotwireGetStateLabel (actual_mode);
  
   // pilotwire mode  -->  "PilotWire":{"Relay":2,"Mode":5,"Label":"Thermostat",Offload:"ON","Temperature":20.5,"Target":21,"Min"=15.5,"Max"=25}
   str_json = "\"" + String (D_JSON_PILOTWIRE) + "\":{";
@@ -672,7 +685,7 @@ void PilotwireShowJSON (bool append)
   {
     // get mode and associated label
     actual_mode = PilotwireGetRelayState ();
-    PilotwireGetStateLabel (actual_mode, str_label);
+    str_label   = PilotwireGetStateLabel (actual_mode);
 
     // relay state  -->  ,"State":{"Mode":4,"Label":"Comfort"}
     str_json += ",\"" + String (D_JSON_PILOTWIRE_STATE) + "\":{\"" + String (D_JSON_PILOTWIRE_MODE) + "\":" + String (actual_mode);
@@ -892,25 +905,16 @@ void PilotwireInit ()
 
 #ifdef USE_WEBSERVER
 
-// Pilotwire langage flag
-void PilotwireWebDisplayFlag (uint8_t langage_code)
+// display base64 embeded icon
+void PilotwireWebDisplayIcon (uint8_t icon_index)
 {
   uint8_t nbrItem, index;
 
-  // display flag according to langage
-  WSContentSend_P (PSTR ("<img  src='data:image/png;base64,"));
-  switch (langage_code)
-  {
-    case PILOTWIRE_LANGAGE_ENGLISH:  // english flag
-      nbrItem = sizeof (arrFlagEnBase64) / sizeof (char*);
-      for (index=0; index<nbrItem; index++) { WSContentSend_P (arrFlagEnBase64[index]); }
-      break;
-    case PILOTWIRE_LANGAGE_FRENCH:  // french flag
-      nbrItem = sizeof (arrFlagFrBase64) / sizeof (char*);
-      for (index=0; index<nbrItem; index++) { WSContentSend_P (arrFlagFrBase64[index]); }
-      break;
-  }
-  WSContentSend_P (PSTR ("' />"));
+  // display icon
+  WSContentSend_P (PSTR ("'data:image/png;base64,"));
+  nbrItem = sizeof (pilotwire_icon[icon_index]) / sizeof (char*);
+  for (index=0; index<nbrItem; index++) if (pilotwire_icon[icon_index][index] != NULL) WSContentSend_P (pilotwire_icon[icon_index][index]);
+  WSContentSend_P (PSTR ("'"));
 }
 
 // Pilotwire mode selection 
@@ -1030,8 +1034,8 @@ bool PilotwireWebSensor ()
 
   // get heater state, associated label and color
   actual_state = PilotwireGetRelayState ();
-  PilotwireGetStateLabel (actual_state, str_label);
-  PilotwireGetStateColor (actual_state, str_color);
+  str_label = PilotwireGetStateLabel (actual_state);
+  str_color = PilotwireGetStateColor (actual_state);
 
   // display current state
   str_title = D_PILOTWIRE_HEATER + String (" ") + D_PILOTWIRE_STATE;
@@ -1525,14 +1529,14 @@ void PilotwireWebPageControl ()
   WSContentSend_P (PSTR ("<form method='get' action='%s'>\n"), D_PAGE_PILOTWIRE_CONTROL);
 
   // french flag
-  WSContentSend_P (PSTR ("<div class='flag fr'><a href='/control?lang=fr'>"));
-  PilotwireWebDisplayFlag (PILOTWIRE_LANGAGE_FRENCH);
-  WSContentSend_P (PSTR ("</a></div>\n"));
+  WSContentSend_P (PSTR ("<div class='flag fr'><a href='/control?lang=fr'><img src="));
+  PilotwireWebDisplayIcon (ICON_FRENCH);
+  WSContentSend_P (PSTR (" /></a></div>\n"));
 
   // english flag
-  WSContentSend_P (PSTR ("<div class='flag en'><a href='/control?lang=en'>"));
-  PilotwireWebDisplayFlag (PILOTWIRE_LANGAGE_ENGLISH);
-  WSContentSend_P (PSTR ("</a></div>\n"));
+  WSContentSend_P (PSTR ("<div class='flag en'><a href='/control?lang=en'><img src="));
+  PilotwireWebDisplayIcon (ICON_ENGLISH);
+  WSContentSend_P (PSTR (" /></a></div>\n"));
 
   // room name and current temperature
   WSContentSend_P (PSTR ("<div class='title bold'>%s</div>\n"), SettingsText(SET_FRIENDLYNAME1));

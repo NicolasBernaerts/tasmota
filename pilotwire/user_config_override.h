@@ -51,7 +51,7 @@
 #define USE_TEMPERATURE_MQTT                  // Add support for MQTT temperature sensor
 #define USE_PILOTWIRE                         // Add support for France Pilotwire protocol for electrical heaters
 
-#define EXTENSION_VERSION "6.3"               // version
+#define EXTENSION_VERSION "6.3.1"             // version
 #define EXTENSION_NAME "Pilotwire"            // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 
@@ -70,11 +70,11 @@
 #undef USE_EMULATION_HUE                      // Disable Hue Bridge emulation for Alexa (+14k code, +2k mem common)
 #undef USE_EMULATION_WEMO                     // Disable Belkin WeMo emulation for Alexa (+6k code, +2k mem common)
 #undef USE_CUSTOM                             // Disable Custom features
-#undef USE_DISCOVERY                          // Disable Discovery services for both MQTT and web server
+//#undef USE_DISCOVERY                          // Disable Discovery services for both MQTT and web server
 //#undef USE_TIMERS                             // Disable support for up to 16 timers
 //#undef USE_TIMERS_WEB                         // Disable support for timer webpage
 //#undef USE_SUNRISE                          // Disable support for Sunrise and sunset tools
-//#undef USE_RULES                            // Disable support for rules
+#undef USE_RULES                            // Disable support for rules
 #undef USE_I2C                                // Disable all I2C sensors and devices
 //#undef USE_DHT                                // Disable internal DHT sensor
 //#undef USE_DS18x20                            // Disable DS18x20 sensor
