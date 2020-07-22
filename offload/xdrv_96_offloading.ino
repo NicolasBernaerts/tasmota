@@ -1,15 +1,16 @@
 /*
   xdrv_96_offloading.ino - Device offloading thru MQTT instant house power
   
-  Copyright (C) 2020  Nicolas Bernaerts
     23/03/2020 - v1.0 - Creation
     26/05/2020 - v1.1 - Add Information JSON page
+    07/07/2020 - v1.2 - Enable discovery (mDNS)
+    20/07/2020 - v1.3 - Change delays to seconds
                    
   Settings are stored using weighting scale parameters :
-    - Settings.energy_max_power              = Appliance power (W) 
-    - Settings.energy_max_power_limit        = Maximum power of the house contract (W) 
-    - Settings.energy_max_power_limit_window = Number of overload messages before offload
-    - Settings.energy_max_power_limit_hold   = Number of back to normal messages before removing offload
+    - Settings.energy_max_power              = Power of plugged appliance (W) 
+    - Settings.energy_max_power_limit        = Maximum power of contract (W) 
+    - Settings.energy_max_power_limit_window = Delay in seconds before effective offload
+    - Settings.energy_max_power_limit_hold   = Delay in seconds before removal of offload
     - Settings.free_f03                      = MQTT Instant house power (Power MQTT topic;Power JSON key)
 
   This program is free software: you can redistribute it and/or modify
@@ -46,27 +47,27 @@
 
 #define D_JSON_OFFLOADING           "Offload"
 #define D_JSON_OFFLOADING_STATE     "State"
+#define D_JSON_OFFLOADING_STAGE     "Stage"
 #define D_JSON_OFFLOADING_BEFORE    "Before"
 #define D_JSON_OFFLOADING_AFTER     "After"
 #define D_JSON_OFFLOADING_CONTRACT  "Contract"
-#define D_JSON_OFFLOADING_POWER     "Power"
+#define D_JSON_OFFLOADING_DEVICE    "Device"
 #define D_JSON_OFFLOADING_TOPIC     "Topic"
 #define D_JSON_OFFLOADING_KEY       "Key"
 
 #define D_OFFLOADING                "Offloading"
 
 #define D_OFFLOADING_POWER          "Power"
-#define D_OFFLOADING_MESSAGE        "Overload messages"
-#define D_OFFLOADING_BEFORE         "Start Offloading"
-#define D_OFFLOADING_AFTER          "End of Offloading"
-#define D_OFFLOADING_IMMEDIATE      "(0:immediate)"
+#define D_OFFLOADING_DELAY          "Delay"
+#define D_OFFLOADING_STATUS         "Status"
+#define D_OFFLOADING_BEFORE         "Before offloading (sec.)"
+#define D_OFFLOADING_AFTER          "Before offloading removal (sec.)"
 
 #define D_OFFLOADING_CONFIGURE      "Configure Offloading"
 #define D_OFFLOADING_DEVICE         "Device"
-#define D_OFFLOADING_SENSOR_UPDATE  "updates"
-#define D_OFFLOADING_ACTIVE         "Active"
+#define D_OFFLOADING_INSTCONTRACT   "Act/Max"
 #define D_OFFLOADING_CONTRACT       "Contract"
-#define D_OFFLOADING_TOTAL_POWER    "Instant power"
+#define D_OFFLOADING_ACTIVE         "Active"
 #define D_OFFLOADING_TOPIC          "MQTT Topic"
 #define D_OFFLOADING_KEY            "MQTT JSON Key"
 
@@ -85,12 +86,12 @@ const char OFFLOADING_TOPIC_STYLE[] PROGMEM = "style='float:right;font-size:0.7r
 enum OffloadingStages { OFFLOADING_NONE, OFFLOADING_BEFORE, OFFLOADING_ACTIVE, OFFLOADING_AFTER };
 
 // variables
-uint8_t  offloading_state            = OFFLOADING_NONE;    // current offloading state
-uint8_t  offloading_relay_before     = 0;                  // relay state before offloading
-uint16_t offloading_counter          = 0;                  // message counter before or after offloading
-uint16_t offloading_house_power      = 0;                  // last total house power retrieved thru MQTT
-bool     offloading_topic_subscribed = false;              // flag for power subscription
-//bool     offloading_device_allowed   = false;              // by default, no direct relay command
+bool    offloading_relay_managed    = true;               // define if relay is managed directly
+uint8_t offloading_relay_state      = 0;                  // relay state before offloading
+uint8_t offloading_stage            = OFFLOADING_NONE;    // current offloading state
+ulong   offloading_stage_time       = 0;                  // time of current stage
+int     offloading_power_actual     = 0;                  // actual total power (retrieved thru MQTT)
+bool    offloading_topic_subscribed = false;              // flag for power subscription
 
 /**************************************************\
  *                  Accessors
@@ -99,17 +100,17 @@ bool     offloading_topic_subscribed = false;              // flag for power sub
 // get offload state
 bool OffloadingIsOffloaded ()
 {
-  return ((offloading_state == OFFLOADING_ACTIVE) || (offloading_state == OFFLOADING_AFTER));
+  return (offloading_stage >= OFFLOADING_ACTIVE);
 }
 
 // get maximum power limit before offload
-uint16_t OffloadingGetPowerLimit ()
+uint16_t OffloadingGetContractPower ()
 {
   return Settings.energy_max_power_limit;
 }
 
 // set maximum power limit before offload
-void OffloadingSetPowerLimit (uint16_t new_power)
+void OffloadingSetContractPower (uint16_t new_power)
 {
   Settings.energy_max_power_limit = new_power;
 }
@@ -126,26 +127,26 @@ void OffloadingSetDevicePower (uint16_t new_power)
   Settings.energy_max_power = new_power;
 }
 
-// get number of power update messages to receive before offloading
-uint16_t OffloadingGetUpdateBeforeOffload ()
+// get delay in seconds before effective offloading
+uint16_t OffloadingGetDelayBeforeOffload ()
 {
   return Settings.energy_max_power_limit_window;;
 }
 
-// set number of power update messages to receive before offloading
-void OffloadingSetUpdateBeforeOffload (uint16_t number)
+// set delay in seconds before effective offloading
+void OffloadingSetDelayBeforeOffload (uint16_t number)
 {
   Settings.energy_max_power_limit_window = number;
 }
 
-// get number of power update messages to receive before removing offload
-uint16_t OffloadingGetUpdateAfterOffload ()
+// get delay in seconds before removing offload
+uint16_t OffloadingGetDelayBeforeRemoval ()
 {
   return Settings.energy_max_power_limit_hold;;
 }
 
-// set number of power update messages to receive before removing offload
-void OffloadingSetUpdateAfterOffload (uint16_t number)
+// set delay in seconds before removing offload
+void OffloadingSetDelayBeforeRemoval (uint16_t number)
 {
   Settings.energy_max_power_limit_hold = number;
 }
@@ -215,16 +216,16 @@ void OffloadingSetMqttPowerKey (char* str_key)
 // Show JSON status (for MQTT)
 void OffloadingShowJSON (bool append)
 {
-  bool     isOffloaded;
-  uint16_t contract, power, before, after;
+  bool     is_offloaded;
+  uint16_t power_contract, power_device, delay_before, delay_after;
   String   str_json, str_topic, str_key;
 
   // read data
-  isOffloaded = OffloadingIsOffloaded ();
-  before   = OffloadingGetUpdateBeforeOffload ();
-  after    = OffloadingGetUpdateAfterOffload ();
-  power    = OffloadingGetDevicePower ();
-  contract = OffloadingGetPowerLimit ();
+  is_offloaded   = OffloadingIsOffloaded ();
+  delay_before   = OffloadingGetDelayBeforeOffload ();
+  delay_after    = OffloadingGetDelayBeforeRemoval ();
+  power_device   = OffloadingGetDevicePower ();
+  power_contract = OffloadingGetContractPower ();
   OffloadingGetMqttPowerTopic (str_topic);
   OffloadingGetMqttPowerKey (str_key);
 
@@ -232,15 +233,16 @@ void OffloadingShowJSON (bool append)
   if (append == false) str_json = "{";
   else str_json = String (mqtt_data) + ",";
 
-  // Offloading  -->  "Offload":{"State":"OFF","Before":1,"After":5,"Power":1000,"Contract":5000,"Topic":"mqtt/topic/of/device","Key":"Power"}
+  // Offloading  -->  "Offload":{"State":"OFF","Stage":1,"Before":1,"After":5,"Device":1000,"Contract":5000,"Topic":"mqtt/topic/of/device","Key":"Power"}
   str_json += "\"" + String (D_JSON_OFFLOADING) + "\":{";
   str_json += "\"" + String (D_JSON_OFFLOADING_STATE) + "\":";
-  if (isOffloaded == true) str_json += "\"ON\",";
+  if (is_offloaded == true) str_json += "\"ON\",";
   else str_json += "\"OFF\",";
-  str_json += "\"" + String (D_JSON_OFFLOADING_BEFORE) + "\":" + String (before) + ",";
-  str_json += "\"" + String (D_JSON_OFFLOADING_AFTER) + "\":" + String (after) + ",";
-  str_json += "\"" + String (D_JSON_OFFLOADING_POWER) + "\":" + String (power) + ",";
-  str_json += "\"" + String (D_JSON_OFFLOADING_CONTRACT) + "\":" + String (contract) + ",";
+  str_json += "\"" + String (D_JSON_OFFLOADING_STAGE) + "\":" + String (offloading_stage) + ",";
+  str_json += "\"" + String (D_JSON_OFFLOADING_BEFORE) + "\":" + String (delay_before) + ",";
+  str_json += "\"" + String (D_JSON_OFFLOADING_AFTER) + "\":" + String (delay_after) + ",";
+  str_json += "\"" + String (D_JSON_OFFLOADING_DEVICE) + "\":" + String (power_device) + ",";
+  str_json += "\"" + String (D_JSON_OFFLOADING_CONTRACT) + "\":" + String (power_contract) + ",";
   str_json += "\"" + String (D_JSON_OFFLOADING_TOPIC) + "\":\"" + str_topic + "\",";
   str_json += "\"" + String (D_JSON_OFFLOADING_KEY) + "\":\"" + str_key + "\"}";
 
@@ -252,104 +254,6 @@ void OffloadingShowJSON (bool append)
 
   // if not in append mode, publish message 
   if (append == false) MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
-}
-
-// update instant house power
-void OffloadingUpdateHousePower (uint16_t new_power)
-{
-  uint8_t  prev_state, next_state;
-  uint16_t device_power, limit_power;
-
-  // update instant power
-  offloading_house_power = new_power;
-
-  // get MQTT power data
-  limit_power  = OffloadingGetPowerLimit ();
-  device_power = OffloadingGetDevicePower ();
-
-  // if house contract and device power are defined
-  if ((limit_power > 0) && (device_power > 0))
-  {
-    // set prrevious state
-    prev_state = offloading_state;
-    next_state = offloading_state;
-  
-    // switch according to current state
-    switch (offloading_state)
-    { 
-      // actually not offloaded
-      case OFFLOADING_NONE:
-        // if overload is detected
-        if (offloading_house_power > limit_power)
-        {
-          // set status to before offloading
-          offloading_counter = OffloadingGetUpdateBeforeOffload ();
-          if (offloading_counter > 0) next_state = OFFLOADING_BEFORE;
-          else next_state = OFFLOADING_ACTIVE;
-        }
-        break;
-
-      // actually just before offloading starts
-      case OFFLOADING_BEFORE:
-          // if house power has gone down, remove offloading countdown
-          if (offloading_house_power <= limit_power) next_state = OFFLOADING_NONE;
-        
-          // else, decrement message counter to activate offloading
-          else
-          {
-            offloading_counter--;
-            if (offloading_counter == 0) next_state = OFFLOADING_ACTIVE;
-          }
-        break;
-
-      // actually offloading is active
-      case OFFLOADING_ACTIVE:
-        if (offloading_house_power <= limit_power - device_power)
-        {
-          // set status to after offloading
-          offloading_counter = OffloadingGetUpdateAfterOffload ();
-          if (offloading_counter > 0) next_state = OFFLOADING_AFTER;
-          else next_state = OFFLOADING_NONE;
-        }
-        break;
-
-      // actually just after offloading should stop
-      case OFFLOADING_AFTER:
-        // if house power has gone again too high, offloading back to active state
-        if (offloading_house_power > limit_power - device_power) next_state = OFFLOADING_ACTIVE;
-        
-        // else, decrement message counter to remove offloading
-        else
-        {
-          offloading_counter--;
-          if (offloading_counter == 0) next_state = OFFLOADING_NONE;
-        }
-        break;
-    }
-
-    // if device needs to be offloaded
-    if ((next_state == OFFLOADING_ACTIVE) && (prev_state != OFFLOADING_ACTIVE))
-    {
-      // get relay state
-      offloading_relay_before = bitRead (power, 0);
-
-      // switch off relay
-      ExecuteCommandPower (1, POWER_OFF, SRC_IGNORE);
-    }
-
-    // update offloading state
-    offloading_state = next_state;
-
-    // if offload needs to be removed
-    if ((next_state == OFFLOADING_NONE) && (prev_state != OFFLOADING_NONE))
-    {
-      // get relay state
-      if (offloading_relay_before == 1) ExecuteCommandPower (1, POWER_ON, SRC_IGNORE);
-    }
-
-    // if state has changed, send MQTT status
-    if (next_state != prev_state) OffloadingShowJSON (false);
-  }
 }
 
 // check and update MQTT power subsciption after disconnexion
@@ -400,7 +304,7 @@ bool OffloadingMqttCommand ()
       OffloadingSetDevicePower (XdrvMailbox.payload);
       break;
     case CMND_OFFLOADING_CONTRACT:  // set house contract power
-      OffloadingSetPowerLimit (XdrvMailbox.payload);
+      OffloadingSetContractPower (XdrvMailbox.payload);
       break;
     case CMND_OFFLOADING_TOPIC:  // set mqtt house power topic 
       OffloadingSetMqttPowerTopic (XdrvMailbox.data);
@@ -408,11 +312,11 @@ bool OffloadingMqttCommand ()
     case CMND_OFFLOADING_KEY:  // set mqtt house power key 
       OffloadingSetMqttPowerKey (XdrvMailbox.data);
       break;
-    case CMND_OFFLOADING_BEFORE:  // set number of updates before offloading 
-      OffloadingSetUpdateBeforeOffload (XdrvMailbox.payload);
+    case CMND_OFFLOADING_BEFORE:  // set delay before offload (in seconds) 
+      OffloadingSetDelayBeforeOffload (XdrvMailbox.payload);
       break;
-    case CMND_OFFLOADING_AFTER:  // set number of updates after offloading 
-      OffloadingSetUpdateAfterOffload (XdrvMailbox.payload);
+    case CMND_OFFLOADING_AFTER:  // set delay before removing offload (in seconds) 
+      OffloadingSetDelayBeforeRemoval (XdrvMailbox.payload);
       break;
     default:
       command_handled = false;
@@ -458,13 +362,127 @@ bool OffloadingMqttData ()
     else str_mailbox_value = str_mailbox_data;
 
     // convert and update instant power
-    OffloadingUpdateHousePower (str_mailbox_value.toInt ());
+    offloading_power_actual = str_mailbox_value.toInt ();
 
     // data from message has been handled
     data_handled = true;
   }
 
   return data_handled;
+}
+
+// update offloading status according to all parameters
+void OffloadingUpdateStatus ()
+{
+  uint8_t  prev_stage, next_stage;
+  uint16_t power_device, power_contract;
+  ulong    time_now, time_delay;
+
+  // get device power and global power limit
+  power_device   = OffloadingGetDevicePower ();
+  power_contract = OffloadingGetContractPower ();
+
+  // get current time
+  time_now = millis ();
+
+  // if house contract and device power are defined
+  if ((power_contract > 0) && (power_device > 0))
+  {
+    // set previous and next state to current state
+    prev_stage = offloading_stage;
+    next_stage = offloading_stage;
+  
+    // switch according to current state
+    switch (offloading_stage)
+    { 
+      // actually not offloaded
+      case OFFLOADING_NONE:
+        // save relay state
+        offloading_relay_state = bitRead (power, 0);
+
+        // if overload is detected
+        if (offloading_power_actual > power_contract)
+        { 
+          // set time for effective offloading calculation
+          offloading_stage_time = time_now;
+
+          // next state is before offloading
+          next_stage = OFFLOADING_BEFORE;
+        }
+        break;
+
+      // pending offloading
+      case OFFLOADING_BEFORE:
+        // save relay state
+        offloading_relay_state = bitRead (power, 0);
+
+        // if house power has gone down, remove pending offloading
+        if (offloading_power_actual <= power_contract) next_stage = OFFLOADING_NONE;
+
+        // else if delay is reached, set active offloading
+        else
+        {
+          time_delay = 1000 * OffloadingGetDelayBeforeOffload ();
+          if (time_now - offloading_stage_time > time_delay)
+          {
+            // set next stage as offloading
+            next_stage = OFFLOADING_ACTIVE;
+
+            // get relay state and log
+            offloading_relay_state = bitRead (power, 0);
+            AddLog_P2(LOG_LEVEL_INFO, PSTR("PWR: Offloading (relay = %d)"), offloading_relay_state);
+
+            // read relay state and switch off if needed
+            if ((offloading_relay_managed == true) && (offloading_relay_state == 1)) ExecuteCommandPower (1, POWER_OFF, SRC_MAX);
+          }
+        } 
+        break;
+
+      // offloading is active
+      case OFFLOADING_ACTIVE:
+        // to remove offload, power limit is current limit minus device power
+        power_contract -= power_device;
+
+        if (offloading_power_actual <= power_contract)
+        {
+          // set time for removing offloading calculation
+          offloading_stage_time = time_now;
+
+          // set stage to after offloading
+          next_stage = OFFLOADING_AFTER;
+        }
+        break;
+
+      // actually just after offloading should stop
+      case OFFLOADING_AFTER:
+        // if house power has gone again too high, offloading back to active state
+        if (offloading_power_actual > power_contract - power_device) next_stage = OFFLOADING_ACTIVE;
+        
+        // else if delay is reached, set active offloading
+        else
+        {
+          time_delay = 1000 * OffloadingGetDelayBeforeRemoval ();
+          if (time_now - offloading_stage_time > time_delay)
+          {
+            // set stage to after offloading
+            next_stage = OFFLOADING_NONE;
+
+            // log offloading removal
+            AddLog_P2(LOG_LEVEL_INFO, PSTR("PWR: Offloading removal (relay = %d)"), offloading_relay_state);
+
+            // switch back relay ON if needed
+            if ((offloading_relay_managed == true) && (offloading_relay_state == 1)) ExecuteCommandPower (1, POWER_ON, SRC_MAX);
+          } 
+        } 
+        break;
+    }
+
+    // update offloading state
+    offloading_stage = next_stage;
+
+    // if state has changed, send MQTT status
+    if (next_stage != prev_stage) OffloadingShowJSON (false);
+  }
 }
 
 /***********************************************\
@@ -482,44 +500,59 @@ void OffloadingWebButton ()
 // append offloading state to main page
 bool OffloadingWebSensor ()
 {
-  uint16_t power_limit, num_message;
+  uint16_t contract_power, num_message;
   String   str_title, str_text;
+  ulong    time_now, time_left, time_delay;
+  
+  // device power
+  contract_power = OffloadingGetDevicePower ();
+  WSContentSend_PD (PSTR("{s}%s{m}<b>%d</b> W{e}"), D_OFFLOADING_DEVICE, contract_power);
 
   // if house power is subscribed, display power
   if (offloading_topic_subscribed == true)
   {
-      // display current power and contract power limit
-    power_limit = OffloadingGetPowerLimit ();
-    if (power_limit > 0) WSContentSend_PD (PSTR("{s}%s{m}<b>%d</b> / %dW{e}"), D_OFFLOADING_TOTAL_POWER, offloading_house_power, power_limit);
+    // get current time
+    time_now = millis ();
+
+    // display current power and contract power limit
+    contract_power = OffloadingGetContractPower ();
+    str_title = D_OFFLOADING_CONTRACT + String (" (") + D_OFFLOADING_INSTCONTRACT + String (")");
+    if (contract_power > 0) WSContentSend_PD (PSTR("{s}%s{m}<b>%d</b> / %d W{e}"), str_title.c_str (), offloading_power_actual, contract_power);
 
     // switch according to current state
-    switch (offloading_state)
+    time_left = 0;
+    str_title = D_OFFLOADING;
+    switch (offloading_stage)
     { 
+      // calculate number of ms left before offloading
       case OFFLOADING_BEFORE:
-        num_message = OffloadingGetUpdateBeforeOffload ();
-        str_title = D_OFFLOADING_BEFORE;
-        str_text  = "<span style='color:orange;'>" + String (offloading_counter) + " " + String (D_OFFLOADING_SENSOR_UPDATE) + "</span>";
+        time_delay = 1000 * OffloadingGetDelayBeforeOffload ();
+        if (time_now - offloading_stage_time < time_delay) time_left = (offloading_stage_time + time_delay - time_now) / 1000;
+        str_text  = PSTR("<span style='color:orange;'>Starting in <b>") + String (time_left) + PSTR(" sec.</b></span>");
         break;
+
+      // calculate number of ms left before offload removal
       case OFFLOADING_AFTER:
-        num_message = OffloadingGetUpdateAfterOffload ();
-        str_title = D_OFFLOADING_AFTER;
-        str_text  = "<span style='color:red;'>" + String (offloading_counter) + " " + String (D_OFFLOADING_SENSOR_UPDATE) + "</span>";
+        time_delay = 1000 * OffloadingGetDelayBeforeRemoval ();
+        if (time_now - offloading_stage_time < time_delay) time_left = (offloading_stage_time + time_delay - time_now) / 1000;
+        str_text  = PSTR("<span style='color:red;'>Ending in <b>") + String (time_left) + PSTR(" sec.</b></span>");
         break;
+
+      // device is offloaded
       case OFFLOADING_ACTIVE:
-        str_title = D_OFFLOADING;
-        str_text  = "<span style='color:red;'><b>" + String (D_OFFLOADING_ACTIVE) + "</b></span>";
+        str_text  = PSTR("<span style='color:red;'><b>Active</b></span>");
         break;
     }
     
     // display current state
-    if (str_title.length () > 0) WSContentSend_PD (PSTR("{s}%s{m}%s{e}"), str_title.c_str (), str_text.c_str ());
+    if (str_text.length () > 0) WSContentSend_PD (PSTR("{s}%s{m}%s{e}"), str_title.c_str (), str_text.c_str ());
   }
 }
 
 // Pilot Wire web page
 void OffloadingWebPage ()
 {
-  uint16_t num_message, power_device, power_limit;
+  uint16_t delay_offload, power_device, power_limit;
   char     argument[OFFLOADING_BUFFER_SIZE];
   String   str_topic, str_key;
 
@@ -535,7 +568,7 @@ void OffloadingWebPage ()
 
     // get maximum power limit according to 'contract' parameter
     WebGetArg (D_CMND_OFFLOADING_CONTRACT, argument, OFFLOADING_BUFFER_SIZE);
-    OffloadingSetPowerLimit ((uint16_t)atoi (argument));
+    OffloadingSetContractPower ((uint16_t)atoi (argument));
 
     // get MQTT topic according to 'topic' parameter
     WebGetArg (D_CMND_OFFLOADING_TOPIC, argument, OFFLOADING_BUFFER_SIZE);
@@ -545,13 +578,13 @@ void OffloadingWebPage ()
     WebGetArg (D_CMND_OFFLOADING_KEY, argument, OFFLOADING_BUFFER_SIZE);
     OffloadingSetMqttPowerKey (argument);
 
-    // get number of overload messages before offloading heater according to 'before' parameter
+    // get delay in sec. before offloading device according to 'before' parameter
     WebGetArg (D_CMND_OFFLOADING_BEFORE, argument, OFFLOADING_BUFFER_SIZE);
-    OffloadingSetUpdateBeforeOffload ((uint8_t)atoi (argument));
+    OffloadingSetDelayBeforeOffload ((uint16_t)atoi (argument));
 
-    // get number of correct load messages before removing offload of heater according to 'after' parameter
+    // get delay in sec. after offloading device according to 'after' parameter
     WebGetArg (D_CMND_OFFLOADING_AFTER, argument, OFFLOADING_BUFFER_SIZE);
-    OffloadingSetUpdateAfterOffload ((uint8_t)atoi (argument));
+    OffloadingSetDelayBeforeRemoval ((uint16_t)atoi (argument));
   }
 
   // beginning of form
@@ -566,11 +599,16 @@ void OffloadingWebPage ()
   // device power
   power_device = OffloadingGetDevicePower ();
   WSContentSend_P (PSTR ("<p>%s (W)<span %s>%s</span><br><input type='number' name='%s' value='%d'></p>\n"), D_OFFLOADING_POWER, OFFLOADING_TOPIC_STYLE, D_CMND_OFFLOADING_DEVICE, D_CMND_OFFLOADING_DEVICE, power_device);
+
   WSContentSend_P (PSTR("</fieldset></p>\n"));
 
   // contract power limit section  
   // ----------------------------
-  WSContentSend_P (PSTR("<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n"), D_OFFLOADING_TOTAL_POWER);
+  WSContentSend_P (PSTR("<p><fieldset><legend><b>&nbsp;%s %s&nbsp;</b></legend>\n"), D_OFFLOADING_CONTRACT, D_OFFLOADING_POWER);
+
+  // contract power limit
+  power_limit = OffloadingGetContractPower ();
+  WSContentSend_P (PSTR ("<p>%s (W)<span %s>%s</span><br><input type='number' name='%s' value='%d'></p>\n"), D_OFFLOADING_CONTRACT, OFFLOADING_TOPIC_STYLE, D_CMND_OFFLOADING_CONTRACT, D_CMND_OFFLOADING_CONTRACT, power_limit);
 
   // house power mqtt topic
   OffloadingGetMqttPowerTopic (str_topic);
@@ -580,26 +618,24 @@ void OffloadingWebPage ()
   OffloadingGetMqttPowerKey (str_key);
   WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input name='%s' value='%s'></p>\n"), D_OFFLOADING_KEY, OFFLOADING_TOPIC_STYLE, D_CMND_OFFLOADING_KEY, D_CMND_OFFLOADING_KEY, str_key.c_str ());
 
-  // contract power limit
-  power_limit = OffloadingGetPowerLimit ();
-  WSContentSend_P (PSTR ("<p>%s (W)<span %s>%s</span><br><input type='number' name='%s' value='%d'></p>\n"), D_OFFLOADING_CONTRACT, OFFLOADING_TOPIC_STYLE, D_CMND_OFFLOADING_CONTRACT, D_CMND_OFFLOADING_CONTRACT, power_limit);
   WSContentSend_P (PSTR("</fieldset></p>\n"));
 
-  // messages section  
-  // ----------------
-  WSContentSend_P (PSTR("<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>"), D_OFFLOADING_MESSAGE);
+  // delay section  
+  // -------------
+  WSContentSend_P (PSTR("<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>"), D_OFFLOADING_DELAY);
 
   // number of overload messages before offloading heater
-  num_message  = OffloadingGetUpdateBeforeOffload ();
-  WSContentSend_P (PSTR ("<p>%s %s<span %s>%s</span><br><input type='number' name='%s' min='0' step='1' value='%d'></p>\n"), D_OFFLOADING_BEFORE, D_OFFLOADING_IMMEDIATE, OFFLOADING_TOPIC_STYLE, D_CMND_OFFLOADING_BEFORE, D_CMND_OFFLOADING_BEFORE, num_message);
+  delay_offload = OffloadingGetDelayBeforeOffload ();
+  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input type='number' name='%s' min='0' step='1' value='%d'></p>\n"), D_OFFLOADING_BEFORE, OFFLOADING_TOPIC_STYLE, D_CMND_OFFLOADING_BEFORE, D_CMND_OFFLOADING_BEFORE, delay_offload);
 
   // number of correct load messages before removing offload of heater
-  num_message  = OffloadingGetUpdateAfterOffload ();
-  WSContentSend_P (PSTR ("<p>%s %s<span %s>%s</span><br><input type='number' name='%s' min='0' step='1' value='%d'></p>\n"), D_OFFLOADING_AFTER, D_OFFLOADING_IMMEDIATE, OFFLOADING_TOPIC_STYLE, D_CMND_OFFLOADING_AFTER, D_CMND_OFFLOADING_AFTER, num_message);
+  delay_offload = OffloadingGetDelayBeforeRemoval ();
+  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input type='number' name='%s' min='0' step='1' value='%d'></p>\n"), D_OFFLOADING_AFTER, OFFLOADING_TOPIC_STYLE, D_CMND_OFFLOADING_AFTER, D_CMND_OFFLOADING_AFTER, delay_offload);
+
   WSContentSend_P (PSTR("</fieldset></p>\n"));
 
   // save button  
-  // --------------
+  // -----------
   WSContentSend_P (PSTR ("<p><button name='save' type='submit' class='button bgrn'>%s</button></p>\n"), D_SAVE);
   WSContentSend_P (PSTR("</form>\n"));
 
@@ -631,6 +667,9 @@ bool Xdrv96 (uint8_t function)
       break;
     case FUNC_COMMAND:
       result = OffloadingMqttCommand ();
+      break;
+    case FUNC_EVERY_250_MSECOND:
+      OffloadingUpdateStatus ();
       break;
     case FUNC_EVERY_SECOND:
       OffloadingCheckMqttConnexion ();

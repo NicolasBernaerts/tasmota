@@ -1,7 +1,13 @@
 /*
   user_config_override.h - user configuration overrides my_user_config.h for Tasmota
 
-  Copyright (C) 2019  Theo Arends
+  Device offloading thru MQTT instant house power
+
+  Copyright (C) 2020  Theo Arends, Nicolas Bernaerts
+    23/03/2020 - v1.0 - Creation
+    26/05/2020 - v1.1 - Add Information JSON page
+    07/07/2020 - v1.2 - Enable discovery (mDNS)
+    20/07/2020 - v1.3 - Change delays to seconds
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -50,14 +56,14 @@
 #define USE_TIMEZONE                          // Add support for timezone management
 #define USE_OFFLOADING                        // Add support for MQTT power offloading
 
-#define EXTENSION_VERSION "1.1"               // version
+#define EXTENSION_VERSION "1.3"               // version
 #define EXTENSION_NAME "Offloading"           // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 
 #undef APP_SLEEP
 #define APP_SLEEP 1                           // Default to sleep = 1
 
-//#undef USE_ENERGY_SENSOR                      // Disable energy sensors
+//#undef USE_ENERGY_SENSOR                    // Disable energy sensors
 #undef USE_ARDUINO_OTA                        // Disable support for Arduino OTA
 #undef USE_WPS                                // Disable support for WPS as initial wifi configuration tool
 #undef USE_SMARTCONFIG                        // Disable support for Wifi SmartConfig as initial wifi configuration tool
@@ -69,11 +75,11 @@
 #undef USE_EMULATION_HUE                      // Disable Hue Bridge emulation for Alexa (+14k code, +2k mem common)
 #undef USE_EMULATION_WEMO                     // Disable Belkin WeMo emulation for Alexa (+6k code, +2k mem common)
 #undef USE_CUSTOM                             // Disable Custom features
-#undef USE_DISCOVERY                          // Disable Discovery services for both MQTT and web server
-//#undef USE_TIMERS                             // Disable support for up to 16 timers
-//#undef USE_TIMERS_WEB                         // Disable support for timer webpage
+//#undef USE_DISCOVERY                        // Disable Discovery services for both MQTT and web server
+//#undef USE_TIMERS                           // Disable support for up to 16 timers
+//#undef USE_TIMERS_WEB                       // Disable support for timer webpage
 //#undef USE_SUNRISE                          // Disable support for Sunrise and sunset tools
-//#undef USE_RULES                            // Disable support for rules
+#undef USE_RULES                              // Disable support for rules
 #undef USE_I2C                                // Disable all I2C sensors and devices
 #undef USE_DHT                                // Disable internal DHT sensor
 #undef USE_DS18x20                            // Disable DS18x20 sensor
@@ -93,15 +99,15 @@
 #undef USE_SDM630                             // Disable support for Eastron SDM630-Modbus energy meter
 #undef USE_MP3_PLAYER                         // Disable DFPlayer Mini MP3 Player RB-DFR-562 commands: play, volume and stop
 
-#undef USE_SONOFF_RF                            // Add support for Sonoff Rf Bridge (+3k2 code)
+#undef USE_SONOFF_RF                          // Add support for Sonoff Rf Bridge (+3k2 code)
 #undef USE_RF_FLASH                           // Add support for flashing the EFM8BB1 chip on the Sonoff RF Bridge. C2CK must be connected to GPIO4, C2D to GPIO5 on the PCB (+2k7 code)
-#undef USE_SONOFF_SC                            // Add support for Sonoff Sc (+1k1 code)
-#undef USE_TUYA_MCU                             // Add support for Tuya Serial MCU
+#undef USE_SONOFF_SC                          // Add support for Sonoff Sc (+1k1 code)
+#undef USE_TUYA_MCU                           // Add support for Tuya Serial MCU
 #undef USE_ARMTRONIX_DIMMERS                  // Disable support for Armtronix Dimmers (+1k4 code)
 #undef USE_PS_16_DZ                           // Disable support for PS-16-DZ Dimmer
-#undef USE_SONOFF_IFAN                          // Add support for Sonoff iFan02 and iFan03 (+2k code)
-#undef USE_BUZZER                               // Add support for a buzzer (+0k6 code)
-#undef USE_ARILUX_RF                            // Add support for Arilux RF remote controller (+0k8 code, 252 iram (non 2.3.0))
+#undef USE_SONOFF_IFAN                        // Add support for Sonoff iFan02 and iFan03 (+2k code)
+#undef USE_BUZZER                             // Add support for a buzzer (+0k6 code)
+#undef USE_ARILUX_RF                          // Add support for Arilux RF remote controller (+0k8 code, 252 iram (non 2.3.0))
 #undef USE_DEEPSLEEP 
 #undef USE_AZ7798                             // Disable support for AZ-Instrument 7798 CO2 datalogger
 #undef USE_PN532_HSU                          // Disable support for PN532 using HSU (Serial) interface (+1k8 code, 140 bytes mem)
