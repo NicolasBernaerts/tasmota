@@ -2,7 +2,7 @@
   xdrv_97_temperature.ino - Retreive Temperature thru MQTT (~2.5 kb)
   
   Copyright (C) 2020  Nicolas Bernaerts
-    15/01/2020 - v5.0 - Separate temperature driver and add remote MQTT sensor
+    15/01/2020 - v1.0 - Creation with management of remote MQTT sensor
                       
   Settings are stored using weighting scale parameters :
     - Settings.free_f03  = MQTT Instant temperature (power data|Temperature MQTT topic;Temperature JSON key)
@@ -50,7 +50,9 @@ enum TemperatureCommands { CMND_TEMPERATURE_TOPIC, CMND_TEMPERATURE_KEY };
 const char kTemperatureCommands[] PROGMEM = D_CMND_TEMPERATURE_TOPIC "|" D_CMND_TEMPERATURE_KEY;
 
 // form topic style
-const char TEMPERATURE_TOPIC_STYLE[] PROGMEM = "style='float:right;font-size:0.7rem;'";
+const char str_temp_fieldset_start[] PROGMEM = "<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n";
+const char str_temp_fieldset_stop[] PROGMEM = "</fieldset></p>\n";
+const char str_temp_input[] PROGMEM = "<p>%s<span style='float:right;font-size:0.7rem;'>%s</span><br><input name='%s' value='%s'></p>\n";
 
 /*************************************************\
  *               Variables
@@ -330,16 +332,16 @@ void TemperatureWebPage ()
 
   // remote sensor section  
   // --------------
-  WSContentSend_P (PSTR("<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n"), D_TEMPERATURE_REMOTE);
+  WSContentSend_P (str_temp_fieldset_start, D_TEMPERATURE_REMOTE);
 
   // remote sensor mqtt topic
   TemperatureGetMqttTopic (str_topic);
-  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input name='%s' value='%s'></p>\n"), D_TEMPERATURE_TOPIC, TEMPERATURE_TOPIC_STYLE, D_CMND_TEMPERATURE_TOPIC, D_CMND_TEMPERATURE_TOPIC, str_topic.c_str ());
+  WSContentSend_P (str_temp_input, D_TEMPERATURE_TOPIC, D_CMND_TEMPERATURE_TOPIC, D_CMND_TEMPERATURE_TOPIC, str_topic.c_str ());
 
   // remote sensor json key
   TemperatureGetMqttKey (str_key);
-  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br/><input name='%s' value='%s'><br/>\n"), D_TEMPERATURE_KEY, TEMPERATURE_TOPIC_STYLE, D_CMND_TEMPERATURE_KEY, D_CMND_TEMPERATURE_KEY, str_key.c_str ());
-  WSContentSend_P (PSTR("</fieldset></p>\n"));
+  WSContentSend_P (str_temp_input, D_TEMPERATURE_KEY, D_CMND_TEMPERATURE_KEY, D_CMND_TEMPERATURE_KEY, str_key.c_str ());
+  WSContentSend_P (str_temp_fieldset_stop);
 
   // end of form and save button
   WSContentSend_P (PSTR ("<p><button name='save' type='submit' class='button bgrn'>%s</button></p>\n"), D_SAVE);
