@@ -138,28 +138,28 @@ bool TimezoneMqttCommand ()
       SettingsUpdateText(SET_NTPSERVER1, XdrvMailbox.data);
       break;
     case CMND_TIMEZONE_STDO:  // set timezone STD offset
-      Settings.toffset[0] = atoi (XdrvMailbox.data);
+      Settings.toffset[0] = XdrvMailbox.payload;
       break;
     case CMND_TIMEZONE_STDM:  // set timezone STD month switch
-      Settings.tflag[0].month = atoi (XdrvMailbox.data);
+      Settings.tflag[0].month = XdrvMailbox.payload;
       break;
     case CMND_TIMEZONE_STDW:  // set timezone STD week of month switch
-      Settings.tflag[0].week = atoi (XdrvMailbox.data);
+      Settings.tflag[0].week = XdrvMailbox.payload;
       break;
     case CMND_TIMEZONE_STDD:  // set timezone STD day of week switch
-      Settings.tflag[0].dow = atoi (XdrvMailbox.data);
+      Settings.tflag[0].dow = XdrvMailbox.payload;
       break;
     case CMND_TIMEZONE_DSTO:  // set timezone DST offset
-      Settings.toffset[1] = atoi (XdrvMailbox.data);
+      Settings.toffset[1] = XdrvMailbox.payload;
       break;
     case CMND_TIMEZONE_DSTM:  // set timezone DST month switch
-      Settings.tflag[1].month = atoi (XdrvMailbox.data);
+      Settings.tflag[1].month = XdrvMailbox.payload;
       break;
     case CMND_TIMEZONE_DSTW:  // set timezone DST week of month switch
-      Settings.tflag[1].week = atoi (XdrvMailbox.data);
+      Settings.tflag[1].week = XdrvMailbox.payload;
       break;
     case CMND_TIMEZONE_DSTD:  // set timezone DST day of week switch
-      Settings.tflag[1].dow = atoi (XdrvMailbox.data);
+      Settings.tflag[1].dow = XdrvMailbox.payload;
       break;
    default:
       command_handled = false;
