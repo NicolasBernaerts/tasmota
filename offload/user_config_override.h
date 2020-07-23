@@ -4,10 +4,11 @@
   Device offloading thru MQTT instant house power
 
   Copyright (C) 2020  Theo Arends, Nicolas Bernaerts
-    23/03/2020 - v1.0 - Creation
-    26/05/2020 - v1.1 - Add Information JSON page
-    07/07/2020 - v1.2 - Enable discovery (mDNS)
-    20/07/2020 - v1.3 - Change delays to seconds
+    23/03/2020 - v1.0   - Creation
+    26/05/2020 - v1.1   - Add Information JSON page
+    07/07/2020 - v1.2   - Enable discovery (mDNS)
+    20/07/2020 - v1.3   - Change offloading delays to seconds
+    22/07/2020 - v1.3.1 - Update instant device power in case of Sonoff energy module
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -56,7 +57,7 @@
 #define USE_TIMEZONE                          // Add support for timezone management
 #define USE_OFFLOADING                        // Add support for MQTT power offloading
 
-#define EXTENSION_VERSION "1.3"               // version
+#define EXTENSION_VERSION "1.3.1"             // version
 #define EXTENSION_NAME "Offloading"           // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 

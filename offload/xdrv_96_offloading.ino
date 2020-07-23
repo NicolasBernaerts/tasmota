@@ -2,9 +2,8 @@
   xdrv_96_offloading.ino - Device offloading thru MQTT instant house power
   
     23/03/2020 - v1.0 - Creation
-    26/05/2020 - v1.1 - Add Information JSON page
-    07/07/2020 - v1.2 - Enable discovery (mDNS)
-    20/07/2020 - v1.3 - Change delays to seconds
+    20/07/2020 - v1.1 - Change delays to seconds
+    22/07/2020 - v1.2 - Update instant device power in case of Sonoff energy module
                    
   Settings are stored using weighting scale parameters :
     - Settings.energy_max_power              = Power of plugged appliance (W) 
@@ -60,8 +59,11 @@
 #define D_OFFLOADING_POWER          "Power"
 #define D_OFFLOADING_DELAY          "Delay"
 #define D_OFFLOADING_STATUS         "Status"
-#define D_OFFLOADING_BEFORE         "Before offloading (sec.)"
-#define D_OFFLOADING_AFTER          "Before offloading removal (sec.)"
+#define D_OFFLOADING_BEFORE         "Before offloading"
+#define D_OFFLOADING_AFTER          "Before offloading removal"
+
+#define D_OFFLOADING_UNIT_W         "W"
+#define D_OFFLOADING_UNIT_SEC       "sec."
 
 #define D_OFFLOADING_CONFIGURE      "Configure Offloading"
 #define D_OFFLOADING_DEVICE         "Device"
@@ -75,8 +77,11 @@
 enum OffloadingCommands { CMND_OFFLOADING_DEVICE, CMND_OFFLOADING_CONTRACT, CMND_OFFLOADING_BEFORE, CMND_OFFLOADING_AFTER, CMND_OFFLOADING_TOPIC, CMND_OFFLOADING_KEY };
 const char kOffloadingCommands[] PROGMEM = D_CMND_OFFLOADING_DEVICE "|" D_CMND_OFFLOADING_CONTRACT "|" D_CMND_OFFLOADING_BEFORE "|" D_CMND_OFFLOADING_AFTER "|" D_CMND_OFFLOADING_TOPIC "|" D_CMND_OFFLOADING_KEY;
 
-// form topic style
-const char OFFLOADING_TOPIC_STYLE[] PROGMEM = "style='float:right;font-size:0.7rem;'";
+// constant chains
+const char str_conf_fieldset_start[] PROGMEM = "<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n";
+const char str_conf_fieldset_stop[] PROGMEM = "</fieldset></p>\n";
+const char str_conf_input_number[] PROGMEM = "<p>%s (%s)<span style='float:right;font-size:0.7rem;'>%s</span><br><input type='number' name='%s' min='0' step='1' value='%d'></p>\n";
+const char str_conf_input_text[] PROGMEM = "<p>%s<span style='float:right;font-size:0.7rem;'>%s</span><br><input name='%s' value='%s'></p>\n";
 
 /*************************************************\
  *               Variables
@@ -375,17 +380,25 @@ bool OffloadingMqttData ()
 void OffloadingUpdateStatus ()
 {
   uint8_t  prev_stage, next_stage;
-  uint16_t power_device, power_contract;
+  uint16_t power_mesured, power_device, power_contract;
   ulong    time_now, time_delay;
 
   // get device power and global power limit
   power_device   = OffloadingGetDevicePower ();
   power_contract = OffloadingGetContractPower ();
+  power_mesured  = (uint16_t)Energy.active_power[0];
+
+  // check if device instant power is beyond defined power
+  if (power_mesured > power_device)
+  {
+    power_device = power_mesured;
+    OffloadingSetDevicePower (power_mesured);
+  }
 
   // get current time
   time_now = millis ();
 
-  // if house contract and device power are defined
+  // if contract power and device power are defined
   if ((power_contract > 0) && (power_device > 0))
   {
     // set previous and next state to current state
@@ -430,7 +443,7 @@ void OffloadingUpdateStatus ()
 
             // get relay state and log
             offloading_relay_state = bitRead (power, 0);
-            AddLog_P2(LOG_LEVEL_INFO, PSTR("PWR: Offloading (relay = %d)"), offloading_relay_state);
+            AddLog_P2(LOG_LEVEL_INFO, PSTR("PWR: Offloading start (relay = %d)"), offloading_relay_state);
 
             // read relay state and switch off if needed
             if ((offloading_relay_managed == true) && (offloading_relay_state == 1)) ExecuteCommandPower (1, POWER_OFF, SRC_MAX);
@@ -468,7 +481,7 @@ void OffloadingUpdateStatus ()
             next_stage = OFFLOADING_NONE;
 
             // log offloading removal
-            AddLog_P2(LOG_LEVEL_INFO, PSTR("PWR: Offloading removal (relay = %d)"), offloading_relay_state);
+            AddLog_P2(LOG_LEVEL_INFO, PSTR("PWR: Offloading stop (relay = %d)"), offloading_relay_state);
 
             // switch back relay ON if needed
             if ((offloading_relay_managed == true) && (offloading_relay_state == 1)) ExecuteCommandPower (1, POWER_ON, SRC_MAX);
@@ -516,7 +529,7 @@ bool OffloadingWebSensor ()
 
     // display current power and contract power limit
     contract_power = OffloadingGetContractPower ();
-    str_title = D_OFFLOADING_CONTRACT + String (" (") + D_OFFLOADING_INSTCONTRACT + String (")");
+    str_title = D_OFFLOADING_POWER + String (" (") + D_OFFLOADING_INSTCONTRACT + String (")");
     if (contract_power > 0) WSContentSend_PD (PSTR("{s}%s{m}<b>%d</b> / %d W{e}"), str_title.c_str (), offloading_power_actual, contract_power);
 
     // switch according to current state
@@ -528,19 +541,19 @@ bool OffloadingWebSensor ()
       case OFFLOADING_BEFORE:
         time_delay = 1000 * OffloadingGetDelayBeforeOffload ();
         if (time_now - offloading_stage_time < time_delay) time_left = (offloading_stage_time + time_delay - time_now) / 1000;
-        str_text  = PSTR("<span style='color:orange;'>Starting in <b>") + String (time_left) + PSTR(" sec.</b></span>");
+        str_text = PSTR("<span style='color:orange;'>Starting in <b>") + String (time_left) + PSTR(" sec.</b></span>");
         break;
 
       // calculate number of ms left before offload removal
       case OFFLOADING_AFTER:
         time_delay = 1000 * OffloadingGetDelayBeforeRemoval ();
         if (time_now - offloading_stage_time < time_delay) time_left = (offloading_stage_time + time_delay - time_now) / 1000;
-        str_text  = PSTR("<span style='color:red;'>Ending in <b>") + String (time_left) + PSTR(" sec.</b></span>");
+        str_text = PSTR("<span style='color:red;'>Ending in <b>") + String (time_left) + PSTR(" sec.</b></span>");
         break;
 
       // device is offloaded
       case OFFLOADING_ACTIVE:
-        str_text  = PSTR("<span style='color:red;'><b>Active</b></span>");
+        str_text = PSTR("<span style='color:red;'><b>Active</b></span>");
         break;
     }
     
@@ -592,47 +605,47 @@ void OffloadingWebPage ()
   WSContentSendStyle ();
   WSContentSend_P (PSTR("<form method='get' action='%s'>\n"), D_PAGE_OFFLOADING_METER);
 
-  // device section  
-  // --------------
-  WSContentSend_P (PSTR("<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>"), D_OFFLOADING_DEVICE);
-
-  // device power
-  power_device = OffloadingGetDevicePower ();
-  WSContentSend_P (PSTR ("<p>%s (W)<span %s>%s</span><br><input type='number' name='%s' value='%d'></p>\n"), D_OFFLOADING_POWER, OFFLOADING_TOPIC_STYLE, D_CMND_OFFLOADING_DEVICE, D_CMND_OFFLOADING_DEVICE, power_device);
-
-  WSContentSend_P (PSTR("</fieldset></p>\n"));
-
   // contract power limit section  
   // ----------------------------
-  WSContentSend_P (PSTR("<p><fieldset><legend><b>&nbsp;%s %s&nbsp;</b></legend>\n"), D_OFFLOADING_CONTRACT, D_OFFLOADING_POWER);
+  WSContentSend_P (str_conf_fieldset_start, D_OFFLOADING_CONTRACT, D_OFFLOADING_POWER);
 
   // contract power limit
   power_limit = OffloadingGetContractPower ();
-  WSContentSend_P (PSTR ("<p>%s (W)<span %s>%s</span><br><input type='number' name='%s' value='%d'></p>\n"), D_OFFLOADING_CONTRACT, OFFLOADING_TOPIC_STYLE, D_CMND_OFFLOADING_CONTRACT, D_CMND_OFFLOADING_CONTRACT, power_limit);
+  WSContentSend_P (str_conf_input_number, D_OFFLOADING_POWER, D_OFFLOADING_UNIT_W, D_CMND_OFFLOADING_CONTRACT, D_CMND_OFFLOADING_CONTRACT, power_limit);
 
   // house power mqtt topic
   OffloadingGetMqttPowerTopic (str_topic);
-  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input name='%s' value='%s'></p>\n"), D_OFFLOADING_TOPIC, OFFLOADING_TOPIC_STYLE, D_CMND_OFFLOADING_TOPIC, D_CMND_OFFLOADING_TOPIC, str_topic.c_str ());
+  WSContentSend_P (str_conf_input_text, D_OFFLOADING_TOPIC, D_CMND_OFFLOADING_TOPIC, D_CMND_OFFLOADING_TOPIC, str_topic.c_str ());
 
   // house power json key
   OffloadingGetMqttPowerKey (str_key);
-  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input name='%s' value='%s'></p>\n"), D_OFFLOADING_KEY, OFFLOADING_TOPIC_STYLE, D_CMND_OFFLOADING_KEY, D_CMND_OFFLOADING_KEY, str_key.c_str ());
+  WSContentSend_P (str_conf_input_text, D_OFFLOADING_KEY, D_CMND_OFFLOADING_KEY, D_CMND_OFFLOADING_KEY, str_key.c_str ());
 
-  WSContentSend_P (PSTR("</fieldset></p>\n"));
+  WSContentSend_P (str_conf_fieldset_stop);
+
+  // device section  
+  // --------------
+  WSContentSend_P (str_conf_fieldset_start, D_OFFLOADING_DEVICE);
+
+  // device power
+  power_device = OffloadingGetDevicePower ();
+  WSContentSend_P (str_conf_input_number, D_OFFLOADING_POWER, D_OFFLOADING_UNIT_W, D_CMND_OFFLOADING_DEVICE, D_CMND_OFFLOADING_DEVICE, power_device);
+
+  WSContentSend_P (str_conf_fieldset_stop);
 
   // delay section  
   // -------------
-  WSContentSend_P (PSTR("<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>"), D_OFFLOADING_DELAY);
+  WSContentSend_P (str_conf_fieldset_start, D_OFFLOADING_DELAY);
 
-  // number of overload messages before offloading heater
+  // delay in seconds before offloading the device
   delay_offload = OffloadingGetDelayBeforeOffload ();
-  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input type='number' name='%s' min='0' step='1' value='%d'></p>\n"), D_OFFLOADING_BEFORE, OFFLOADING_TOPIC_STYLE, D_CMND_OFFLOADING_BEFORE, D_CMND_OFFLOADING_BEFORE, delay_offload);
+  WSContentSend_P (str_conf_input_number, D_OFFLOADING_BEFORE, D_OFFLOADING_UNIT_SEC, D_CMND_OFFLOADING_BEFORE, D_CMND_OFFLOADING_BEFORE, delay_offload);
 
-  // number of correct load messages before removing offload of heater
+  // delay in seconds before removing offload of the device
   delay_offload = OffloadingGetDelayBeforeRemoval ();
-  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input type='number' name='%s' min='0' step='1' value='%d'></p>\n"), D_OFFLOADING_AFTER, OFFLOADING_TOPIC_STYLE, D_CMND_OFFLOADING_AFTER, D_CMND_OFFLOADING_AFTER, delay_offload);
+  WSContentSend_P (str_conf_input_number, D_OFFLOADING_AFTER, D_OFFLOADING_UNIT_SEC, D_CMND_OFFLOADING_AFTER, D_CMND_OFFLOADING_AFTER, delay_offload);
 
-  WSContentSend_P (PSTR("</fieldset></p>\n"));
+  WSContentSend_P (str_conf_fieldset_stop);
 
   // save button  
   // -----------
