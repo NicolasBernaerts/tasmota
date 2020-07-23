@@ -78,10 +78,10 @@ enum OffloadingCommands { CMND_OFFLOADING_DEVICE, CMND_OFFLOADING_CONTRACT, CMND
 const char kOffloadingCommands[] PROGMEM = D_CMND_OFFLOADING_DEVICE "|" D_CMND_OFFLOADING_CONTRACT "|" D_CMND_OFFLOADING_BEFORE "|" D_CMND_OFFLOADING_AFTER "|" D_CMND_OFFLOADING_TOPIC "|" D_CMND_OFFLOADING_KEY;
 
 // constant chains
-const char str_conf_fieldset_start[] PROGMEM = "<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n";
-const char str_conf_fieldset_stop[] PROGMEM = "</fieldset></p>\n";
-const char str_conf_input_number[] PROGMEM = "<p>%s (%s)<span style='float:right;font-size:0.7rem;'>%s</span><br><input type='number' name='%s' min='0' step='1' value='%d'></p>\n";
-const char str_conf_input_text[] PROGMEM = "<p>%s<span style='float:right;font-size:0.7rem;'>%s</span><br><input name='%s' value='%s'></p>\n";
+const char str_offload_fieldset_start[] PROGMEM = "<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n";
+const char str_offload_fieldset_stop[] PROGMEM = "</fieldset></p>\n";
+const char str_offload_input_number[] PROGMEM = "<p>%s (%s)<span style='float:right;font-size:0.7rem;'>%s</span><br><input type='number' name='%s' min='0' step='1' value='%d'></p>\n";
+const char str_offload_input_text[] PROGMEM = "<p>%s<span style='float:right;font-size:0.7rem;'>%s</span><br><input name='%s' value='%s'></p>\n";
 
 /*************************************************\
  *               Variables
@@ -607,45 +607,45 @@ void OffloadingWebPage ()
 
   // contract power limit section  
   // ----------------------------
-  WSContentSend_P (str_conf_fieldset_start, D_OFFLOADING_CONTRACT, D_OFFLOADING_POWER);
+  WSContentSend_P (str_offload_fieldset_start, D_OFFLOADING_CONTRACT, D_OFFLOADING_POWER);
 
   // contract power limit
   power_limit = OffloadingGetContractPower ();
-  WSContentSend_P (str_conf_input_number, D_OFFLOADING_POWER, D_OFFLOADING_UNIT_W, D_CMND_OFFLOADING_CONTRACT, D_CMND_OFFLOADING_CONTRACT, power_limit);
+  WSContentSend_P (str_offload_input_number, D_OFFLOADING_POWER, D_OFFLOADING_UNIT_W, D_CMND_OFFLOADING_CONTRACT, D_CMND_OFFLOADING_CONTRACT, power_limit);
 
   // house power mqtt topic
   OffloadingGetMqttPowerTopic (str_topic);
-  WSContentSend_P (str_conf_input_text, D_OFFLOADING_TOPIC, D_CMND_OFFLOADING_TOPIC, D_CMND_OFFLOADING_TOPIC, str_topic.c_str ());
+  WSContentSend_P (str_offload_input_text, D_OFFLOADING_TOPIC, D_CMND_OFFLOADING_TOPIC, D_CMND_OFFLOADING_TOPIC, str_topic.c_str ());
 
   // house power json key
   OffloadingGetMqttPowerKey (str_key);
-  WSContentSend_P (str_conf_input_text, D_OFFLOADING_KEY, D_CMND_OFFLOADING_KEY, D_CMND_OFFLOADING_KEY, str_key.c_str ());
+  WSContentSend_P (str_offload_input_text, D_OFFLOADING_KEY, D_CMND_OFFLOADING_KEY, D_CMND_OFFLOADING_KEY, str_key.c_str ());
 
-  WSContentSend_P (str_conf_fieldset_stop);
+  WSContentSend_P (str_offload_fieldset_stop);
 
   // device section  
   // --------------
-  WSContentSend_P (str_conf_fieldset_start, D_OFFLOADING_DEVICE);
+  WSContentSend_P (str_offload_fieldset_start, D_OFFLOADING_DEVICE);
 
   // device power
   power_device = OffloadingGetDevicePower ();
-  WSContentSend_P (str_conf_input_number, D_OFFLOADING_POWER, D_OFFLOADING_UNIT_W, D_CMND_OFFLOADING_DEVICE, D_CMND_OFFLOADING_DEVICE, power_device);
+  WSContentSend_P (str_offload_input_number, D_OFFLOADING_POWER, D_OFFLOADING_UNIT_W, D_CMND_OFFLOADING_DEVICE, D_CMND_OFFLOADING_DEVICE, power_device);
 
-  WSContentSend_P (str_conf_fieldset_stop);
+  WSContentSend_P (str_offload_fieldset_stop);
 
   // delay section  
   // -------------
-  WSContentSend_P (str_conf_fieldset_start, D_OFFLOADING_DELAY);
+  WSContentSend_P (str_offload_fieldset_start, D_OFFLOADING_DELAY);
 
   // delay in seconds before offloading the device
   delay_offload = OffloadingGetDelayBeforeOffload ();
-  WSContentSend_P (str_conf_input_number, D_OFFLOADING_BEFORE, D_OFFLOADING_UNIT_SEC, D_CMND_OFFLOADING_BEFORE, D_CMND_OFFLOADING_BEFORE, delay_offload);
+  WSContentSend_P (str_offload_input_number, D_OFFLOADING_BEFORE, D_OFFLOADING_UNIT_SEC, D_CMND_OFFLOADING_BEFORE, D_CMND_OFFLOADING_BEFORE, delay_offload);
 
   // delay in seconds before removing offload of the device
   delay_offload = OffloadingGetDelayBeforeRemoval ();
-  WSContentSend_P (str_conf_input_number, D_OFFLOADING_AFTER, D_OFFLOADING_UNIT_SEC, D_CMND_OFFLOADING_AFTER, D_CMND_OFFLOADING_AFTER, delay_offload);
+  WSContentSend_P (str_offload_input_number, D_OFFLOADING_AFTER, D_OFFLOADING_UNIT_SEC, D_CMND_OFFLOADING_AFTER, D_CMND_OFFLOADING_AFTER, delay_offload);
 
-  WSContentSend_P (str_conf_fieldset_stop);
+  WSContentSend_P (str_offload_fieldset_stop);
 
   // save button  
   // -----------
