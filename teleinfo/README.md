@@ -8,13 +8,13 @@ It is a completly different implementation than the one published early 2020 by 
 It provides Teleinfo data thru MQTT to allow easy offloading of electrical appliances or heaters.
 Teleinfo data have been slightly adapted to handle easily mono-phase and tri-phase meters.
 Data provided are :
-  * PHASE (number of phases)
-  * ADCO (contract number)
-  * ISOUSC (max contract current per phase) 
-  * SSOUSC (max contract power per phase)
-  * IINST1, IINST2, IINST3 (instant current per phase)
-  * SINSTS1, SINSTS2, SINSTS3 (instant apparent power per phase)
-  * ADIR1, ADIR2, ADIR3 (% of instant power according to the contract, >100 means overload)
+  * **PHASE** (number of phases)
+  * **ADCO** (contract number)
+  * **ISOUSC** (max contract current per phase) 
+  * **SSOUSC** (max contract power per phase)
+  * **IINST1**, **IINST2**, **IINST3** (instant current per phase)
+  * **SINSTS1**, **SINSTS2**, **SINSTS3** (instant apparent power per phase)
+  * **ADIR1**, **ADIR2**, **ADIR3** (% of instant power according to the contract, >100 means overload)
   
 These meters are :
   * Classical electronic meter (white)
