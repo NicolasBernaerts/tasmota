@@ -1,7 +1,23 @@
 /*
   user_config_override.h - user configuration overrides my_user_config.h for Tasmota
 
-  Copyright (C) 2019  Theo Arends
+  Copyright (C) 2019 & 2020  Theo Arends & Nicolas Bernaerts
+
+    05/05/2019 - v1.0   - Creation
+    16/05/2019 - v1.1   - Add Tempo and EJP contracts
+    08/06/2019 - v1.2   - Handle active and apparent power
+    05/07/2019 - v2.0   - Rework with selection thru web interface
+    02/01/2020 - v3.0   - Functions rewrite for Tasmota 8.x compatibility
+    05/02/2020 - v3.1   - Add support for 3 phases meters
+    14/03/2020 - v3.2   - Add apparent power graph
+    05/04/2020 - v3.3   - Add Timezone management
+    13/05/2020 - v3.4   - Add overload management per phase
+    15/05/2020 - v3.5   - Add tele.info and tele.json pages
+    19/05/2020 - v3.6   - Add configuration for first NTP server
+    26/05/2020 - v3.7   - Add Information JSON page
+    07/07/2020 - v3.7.1 - Enable discovery (mDNS)
+    29/07/2020 - v3.8   - Add phasis percentage
+    05/08/2020 - v4.0   - Add Meter in JSON & make error correction more robust 
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -45,18 +61,32 @@
  *    Teleinfo : configuration starts
 \********************************************/
 
-#define USE_VERSION                           // Add support for Version page
+#define USE_INFOJSON                          // Add support for Information JSON page
 #define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_TELEINFO                          // Add support for France Teleinfo Energy monitor as used in Linky (+1k1 code)
 
-#define EXTENSION_VERSION "3.6"               // version
-#define EXTENSION_NAME "Teleinfo"             // name
-#define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
+#define EXTENSION_VERSION  "4.0"                // version
+#define EXTENSION_NAME     "Teleinfo"           // name
+#define EXTENSION_AUTHOR   "Nicolas Bernaerts"  // author
+
+// default values
+#undef MQTT_HOST
+#define MQTT_HOST          "openhab"
+#undef MQTT_PORT
+#define MQTT_PORT          1883              
+#undef MQTT_USER
+#define MQTT_USER          ""
+#undef MQTT_PASS
+#define MQTT_PASS          ""
+#undef MQTT_FULLTOPIC
+#define MQTT_FULLTOPIC     "compteur/%topic%/%prefix%/"
+#undef FRIENDLY_NAME
+#define FRIENDLY_NAME      "Compteur"
 
 #undef APP_SLEEP
 #define APP_SLEEP 1                           // Default to sleep = 1
 
-//#undef USE_ENERGY_SENSOR                      // Disable energy sensors
+//#undef USE_ENERGY_SENSOR                    // Disable energy sensors
 #undef USE_ARDUINO_OTA                        // Disable support for Arduino OTA
 #undef USE_WPS                                // Disable support for WPS as initial wifi configuration tool
 #undef USE_SMARTCONFIG                        // Disable support for Wifi SmartConfig as initial wifi configuration tool
@@ -68,11 +98,11 @@
 #undef USE_EMULATION_HUE                      // Disable Hue Bridge emulation for Alexa (+14k code, +2k mem common)
 #undef USE_EMULATION_WEMO                     // Disable Belkin WeMo emulation for Alexa (+6k code, +2k mem common)
 #undef USE_CUSTOM                             // Disable Custom features
-#undef USE_DISCOVERY                          // Disable Discovery services for both MQTT and web server
+//#undef USE_DISCOVERY                        // Disable Discovery services for both MQTT and web server
 #undef USE_TIMERS                             // Disable support for up to 16 timers
 #undef USE_TIMERS_WEB                         // Disable support for timer webpage
-#undef USE_SUNRISE                          // Disable support for Sunrise and sunset tools
-#undef USE_RULES                            // Disable support for rules
+#undef USE_SUNRISE                            // Disable support for Sunrise and sunset tools
+#undef USE_RULES                              // Disable support for rules
 #undef USE_I2C                                // Disable all I2C sensors and devices
 #undef USE_DHT                                // Disable internal DHT sensor
 #undef USE_DS18x20                            // Disable DS18x20 sensor
@@ -92,15 +122,15 @@
 #undef USE_SDM630                             // Disable support for Eastron SDM630-Modbus energy meter
 #undef USE_MP3_PLAYER                         // Disable DFPlayer Mini MP3 Player RB-DFR-562 commands: play, volume and stop
 
-#undef USE_SONOFF_RF                            // Add support for Sonoff Rf Bridge (+3k2 code)
+#undef USE_SONOFF_RF                          // Add support for Sonoff Rf Bridge (+3k2 code)
 #undef USE_RF_FLASH                           // Add support for flashing the EFM8BB1 chip on the Sonoff RF Bridge. C2CK must be connected to GPIO4, C2D to GPIO5 on the PCB (+2k7 code)
-#undef USE_SONOFF_SC                            // Add support for Sonoff Sc (+1k1 code)
-#undef USE_TUYA_MCU                             // Add support for Tuya Serial MCU
+#undef USE_SONOFF_SC                          // Add support for Sonoff Sc (+1k1 code)
+#undef USE_TUYA_MCU                           // Add support for Tuya Serial MCU
 #undef USE_ARMTRONIX_DIMMERS                  // Disable support for Armtronix Dimmers (+1k4 code)
 #undef USE_PS_16_DZ                           // Disable support for PS-16-DZ Dimmer
-#undef USE_SONOFF_IFAN                          // Add support for Sonoff iFan02 and iFan03 (+2k code)
-#undef USE_BUZZER                               // Add support for a buzzer (+0k6 code)
-#undef USE_ARILUX_RF                            // Add support for Arilux RF remote controller (+0k8 code, 252 iram (non 2.3.0))
+#undef USE_SONOFF_IFAN                        // Add support for Sonoff iFan02 and iFan03 (+2k code)
+#undef USE_BUZZER                             // Add support for a buzzer (+0k6 code)
+#undef USE_ARILUX_RF                          // Add support for Arilux RF remote controller (+0k8 code, 252 iram (non 2.3.0))
 #undef USE_DEEPSLEEP 
 #undef USE_AZ7798                             // Disable support for AZ-Instrument 7798 CO2 datalogger
 #undef USE_PN532_HSU                          // Disable support for PN532 using HSU (Serial) interface (+1k8 code, 140 bytes mem)
