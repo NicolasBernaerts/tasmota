@@ -2,7 +2,8 @@ Tasmota firmware modified for France energy meters
 =============
 
 This evolution of Tasmota firmware has been enhanced to handle France energy meters using **Teleinfo** protocol.
-It is a completly different evolution than the one published early 2020 by Charles Hallard.
+
+It is a completly different implementation than the one published early 2020 by Charles Hallard. It replaces it.
 
 It provides Teleinfo data thru MQTT to allow easy offloading of electrical appliances or heaters.
 Teleinfo data have been slightly adapted to handle easily mono-phase and tri-phase meters.
