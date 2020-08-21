@@ -316,7 +316,7 @@ bool Xsns95 (uint8_t function)
   switch (function)
   { 
     case FUNC_JSON_APPEND:
-      TimezoneShowJSON (true);
+      //TimezoneShowJSON (true);
       break;
 
 #ifdef USE_WEBSERVER
