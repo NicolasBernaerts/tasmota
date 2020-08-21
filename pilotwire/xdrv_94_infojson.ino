@@ -22,9 +22,94 @@
 
 #ifdef USE_INFOJSON
 
-#define XDRV_94                   94
+#define XDRV_94             94
 
-#define D_PAGE_INFO_JSON          "info.json"
+#define D_PAGE_INFO_JSON    "info.json"
+
+#define D_JSON_INFO_IP      "IP"
+
+/**************************************************\
+ *                  Accessors
+\**************************************************/
+
+// get configuration string based on an index
+String InfoGetConfig (int index)
+{
+  String str_result;
+
+  switch (index)
+  { 
+    case 0:
+      str_result = Settings.ex_mqtt_client;
+      break;
+    case 1:
+      str_result = Settings.ex_mqtt_user;
+      break;
+    case 2:
+      str_result = Settings.ex_mqtt_pwd;
+      break;
+    case 3:
+      str_result = Settings.ex_mqtt_topic;
+      break;
+    case 4:
+      str_result = Settings.ex_button_topic;
+      break;
+    case 5:
+      str_result = Settings.ex_mqtt_grptopic;
+      break;
+  }
+
+  return str_result;
+}
+
+// set configuration string based on an index
+bool InfoSetConfig (int index, char* str_config)
+{
+  bool result = true;
+
+  switch (index)
+  { 
+    case 0:
+      strncpy ((char*)Settings.ex_mqtt_client, str_config, 32);
+      break;
+    case 1:
+      strncpy ((char*)Settings.ex_mqtt_user, str_config, 32);
+      break;
+    case 2:
+      strncpy ((char*)Settings.ex_mqtt_pwd, str_config, 32);
+      break;
+    case 3:
+      strncpy ((char*)Settings.ex_mqtt_topic, str_config, 32);
+      break;
+    case 4:
+      strncpy ((char*)Settings.ex_button_topic, str_config, 32);
+      break;
+    case 5:
+      strncpy ((char*)Settings.ex_mqtt_grptopic, str_config, 32);
+      break;
+    default:
+      result = false;
+      break;
+  }
+
+  return result;
+}
+
+/**************************************************\
+ *                  Functions
+\**************************************************/
+
+// Show JSON status (for MQTT)
+void InfoShowJSON ()
+{
+  String str_mqtt;
+
+  // append to MQTT message
+  str_mqtt = String (mqtt_data) + ",\"" + String (D_JSON_INFO_IP) + "\":\"" + WiFi.localIP().toString() + "\"";
+
+  // place JSON back to MQTT data
+  snprintf_P (mqtt_data, sizeof(mqtt_data), str_mqtt.c_str ());
+}
 
 /***********************************************\
  *                    Web
@@ -75,6 +160,10 @@ bool Xdrv94 (uint8_t function)
   // main callback switch
   switch (function)
   { 
+    case FUNC_JSON_APPEND:
+      InfoShowJSON ();
+      break;
+
 #ifdef USE_WEBSERVER
     case FUNC_WEB_ADD_HANDLER:
       WebServer->on ("/" D_PAGE_INFO_JSON, InfoWebPageJson);

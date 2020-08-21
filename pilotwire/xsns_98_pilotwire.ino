@@ -36,7 +36,7 @@
 #define D_PAGE_PILOTWIRE_CONFIG         "config"
 #define D_PAGE_PILOTWIRE_CONTROL        "control"
 #define D_PAGE_PILOTWIRE_SWITCH         "mode"
-#define D_PAGE_PILOTWIRE_JSON           "json"
+//#define D_PAGE_PILOTWIRE_JSON           "json"
 
 #define D_CMND_PILOTWIRE_ON             "on"
 #define D_CMND_PILOTWIRE_OFF            "off"
@@ -114,7 +114,8 @@
 #define PILOTWIRE_GRAPH_WIDTH           800      
 #define PILOTWIRE_GRAPH_HEIGHT          400 
 #define PILOTWIRE_GRAPH_PERCENT_START   15      
-#define PILOTWIRE_GRAPH_PERCENT_STOP    85      
+#define PILOTWIRE_GRAPH_PERCENT_STOP    85
+#define PILOTWIRE_GRAPH_REFRESH         60 * PILOTWIRE_GRAPH_STEP
 
 // constant chains
 const char str_conf_fieldset_start[] PROGMEM = "<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n";
@@ -127,36 +128,17 @@ const char str_graph_separation[] PROGMEM = "<line class='dash' x1='%d%%' y1='%d
 const char str_graph_temperature[] PROGMEM = "<text class='temperature' x='%d%%' y='%d%%'>%s°C</text>\n";
 
 // control page texts
-const char *const arrControlTemp[]   PROGMEM = {"Target", "Thermostat"};
-const char *const arrControlSet[]    PROGMEM = {"Set to", "Définir à"};
-const char *const arrControlStatus[] PROGMEM = {"Currently heating", "Radiateur en chauffe"};
-
-// french flag icon coded in base64
-const char flag_fr_0[] PROGMEM = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgBAMAAACBVGfHAAAGfnpUWHRSYXcgcHJvZmlsZSB0eXBlIGV4aWYAAHjarVdbluMoDP3XKmYJBiEEy+Glc2YHs/y5gOOqpJOq6u7YscEEC6GrxzWN//41+geH13BQEE0xx3jgCDlkX9BJxz52646w7uvw5194vhun6w+PIUbL+zGOc37BuHy8oOEcr/fjpO2Uk05B7rhbmufKs99PJU9B7Pe4O58pny+U+Gk75+XbKfa2rYfnoDBGF8hjT36w42Pd/V6J91VwRdw9Kybi39WXdX9iP7pM98SAV+/BfsdNM/4wxxZ021Z8sNM57uRhnK9l/J1Gzl8r+88a5Xbk4/PxyX5mPZmNvbsSIsFc8dzUbSurh4kV5uT1WsSpuAR9XWfGmY5yNKDWsdVKR8VDdh4WNxdcd8WZG6ttrkHF4IeHub33zfMaSzB/9o0nBGGezrwSZ+6cgEQDcoxhf+ni1rp5rofFElbuDjO9g7CJ4t1JjwN/et4JMptu7tyRLltBLz/9C2pM5OYdswCIs9OmsuzraDfH4zGBZSAoy8wJGyxH3SKquA/f4oUzH0KYGo4dL077KQAmwtoCZRwDgSM6Fhfdod6rc7BjAj4FmnsOvgIBJyS+Q0sfmCPASX6ujXfUrble/B5GegEQgqBRQJO5AKwQJETEW4ILFRKWICJRVJJkKZFjiBJj1DjzVFHWoKJRVZNmLYlTSJJi0pRSTiX7zEhjQjlmzSnnXAoWLaFAVsH8goHqK9dQpcaqNdVcS4P7tNCkxaYttdxK9507UgD12LWnnnsZbsCVRhgy4tCRRh7";
-const char flag_fr_1[] PROGMEM = "F4GvGFkwsmlqybOVC7UT1HrVH5L5GzZ2o+QXUnKcfqGFY9SbCzXQiEzMg5oMD4joRgEP7idmRXAh+IjcxO7JnYhYPLWWC091EDAiG4byYu7D7QO4lbgTr/i5u/hlyNKF7B3I0ofuE3K+4PUGtl5VueQE0oxA2RYZkhJ95KT4VX8dAP8xuKrNGvWwNRaB2XI01NzMIUoa32EyEqj20KbT2gUSwX7Mj9fRKoqU8MKVGT7W1UXuXKfWz0MjBDm7Yj1Z0hjL07Qc0sFGhTW+tjlpbHwO7951q6XNq9qMpgAKuajEid1ZrvXUdOfbSR7SaxAVxMgoi4Fh9uN/V0uPA160zeIYWXDn31Tau3EcLBFKwzJxda2uyzHr+0AJFlZHzbEN3SPI6ypS1dQzAkvSAdIP0Yw7lITVn2BwO07GhAe+BC3XFXnszx5xbrgbHQs0wuIlUC3XAN4gFhY7tBn6zVtMP0P+lpQXi5RMTQbSoaxnLgDecxkkjbgugxv7SGnMxCm11Ity4sQlD1nYfHwy2uBZdsPflisE2+EUW+AhiqYU6gsgyj6EItjZCRwBIgz7wpukfVgTuobnAPWDLZV1DBA+5x4aegfTQanf5htlq7YAttTrXTzMFZXrtOZeroGUkneGs5In/nKHZw1c/KUWXp6jJSHMKHASwi4mHP6vmmktHfqhiLZvODDLURxvdj4AIQgaK1j1Z7QgYjQir08q1svnxGqT7lkcCXKHRBm9il2DC2lNaeuHnOb/2qMtT0GYkQyR/62HKWg7ZMpLYS2W20ham5yC/IVdWBfMo0wMq0gjOOKoiBY1Qq8Om/yQJ0G8G+csYp98Mcn";
-const char flag_fr_2[] PROGMEM = "3lLvQR/KvtyODwhFY7tggpLZhL08tbzWYoJLMf+3EGOfJqyuuBfoDsj4ClHyD7I2DpGcLTLWEgUIb2XSq6MhD9RQq6y0D0RQp6pcQtn2KLqF68xdObbH3Qm2w9c/ZbbN3oTbY2epOtE73J1ttGb7B1otum7SNjFR1ukZyMGPVTDlgQuz3Ctrjb6GWrhTDPhu9GekcpOmRXkb8uRbOlu7ymtgspeO7kGbsg1V2Q/CpIYGWzxqAiYUdnReJZkch6XBUJmfrMVj2gdv20Cl2Y0l9WoQtT+qYKbTgn/ai6uafp5BZ1cQtb3GKxD8KWe4Yo0JHJT6xMeqKTntzg7Rnp+1uSSX9egO7rD/1mAdolR09U+0YVj526B2i2aUQ4UYUlFqqA3RYPqZOHHF/yTPp5xvk64dDPM87ThLOpJbdKOmni4hN904m86EQEnRh+sokVvptP5M0n6uIT4eITi1KStO8o5LfxjOzWHclwdZF5g49bcwzaG7nmMZnvAN+vpz+lEL+D3xhwyxjlTqArmgYYE6jg+iq7YhqKPAlpumK6zu8MzN3fGW1/Z8j6zvBy+/QzOcx98QmBKKH/AV/yd3T3AHXYAAABhWlDQ1BJQ0MgcHJvZmlsZQAAeJx9kT1Iw0AcxV9TtVYqDnYQdchQnSyIiuimVShChVArtOpgcumH0KQhSXFxFFwLDn4sVh1cnHV1cBUEwQ8QJ0cnRRcp8X9JoUWsB8f9eHfvcfcOEKpFpllto4Cm22YyHhPTmRUx8IoODCCIaQRlZhmzkpRAy/F1Dx9f76I8q/W5P0e3mrUY4BOJZ5hh2sTrxJObtsF5nzjMCrJKfE48Y";
-const char flag_fr_3[] PROGMEM = "tIFiR+5rnj8xjnvssAzw2YqOUccJhbzTaw0MSuYGvEEcUTVdMoX0h6rnLc4a8Uyq9+TvzCU1ZeXuE5zEHEsYBESRCgoYwNF2IjSqpNiIUn7sRb+ftcvkUsh1wYYOeZRggbZ9YP/we9urdz4mJcUigHtL47zMQQEdoFaxXG+jx2ndgL4n4ErveEvVYGpT9IrDS1yBPRsAxfXDU3ZAy53gL4nQzZlV/LTFHI54P2MvikD9N4CXateb/V9nD4AKeoqcQMcHALDecpea/Huzube/j1T7+8HeENyqd9jlV0AAAAPUExURfZVAAMile0pOs2ktv3//KPDeLIAAAABdFJOUwBA5thmAAAAAWJLR0QAiAUdSAAAAAlwSFlzAAAuIwAALiMBeKU/dgAAAAd0SU1FB+QGGwoZFisaT5UAAABbSURBVCjPY2AAAxcgYEAARhOQgLMCnC8IEVCCiQjCBJRgCuACClAFcAElqAKEgAJEAUJACYsAI6qAAhECgqgCSgMlQIbTCYcHZhBiBDJmNGBEFGZUYkQ2SnIAAEjVRhNKZ4XRAAAAAElFTkSuQmCC";
-
-// english flag icon coded in base64
-const char flag_en_0[] PROGMEM = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgBAMAAACBVGfHAAAKB3pUWHRSYXcgcHJvZmlsZSB0eXBlIGV4aWYAAHjarZlpduM6DoX/cxW9BM7Dcjie0zvo5fcHUnKcwZWk3ovLlkSTIIALXIAuNf/336X+w5+LxSofUo4lRs2fL77Yyk3W5+9cjfb7c//Z6yue342rxxeWIcfVncc4r/mV8fC2IPlrvL0fV6lfcvIlyOh3WzvZWe7HpeQlyNkzbq5nVa4FNT6Zc71tv8TeZn149glnjIA8Z5Wdzji9P+3ZyZ135R35tC4xkW/3vYw4Zz77Tz1c94UDH3cf/KdvzdybO46g26z4wU/XuAkfxt1jG/tOI2MfO9tnjYK7XfzZf2uNvNY81lUfFe6Kl1G3KfuOiQ13ur0s8kq8A/dpvwqvrKvuoDYwtSndeCjG4vFlvBmmmmXmvnbTUdHbaXG3tbZbt8cy7i+2O4HAy8ssm5QrbrgMHh3kHMP2oYvZ+xbZj80yOw/DTGsQJii+e6mPA3/7eidoLQlzY3R++Aq9rMQXaghy8sksADHr8mnY/jXqXPTHPwHWgWDYbs4YWHU7Ilowb7HlNs5OB8VUr0++mDQuAbiIvQPKGAcCOhoXTDQ6WZuMwY8ZfCqaW+dtAwETVLADLa13LgJOtrI3a5LZc22wZxh6AYhAiiSgKa4ClvfBR/ItE0JVBRd8CCGGFHIooUYXfQwxxhSFp2pyyaeQYkopp5JqdtnnkGNOOeeSa7HFQWNBlVhSyaWUWtm0+oqsyvzKQLPNNd9Ciy213EqrnfDpvocee+q5l16HHW5AAWrEkUYeZdRpJqE";
-const char flag_en_1[] PROGMEM = "0/QwzzjTzLLMuYm255VdYcaWVV1n1gdqF6nvUPiL3Z9TMhZrdQMm89IYawyndIozQSRDMQMx6A+JJECCgrWCms/HeCnKCmS7WKeeCRcsg4AwjiIGgn8aGZR7YvSH3EjeFd3+Lm/0KOSXQ/RvIKYHuCbnPuH2B2qibbt0GSLIQn8KQjvRbrlSbq20jOaf3LSz41XXOWByOL52sCXOlMDU2DeVq6Yskq8Wn4rewVuowrRmb9KAQtzFStiEmP/HXWN7WYGa4xTYfZ8fZHwR/L3e4FpYD5uBrXbhv5gDKqlfjA/8isRb2rf75NbYRkZ2ICmWj8wlcMMGG24SEVnb6VrzoDgh9WwGKKFZKnwMretlWuDNd2fqr+S+nq+/m5yhOHQH+0rff97XakXS3RJebOQ4lriaw0tqeSgTm964RpwCSXMjGHEAhqBsw42PqA1US0LowG0E+TRXMSIGmediLL6X8MGUhjrxbttTlVbjcHhc5jqaYslKrizqcaTzEuHnJzrdTxsxM3Io89FBHEdOn6xU0TSgmjD5CG5igt1JjztaNxVd9lTpd6YSY7Iboxi7EWs8KgWvoVeOaPaxJX0Dh0n6RvG1GWxvOI3qbSbPPVWGkLqm7yMe0p1JxJBSVeLjp1Hv+xqeFCN5WoK8YhVNNb+JUO6Ou6oJYTJ/RfzP7mgz2w/pMFl1BzF5K9iSYfzr/5XT18/m2ERSWTwLVk1NLWKcRukBcA6iNgWt7TaUJSYy+iM6p6ZGWuA/XBTcZxFbJ9dUa/Ea34bqblRhoC6hhyJxqmT2uGuZEVsnwQiu9QZ9puTHHLPR4F7kJ75FC+zbMTXD1MkTZcK";
-const char flag_en_2[] PROGMEM = "InuJxs6K0Qg9QciWgriVkjhtSH2XuyVJleJCFXySdIs6ozkb+so0rdmUvEkwNHcv2hZPVJ9F9KVs+iSTv4WAujBVdCXzXFRogvV3c6dPYZsE8ZNKuhT8GB2lk0BUeJBuI82tVMfIcnVk71jZbj9mE+VONCbYmKfLHDznRVVs76zvetb87ejVKCLYl2eKeI35meKOL25pGd2tR/zMda31TJz3KJkUy/fNL9cIY1ekUpGaF3Ecf6zUyB1oSUOjRC0uIa37dcuLXdLodEqsiiIqUJoVihr8civnZb7TyD3Z7PVT2sKgO6xht2V7R2US9HBhx0Kpac8q5roEouTmrA2exc+FTZRYaU3oVZIJmx9p1/ZC7RbCCG1InwzQhXHVu0SBfHbMZQQpO6AM0pxO/8c9yen92TqtnBctborf02St1YHZ+aJ6jCxU3++Mn+eR/FRnXdZY3IcCvSjz02uvfhgEUBMw/lPq1RHxZl8TotUpvcCIryDeUo1RPiMdSCp+DzfhHGksqYnSKJQm6rjkVqJXFl5TTFmJstTf+YCF5Rn2n0zOOtfZCepsykqiPvgIZdsb25KozTyk7PTZXzXkFrB412cjrXFf22oFzTg1W/nP9yuvrl/JfT1av5QvMX1pK/sC65KY2sJC3t9HJZmhgHSMR+GkT2irzTrplrZZsgG6RSw2GnFcfk7DuAY8iM7qgLZdF3myMKOovLkhPq1Gmt7/IrtRrt2ZweYjRYK+2dtJa95EpcS22aByQHkgkkiaPZG6lW5rZmf81ZPIRGGAyabCcdwP2F4E5x/2KJ+os1Xy5Rf7HmyyXqn5jzvES50ylRB6RfGisiB";
-const char flag_en_3[] PROGMEM = "ODwMJU2OdJhQW4bw4OnkZYT9DjlrFau8k2KPKTkLQOoobtHA3CiZcMN0DwC9KiLZJ1uoyyVCJDdVMghyRkewaG6343cIgIsARE8Zg4d91T2akTei2nqh/O+naZ+te0fpqm/sOLLaeqLeV1ftaatQF+e1yicHMnMGiRhCINV0rxOVQkOGHT/6rcnq1fXbwUdxTzpaXtrc6TOI3HjNvyoRl9Ho27VDlK6I2ybvRIKo4YmMykOlJ+T4zCCRCvVhMPvbmeksfG0ADxJMzOzmts5PFJOAgd8FElanvolQPz5avXTYvWPVj8tVj9Yvc8kyFjQtJBmomp14et49boRilRJ+u4DOESXc+XwEgcnKYqcjoGkpYNwSX6L4GTZpBuEvkWslpUFn7IOPiLN4ybSdhPpadJ3v27m4DBEpjua9bEyQWSexJDnZVM6pyU15jqMPufuh9ImdL8JHVahuXqweRKqpt8XMq+HzNHhaEDD/ncKfNpffa3Aq+1fu0D9tQofNFBf+EDOPHQ9swidTt5mRrgT/Mqyi9MueRtpdPaC+6ijzlknV/l/iHOVPlTaTGn7O31R9oROlLNYzDEJry/6z7W3f6NzJXwOWQuht498fOrtqb2Ow1bJzzXhWYwZ6quysH+ueqouP6kL6lNh+LMaL0uTeq5N/6Q0qd/64vyaNXwjEKiwtRhHDpakdrd/jDqwLXrOUv74gx1X4Nm9DV3NgZcmovk0Cka4mOWEcthQqoG0dej1s/qi/qWyttSP5sF9QuuNDiQY8gZmm77U6zdEKQxOme+88fm6qwqWx+4PsvJSWU5cq0uKpQ4vkpyR/BJcPaFBx1qlFEKS";
-const char flag_en_4[] PROGMEM = "wrE3+9hUKUJt7SPZ7kHVDjL5nSPvigNvfEq+p+uWWQmuMt74gBK1hnqWegvd1TjIOV+i1sAA4EfvHanfiVTHRxgEy0fIp/WS5PejrUnF1f6VIov9Uf3/nufB/WXA79gAAAGFaUNDUElDQyBwcm9maWxlAAB4nH2RPUjDQBzFX1O1VioOdhB1yFCdLIiK6KZVKEKFUCu06mBy6YfQpCFJcXEUXAsOfixWHVycdXVwFQTBDxAnRydFFynxf0mhRawHx/14d+9x9w4QqkWmWW2jgKbbZjIeE9OZFTHwig4MIIhpBGVmGbOSlEDL8XUPH1/vojyr9bk/R7eatRjgE4lnmGHaxOvEk5u2wXmfOMwKskp8Tjxi0gWJH7muePzGOe+ywDPDZio5RxwmFvNNrDQxK5ga8QRxRNV0yhfSHquctzhrxTKr35O/MJTVl5e4TnMQcSxgERJEKChjA0XYiNKqk2IhSfuxFv5+1y+RSyHXBhg55lGCBtn1g//B726t3PiYlxSKAe0vjvMxBAR2gVrFcb6PHad2AvifgSu94S9VgalP0isNLXIE9GwDF9cNTdkDLneAvidDNmVX8tMUcjng/Yy+KQP03gJdq15v9X2cPgAp6ipxAxwcAsN5yl5r8e7O5t7+PVPv7wd4Q3Kp32OVXQAAABtQTFRFYQAANDRpsRouT0p4b26UwK6+4aav5NDX/Pr3wBAfiwAAAAF0Uk5TAEDm2GYAAAABYktHRACIBR1IAAAACXBIWXMAAC4jAAAuIwF4pT92AAAAB3RJTUUH5AYbChofeeuk8gAAALdJREFUKM9lkcENwyAMRd00Us4IBojYAKU";
-const char flag_en_5[] PROGMEM = "LoCxQX5pOwJkbHYGxa1wSMP3/xMd+WAaApUjQNKMpjuf5vu1s/6yB+RWgetcG//Ab+4iiwKC1HbG0WLuWAm+8ZrtXCBRga/nk3N4kuyOlCDfTMwgye8PWqJEDOvB1CQgaQHUtBM2gJTR1c5ZJaVblmjlIgyAPgjAIJiu0/geLZNLOBiYMVAomiSD1AW99EcgigeSSk3h97tQRqy4gfAGw0HAXNQXCvAAAAABJRU5ErkJggg==";
-
-// icons
-enum IntercomIcons { ICON_FRENCH, ICON_ENGLISH };
-const char* pilotwire_icon[][6] PROGMEM = { 
-  {flag_fr_0, flag_fr_1, flag_fr_2, flag_fr_3, NULL,      NULL      },
-  {flag_en_0, flag_en_1, flag_en_2, flag_en_3, flag_en_4, flag_en_5 }
-};
+enum PilotwireLangages { PILOTWIRE_LANGAGE_ENGLISH, PILOTWIRE_LANGAGE_FRENCH };
+const char *const arrControlLang[]    PROGMEM = {"en", "fr"};
+const char *const arrControlLangage[] PROGMEM = {"English", "Français"};
+const char *const arrControlTemp[]    PROGMEM = {"Target", "Thermostat"};
+const char *const arrControlSet[]     PROGMEM = {"Set to", "Définir à"};
+const char *const arrControlStatus[]  PROGMEM = {"Currently heating", "Radiateur en chauffe"};
 
 // enumarations
 enum PilotwireDevices { PILOTWIRE_DEVICE_NORMAL, PILOTWIRE_DEVICE_DIRECT };
 enum PilotwireModes { PILOTWIRE_DISABLED, PILOTWIRE_OFF, PILOTWIRE_COMFORT, PILOTWIRE_ECO, PILOTWIRE_FROST, PILOTWIRE_THERMOSTAT, PILOTWIRE_OFFLOAD };
 enum PilotwireSources { PILOTWIRE_SOURCE_NONE, PILOTWIRE_SOURCE_LOCAL, PILOTWIRE_SOURCE_REMOTE };
-enum PilotwireLangages { PILOTWIRE_LANGAGE_ENGLISH, PILOTWIRE_LANGAGE_FRENCH };
 
 // fil pilote commands
 enum PilotwireCommands { CMND_PILOTWIRE_MODE, CMND_PILOTWIRE_MIN, CMND_PILOTWIRE_MAX, CMND_PILOTWIRE_TARGET, CMND_PILOTWIRE_OUTSIDE, CMND_PILOTWIRE_DRIFT};
@@ -169,7 +151,6 @@ const char kPilotWireCommands[] PROGMEM = D_CMND_PILOTWIRE_MODE "|" D_CMND_PILOT
 // variables
 bool     pilotwire_outside_mode;                   // flag for outside mode (target temperature dropped)
 bool     pilotwire_updated;                        // JSON needs update
-int      pilotwire_graph_refresh;                  // graph refresh rate (in seconds)
 uint8_t  pilotwire_device;                         // device type (pilotwire or direct heater)
 uint8_t  pilotwire_temperature_source;             // temperature source (local or distant)
 uint8_t  pilotwire_langage;                        // current langange for control page
@@ -184,7 +165,6 @@ uint32_t pilotwire_graph_counter;                  // graph update counter
 float    arr_temperature[PILOTWIRE_GRAPH_SAMPLE];  // graph temperature array
 float    arr_target[PILOTWIRE_GRAPH_SAMPLE];       // graph target temperature array
 uint8_t  arr_state[PILOTWIRE_GRAPH_SAMPLE];        // graph command state array
-String   str_pilotwire_json;                       // last pilotwire data JSON
 
 /**************************************************\
  *                  Accessors
@@ -588,7 +568,7 @@ float PilotwireGetTemperature ()
   // if temperature is available, apply correction
   if (!isnan (temperature))
   {
-    // trunc temperature to 1 decimal
+    // trunc temperature to 0.2°C
     temperature = ceil (temperature * 10) / 10;
 
     // add correction
@@ -628,9 +608,6 @@ void PilotwireShowJSON (bool append)
   float    actual_temperature;
   String   str_temperature, str_label, str_json, str_mqtt;
 
-  // save mqtt_data
-  str_mqtt = mqtt_data;
-
   // get temperature and mode
   actual_temperature = PilotwireGetTemperature ();
   actual_mode = PilotwireGetMode ();
@@ -638,11 +615,14 @@ void PilotwireShowJSON (bool append)
  
   // pilotwire mode  -->  "PilotWire":{"Relay":2,"Mode":5,"Label":"Thermostat",Offload:"ON","Temperature":20.5,"Target":21,"Min"=15.5,"Max"=25}
   str_json = "\"" + String (D_JSON_PILOTWIRE) + "\":{";
-  str_json += "\"" + String (D_JSON_PILOTWIRE_RELAY) + "\":" + String (devices_present) + ",";
-  str_json += "\"" + String (D_JSON_PILOTWIRE_MODE) + "\":" + String (actual_mode) + ",";
-  str_json += "\"" + String (D_JSON_PILOTWIRE_LABEL) + "\":\"" + str_label + "\",";
 
-  // add outside mode
+  // thermostat data
+  str_json += "\"" + String (D_JSON_PILOTWIRE_TARGET) + "\":" + String (PilotwireGetTargetTemperature (), 1) + ",";
+  str_json += "\"" + String (D_JSON_PILOTWIRE_DRIFT) + "\":" + String (PilotwireGetDrift (), 1) + ",";
+  str_json += "\"" + String (D_JSON_PILOTWIRE_MIN) + "\":" + String (PilotwireGetMinTemperature (), 1) + ",";
+  str_json += "\"" + String (D_JSON_PILOTWIRE_MAX) + "\":" + String (PilotwireGetMaxTemperature (), 1) + ",";
+
+  // outside mode
   str_json += "\"" + String (D_JSON_PILOTWIRE_OUTSIDE) + "\":";
   if (pilotwire_outside_mode == true) str_json += "\"ON\",";
   else str_json += "\"OFF\",";
@@ -650,11 +630,10 @@ void PilotwireShowJSON (bool append)
   // if defined, add current temperature
   if (actual_temperature != NAN) str_json += "\"" + String (D_JSON_PILOTWIRE_TEMPERATURE) + "\":" + String (actual_temperature, 1) + ",";
 
-  // thermostat data
-  str_json += "\"" + String (D_JSON_PILOTWIRE_TARGET) + "\":" + String (PilotwireGetTargetTemperature (), 1) + ",";
-  str_json += "\"" + String (D_JSON_PILOTWIRE_DRIFT) + "\":" + String (PilotwireGetDrift (), 1) + ",";
-  str_json += "\"" + String (D_JSON_PILOTWIRE_MIN) + "\":" + String (PilotwireGetMinTemperature (), 1) + ",";
-  str_json += "\"" + String (D_JSON_PILOTWIRE_MAX) + "\":" + String (PilotwireGetMaxTemperature (), 1) + "}";
+  // current status
+  str_json += "\"" + String (D_JSON_PILOTWIRE_RELAY) + "\":" + String (devices_present) + ",";
+  str_json += "\"" + String (D_JSON_PILOTWIRE_MODE) + "\":" + String (actual_mode) + ",";
+  str_json += "\"" + String (D_JSON_PILOTWIRE_LABEL) + "\":\"" + str_label + "\"}";
 
   // if pilot wire mode is enabled
   if (actual_mode != PILOTWIRE_DISABLED)
@@ -664,21 +643,14 @@ void PilotwireShowJSON (bool append)
     str_label   = PilotwireGetStateLabel (actual_mode);
 
     // relay state  -->  ,"State":{"Mode":4,"Label":"Comfort"}
-    str_json += ",\"" + String (D_JSON_PILOTWIRE_STATE) + "\":{\"" + String (D_JSON_PILOTWIRE_MODE) + "\":" + String (actual_mode);
+    str_json += ",\"" + String (D_JSON_PILOTWIRE_STATE) + "\":{";
+    str_json += "\"" + String (D_JSON_PILOTWIRE_MODE) + "\":" + String (actual_mode);
     str_json += ",\"" + String (D_JSON_PILOTWIRE_LABEL) + "\":\"" + str_label + "\"}";
   }
 
-  // generate JSON for offloading and temperature
-  snprintf_P (mqtt_data, sizeof(mqtt_data), str_json.c_str());
-  OffloadingShowJSON (true);
-  TemperatureShowJSON (true);
-
-  // save latest teleinfo JSON
-  str_pilotwire_json = mqtt_data;
-
   // generate MQTT message according to append mode
-  if (append == true) str_mqtt += "," + str_pilotwire_json;
-  else str_mqtt = "{" + str_pilotwire_json + "}";
+  if (append == true) str_mqtt = mqtt_data + String (",") + str_json;
+  else str_mqtt = "{" + str_json + "}";
 
   // place JSON back to MQTT data and publish it if not in append mode
   snprintf_P (mqtt_data, sizeof(mqtt_data), str_mqtt.c_str ());
@@ -762,8 +734,7 @@ void PilotwireUpdateStatus ()
   // update current temperature
   if (isnan(heater_temperature) == false)
   {
-    // if temperature change, data update
-    if (heater_temperature != pilotwire_temperature) pilotwire_updated = true;
+    // set new temperature
     pilotwire_temperature = heater_temperature;
 
     // update graph temperature for current slot
@@ -793,7 +764,7 @@ void PilotwireUpdateStatus ()
   // if pilotwire mode is enabled
   if (heater_mode != PILOTWIRE_DISABLED)
   {
-    is_offloaded = OffloadingIsOffloaded ();
+    is_offloaded = OffloadIsOffloaded ();
 
     // if offload mode, target state is off
     if (is_offloaded == true) target_state = PILOTWIRE_OFF;
@@ -831,7 +802,7 @@ void PilotwireEverySecond ()
   // increment delay counter and if delay reached, update history data
   if (pilotwire_graph_counter == 0) PilotwireUpdateGraph ();
   pilotwire_graph_counter ++;
-  pilotwire_graph_counter = pilotwire_graph_counter % pilotwire_graph_refresh;
+  pilotwire_graph_counter = pilotwire_graph_counter % PILOTWIRE_GRAPH_REFRESH;
 }
 
 void PilotwireInit ()
@@ -853,7 +824,6 @@ void PilotwireInit ()
   pilotwire_graph_index        = 0;
   pilotwire_graph_counter      = 0;
   pilotwire_langage            = PILOTWIRE_LANGAGE_ENGLISH;
-  pilotwire_graph_refresh      = 60 * PILOTWIRE_GRAPH_STEP;
 
   // initialise temperature graph
   for (index = 0; index < PILOTWIRE_GRAPH_SAMPLE; index++)
@@ -862,11 +832,6 @@ void PilotwireInit ()
     arr_target[index] = NAN;
     arr_state[index] = PILOTWIRE_OFF;
   }
-
-  // if needed, initialise offload and remote temperature MQTT data
-  str_setting = (char*)Settings.free_f03;
-  index = str_setting.indexOf ('|');
-  if (index == -1) strcpy ((char*)Settings.free_f03, ";|;");
 }
 
 /***********************************************\
@@ -874,18 +839,6 @@ void PilotwireInit ()
 \***********************************************/
 
 #ifdef USE_WEBSERVER
-
-// display base64 embeded icon
-void PilotwireWebDisplayIcon (uint8_t icon_index)
-{
-  uint8_t nbrItem, index;
-
-  // display icon
-  WSContentSend_P (PSTR ("'data:image/png;base64,"));
-  nbrItem = sizeof (pilotwire_icon[icon_index]) / sizeof (char*);
-  for (index=0; index<nbrItem; index++) if (pilotwire_icon[icon_index][index] != NULL) WSContentSend_P (pilotwire_icon[icon_index][index]);
-  WSContentSend_P (PSTR ("'"));
-}
 
 // Pilotwire mode selection 
 void PilotwireWebSelectMode ()
@@ -1384,8 +1337,8 @@ void PilotwireWebPageControl ()
     else if (strcmp (argument, D_PILOTWIRE_FRENCH) == 0) pilotwire_langage = PILOTWIRE_LANGAGE_FRENCH;
   }
 
-  // else if heater has to be switched off, set in anti-frost mode
-  else if (WebServer->hasArg(D_CMND_PILOTWIRE_OFF)) PilotwireSetMode (PILOTWIRE_FROST); 
+  // if heater has to be switched off, set in anti-frost mode
+  if (WebServer->hasArg(D_CMND_PILOTWIRE_OFF)) PilotwireSetMode (PILOTWIRE_FROST); 
 
   // else, if heater has to be switched on, set in thermostat mode
   else if (WebServer->hasArg(D_CMND_PILOTWIRE_ON)) PilotwireSetMode (PILOTWIRE_THERMOSTAT);
@@ -1456,10 +1409,8 @@ void PilotwireWebPageControl ()
   WSContentSend_P (PSTR (".time {font-size:20px;}\n"));
   WSContentSend_P (PSTR (".switch {text-align:left;font-size:24px;}\n"));
   WSContentSend_P (PSTR (".bold {font-weight:bold;}\n"));
-  
-  WSContentSend_P (PSTR (".flag {position:absolute;top:20px;}\n"));
-  WSContentSend_P (PSTR (".fr {right:40%%;}\n"));
-  WSContentSend_P (PSTR (".en {left:40%%;}\n"));
+
+  WSContentSend_P (PSTR (".lang {font-size:16px;}\n"));
 
   WSContentSend_P (PSTR (".centered {width:%d%%;max-width:%dpx;}\n"), PILOTWIRE_GRAPH_PERCENT_STOP - PILOTWIRE_GRAPH_PERCENT_START, PILOTWIRE_GRAPH_WIDTH * (PILOTWIRE_GRAPH_PERCENT_STOP - PILOTWIRE_GRAPH_PERCENT_START) / 100);
   WSContentSend_P (PSTR (".graph {max-width:%dpx;}\n"), PILOTWIRE_GRAPH_WIDTH);
@@ -1500,17 +1451,7 @@ void PilotwireWebPageControl ()
 
   // page body
   WSContentSend_P (PSTR ("<body>\n"));
-  WSContentSend_P (PSTR ("<form method='get' action='%s'>\n"), D_PAGE_PILOTWIRE_CONTROL);
-
-  // french flag
-  WSContentSend_P (PSTR ("<div class='flag fr'><a href='/control?lang=fr'><img src="));
-  PilotwireWebDisplayIcon (ICON_FRENCH);
-  WSContentSend_P (PSTR (" /></a></div>\n"));
-
-  // english flag
-  WSContentSend_P (PSTR ("<div class='flag en'><a href='/control?lang=en'><img src="));
-  PilotwireWebDisplayIcon (ICON_ENGLISH);
-  WSContentSend_P (PSTR (" /></a></div>\n"));
+  WSContentSend_P (PSTR ("<form name='control' method='get' action='%s'>\n"), D_PAGE_PILOTWIRE_CONTROL);
 
   // room name and current temperature
   WSContentSend_P (PSTR ("<div class='title bold'>%s</div>\n"), SettingsText(SET_FRIENDLYNAME1));
@@ -1548,6 +1489,18 @@ void PilotwireWebPageControl ()
   // display temperature graph
   WSContentSend_P (PSTR ("<div class='graph'>\n"));
   PilotwireWebTemperatureGraph (actual_mode);
+  WSContentSend_P (PSTR ("</div>\n"));
+
+  // display langage selection
+  WSContentSend_P (PSTR ("<div class='centered'>\n"));
+  WSContentSend_P (PSTR ("<select name=lang class='lang' size=1 onChange='control.submit();'>\n"));
+  for (index = 0; index <= PILOTWIRE_LANGAGE_FRENCH; index++)
+  {
+    if (index == pilotwire_langage) str_text = "selected";
+    else str_text = "";
+    WSContentSend_P (PSTR ("<option value='%s' %s>%s\n"), arrControlLang[index], str_text.c_str (), arrControlLangage[index]);
+  }
+  WSContentSend_P (PSTR ("</select>\n"));
   WSContentSend_P (PSTR ("</div>\n"));
 
   // if heater is in thermostat mode, enable the scripts   
@@ -1591,14 +1544,6 @@ void PilotwireWebPageControl ()
   WSContentStop ();
 }
 
-// JSON public page
-void PilotwirePageJson ()
-{
-  WSContentBegin(200, CT_HTML);
-  WSContentSend_P (PSTR ("{%s}\n"), str_pilotwire_json.c_str ());
-  WSContentEnd();
-}
-
 #endif  // USE_WEBSERVER
 
 /***********************************************************\
@@ -1633,7 +1578,7 @@ bool Xsns98 (uint8_t function)
       WebServer->on ("/" D_PAGE_PILOTWIRE_CONFIG,  PilotwireWebPageConfigure);
       WebServer->on ("/" D_PAGE_PILOTWIRE_CONTROL, PilotwireWebPageControl);
       WebServer->on ("/" D_PAGE_PILOTWIRE_SWITCH,  PilotwireWebPageSwitchMode);
-      WebServer->on ("/" D_PAGE_PILOTWIRE_JSON, PilotwirePageJson);
+//      WebServer->on ("/" D_PAGE_PILOTWIRE_JSON, PilotwirePageJson);
       break;
     case FUNC_WEB_SENSOR:
       PilotwireWebSensor ();

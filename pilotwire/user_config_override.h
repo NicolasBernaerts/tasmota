@@ -25,7 +25,7 @@
     16/05/2020 - v6.1   - Add /json page and outside mode in JSON
     20/05/2020 - v6.2   - Add configuration for first NTP server
     26/05/2020 - v6.3   - Add Information JSON page
-    07/07/2020 - v6.3.1 - Enable discovery (mDNS)
+    07/07/2020 - v6.4   - Change MQTT subscription and parameters
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -75,12 +75,28 @@
 #define USE_TEMPERATURE_MQTT                  // Add support for MQTT temperature sensor
 #define USE_PILOTWIRE                         // Add support for France Pilotwire protocol for electrical heaters
 
-#define EXTENSION_VERSION "6.3.1"             // version
+#define EXTENSION_VERSION "6.4"               // version
 #define EXTENSION_NAME "Pilotwire"            // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 
 #undef APP_SLEEP
 #define APP_SLEEP 1                           // Default to sleep = 1
+
+// MQTT default
+#undef MQTT_HOST
+#define MQTT_HOST          "openhab.local"
+#undef MQTT_PORT
+#define MQTT_PORT          1883              
+#undef MQTT_USER
+#define MQTT_USER          ""
+#undef MQTT_PASS
+#define MQTT_PASS          ""
+#undef MQTT_TOPIC
+#define MQTT_TOPIC         "filpilote_%06X"
+#undef MQTT_FULLTOPIC
+#define MQTT_FULLTOPIC     "%topic%/%prefix%/"
+#undef FRIENDLY_NAME
+#define FRIENDLY_NAME      "Fil Pilote"
 
 //#undef USE_ENERGY_SENSOR                      // Disable energy sensors
 #undef USE_ARDUINO_OTA                        // Disable support for Arduino OTA
@@ -94,7 +110,7 @@
 #undef USE_EMULATION_HUE                      // Disable Hue Bridge emulation for Alexa (+14k code, +2k mem common)
 #undef USE_EMULATION_WEMO                     // Disable Belkin WeMo emulation for Alexa (+6k code, +2k mem common)
 #undef USE_CUSTOM                             // Disable Custom features
-//#undef USE_DISCOVERY                        // Disable Discovery services for both MQTT and web server
+#undef USE_DISCOVERY                          // Disable Discovery services for both MQTT and web server
 //#undef USE_TIMERS                           // Disable support for up to 16 timers
 //#undef USE_TIMERS_WEB                       // Disable support for timer webpage
 //#undef USE_SUNRISE                          // Disable support for Sunrise and sunset tools
