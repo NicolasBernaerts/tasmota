@@ -71,15 +71,17 @@
 
 // default values
 #undef MQTT_HOST
-#define MQTT_HOST          "openhab"
+#define MQTT_HOST          "openhab.local"
 #undef MQTT_PORT
 #define MQTT_PORT          1883              
 #undef MQTT_USER
 #define MQTT_USER          ""
 #undef MQTT_PASS
 #define MQTT_PASS          ""
+#undef MQTT_TOPIC
+#define MQTT_TOPIC         "compteur"
 #undef MQTT_FULLTOPIC
-#define MQTT_FULLTOPIC     "compteur/%topic%/%prefix%/"
+#define MQTT_FULLTOPIC     "%topic%/%prefix%/"
 #undef FRIENDLY_NAME
 #define FRIENDLY_NAME      "Compteur"
 

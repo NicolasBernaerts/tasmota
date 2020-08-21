@@ -520,8 +520,11 @@ void TeleinfoShowJSON (bool append)
   // save mqtt_data
   str_mqtt = mqtt_data;
 
+  // if not in append mode, add current time
+  if (append == false) str_json = "\"" + String (D_JSON_TIME) + "\":\"" + GetDateAndTime(DT_LOCAL) + "\",";
+
   // start TIC section
-  str_json = "\"" + String (TELEINFO_JSON_TIC) + "\":{";
+  str_json += "\"" + String (TELEINFO_JSON_TIC) + "\":{";
 
   // if in append mode, add contract data
   if (append == true)
@@ -529,11 +532,12 @@ void TeleinfoShowJSON (bool append)
     str_json += "\"" + String (TELEINFO_JSON_PHASE) + "\":" + String (Energy.phase_count);
     str_json += ",\"" + String (TELEINFO_JSON_ADCO) + "\":\"" + String (teleinfo_adco) + "\"";
     str_json += ",\"" + String (TELEINFO_JSON_ISOUSC) + "\":" + String (teleinfo_isousc);
-    str_json += ",\"" + String (TELEINFO_JSON_SSOUSC) + "\":" + String (teleinfo_ssousc) + ",";
+    str_json += ",";
   }
-
+ 
   // add instant values
-  str_json += "\"" + String (TELEINFO_JSON_SINSTS) + "\":" + String (teleinfo_papp);
+  str_json += "\"" + String (TELEINFO_JSON_SSOUSC) + "\":" + String (teleinfo_ssousc);
+  str_json += ",\"" + String (TELEINFO_JSON_SINSTS) + "\":" + String (teleinfo_papp);
   for (index = 0; index < Energy.phase_count; index++)
   {
     // calculate data
