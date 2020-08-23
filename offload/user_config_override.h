@@ -12,6 +12,8 @@
     05/08/2020 - v1.4   - Add /control page to have a public switch
                           If available, get max power thru MQTT meter
                           Phase selection and disable mDNS 
+    22/08/2020 - v1.4.1 - Save offload config using new Settings text
+                          Add restart after offload configuration
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -60,7 +62,7 @@
 #define USE_TIMEZONE                          // Add support for timezone management
 #define USE_OFFLOADING                        // Add support for MQTT power offloading
 
-#define EXTENSION_VERSION "1.4"               // version
+#define EXTENSION_VERSION "1.4.1"             // version
 #define EXTENSION_NAME "Offloading"           // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 

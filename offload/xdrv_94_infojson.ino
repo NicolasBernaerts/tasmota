@@ -29,61 +29,6 @@
 #define D_JSON_INFO_IP      "IP"
 
 /**************************************************\
- *                  Accessors
-\**************************************************/
-
-// get configuration string based on an index
-String InfoGetConfig (int index)
-{
-  String str_result;
-
-  switch (index)
-  { 
-    case 0:
-      str_result = Settings.ex_mqtt_client;
-      break;
-    case 1:
-      str_result = Settings.ex_mqtt_user;
-      break;
-    case 2:
-      str_result = Settings.ex_mqtt_pwd;
-      break;
-    case 3:
-      str_result = Settings.ex_mqtt_topic;
-      break;
-  }
-
-  return str_result;
-}
-
-// set configuration string based on an index
-bool InfoSetConfig (int index, char* str_config)
-{
-  bool result = true;
-
-  switch (index)
-  { 
-    case 0:
-      strncpy ((char*)Settings.ex_mqtt_client, str_config, 32);
-      break;
-    case 1:
-      strncpy ((char*)Settings.ex_mqtt_user, str_config, 32);
-      break;
-    case 2:
-      strncpy ((char*)Settings.ex_mqtt_pwd, str_config, 32);
-      break;
-    case 3:
-      strncpy ((char*)Settings.ex_mqtt_topic, str_config, 32);
-      break;
-    default:
-      result = false;
-      break;
-  }
-
-  return result;
-}
-
-/**************************************************\
  *                  Functions
 \**************************************************/
 
