@@ -1,10 +1,12 @@
 /*
   xdrv_96_offloading.ino - Device offloading thru MQTT instant and max power
   
-    23/03/2020 - v1.0 - Creation
-    20/07/2020 - v1.1 - Change delays to seconds
-    22/07/2020 - v1.2 - Update instant device power in case of Sonoff energy module
-    05/08/2020 - v1.4 - Get max power thru MQTT meter
+    23/03/2020 - v1.0   - Creation
+    20/07/2020 - v1.1   - Change delays to seconds
+    22/07/2020 - v1.2   - Update instant device power in case of Sonoff energy module
+    05/08/2020 - v1.4   - Get max power thru MQTT meter
+    22/08/2020 - v1.4.1 - Save offload config using new Settings text
+                          Add restart after offload configuration
                    
   Settings are stored using unused KNX parameters :
     - Settings.knx_GA_addr[0]   = Power of plugged appliance (W) 
@@ -179,7 +181,7 @@ void OffloadSetDelayBeforeRemoval (uint16_t number)
   Settings.knx_GA_addr[3] = number;
 }
 
-// get phase number (if using default MQTT instant power key)
+// get phase number
 uint16_t OffloadGetPhase ()
 {
   uint16_t number;
@@ -197,15 +199,13 @@ void OffloadSetPhase (uint16_t number)
 }
 
 // get instant power MQTT topic
-String OffloadGetPowerTopic ()
+String OffloadGetPowerTopic (bool get_default)
 {
   String str_result;
 
-  // extract power topic from generic config
-  str_result = InfoGetConfig (PARAM_OFFLOAD_TOPIC);
-
-  // if power topic is undefined, use default one
-  if (str_result.length () == 0) str_result = MQTT_OFFLOAD_TOPIC;
+  // get value or default value if not set
+  str_result = SettingsText (SET_OFFLOAD_TOPIC);
+  if (get_default == true || str_result == "") str_result = MQTT_OFFLOAD_TOPIC;
 
   return str_result;
 }
@@ -213,39 +213,17 @@ String OffloadGetPowerTopic ()
 // set power MQTT topic
 void OffloadSetPowerTopic (char* str_topic)
 {
-  InfoSetConfig (PARAM_OFFLOAD_TOPIC, str_topic);
-}
-
-// get instant power JSON key
-String OffloadGetInstPowerKey ()
-{
-  String str_result;
-
-  // extract power key from generic config
-  str_result = InfoGetConfig (PARAM_OFFLOAD_KEY_INST);
-
-  // if power key is undefined, use default one
-  if (str_result.length () == 0) str_result = MQTT_OFFLOAD_KEY_INST + String (OffloadGetPhase ());
-
-  return str_result;
-}
-
-// set instant power JSON key
-void OffloadSetInstantPowerKey (char* str_key)
-{
-  InfoSetConfig (PARAM_OFFLOAD_KEY_INST, str_key);
+  SettingsUpdateText (SET_OFFLOAD_TOPIC, str_topic);
 }
 
 // get max power JSON key
-String OffloadGetMaxPowerKey ()
+String OffloadGetMaxPowerKey (bool get_default)
 {
   String str_result;
 
-  // extract power key from generic config
-  str_result = InfoGetConfig (PARAM_OFFLOAD_KEY_MAX);
-
-  // if power key is undefined, use default one
-  if (str_result.length () == 0) str_result = MQTT_OFFLOAD_KEY_MAX;
+  // get value or default value if not set
+  str_result = SettingsText (SET_OFFLOAD_KEY_MAX);
+  if (get_default == true || str_result == "") str_result = MQTT_OFFLOAD_KEY_MAX;
 
   return str_result;
 }
@@ -253,7 +231,25 @@ String OffloadGetMaxPowerKey ()
 // set max power JSON key
 void OffloadSetMaxPowerKey (char* str_key)
 {
-  InfoSetConfig (PARAM_OFFLOAD_KEY_MAX, str_key);
+  SettingsUpdateText (SET_OFFLOAD_KEY_MAX, str_key);
+}
+
+// get instant power JSON key
+String OffloadGetInstPowerKey (bool get_default)
+{
+  String str_result;
+
+  // get value or default value if not set
+  str_result = SettingsText (SET_OFFLOAD_KEY_INST);
+  if (get_default == true || str_result == "") str_result = MQTT_OFFLOAD_KEY_INST + String (OffloadGetPhase ());
+
+  return str_result;
+}
+
+// set instant power JSON key
+void OffloadSetInstPowerKey (char* str_key)
+{
+  SettingsUpdateText (SET_OFFLOAD_KEY_INST, str_key);
 }
 
 /**************************************************\
@@ -294,9 +290,9 @@ void OffloadShowJSON (bool append)
     str_json += ",\"" + String (D_JSON_OFFLOAD_AFTER) + "\":" + String (delay_after);
     str_json += ",\"" + String (D_JSON_OFFLOAD_DEVICE) + "\":" + String (power_device);
     str_json += ",\"" + String (D_JSON_OFFLOAD_CONTRACT) + "\":" + String (power_max);
-    str_json += ",\"" + String (D_JSON_OFFLOAD_TOPIC) + "\":\"" + OffloadGetPowerTopic () + "\"";
-    str_json += ",\"" + String (D_JSON_OFFLOAD_KEY_INST) + "\":\"" + OffloadGetInstPowerKey () + "\"";
-    str_json += ",\"" + String (D_JSON_OFFLOAD_KEY_MAX) + "\":\"" + OffloadGetMaxPowerKey () + "\"";
+    str_json += ",\"" + String (D_JSON_OFFLOAD_TOPIC) + "\":\"" + OffloadGetPowerTopic (false) + "\"";
+    str_json += ",\"" + String (D_JSON_OFFLOAD_KEY_INST) + "\":\"" + OffloadGetInstPowerKey (false) + "\"";
+    str_json += ",\"" + String (D_JSON_OFFLOAD_KEY_MAX) + "\":\"" + OffloadGetMaxPowerKey (false) + "\"";
   }
 
   str_json += "}";
@@ -324,7 +320,7 @@ void OffloadEverySecond ()
     if (offload_topic_subscribed == false)
     {
       // check power topic availability
-      str_topic = OffloadGetPowerTopic ();
+      str_topic = OffloadGetPowerTopic (false);
       if (str_topic.length () > 0) 
       {
         // subscribe to power meter
@@ -396,7 +392,7 @@ bool OffloadMqttData ()
 {
   bool    data_handled = false;
   int     idx_value, mqtt_power;
-  String  str_mailbox_topic, str_mailbox_data, str_key;
+  String  str_mailbox_topic, str_mailbox_data, str_topic, str_key;
 
   // get message topic and data (removing SPACE and QUOTE)
   str_mailbox_topic = XdrvMailbox.topic;
@@ -405,10 +401,14 @@ bool OffloadMqttData ()
   str_mailbox_data.replace ("\"", "");
 
   // if topic is the instant house power
-  if (str_mailbox_topic == OffloadGetPowerTopic ())
+  str_topic = OffloadGetPowerTopic (false);
+  if (str_mailbox_topic == str_topic)
   {
+    // log
+    AddLog_P2(LOG_LEVEL_INFO, PSTR("MQT: Received %s"), str_topic.c_str ());
+
     // if instant power key is present
-    str_key = OffloadGetInstPowerKey () + ":";
+    str_key = OffloadGetInstPowerKey (false) + ":";
     idx_value = str_mailbox_data.indexOf (str_key);
     if (idx_value >= 0) idx_value = str_mailbox_data.indexOf (':', idx_value + 1);
     if (idx_value >= 0)
@@ -418,7 +418,7 @@ bool OffloadMqttData ()
     }
 
     // if max power key is present
-    str_key = OffloadGetMaxPowerKey () + ":";;
+    str_key = OffloadGetMaxPowerKey (false) + ":";
     idx_value = str_mailbox_data.indexOf (str_key);
     if (idx_value >= 0) idx_value = str_mailbox_data.indexOf (':', idx_value + 1);
     if (idx_value >= 0)
@@ -511,9 +511,11 @@ void OffloadUpdateStatus ()
 
       // offloading is active
       case OFFLOAD_ACTIVE:
-        // to remove offload, power limit is current limit minus device power
-        power_max -= power_device;
+        // calculate maximum power allowed when substracting device power
+        if (power_max > power_device) power_max -= power_device;
+        else power_max = 0;
 
+        // if instant power is under this value, prepare to remove offload
         if (offload_power_inst <= power_max)
         {
           // set time for removing offloading calculation
@@ -526,8 +528,12 @@ void OffloadUpdateStatus ()
 
       // actually just after offloading should stop
       case OFFLOAD_AFTER:
-        // if house power has gone again too high, offloading back to active state
-        if (offload_power_inst > power_max - power_device) next_stage = OFFLOAD_ACTIVE;
+        // calculate maximum power allowed when substracting device power
+        if (power_max > power_device) power_max -= power_device;
+        else power_max = 0;
+
+        // if house power has gone again too high, offloading back again
+        if (offload_power_inst > power_max) next_stage = OFFLOAD_ACTIVE;
         
         // else if delay is reached, set active offloading
         else
@@ -675,11 +681,14 @@ void OffloadWebPageConfig ()
 
     // get JSON key according to 'inst' parameter
     WebGetArg (D_CMND_OFFLOAD_KEY_INST, argument, OFFLOAD_BUFFER_SIZE);
-    OffloadSetInstantPowerKey (argument);
+    OffloadSetInstPowerKey (argument);
 
     // get JSON key according to 'max' parameter
     WebGetArg (D_CMND_OFFLOAD_KEY_MAX, argument, OFFLOAD_BUFFER_SIZE);
     OffloadSetMaxPowerKey (argument);
+
+    // restart device
+    WebRestart (1);
   }
 
   // beginning of form
@@ -718,20 +727,20 @@ void OffloadWebPageConfig ()
   WSContentSend_P (str_offload_fieldset_start, D_OFFLOAD_METER);
 
   // instant power mqtt topic
-  str_text = OffloadGetPowerTopic ();
-  str_default = MQTT_OFFLOAD_TOPIC;
+  str_text    = OffloadGetPowerTopic (false);
+  str_default = OffloadGetPowerTopic (true);
   if (str_text == str_default) str_text = "";
   WSContentSend_P (str_offload_input_text, D_OFFLOAD_TOPIC, D_CMND_OFFLOAD_TOPIC, D_CMND_OFFLOAD_TOPIC, str_text.c_str (), str_default.c_str ());
 
   // max power json key
-  str_text = OffloadGetMaxPowerKey ();
-  str_default = MQTT_OFFLOAD_KEY_MAX;
+  str_text    = OffloadGetMaxPowerKey (false);
+  str_default = OffloadGetMaxPowerKey (true);
   if (str_text == str_default) str_text = "";
   WSContentSend_P (str_offload_input_text, D_OFFLOAD_KEY_MAX, D_CMND_OFFLOAD_KEY_MAX, D_CMND_OFFLOAD_KEY_MAX, str_text.c_str (), str_default.c_str ());
 
   // instant power json key
-  str_text = OffloadGetInstPowerKey ();
-  str_default = MQTT_OFFLOAD_KEY_INST + String (OffloadGetPhase ());
+  str_text    = OffloadGetInstPowerKey (false);
+  str_default = OffloadGetInstPowerKey (true);
   if (str_text == str_default) str_text = "";
   WSContentSend_P (str_offload_input_text, D_OFFLOAD_KEY_INST, D_CMND_OFFLOAD_KEY_INST, D_CMND_OFFLOAD_KEY_INST, str_text.c_str (), str_default.c_str ());
 

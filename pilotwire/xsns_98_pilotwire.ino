@@ -1,7 +1,30 @@
 /*
   xsns_98_pilotwire.ino - French Pilot Wire (Fil Pilote) support (~27.5 kb)
   for Sonoff Basic or Sonoff Dual R2
-  
+
+  Copyright (C) 2019/2020  Theo Arends, Nicolas Bernaerts
+    05/04/2019 - v1.0   - Creation
+    12/04/2019 - v1.1   - Save settings in Settings.weight... variables
+    10/06/2019 - v2.0   - Complete rewrite to add web management
+    25/06/2019 - v2.1   - Add DHT temperature sensor and settings validity control
+    05/07/2019 - v2.2   - Add embeded icon
+    05/07/2019 - v3.0   - Add max power management with automatic offload
+                          Save power settings in Settings.energy... variables
+    12/12/2019 - v3.1   - Add public configuration page http://.../control
+    30/12/2019 - v4.0   - Functions rewrite for Tasmota 8.x compatibility
+    06/01/2019 - v4.1   - Handle offloading with finite state machine
+    09/01/2019 - v4.2   - Separation between Offloading driver and Pilotwire sensor
+    15/01/2020 - v5.0   - Separate temperature driver and add remote MQTT sensor
+    05/02/2020 - v5.1   - Block relay command if not coming from a mode set
+    21/02/2020 - v5.2   - Add daily temperature graph
+    24/02/2020 - v5.3   - Add control button to main page
+    27/02/2020 - v5.4   - Add target temperature and relay state to temperature graph
+    01/03/2020 - v5.5   - Add timer management with Outside mode
+    13/03/2020 - v5.6   - Add time to graph
+    05/04/2020 - v5.7   - Add timezone management
+    18/04/2020 - v6.0   - Handle direct connexion of heater in addition to pilotwire
+    22/08/2020 - v6.1   - Handle out of range values during first flash
+
   Settings are stored using weighting scale parameters :
     - Settings.weight_reference             = Fil pilote mode
     - Settings.weight_max                   = Target temperature  (x10 -> 192 = 19.2°C)
@@ -36,7 +59,6 @@
 #define D_PAGE_PILOTWIRE_CONFIG         "config"
 #define D_PAGE_PILOTWIRE_CONTROL        "control"
 #define D_PAGE_PILOTWIRE_SWITCH         "mode"
-//#define D_PAGE_PILOTWIRE_JSON           "json"
 
 #define D_CMND_PILOTWIRE_ON             "on"
 #define D_CMND_PILOTWIRE_OFF            "off"
@@ -96,16 +118,17 @@
 #define D_PILOTWIRE_FRENCH              "fr"
 #define D_PILOTWIRE_CHECKED             "checked"
 
-#define PILOTWIRE_TEMP_MIN              0
+#define PILOTWIRE_TEMP_MIN              2
 #define PILOTWIRE_TEMP_MAX              50
-#define PILOTWIRE_TEMP_DEFAULT          18
+#define PILOTWIRE_TEMP_DRIFT            5
+#define PILOTWIRE_TEMP_DROP             10
+#define PILOTWIRE_TEMP_DEFAULT_TARGET   18
+#define PILOTWIRE_TEMP_DEFAULT_MIN      15
+#define PILOTWIRE_TEMP_DEFAULT_MAX      25
+#define PILOTWIRE_TEMP_DEFAULT_DRIFT    0
+#define PILOTWIRE_TEMP_DEFAULT_DROP     2
 #define PILOTWIRE_TEMP_STEP             0.5
-
-#define PILOTWIRE_SHIFT_MIN             -10
-#define PILOTWIRE_SHIFT_MAX             10
-
-#define PILOTWIRE_DRIFT_DEFAULT         0
-#define PILOTWIRE_DRIFT_STEP            0.1
+#define PILOTWIRE_TEMP_DRIFT_STEP       0.1
 
 #define PILOTWIRE_TEMP_THRESHOLD        0.25
 
@@ -394,23 +417,22 @@ void PilotwireSetMinTemperature (float new_temperature)
 // get pilot wire minimum temperature
 float PilotwireGetMinTemperature ()
 {
-  float min_temperature;
+  float temperature;
 
   // get drift temperature (/10)
-  min_temperature = float (Settings.weight_item) / 10;
+  temperature = float (Settings.weight_item) / 10;
   
   // check if within range
-  if (min_temperature < PILOTWIRE_TEMP_MIN) min_temperature = PILOTWIRE_TEMP_MIN;
-  if (min_temperature > PILOTWIRE_TEMP_MAX) min_temperature = PILOTWIRE_TEMP_MAX;
+  if (temperature < PILOTWIRE_TEMP_MIN || temperature > PILOTWIRE_TEMP_MAX) temperature = PILOTWIRE_TEMP_DEFAULT_MIN;
 
-  return min_temperature;
+  return temperature;
 }
 
 // set pilot wire maximum temperature
 void PilotwireSetMaxTemperature (float new_temperature)
 {
   // if within range, save temperature correction
-  if ((new_temperature >= PILOTWIRE_TEMP_MIN) && (new_temperature <= PILOTWIRE_TEMP_MAX)) Settings.energy_frequency_calibration = (unsigned long) int (new_temperature * 10);
+  if (new_temperature >= PILOTWIRE_TEMP_MIN && new_temperature <= PILOTWIRE_TEMP_MAX) Settings.energy_frequency_calibration = (unsigned long) int (new_temperature * 10);
 
   // update JSON status
   pilotwire_updated = true;
@@ -419,49 +441,23 @@ void PilotwireSetMaxTemperature (float new_temperature)
 // get pilot wire maximum temperature
 float PilotwireGetMaxTemperature ()
 {
-  float max_temperature;
+  float temperature;
 
   // get drift temperature (/10)
-  max_temperature = float (Settings.energy_frequency_calibration) / 10;
+  temperature = float (Settings.energy_frequency_calibration) / 10;
   
   // check if within range
-  if (max_temperature < PILOTWIRE_TEMP_MIN) max_temperature = PILOTWIRE_TEMP_MIN;
-  if (max_temperature > PILOTWIRE_TEMP_MAX) max_temperature = PILOTWIRE_TEMP_MAX;
+  if (temperature < PILOTWIRE_TEMP_MIN || temperature > PILOTWIRE_TEMP_MAX) temperature = PILOTWIRE_TEMP_DEFAULT_MAX;
 
-  return max_temperature;
+  return temperature;
 }
 
-// set pilot wire drift temperature
-void PilotwireSetDrift (float new_drift)
-{
-  // if within range, save temperature correction
-  if ((new_drift >= PILOTWIRE_SHIFT_MIN) && (new_drift <= PILOTWIRE_SHIFT_MAX)) Settings.weight_calibration = (unsigned long) int (50 + (new_drift * 10));
-
-  // update JSON status
-  pilotwire_updated = true;
-}
-
-// get pilot wire drift temperature
-float PilotwireGetDrift ()
-{
-  float drift;
-
-  // get drift temperature (/10)
-  drift = float (Settings.weight_calibration);
-  drift = ((drift - 50) / 10);
-  
-  // check if within range
-  if (drift < PILOTWIRE_SHIFT_MIN) drift = PILOTWIRE_SHIFT_MIN;
-  if (drift > PILOTWIRE_SHIFT_MAX) drift = PILOTWIRE_SHIFT_MAX;
-
-  return drift;
-}
 
 // set target temperature
 void PilotwireSetTargetTemperature (float new_thermostat)
 {
   // save target temperature
-  if ((new_thermostat >= PILOTWIRE_TEMP_MIN) && (new_thermostat <= PILOTWIRE_TEMP_MAX))
+  if (new_thermostat >= PILOTWIRE_TEMP_MIN && new_thermostat <= PILOTWIRE_TEMP_MAX)
   {
     // save new target
     Settings.weight_max = (uint16_t) int (new_thermostat * 10);
@@ -483,8 +479,7 @@ float PilotwireGetTargetTemperature ()
   temperature = float (Settings.weight_max) / 10;
   
   // check if within range
-  if (temperature < PILOTWIRE_TEMP_MIN) temperature = PILOTWIRE_TEMP_MIN;
-  if (temperature > PILOTWIRE_TEMP_MAX) temperature = PILOTWIRE_TEMP_MAX;
+  if (temperature < PILOTWIRE_TEMP_MIN || temperature > PILOTWIRE_TEMP_MAX) temperature = PILOTWIRE_TEMP_DEFAULT_TARGET;
 
   return temperature;
 }
@@ -493,7 +488,7 @@ float PilotwireGetTargetTemperature ()
 void PilotwireSetOutsideDropdown (float new_dropdown)
 {
   // save target temperature
-  if (new_dropdown <= PILOTWIRE_SHIFT_MAX) Settings.energy_voltage_calibration = (unsigned long) int (new_dropdown * 10);
+  if (new_dropdown <= PILOTWIRE_TEMP_DROP) Settings.energy_voltage_calibration = (unsigned long) int (new_dropdown * 10);
 
   // update JSON status
   pilotwire_updated = true;
@@ -506,7 +501,35 @@ float PilotwireGetOutsideDropdown ()
 
   // get target temperature (/10)
   temperature = float (Settings.energy_voltage_calibration) / 10;
- 
+
+  // check if within range
+  if (temperature > PILOTWIRE_TEMP_DROP) temperature = PILOTWIRE_TEMP_DEFAULT_DROP;
+
+  return temperature;
+}
+
+// set pilot wire drift temperature
+void PilotwireSetDrift (float new_drift)
+{
+  // if within range, save temperature correction
+  if (abs (new_drift) <= PILOTWIRE_TEMP_DRIFT) Settings.weight_calibration = (unsigned long) int (50 + (new_drift * 10));
+
+  // update JSON status
+  pilotwire_updated = true;
+}
+
+// get pilot wire drift temperature
+float PilotwireGetDrift ()
+{
+  float temperature;
+
+  // get drift temperature (/10)
+  temperature = float (Settings.weight_calibration);
+  temperature = ((temperature - 50) / 10);
+  
+  // check if within range
+  if (abs (temperature) > PILOTWIRE_TEMP_DRIFT) temperature = PILOTWIRE_TEMP_DEFAULT_DRIFT;
+
   return temperature;
 }
 
@@ -523,19 +546,14 @@ bool PilotwireGetDS18B20Pullup ()
 }
 
 // set DS18B20 internal pullup state
-void PilotwireSetDS18B20Pullup (bool new_state)
+bool PilotwireSetDS18B20Pullup (bool new_state)
 {
   bool actual_state = PilotwireGetDS18B20Pullup ();
 
   // if not set, set pullup resistor for DS18B20 temperature sensor
-  if (actual_state != new_state)
-  {
-    // update DS18B20 pullup state
-    bitWrite (Settings.flag3.data, 24, new_state);
+  if (actual_state != new_state) bitWrite (Settings.flag3.data, 24, new_state);
 
-    // ask for reboot
-    restart_flag = 2;
-  }
+  return (actual_state != new_state);
 }
 
 // get current temperature with drift correction
@@ -808,6 +826,7 @@ void PilotwireEverySecond ()
 void PilotwireInit ()
 {
   int    index;
+  float  param_temperature;
   String str_setting;
 
   // init default values
@@ -992,6 +1011,7 @@ void PilotwireWebPageSwitchMode ()
 // Pilotwire heater configuration web page
 void PilotwireWebPageConfigure ()
 {
+  bool    is_modified;
   uint8_t target_mode, device_type;
   float   actual_temperature;
   char    argument[PILOTWIRE_BUFFER_SIZE];
@@ -1005,7 +1025,7 @@ void PilotwireWebPageConfigure ()
   target_mode = PilotwireGetMode ();
   str_unit       = String (TempUnit ());
   str_temp_step  = String (PILOTWIRE_TEMP_STEP, 1);
-  str_drift_step = String (PILOTWIRE_DRIFT_STEP, 1);
+  str_drift_step = String (PILOTWIRE_TEMP_DRIFT_STEP, 1);
 
   // page comes from save button on configuration page
   if (WebServer->hasArg("save"))
@@ -1040,8 +1060,8 @@ void PilotwireWebPageConfigure ()
 
     // set ds18b20 pullup according to 'pullup' parameter
     WebGetArg (D_CMND_PILOTWIRE_PULLUP, argument, PILOTWIRE_BUFFER_SIZE);
-    if (strlen(argument) > 0) PilotwireSetDS18B20Pullup (true);
-    else PilotwireSetDS18B20Pullup (false);
+    is_modified = PilotwireSetDS18B20Pullup (strlen(argument) > 0);
+    if (is_modified == true) WebRestart (1);
   }
 
   // beginning of form
@@ -1093,11 +1113,11 @@ void PilotwireWebPageConfigure ()
     // outside mode temperature dropdown
     str_temperature = String (PilotwireGetOutsideDropdown (), 1);
     str_text = D_PILOTWIRE_OUTSIDE + String (" ") + D_PILOTWIRE_MODE + String (" ") + D_PILOTWIRE_DROPDOWN;
-    WSContentSend_P (str_conf_temperature, str_text.c_str (), str_unit.c_str (), str_conf_topic_style, D_CMND_PILOTWIRE_OUTSIDE, D_CMND_PILOTWIRE_OUTSIDE, 0, PILOTWIRE_SHIFT_MAX, str_temp_step.c_str(), str_temperature.c_str());
+    WSContentSend_P (str_conf_temperature, str_text.c_str (), str_unit.c_str (), str_conf_topic_style, D_CMND_PILOTWIRE_OUTSIDE, D_CMND_PILOTWIRE_OUTSIDE, 0, PILOTWIRE_TEMP_DROP, str_temp_step.c_str(), str_temperature.c_str());
 
     // temperature correction label and input
     str_temperature = String (PilotwireGetDrift (), 1);
-    WSContentSend_P (str_conf_temperature, D_PILOTWIRE_DRIFT, str_unit.c_str (), str_conf_topic_style, D_CMND_PILOTWIRE_DRIFT, D_CMND_PILOTWIRE_DRIFT, PILOTWIRE_SHIFT_MIN, PILOTWIRE_SHIFT_MAX, str_drift_step.c_str(), str_temperature.c_str());
+    WSContentSend_P (str_conf_temperature, D_PILOTWIRE_DRIFT, str_unit.c_str (), str_conf_topic_style, D_CMND_PILOTWIRE_DRIFT, D_CMND_PILOTWIRE_DRIFT, - PILOTWIRE_TEMP_DRIFT, PILOTWIRE_TEMP_DRIFT, str_drift_step.c_str(), str_temperature.c_str());
   }
   else WSContentSend_P (PSTR ("<p><i>%s</i></p>\n"), D_PILOTWIRE_NOSENSOR);
 

@@ -71,37 +71,27 @@ uint32_t temperature_last_update      = 0;            // last time (in millis) t
 \**************************************************/
 
 // get current temperature MQTT topic ()
-String TemperatureGetMqttTopic ()
+const char* TemperatureGetMqttTopic ()
 {
-  String str_result;
-
-  // extract power topic from generic config
-  str_result = InfoGetConfig (TEMPERATURE_PARAM_TOPIC);
-
-  return str_result;
+  return SettingsText (SET_TEMPERATURE_TOPIC);
 }
 
 // get current temperature JSON key
-String TemperatureGetMqttKey ()
+const char* TemperatureGetMqttKey ()
 {
-  String str_result;
-
-  // extract power topic from generic config
-  str_result = InfoGetConfig (TEMPERATURE_PARAM_KEY);
-
-  return str_result;
+  return SettingsText (SET_TEMPERATURE_KEY);
 }
 
-// set current temperature MQTT topic (power topic;power key|temperature topic;temperature key)
+// set current temperature MQTT topic
 void TemperatureSetMqttTopic (char* str_topic)
 {
-  InfoSetConfig (TEMPERATURE_PARAM_TOPIC, str_topic);
+  SettingsUpdateText (SET_TEMPERATURE_TOPIC, str_topic);
 }
 
-// set current temperature JSON key (power topic;power key|temperature topic;temperature key)
+// set current temperature JSON key
 void TemperatureSetMqttKey (char* str_key)
 {
-  InfoSetConfig (TEMPERATURE_PARAM_KEY, str_key);
+  SettingsUpdateText (SET_TEMPERATURE_KEY, str_key);
 }
 
 /**************************************************\
