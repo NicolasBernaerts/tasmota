@@ -18,6 +18,7 @@
     07/07/2020 - v3.7.1 - Enable discovery (mDNS)
     29/07/2020 - v3.8   - Add Meter section to JSON
     05/08/2020 - v4.0   - Major code rewrite, JSON section is now TIC, numbered like new official Teleinfo module
+    24/08/2020 - v4.0.1 - Web sensor display update
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -90,11 +91,11 @@
 #define D_TELEINFO_CONFIG            "Configure Teleinfo"
 #define D_TELEINFO_GRAPH             "Graph"
 #define D_TELEINFO_REFERENCE         "Contract n°"
-#define D_TELEINFO_LAST              "Last TIC"
+#define D_TELEINFO_TIC               "TIC"
 #define D_TELEINFO_DISABLED          "Désactivé"
 #define D_TELEINFO_1200              "TIC Historique (1200 bauds)"
 #define D_TELEINFO_9600              "TIC Standard (9600 bauds)"
-#define D_TELEINFO_COUNTER           "Messages reçus"
+//#define D_TELEINFO_COUNTER           "Messages reçus"
 
 // others
 #define TELEINFO_MAX_PHASE           3      
@@ -640,10 +641,10 @@ void TeleinfoWebButton ()
 bool TeleinfoWebSensor ()
 {
   // display frame counter
-  WSContentSend_PD (PSTR("{s}%s{m}%d{e}"), D_TELEINFO_COUNTER, teleinfo_count);
+  //WSContentSend_PD (PSTR("{s}%s{m}%d{e}"), D_TELEINFO_COUNTER, teleinfo_count);
 
   // display last TIC data received
-  WSContentSend_PD (PSTR("{s}%s{m}%s{e}"), D_TELEINFO_LAST, str_teleinfo_last.c_str ());
+  WSContentSend_PD (PSTR("{s}%s <small><i>(%d)</i></small>{m}%s{e}"), D_TELEINFO_TIC, teleinfo_count, str_teleinfo_last.c_str ());
 }
 
 // Teleinfo web page

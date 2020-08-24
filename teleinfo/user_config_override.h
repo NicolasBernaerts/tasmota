@@ -18,6 +18,7 @@
     07/07/2020 - v3.7.1 - Enable discovery (mDNS)
     29/07/2020 - v3.8   - Add phasis percentage
     05/08/2020 - v4.0   - Add Meter in JSON & make error correction more robust 
+    24/08/2020 - v4.0.1 - Web sensor display update
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
