@@ -29,6 +29,7 @@
     22/08/2020 - v6.4.1 - Save offload config using new Settings text
                           Add restart after offload configuration
                           Handle out of range values during first flash
+    24/08/2020 - v6.5   - Add status icon to Web UI 
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -78,9 +79,9 @@
 #define USE_TEMPERATURE_MQTT                  // Add support for MQTT temperature sensor
 #define USE_PILOTWIRE                         // Add support for France Pilotwire protocol for electrical heaters
 
-#define EXTENSION_VERSION "6.4.1"             // version
-#define EXTENSION_NAME "Pilotwire"            // name
-#define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
+#define EXTENSION_VERSION "6.5"               // version
+#define EXTENSION_NAME    "Pilotwire"         // name
+#define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
 
 // MQTT default
 #undef MQTT_HOST
