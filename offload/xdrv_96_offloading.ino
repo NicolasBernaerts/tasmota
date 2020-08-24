@@ -113,14 +113,15 @@ const char str_offload_input_text[] PROGMEM = "<p>%s<span style='float:right;fon
 enum OffloadStages { OFFLOAD_NONE, OFFLOAD_BEFORE, OFFLOAD_ACTIVE, OFFLOAD_AFTER };
 
 // variables
-bool    offload_relay_managed    = true;               // define if relay is managed directly
-uint8_t offload_relay_state      = 0;                  // relay state before offloading
-uint8_t offload_stage            = OFFLOAD_NONE;       // current offloading state
-ulong   offload_stage_time       = 0;                  // time of current stage
-int     offload_power_inst       = 0;                  // actual phase instant power (retrieved thru MQTT)
-bool    offload_topic_subscribed = false;              // flag for power subscription
-uint8_t offload_message_left     = 0;                  // number of JSON messages to send
-uint8_t offload_message_delay    = 0;                  // delay in seconds before next JSON message
+bool     offload_relay_managed    = true;               // define if relay is managed directly
+uint8_t  offload_relay_state      = 0;                  // relay state before offloading
+uint8_t  offload_stage            = OFFLOAD_NONE;       // current offloading state
+ulong    offload_stage_time       = 0;                  // time of current stage
+int      offload_power_inst       = 0;                  // actual phase instant power (retrieved thru MQTT)
+bool     offload_topic_subscribed = false;              // flag for power subscription
+uint8_t  offload_message_left     = 0;                  // number of JSON messages to send
+uint8_t  offload_message_delay    = 0;                  // delay in seconds before next JSON message
+uint32_t offload_message_time     = 0;                  // time of last message
 
 /**************************************************\
  *                  Accessors
@@ -403,8 +404,9 @@ bool OffloadMqttData ()
   str_topic = OffloadGetPowerTopic (false);
   if (str_mailbox_topic == str_topic)
   {
-    // log
+    // log and counter increment
     AddLog_P2(LOG_LEVEL_INFO, PSTR("MQT: Received %s"), str_topic.c_str ());
+    offload_message_time = LocalTime ();
 
     // if instant power key is present
     str_key = OffloadGetInstPowerKey (false) + ":";
@@ -594,7 +596,9 @@ bool OffloadWebSensor ()
   uint16_t contract_power, num_message;
   String   str_title, str_text;
   ulong    time_now, time_left, time_delay;
-  
+  uint32_t message_delay;
+  TIME_T   message_dst;
+
   // device power
   contract_power = OffloadGetDevicePower ();
   WSContentSend_PD (PSTR("{s}%s{m}<b>%d</b> W{e}"), D_OFFLOAD_DEVICE, contract_power);
@@ -602,16 +606,29 @@ bool OffloadWebSensor ()
   // if house power is subscribed, display power
   if (offload_topic_subscribed == true)
   {
-    // get current time
-    time_now = millis ();
+    // calculate delay since last power message
+    str_text = "...";
+    if (offload_message_time > 0)
+    {
+      // calculate delay
+      message_delay = LocalTime() - offload_message_time;
+      BreakTime (message_delay, message_dst);
+
+      // generate readable format
+      str_text = "";
+      if (message_dst.hour > 0) str_text += String (message_dst.hour) + "h";
+      if (message_dst.hour > 0 || message_dst.minute > 0) str_text += String (message_dst.minute) + "m";
+      str_text += String (message_dst.second) + "s";
+    }
 
     // display current power and contract power limit
     contract_power = OffloadGetMaxPower ();
-    str_title = D_OFFLOAD_POWER + String (" (") + D_OFFLOAD_INSTCONTRACT + String (")");
-    if (contract_power > 0) WSContentSend_PD (PSTR("{s}%s{m}<b>%d</b> / %d W{e}"), str_title.c_str (), offload_power_inst, contract_power);
+    if (contract_power > 0) WSContentSend_PD (PSTR("{s}%s <small><i>[%s]</i></small>{m}<b>%d</b> / %d W{e}"), D_OFFLOAD_POWER, str_text.c_str (), offload_power_inst, contract_power);
 
     // switch according to current state
+    time_now  = millis ();
     time_left = 0;
+    str_text  = "";
     str_title = D_OFFLOADING;
     switch (offload_stage)
     { 
