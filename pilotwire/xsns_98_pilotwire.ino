@@ -133,14 +133,13 @@
 #define PILOTWIRE_TEMP_DRIFT_STEP       0.1
 
 #define PILOTWIRE_TEMP_THRESHOLD        0.25
-
-#define PILOTWIRE_GRAPH_STEP            5           // collect temperature every 5mn
+        
+#define PILOTWIRE_GRAPH_REFRESH         300         // collect temperature every 5mn
 #define PILOTWIRE_GRAPH_SAMPLE          288         // 24 hours display with collect every 5 mn
 #define PILOTWIRE_GRAPH_WIDTH           800      
 #define PILOTWIRE_GRAPH_HEIGHT          400 
 #define PILOTWIRE_GRAPH_PERCENT_START   15      
 #define PILOTWIRE_GRAPH_PERCENT_STOP    85
-#define PILOTWIRE_GRAPH_REFRESH         60 * PILOTWIRE_GRAPH_STEP
 
 // constant chains
 const char str_conf_fieldset_start[] PROGMEM = "<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n";
