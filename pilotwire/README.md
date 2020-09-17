@@ -22,14 +22,14 @@ In thermostat mode, if you use Tasmota standard timers, you'll be able to manage
   * Timer **ON** means normal target temperature
   * Timer **OFF** means target temperature minus night dropdown
 
-This Tasmota firmware is based on version **v8.1** modified to handle **Pilotwire** with :
+This Tasmota firmware is based on version **v8.4** modified to handle **Pilotwire** with :
   * Web configuration interface
   * extension of JSON MQTT status
   * new specific MQTT commands
   * automatic offload when global power is overloading your contract
   * timers management (ON = target temperature, OFF = night mode temperature)
   * **/control** public page to control thermostat
-  * **/json** public page to get latest JSON
+  * **/info.json** public page to get device main caracteristics
 
 MQTT JSON result should look like that :
 
