@@ -204,7 +204,7 @@ void TimezoneWebPageConfigure ()
   if (!HttpCheckPriviledgedAccess()) return;
 
   // page comes from save button on configuration page
-  if (WebServer->hasArg("save"))
+  if (Webserver->hasArg("save"))
   {
     // set first time server
     WebGetArg (D_CMND_TIMEZONE_NTP, argument, TIMEZONE_BUFFER_SIZE);
@@ -321,7 +321,7 @@ bool Xsns95 (uint8_t function)
 
 #ifdef USE_WEBSERVER
     case FUNC_WEB_ADD_HANDLER:
-      WebServer->on ("/" D_PAGE_TIMEZONE_CONFIG, TimezoneWebPageConfigure);
+      Webserver->on ("/" D_PAGE_TIMEZONE_CONFIG, TimezoneWebPageConfigure);
       break;
     case FUNC_WEB_ADD_BUTTON:
       TimezoneWebConfigButton ();

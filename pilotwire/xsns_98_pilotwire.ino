@@ -25,6 +25,7 @@
     18/04/2020 - v6.0   - Handle direct connexion of heater in addition to pilotwire
     22/08/2020 - v6.1   - Handle out of range values during first flash
     24/08/2020 - v6.5   - Add status icon to Web UI 
+    12/09/2020 - v6.6   - Add offload icon status 
 
   Settings are stored using weighting scale parameters :
     - Settings.weight_reference             = Fil pilote mode
@@ -191,13 +192,19 @@ const char icon_frost_0[] PROGMEM = "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXH
 const char icon_frost_1[] PROGMEM = "UNtWP1J7J/Z4abWq8QM1xdqcGs9nNBc3jRCczEGNPIG6TABY0T2ZHJO95kpvMjsTiRJSRpU44jSYxEPSdWAdd7O7kfsnNQd2vcuNX5NxE9y/IuYnugdxnbi+otbyOW1mA5i6EpjghBduvFK+E38qWgDXQ6sxfiz+v3Vc/eDt6O3o7ejt6O3o7ejv67x3ZwB8QCf9S/QSm6TClE701wgAAAYVpQ0NQSUNDIHByb2ZpbGUAAHicfZE9SMNQFIVPU6VFKg52EHHIUAXBgqiIo1ahCBVCrdCqg8lL/6BJQ5Li4ii4Fhz8Waw6uDjr6uAqCII/IE6OToouUuJ9SaFFjBce7+O8ew7v3QcIjQrTrK5xQNNtM51MiNncqhh6RRgDiCKAUZlZxpwkpeBbX/fUR3UX51n+fX9Wr5q3GBAQiWeZYdrEG8TTm7bBeZ84ykqySnxOPGbSBYkfua54/Ma56LLAM6NmJj1PHCUWix2sdDArmRrxFHFM1XTKF7Ieq5y3OGuVGmvdk78wktdXlrlOawhJLGIJEkQoqKGMCmzEaddJsZCm84SPf9D1S+RSyFUGI8cCqtAgu37wP/g9W6swOeElRRJA94vjfAwDoV2gWXec72PHaZ4AwWfgSm/7qw1g5pP0eluLHQF928DFdVtT9oDLHWDgyZBN2ZWCtIRCAXg/o2/KAf23QM+aN7fWOU4fgAzNKnUDHBwCI0XKXvd5d7hzbv/2tOb3A1UncpstJyOAAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH5AgYFAcXM2HfKQAAAhFJREFUeNrtW0";
 const char icon_frost_2[] PROGMEM = "GSxCAITFv+Z/+9v9sX9F63pjYGEIQkepqpiUq3CA2pwdf3z/Hm0RP35p/PyDKiHS8fm4BNwCbg3SMqC/DjO5LWKOMBDH6+HAGYAEXheuU94IwEDoAvBT9DACdI+G8+lfPdrkybAK8hAQbvQZA9aWkQzs+ViAF0JgHB+5cQQqhw8v8JIS40CIvL4VNsXTAprVZfIcCaMGWNTotFwEKoNzCKAbhgk8VP98pGSIohXJwsb+jusFSDKA7YRVN0xSJ8EnDvfsDKjOF6EN15s0giaHwWWgKodDUGE0HD/mIyugE8FDFihghpVIfCfn7a0h2DCgSpEw6uDoUYUscATJ6aVEPAGbiUDJUQ8khDUjFFR+BuQuhYQER6Y2TV22ENEbfqCN1+rPIAi4h5xBWgw9zl7wU86n5tXR7dhzhdY6QELT07DxFDJ4+gpxKUkOGVyyVEwOvKdYfiIkrESGsMGtYUK0EaXd4zcEmIMOuKrpicLWJCxFR3Nq6aqnQh4I5NUXHG6A8DriaiBae0I+FqqIRQU6guFAMPg40cESAFzqIeQSERlMYAPCAGXGaMngSYCnkbGh9asqumZ50WxawRJIP3T/UAOj+X5gEw1OWWd4wMssfFA2YbJNKOEKOvQlvs8qP8fPYbq12BGfDW0+TdCJh10WWapBcBnEbC/tPUJmATsAl49cj893iJfsMv2vSRgZoqMgoAAAAASUVORK5CYII=";
 
-// icons
+// icon : offload
+const char icon_offload_0[] PROGMEM = "iVBORw0KGgoAAAANSUhEUgAAAEAAAABAAQMAAACQp+OdAAABhGlDQ1BJQ0MgcHJvZmlsZQAAKJF9kTtIw1AUhv+mFh9UHOyg4pChOlkQFXHUKhShQqgVWnUwuekLmjQkKS6OgmvBwcdi1cHFWVcHV0EQfIA4OTopukiJ5yaFFjFeONyP/97/59xzAaFeZprVMQ5oum2mEnExk10VO1/RjTDVIEIys4w5SUrCd33dI8D3uxjP8r/35+pVcxYDAiLxLDNMm3iDeHrTNjjvE0dYUVaJz4nHTGqQ+JHrisdvnAsuCzwzYqZT88QRYrHQxkobs6KpEU8RR1VNp3wh47HKeYuzVq6yZp/8heGcvrLMdaphJLCIJUgQoaCKEsqwEaNdJ8VCis7jPv4h1y+RSyFXCYwcC6hAg+z6wf/g92yt/OSElxSOA6EXx/kYATp3gUbNcb6PHadxAgSfgSu95a/UgZlP0mstLXoE9G0DF9ctTdkDLneAgSdDNmVXClIJ+TzwfkbflAX6b4GeNW9uzXOcPgBpmlXyBjg4BEYLlL3u8+6u9rn9e6c5vx8AUXJ5na0xzAAAAAZQTFRFAAAA/wAAG/+NIgAAAAF0Uk5TAEDm2GYAAAABYktHRACIBR1IAAAACXBIWXMAAA3XAAAN1wFCKJt4AAAAB3RJTUUH5AkMCSESdjBx2QAAANFJREFUKM+F0TEKwzAMBVC5hnrUEdyTJD1YSAwdeq2UXsS5gaFLhhDXkb6WtlAP4RFsSf4m+r0uX7ga5k84g0/4hANhBnwm4gOuEEXZuRoGol7QEU2C9n8UtCO7IMxO4bPftGMBaA3AwEDHqyI";
+const char icon_offload_1[] PROGMEM = "GgG9AeAB+KRi9GNZJe7it10J+j7o7VNZNXO+GZ9YWdcHdQ0kAWpDNQ7wbKhBrMuB4fGXAJuszCvXzAKQOQHYtMNZCo4QtcfqMgF2xpLVQkbDbyhK2PpsUcq0IG85yd3viE/1Zb3y9TgwzKed+AAAAAElFTkSuQmCC";
+
+// icons associated to heater mode
 const char* pilotwire_icon[][3] PROGMEM = { 
-  {NULL,           NULL,           NULL           },
-  {icon_off_0,     icon_off_1,     icon_off_2     },
-  {icon_comfort_0, icon_comfort_1, icon_comfort_2 },
-  {icon_eco_0,     icon_eco_1,     icon_eco_2     },
-  {icon_frost_0,   icon_frost_1,   icon_frost_2   }
+  {nullptr,        nullptr,        nullptr        },    // PILOTWIRE_DISABLED
+  {icon_off_0,     icon_off_1,     icon_off_2     },    // PILOTWIRE_OFF
+  {icon_comfort_0, icon_comfort_1, icon_comfort_2 },    // PILOTWIRE_COMFORT
+  {icon_eco_0,     icon_eco_1,     icon_eco_2     },    // PILOTWIRE_ECO
+  {icon_frost_0,   icon_frost_1,   icon_frost_2   },    // PILOTWIRE_FROST
+  {nullptr,        nullptr,        nullptr        },    // PILOTWIRE_THERMOSTAT
+  {icon_offload_0, icon_offload_1, nullptr        }     // PILOTWIRE_OFFLOAD
 };
 
 /*************************************************\
@@ -750,7 +757,6 @@ void PilotwireUpdateGraph ()
 // update pilotwire status
 void PilotwireUpdateStatus ()
 {
-  bool    is_offloaded;
   uint8_t heater_state, target_state, heater_mode;
   float   heater_temperature, target_temperature;
 
@@ -793,10 +799,8 @@ void PilotwireUpdateStatus ()
   // if pilotwire mode is enabled
   if (heater_mode != PILOTWIRE_DISABLED)
   {
-    is_offloaded = OffloadIsOffloaded ();
-
     // if offload mode, target state is off
-    if (is_offloaded == true) target_state = PILOTWIRE_OFF;
+    if (OffloadIsOffloaded () == true) target_state = PILOTWIRE_OFF;
  
     // else if thermostat mode
     else if (heater_mode == PILOTWIRE_THERMOSTAT)
@@ -841,6 +845,9 @@ void PilotwireInit ()
   // save number of devices and set it to 0
   pilotwire_devices_present = devices_present;
   devices_present = 0;
+
+  // offloading module is not managing the relay
+  OffloadSetRelayMode (false);
 
   // init default values
   pilotwire_temperature_source = PILOTWIRE_SOURCE_NONE;
@@ -928,13 +935,14 @@ void PilotwireWebDisplayIcon ()
   uint8_t nbrItem, index;
   uint8_t icon_index;
 
-  // get current device state
-  icon_index = PilotwireGetRelayState ();
+  // if offload is active, display offload icon, else display heater state icon
+  if (OffloadIsOffloaded () == true) icon_index = 0;
+  else icon_index = PilotwireGetRelayState ();
 
   // display icon
   WSContentSend_P (PSTR ("<img src='data:image/png;base64,"));
   nbrItem = sizeof (pilotwire_icon[icon_index]) / sizeof (char*);
-  for (index=0; index<nbrItem; index++) if (pilotwire_icon[icon_index][index] != NULL) WSContentSend_P (pilotwire_icon[icon_index][index]);
+  for (index=0; index<nbrItem; index++) if (pilotwire_icon[icon_index][index] != nullptr) WSContentSend_P (pilotwire_icon[icon_index][index]);
   WSContentSend_P (PSTR ("' >"));
 }
 
@@ -1051,7 +1059,7 @@ void PilotwireWebPageConfigure ()
   str_drift_step = String (PILOTWIRE_TEMP_DRIFT_STEP, 1);
 
   // page comes from save button on configuration page
-  if (WebServer->hasArg("save"))
+  if (Webserver->hasArg("save"))
   {
     // get pilot wire mode according to 'mode' parameter
     WebGetArg (D_CMND_PILOTWIRE_MODE, argument, PILOTWIRE_BUFFER_SIZE);
@@ -1371,7 +1379,7 @@ void PilotwireWebPageControl ()
   String  str_temperature, str_temp_target, str_temp_min, str_temp_max, str_temp_step, str_temp_scope, str_slider_min, str_slider_max, str_text;
 
   // if langage is changed
-  if (WebServer->hasArg(D_CMND_PILOTWIRE_LANG))
+  if (Webserver->hasArg(D_CMND_PILOTWIRE_LANG))
   {
     // get langage according to 'lang' parameter
     WebGetArg (D_CMND_PILOTWIRE_LANG, argument, PILOTWIRE_BUFFER_SIZE);
@@ -1381,13 +1389,13 @@ void PilotwireWebPageControl ()
   }
 
   // if heater has to be switched off, set in anti-frost mode
-  if (WebServer->hasArg(D_CMND_PILOTWIRE_OFF)) PilotwireSetMode (PILOTWIRE_FROST); 
+  if (Webserver->hasArg(D_CMND_PILOTWIRE_OFF)) PilotwireSetMode (PILOTWIRE_FROST); 
 
   // else, if heater has to be switched on, set in thermostat mode
-  else if (WebServer->hasArg(D_CMND_PILOTWIRE_ON)) PilotwireSetMode (PILOTWIRE_THERMOSTAT);
+  else if (Webserver->hasArg(D_CMND_PILOTWIRE_ON)) PilotwireSetMode (PILOTWIRE_THERMOSTAT);
 
    // else, if target temperature has been defined
-  else if (WebServer->hasArg(D_CMND_PILOTWIRE_TARGET))
+  else if (Webserver->hasArg(D_CMND_PILOTWIRE_TARGET))
   {
     // get target temperature according to 'target' parameter
     WebGetArg (D_CMND_PILOTWIRE_TARGET, argument, PILOTWIRE_BUFFER_SIZE);
@@ -1620,9 +1628,9 @@ bool Xsns98 (uint8_t function)
 
 #ifdef USE_WEBSERVER
     case FUNC_WEB_ADD_HANDLER:
-      WebServer->on ("/" D_PAGE_PILOTWIRE_CONFIG,  PilotwireWebPageConfigure);
-      WebServer->on ("/" D_PAGE_PILOTWIRE_CONTROL, PilotwireWebPageControl);
-      WebServer->on ("/" D_PAGE_PILOTWIRE_SWITCH,  PilotwireWebPageSwitchMode);
+      Webserver->on ("/" D_PAGE_PILOTWIRE_CONFIG,  PilotwireWebPageConfigure);
+      Webserver->on ("/" D_PAGE_PILOTWIRE_CONTROL, PilotwireWebPageControl);
+      Webserver->on ("/" D_PAGE_PILOTWIRE_SWITCH,  PilotwireWebPageSwitchMode);
       break;
     case FUNC_WEB_SENSOR:
       PilotwireWebSensor ();
@@ -1633,7 +1641,7 @@ bool Xsns98 (uint8_t function)
     case FUNC_WEB_ADD_BUTTON:
       PilotwireWebButton ();
       break;
-#endif  // USE_WEBSERVER
+#endif  // USE_Webserver
 
   }
   return result;

@@ -286,7 +286,7 @@ void TemperatureWebPage ()
   if (!HttpCheckPriviledgedAccess()) return;
 
   // page comes from save button on configuration page
-  if (WebServer->hasArg("save"))
+  if (Webserver->hasArg("save"))
   {
     // set MQTT topic according to 'ttopic' parameter
     WebGetArg (D_CMND_TEMPERATURE_TOPIC, argument, TEMPERATURE_BUFFER_SIZE);
@@ -365,7 +365,7 @@ bool Xsns97 (uint8_t function)
   { 
 #ifdef USE_WEBSERVER
     case FUNC_WEB_ADD_HANDLER:
-      WebServer->on ("/" D_PAGE_TEMPERATURE, TemperatureWebPage);
+      Webserver->on ("/" D_PAGE_TEMPERATURE, TemperatureWebPage);
       break;
     case FUNC_WEB_ADD_BUTTON:
       TemperatureWebButton ();
