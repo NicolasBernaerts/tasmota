@@ -4,6 +4,7 @@
   Copyright (C) 2020  Nicolas Bernaerts
     04/04/2020 - v1.0 - Creation 
     19/05/2020 - v1.1 - Add configuration for first NTP server 
+    22/07/2020 - v1.2 - Memory optimisation 
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -63,8 +64,10 @@
 enum TimezoneCommands { CMND_TIMEZONE_NTP, CMND_TIMEZONE_STDO, CMND_TIMEZONE_STDM, CMND_TIMEZONE_STDW, CMND_TIMEZONE_STDD, CMND_TIMEZONE_DSTO, CMND_TIMEZONE_DSTM, CMND_TIMEZONE_DSTW, CMND_TIMEZONE_DSTD };
 const char kTimezoneCommands[] PROGMEM = D_CMND_TIMEZONE_NTP "|" D_CMND_TIMEZONE_STDO "|" D_CMND_TIMEZONE_STDM "|" D_CMND_TIMEZONE_STDW "|" D_CMND_TIMEZONE_STDD "|" D_CMND_TIMEZONE_DSTO "|" D_CMND_TIMEZONE_DSTM "|" D_CMND_TIMEZONE_DSTW "|" D_CMND_TIMEZONE_DSTD;
 
-// form topic style
-const char TIMEZONE_TOPIC_STYLE[] PROGMEM = "style='float:right;font-size:0.7rem;'";
+// constant strings
+const char str_tz_fieldset_start[] PROGMEM = "<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n";
+const char str_tz_fieldset_stop[] PROGMEM = "</fieldset></p>\n";
+const char str_tz_input[] PROGMEM = "<p>%s<span style='float:right;font-size:0.7rem;'>%s</span><br><input type='number' name='%s' min='%d' max='%d' step='%d' value='%d'></p>\n";
 
 /**************************************************\
  *                  Functions
@@ -73,36 +76,41 @@ const char TIMEZONE_TOPIC_STYLE[] PROGMEM = "style='float:right;font-size:0.7rem
 // Show JSON status (for MQTT)
 void TimezoneShowJSON (bool append)
 {
-  String str_mqtt, str_json;
+  String  str_json;
+
+  // start message  -->  {  or message,
+  if (append == false) str_json = "{";
+  else str_json = ",";
 
   // Timezone section start -->  "Timezone":{
-  str_json = "\"" + String (D_JSON_TIMEZONE) + "\":{";
+  str_json += "\"" + String (D_JSON_TIMEZONE) + "\":{";
+
 
   // STD section -->  "STD":{"Offset":60,"Month":10,"Week":0,"Day":1}
   str_json += "\"" + String (D_JSON_TIMEZONE_STD) + "\":{";
   str_json += "\"" + String (D_JSON_TIMEZONE_OFFSET) + "\":" + String (Settings.toffset[0]) + ",";
   str_json += "\"" + String (D_JSON_TIMEZONE_MONTH) + "\":" + String (Settings.tflag[0].month) + ",";
   str_json += "\"" + String (D_JSON_TIMEZONE_WEEK) + "\":" + String (Settings.tflag[0].week) + ",";
-  str_json += "\"" + String (D_JSON_TIMEZONE_DAY) + "\":" + String (Settings.tflag[0].dow) + "},";
+  str_json += "\"" + String (D_JSON_TIMEZONE_DAY) + "\":" + String (Settings.tflag[0].dow) + "}";
+  str_json += ",";
 
   // DST section -->  "DST":{"Offset":60,"Month":10,"Week":0,"Day":1}
   str_json += "\"" + String (D_JSON_TIMEZONE_DST) + "\":{";
   str_json += "\"" + String (D_JSON_TIMEZONE_OFFSET) + "\":" + String (Settings.toffset[1]) + ",";
   str_json += "\"" + String (D_JSON_TIMEZONE_MONTH) + "\":" + String (Settings.tflag[1].month) + ",";
   str_json += "\"" + String (D_JSON_TIMEZONE_WEEK) + "\":" + String (Settings.tflag[1].week) + ",";
-  str_json += "\"" + String (D_JSON_TIMEZONE_DAY) + "\":" + String (Settings.tflag[1].dow) + "}}";
+  str_json += "\"" + String (D_JSON_TIMEZONE_DAY) + "\":" + String (Settings.tflag[1].dow) + "}";
+  str_json += "}";
 
-  // generate MQTT message according to publish state and publish if needed
-  if (append == false) 
+  // if append mode, add json string to MQTT message
+  if (append == true) ResponseAppend_P (str_json.c_str ());
+
+  // else, add last bracket and directly publish message
+  else 
   {
-    str_mqtt = "{" + str_json + "}";
-    snprintf_P(mqtt_data, sizeof(mqtt_data), str_mqtt.c_str());
+    str_json += "}";
+    Response_P (str_json.c_str ());
     MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
-  }
-  else
-  {
-    str_mqtt = String (mqtt_data) + "," + str_json;
-    snprintf_P(mqtt_data, sizeof(mqtt_data), str_mqtt.c_str());
   }
 }
 
@@ -130,34 +138,34 @@ bool TimezoneMqttCommand ()
       SettingsUpdateText(SET_NTPSERVER1, XdrvMailbox.data);
       break;
     case CMND_TIMEZONE_STDO:  // set timezone STD offset
-      Settings.toffset[0] = atoi (XdrvMailbox.data);
+      Settings.toffset[0] = XdrvMailbox.payload;
       break;
     case CMND_TIMEZONE_STDM:  // set timezone STD month switch
-      Settings.tflag[0].month = atoi (XdrvMailbox.data);
+      Settings.tflag[0].month = XdrvMailbox.payload;
       break;
     case CMND_TIMEZONE_STDW:  // set timezone STD week of month switch
-      Settings.tflag[0].week = atoi (XdrvMailbox.data);
+      Settings.tflag[0].week = XdrvMailbox.payload;
       break;
     case CMND_TIMEZONE_STDD:  // set timezone STD day of week switch
-      Settings.tflag[0].dow = atoi (XdrvMailbox.data);
+      Settings.tflag[0].dow = XdrvMailbox.payload;
       break;
     case CMND_TIMEZONE_DSTO:  // set timezone DST offset
-      Settings.toffset[1] = atoi (XdrvMailbox.data);
+      Settings.toffset[1] = XdrvMailbox.payload;
       break;
     case CMND_TIMEZONE_DSTM:  // set timezone DST month switch
-      Settings.tflag[1].month = atoi (XdrvMailbox.data);
+      Settings.tflag[1].month = XdrvMailbox.payload;
       break;
     case CMND_TIMEZONE_DSTW:  // set timezone DST week of month switch
-      Settings.tflag[1].week = atoi (XdrvMailbox.data);
+      Settings.tflag[1].week = XdrvMailbox.payload;
       break;
     case CMND_TIMEZONE_DSTD:  // set timezone DST day of week switch
-      Settings.tflag[1].dow = atoi (XdrvMailbox.data);
+      Settings.tflag[1].dow = XdrvMailbox.payload;
       break;
    default:
       command_handled = false;
   }
 
-  // if command handled, publish JSON
+  // if needed, send updated status
   if (command_handled == true) TimezoneShowJSON (false);
 
   return command_handled;
@@ -196,7 +204,7 @@ void TimezoneWebPageConfigure ()
   if (!HttpCheckPriviledgedAccess()) return;
 
   // page comes from save button on configuration page
-  if (WebServer->hasArg("save"))
+  if (Webserver->hasArg("save"))
   {
     // set first time server
     WebGetArg (D_CMND_TIMEZONE_NTP, argument, TIMEZONE_BUFFER_SIZE);
@@ -242,27 +250,27 @@ void TimezoneWebPageConfigure ()
 
   // NTP server section  
   // ---------------------
-  WSContentSend_P (PSTR("<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>"), D_TIMEZONE_NTP);
-  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input type='text' name='%s' value='%s'></p>\n"), D_TIMEZONE_NTP, TIMEZONE_TOPIC_STYLE, D_CMND_TIMEZONE_NTP, D_CMND_TIMEZONE_NTP, SettingsText(SET_NTPSERVER1));
-  WSContentSend_P (PSTR("</fieldset></p>\n"));
+  WSContentSend_P (str_tz_fieldset_start, D_TIMEZONE_NTP);
+  WSContentSend_P (PSTR ("<p>%s<span style='float:right;font-size:0.7rem;'>%s</span><br><input type='text' name='%s' value='%s'></p>\n"), D_TIMEZONE_NTP, D_CMND_TIMEZONE_NTP, D_CMND_TIMEZONE_NTP, SettingsText(SET_NTPSERVER1));
+  WSContentSend_P (str_tz_fieldset_stop);
 
   // Standard Time section  
   // ---------------------
-  WSContentSend_P (PSTR("<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>"), D_TIMEZONE_STD);
-  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input type='number' name='%s' min='-720' max='720' step='1' value='%d'></p>\n"), D_TIMEZONE_OFFSET, TIMEZONE_TOPIC_STYLE, D_CMND_TIMEZONE_STDO, D_CMND_TIMEZONE_STDO, Settings.toffset[0]);
-  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input type='number' name='%s' min='1' max='12' step='1' value='%d'></p>\n"), D_TIMEZONE_MONTH, TIMEZONE_TOPIC_STYLE, D_CMND_TIMEZONE_STDM, D_CMND_TIMEZONE_STDM, Settings.tflag[0].month);
-  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input type='number' name='%s' min='0' max='4' step='1' value='%d'></p>\n"), D_TIMEZONE_WEEK, TIMEZONE_TOPIC_STYLE, D_CMND_TIMEZONE_STDW, D_CMND_TIMEZONE_STDW, Settings.tflag[0].week);
-  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input type='number' name='%s' min='1' max='7' step='1' value='%d'></p>\n"), D_TIMEZONE_DAY, TIMEZONE_TOPIC_STYLE, D_CMND_TIMEZONE_STDD, D_CMND_TIMEZONE_STDD, Settings.tflag[0].dow);
-  WSContentSend_P (PSTR("</fieldset></p>\n"));
+  WSContentSend_P (str_tz_fieldset_start, D_TIMEZONE_STD);
+  WSContentSend_P (str_tz_input, D_TIMEZONE_OFFSET, D_CMND_TIMEZONE_STDO, D_CMND_TIMEZONE_STDO, -720, 720, 1, Settings.toffset[0]);
+  WSContentSend_P (str_tz_input, D_TIMEZONE_MONTH,  D_CMND_TIMEZONE_STDM, D_CMND_TIMEZONE_STDM, 1,    12,  1, Settings.tflag[0].month);
+  WSContentSend_P (str_tz_input, D_TIMEZONE_WEEK,   D_CMND_TIMEZONE_STDW, D_CMND_TIMEZONE_STDW, 0,    4,   1, Settings.tflag[0].week);
+  WSContentSend_P (str_tz_input, D_TIMEZONE_DAY,    D_CMND_TIMEZONE_STDD, D_CMND_TIMEZONE_STDD, 1,    7,   1, Settings.tflag[0].dow);
+  WSContentSend_P (str_tz_fieldset_stop);
 
   // Daylight Saving Time section  
   // ----------------------------
-  WSContentSend_P (PSTR("<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>"), D_TIMEZONE_DST);
-  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input type='number' name='%s' min='-720' max='720' step='1' value='%d'></p>\n"), D_TIMEZONE_OFFSET, TIMEZONE_TOPIC_STYLE, D_CMND_TIMEZONE_DSTO, D_CMND_TIMEZONE_DSTO, Settings.toffset[1]);
-  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input type='number' name='%s' min='1' max='12' step='1' value='%d'></p>\n"), D_TIMEZONE_MONTH, TIMEZONE_TOPIC_STYLE, D_CMND_TIMEZONE_DSTM, D_CMND_TIMEZONE_DSTM, Settings.tflag[1].month);
-  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input type='number' name='%s' min='0' max='4' step='1' value='%d'></p>\n"), D_TIMEZONE_WEEK, TIMEZONE_TOPIC_STYLE, D_CMND_TIMEZONE_DSTW, D_CMND_TIMEZONE_DSTW, Settings.tflag[1].week);
-  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input type='number' name='%s' min='1' max='7' step='1' value='%d'></p>\n"), D_TIMEZONE_DAY, TIMEZONE_TOPIC_STYLE, D_CMND_TIMEZONE_DSTD, D_CMND_TIMEZONE_DSTD, Settings.tflag[1].dow);
-  WSContentSend_P (PSTR("</fieldset></p>\n"));
+  WSContentSend_P (str_tz_fieldset_start, D_TIMEZONE_DST);
+  WSContentSend_P (str_tz_input, D_TIMEZONE_OFFSET, D_CMND_TIMEZONE_DSTO, D_CMND_TIMEZONE_DSTO, -720, 720, 1, Settings.toffset[1]);
+  WSContentSend_P (str_tz_input, D_TIMEZONE_MONTH,  D_CMND_TIMEZONE_DSTM, D_CMND_TIMEZONE_DSTM, 1,    12,  1, Settings.tflag[1].month);
+  WSContentSend_P (str_tz_input, D_TIMEZONE_WEEK,   D_CMND_TIMEZONE_DSTW, D_CMND_TIMEZONE_DSTW, 0,    4,   1, Settings.tflag[1].week);
+  WSContentSend_P (str_tz_input, D_TIMEZONE_DAY,    D_CMND_TIMEZONE_DSTD, D_CMND_TIMEZONE_DSTD, 1,    7,   1, Settings.tflag[1].dow);
+  WSContentSend_P (str_tz_fieldset_stop);
 
   // save button  
   // --------------
@@ -308,12 +316,12 @@ bool Xsns95 (uint8_t function)
   switch (function)
   { 
     case FUNC_JSON_APPEND:
-      TimezoneShowJSON (true);
+      //TimezoneShowJSON (true);
       break;
 
 #ifdef USE_WEBSERVER
     case FUNC_WEB_ADD_HANDLER:
-      WebServer->on ("/" D_PAGE_TIMEZONE_CONFIG, TimezoneWebPageConfigure);
+      Webserver->on ("/" D_PAGE_TIMEZONE_CONFIG, TimezoneWebPageConfigure);
       break;
     case FUNC_WEB_ADD_BUTTON:
       TimezoneWebConfigButton ();
