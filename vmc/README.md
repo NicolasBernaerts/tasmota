@@ -1,7 +1,8 @@
 Tasmota firmware modified to control VMC
 =============
 
-This evolution of Tasmota firmware has been enhanced to handle a Motor Controled Ventilator according to current humidity level. VMC is :
+This evolution of Tasmota firmware has been enhanced to handle a Motor Controled Ventilator according to current humidity level.
+In **Auto** mode, VMC is :
   * started as soon as humidity goes beyond a target value
   * stopped as soon as humidity goes below this target value.
 
@@ -9,11 +10,11 @@ Humidity sensor can either be :
   * a local SI7021 sensor connected to your Sonoff
   * a remote MQTT humidity sensor
   
-This Tasmota firmware is based on sonoff original version **v8.1** modified with extended MQTT messages.
+This Tasmota firmware is based on sonoff original version **v8.4** modified with extended MQTT messages.
 
 You'll get some extra Web pages on the device :
-  * **/graph** : 24h humidity/temperature graph (updated every 5mn)
-  * **/json** : last full extended JSON message
+  * **/control** : page to control operating mode and with a 24h humidity/temperature graph
+  * **/info.json** : Main device characteristics in JSON format
 
 MQTT result should look like that :
 
