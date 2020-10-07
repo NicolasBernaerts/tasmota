@@ -4,6 +4,7 @@
   Copyright (C) 2020  Nicolas Bernaerts
     22/05/2020 - v1.0 - Creation 
     12/09/2020 - v1.1 - Correction of PSTR bug 
+    19/09/2020 - v1.2 - Add MAC address to JSON 
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -28,6 +29,7 @@
 #define D_PAGE_INFO_JSON    "info.json"
 
 #define D_JSON_INFO_IP      "IP"
+#define D_JSON_INFO_MAC     "MAC"
 
 /**************************************************\
  *                  Functions
@@ -39,7 +41,9 @@ void InfoShowJSON ()
   String str_mqtt;
 
   // append to MQTT message
-  str_mqtt = String (mqtt_data) + ",\"" + String (D_JSON_INFO_IP) + "\":\"" + WiFi.localIP().toString() + "\"";
+  str_mqtt = String (mqtt_data);
+  str_mqtt += ",\"" + String (D_JSON_INFO_IP) + "\":\"" + WiFi.localIP().toString() + "\"";
+  str_mqtt += ",\"" + String (D_JSON_INFO_MAC) + "\":\"" + WiFi.macAddress() + "\"";
 
   // place JSON back to MQTT data
   snprintf_P (mqtt_data, sizeof(mqtt_data), str_mqtt.c_str ());
@@ -65,7 +69,7 @@ void InfoWebPageJson ()
   json_version += "\"Extension version\":\"" + String (EXTENSION_VERSION) + "\",";
   json_version += "\"Extension author\":\"" + String (EXTENSION_AUTHOR) + "\",";
   json_version += "\"" + String (D_UPTIME) + "\":\"" + GetUptime() + "\",";
-  json_version += "\"" + String (D_FRIENDLY_NAME) + "\":\"" + SettingsText(SET_FRIENDLYNAME1) + "\",";
+  json_version += "\"" + String (D_FRIENDLY_NAME) + "\":\"" + SettingsText(SET_DEVICENAME) + "\",";
   json_version += "\"" + String (D_SSID) + "\":\"" + SettingsText(SET_STASSID1 + Settings.sta_active) + " (" + WifiGetRssiAsQuality(WiFi.RSSI()) + "%%)\",";
   json_version += "\"" + String (D_HOSTNAME) + "\":\"" + my_hostname + "\",";
   json_version += "\"" + String (D_IP_ADDRESS) + "\":\"" + WiFi.localIP().toString() + "\",";

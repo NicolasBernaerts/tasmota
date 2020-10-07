@@ -31,6 +31,7 @@
                           Handle out of range values during first flash
     24/08/2020 - v6.5   - Add status icon to Web UI 
     12/09/2020 - v6.6   - Add offload icon status and based on Tasmota 8.4 
+    19/09/2020 - v6.7   - Based on Offload 2.0 
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -80,7 +81,7 @@
 #define USE_TEMPERATURE_MQTT                  // Add support for MQTT temperature sensor
 #define USE_PILOTWIRE                         // Add support for France Pilotwire protocol for electrical heaters
 
-#define EXTENSION_VERSION "6.6"               // version
+#define EXTENSION_VERSION "6.7"               // version
 #define EXTENSION_NAME    "Pilotwire"         // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
 

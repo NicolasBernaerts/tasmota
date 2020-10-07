@@ -138,7 +138,7 @@
 #define PILOTWIRE_GRAPH_REFRESH         300         // collect temperature every 5mn
 #define PILOTWIRE_GRAPH_SAMPLE          288         // 24 hours display with collect every 5 mn
 #define PILOTWIRE_GRAPH_WIDTH           800      
-#define PILOTWIRE_GRAPH_HEIGHT          400 
+#define PILOTWIRE_GRAPH_HEIGHT          500 
 #define PILOTWIRE_GRAPH_PERCENT_START   15      
 #define PILOTWIRE_GRAPH_PERCENT_STOP    85
 
@@ -192,10 +192,6 @@ const char icon_frost_0[] PROGMEM = "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXH
 const char icon_frost_1[] PROGMEM = "UNtWP1J7J/Z4abWq8QM1xdqcGs9nNBc3jRCczEGNPIG6TABY0T2ZHJO95kpvMjsTiRJSRpU44jSYxEPSdWAdd7O7kfsnNQd2vcuNX5NxE9y/IuYnugdxnbi+otbyOW1mA5i6EpjghBduvFK+E38qWgDXQ6sxfiz+v3Vc/eDt6O3o7ejt6O3o7ejv67x3ZwB8QCf9S/QSm6TClE701wgAAAYVpQ0NQSUNDIHByb2ZpbGUAAHicfZE9SMNQFIVPU6VFKg52EHHIUAXBgqiIo1ahCBVCrdCqg8lL/6BJQ5Li4ii4Fhz8Waw6uDjr6uAqCII/IE6OToouUuJ9SaFFjBce7+O8ew7v3QcIjQrTrK5xQNNtM51MiNncqhh6RRgDiCKAUZlZxpwkpeBbX/fUR3UX51n+fX9Wr5q3GBAQiWeZYdrEG8TTm7bBeZ84ykqySnxOPGbSBYkfua54/Ma56LLAM6NmJj1PHCUWix2sdDArmRrxFHFM1XTKF7Ieq5y3OGuVGmvdk78wktdXlrlOawhJLGIJEkQoqKGMCmzEaddJsZCm84SPf9D1S+RSyFUGI8cCqtAgu37wP/g9W6swOeElRRJA94vjfAwDoV2gWXec72PHaZ4AwWfgSm/7qw1g5pP0eluLHQF928DFdVtT9oDLHWDgyZBN2ZWCtIRCAXg/o2/KAf23QM+aN7fWOU4fgAzNKnUDHBwCI0XKXvd5d7hzbv/2tOb3A1UncpstJyOAAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH5AgYFAcXM2HfKQAAAhFJREFUeNrtW0";
 const char icon_frost_2[] PROGMEM = "GSxCAITFv+Z/+9v9sX9F63pjYGEIQkepqpiUq3CA2pwdf3z/Hm0RP35p/PyDKiHS8fm4BNwCbg3SMqC/DjO5LWKOMBDH6+HAGYAEXheuU94IwEDoAvBT9DACdI+G8+lfPdrkybAK8hAQbvQZA9aWkQzs+ViAF0JgHB+5cQQqhw8v8JIS40CIvL4VNsXTAprVZfIcCaMGWNTotFwEKoNzCKAbhgk8VP98pGSIohXJwsb+jusFSDKA7YRVN0xSJ8EnDvfsDKjOF6EN15s0giaHwWWgKodDUGE0HD/mIyugE8FDFihghpVIfCfn7a0h2DCgSpEw6uDoUYUscATJ6aVEPAGbiUDJUQ8khDUjFFR+BuQuhYQER6Y2TV22ENEbfqCN1+rPIAi4h5xBWgw9zl7wU86n5tXR7dhzhdY6QELT07DxFDJ4+gpxKUkOGVyyVEwOvKdYfiIkrESGsMGtYUK0EaXd4zcEmIMOuKrpicLWJCxFR3Nq6aqnQh4I5NUXHG6A8DriaiBae0I+FqqIRQU6guFAMPg40cESAFzqIeQSERlMYAPCAGXGaMngSYCnkbGh9asqumZ50WxawRJIP3T/UAOj+X5gEw1OWWd4wMssfFA2YbJNKOEKOvQlvs8qP8fPYbq12BGfDW0+TdCJh10WWapBcBnEbC/tPUJmATsAl49cj893iJfsMv2vSRgZoqMgoAAAAASUVORK5CYII=";
 
-// icon : offload
-const char icon_offload_0[] PROGMEM = "iVBORw0KGgoAAAANSUhEUgAAAEAAAABAAQMAAACQp+OdAAABhGlDQ1BJQ0MgcHJvZmlsZQAAKJF9kTtIw1AUhv+mFh9UHOyg4pChOlkQFXHUKhShQqgVWnUwuekLmjQkKS6OgmvBwcdi1cHFWVcHV0EQfIA4OTopukiJ5yaFFjFeONyP/97/59xzAaFeZprVMQ5oum2mEnExk10VO1/RjTDVIEIys4w5SUrCd33dI8D3uxjP8r/35+pVcxYDAiLxLDNMm3iDeHrTNjjvE0dYUVaJz4nHTGqQ+JHrisdvnAsuCzwzYqZT88QRYrHQxkobs6KpEU8RR1VNp3wh47HKeYuzVq6yZp/8heGcvrLMdaphJLCIJUgQoaCKEsqwEaNdJ8VCis7jPv4h1y+RSyFXCYwcC6hAg+z6wf/g92yt/OSElxSOA6EXx/kYATp3gUbNcb6PHadxAgSfgSu95a/UgZlP0mstLXoE9G0DF9ctTdkDLneAgSdDNmVXClIJ+TzwfkbflAX6b4GeNW9uzXOcPgBpmlXyBjg4BEYLlL3u8+6u9rn9e6c5vx8AUXJ5na0xzAAAAAZQTFRFAAAA/wAAG/+NIgAAAAF0Uk5TAEDm2GYAAAABYktHRACIBR1IAAAACXBIWXMAAA3XAAAN1wFCKJt4AAAAB3RJTUUH5AkMCSESdjBx2QAAANFJREFUKM+F0TEKwzAMBVC5hnrUEdyTJD1YSAwdeq2UXsS5gaFLhhDXkb6WtlAP4RFsSf4m+r0uX7ga5k84g0/4hANhBnwm4gOuEEXZuRoGol7QEU2C9n8UtCO7IMxO4bPftGMBaA3AwEDHqyI";
-const char icon_offload_1[] PROGMEM = "GgG9AeAB+KRi9GNZJe7it10J+j7o7VNZNXO+GZ9YWdcHdQ0kAWpDNQ7wbKhBrMuB4fGXAJuszCvXzAKQOQHYtMNZCo4QtcfqMgF2xpLVQkbDbyhK2PpsUcq0IG85yd3viE/1Zb3y9TgwzKed+AAAAAElFTkSuQmCC";
-
 // icons associated to heater mode
 const char* pilotwire_icon[][3] PROGMEM = { 
   {nullptr,        nullptr,        nullptr        },    // PILOTWIRE_DISABLED
@@ -203,8 +199,7 @@ const char* pilotwire_icon[][3] PROGMEM = {
   {icon_comfort_0, icon_comfort_1, icon_comfort_2 },    // PILOTWIRE_COMFORT
   {icon_eco_0,     icon_eco_1,     icon_eco_2     },    // PILOTWIRE_ECO
   {icon_frost_0,   icon_frost_1,   icon_frost_2   },    // PILOTWIRE_FROST
-  {nullptr,        nullptr,        nullptr        },    // PILOTWIRE_THERMOSTAT
-  {icon_offload_0, icon_offload_1, nullptr        }     // PILOTWIRE_OFFLOAD
+  {nullptr,        nullptr,        nullptr        }     // PILOTWIRE_THERMOSTAT
 };
 
 /*************************************************\
@@ -930,20 +925,24 @@ void PilotwireWebSelectMode ()
 }
 
 // display base64 embeded icon
-void PilotwireWebDisplayIcon ()
+void PilotwireWebDisplayIcon (uint8_t icon_height)
 {
   uint8_t nbrItem, index;
   uint8_t icon_index;
 
   // if offload is active, display offload icon, else display heater state icon
-  if (OffloadIsOffloaded () == true) icon_index = 0;
-  else icon_index = PilotwireGetRelayState ();
+  if (OffloadIsOffloaded () == true) OffloadWebDisplayIcon (icon_height, OFFLOAD_ICON_OFFLOADED);
+  else 
+  {
+    // get heater status
+    icon_index = PilotwireGetRelayState ();
 
-  // display icon
-  WSContentSend_P (PSTR ("<img src='data:image/png;base64,"));
-  nbrItem = sizeof (pilotwire_icon[icon_index]) / sizeof (char*);
-  for (index=0; index<nbrItem; index++) if (pilotwire_icon[icon_index][index] != nullptr) WSContentSend_P (pilotwire_icon[icon_index][index]);
-  WSContentSend_P (PSTR ("' >"));
+    // display icon
+    WSContentSend_P (PSTR ("<img height=%d src='data:image/png;base64,"), icon_height);
+    nbrItem = sizeof (pilotwire_icon[icon_index]) / sizeof (char*);
+    for (index=0; index<nbrItem; index++) if (pilotwire_icon[icon_index][index] != nullptr) WSContentSend_P (pilotwire_icon[icon_index][index]);
+    WSContentSend_P (PSTR ("' >"));
+  }
 }
 
 // append pilotwire control button to main page
@@ -1015,7 +1014,7 @@ bool PilotwireWebSensor ()
 
   // display heater icon status
   WSContentSend_PD (PSTR("<tr><td colspan=2 style='width:100%;text-align:center;padding:10px;'>"));
-  PilotwireWebDisplayIcon ();
+  PilotwireWebDisplayIcon (64);
   WSContentSend_PD (PSTR("</td></tr>\n"));
 }
 
@@ -1333,7 +1332,7 @@ void PilotwireWebTemperatureGraph (uint8_t mode)
   // dislay first time mark
   graph_x = graph_left + graph_hour;
   sprintf(str_hour, "%02d", current_dst.hour);
-  WSContentSend_P (PSTR ("<text class='time' x='%d' y='52%%'>%sh</text>\n"), graph_x, str_hour);
+  WSContentSend_P (PSTR ("<text class='time' x='%d' y='%d%%'>%sh</text>\n"), graph_x, 51, str_hour);
 
   // dislay next 5 time marks (every 4 hours)
   for (index = 0; index < 5; index++)
@@ -1341,7 +1340,7 @@ void PilotwireWebTemperatureGraph (uint8_t mode)
     current_dst.hour = (current_dst.hour + 4) % 24;
     graph_x += 48 * graph_width / PILOTWIRE_GRAPH_SAMPLE;
     sprintf(str_hour, "%02d", current_dst.hour);
-    WSContentSend_P (PSTR ("<text class='time' x='%d' y='52%%'>%sh</text>\n"), graph_x, str_hour);
+    WSContentSend_P (PSTR ("<text class='time' x='%d' y='%d%%'>%sh</text>\n"), graph_x, 51, str_hour);
   }
 
   // --------------
@@ -1433,7 +1432,7 @@ void PilotwireWebPageControl ()
   temp_target = PilotwireGetTargetTemperature ();
 
   // convert temperatures to string with 1 digit
-  str_temperature = String (temperature, 1);
+  if (!isnan (temperature)) str_temperature = String (temperature, 1);
   str_temp_target = String (temp_target, 1);
   str_temp_min    = String (temp_min, 1);
   str_temp_max    = String (temp_max, 1);
@@ -1451,20 +1450,20 @@ void PilotwireWebPageControl ()
   WSContentSend_P (PSTR ("<style>\n"));
 
   WSContentSend_P (PSTR ("body {color:white;background-color:#303030;font-family:Arial, Helvetica, sans-serif;}\n"));
-  WSContentSend_P (PSTR ("div {width:100%%;margin:auto;padding:3px 0px;text-align:center;vertical-align:middle;}\n"));
+  WSContentSend_P (PSTR ("div {width:100%%;margin:12px auto;padding:3px 0px;text-align:center;vertical-align:middle;}\n"));
   WSContentSend_P (PSTR ("fieldset {border-radius:10px;}\n"));
   
   WSContentSend_P (PSTR (".title {font-size:5vh;}\n"));
+  WSContentSend_P (PSTR (".value {font-size:4vh;}\n"));
+  WSContentSend_P (PSTR (".lang {font-size:2vh;}\n"));
+  
   WSContentSend_P (PSTR (".temperature {font-size:24px;}\n"));
   WSContentSend_P (PSTR (".target {font-size:24px;}\n"));
   WSContentSend_P (PSTR (".time {font-size:20px;}\n"));
-  WSContentSend_P (PSTR (".switch {text-align:left;font-size:24px;}\n"));
   WSContentSend_P (PSTR (".bold {font-weight:bold;}\n"));
 
-  WSContentSend_P (PSTR (".lang {font-size:16px;}\n"));
-
   WSContentSend_P (PSTR (".centered {width:%d%%;max-width:%dpx;}\n"), PILOTWIRE_GRAPH_PERCENT_STOP - PILOTWIRE_GRAPH_PERCENT_START, PILOTWIRE_GRAPH_WIDTH * (PILOTWIRE_GRAPH_PERCENT_STOP - PILOTWIRE_GRAPH_PERCENT_START) / 100);
-  WSContentSend_P (PSTR (".graph {max-width:%dpx;}\n"), PILOTWIRE_GRAPH_WIDTH);
+  WSContentSend_P (PSTR (".graph {margin-top:20px;max-width:%dpx;}\n"), PILOTWIRE_GRAPH_WIDTH);
   WSContentSend_P (PSTR (".thermostat {margin-bottom:10px;}\n"));
   WSContentSend_P (PSTR (".yellow {color:#FFFF33;}\n"));
 
@@ -1479,9 +1478,10 @@ void PilotwireWebPageControl ()
   WSContentSend_P (PSTR (".slider::-moz-range-thumb {width:25px;height:25px;border-radius:50%%;background:orange;cursor:pointer;border:1px solid orange;}\n"));
   WSContentSend_P (PSTR (".slider::-ms-thumb {width:25px;height:25px;border-radius:50%%;background:orange;cursor:pointer;border:1px solid orange;}\n"));
 
+  WSContentSend_P (PSTR (".switch {text-align:left;font-size:24px;font-weight:bold;}\n"));
   WSContentSend_P (PSTR (".toggle input {display:none;}\n"));
   WSContentSend_P (PSTR (".toggle {position:relative;display:inline-block;width:140px;height:40px;margin:10px auto;}\n"));
-  WSContentSend_P (PSTR (".slide-off {position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#bc2612;border:1px solid #aaa;border-radius:5px;}\n"));
+  WSContentSend_P (PSTR (".slide-off {position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#ff0000;border:1px solid #aaa;border-radius:5px;}\n"));
   WSContentSend_P (PSTR (".slide-off:before {position:absolute;content:'';width:64px;height:34px;left:2px;top:2px;background-color:#eee;border-radius:5px;}\n"));
   WSContentSend_P (PSTR (".slide-off:after {position:absolute;content:'Off';top:5px;right:20px;color:#fff;}\n"));
   WSContentSend_P (PSTR (".slide-on {position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#8cbc13;border:1px solid #aaa;border-radius:5px;}\n"));
@@ -1508,11 +1508,11 @@ void PilotwireWebPageControl ()
   WSContentSend_P (PSTR ("<div class='title bold'>%s</div>\n"), SettingsText(SET_FRIENDLYNAME1));
 
   // current temperature
-  WSContentSend_P (PSTR ("<div class='title bold yellow'>%s °C</div>\n"), str_temperature.c_str());
+  if (str_temperature != "") WSContentSend_P (PSTR ("<div class='value bold yellow'>%s °C</div>\n"), str_temperature.c_str());
 
   // status icon
   WSContentSend_P (PSTR ("<div class='status'>"));
-  PilotwireWebDisplayIcon ();
+  PilotwireWebDisplayIcon (64);
   WSContentSend_P (PSTR ("</div>\n"));
 
   // if heater is in thermostat mode, button to switch off heater, else button to switch on thermostat
