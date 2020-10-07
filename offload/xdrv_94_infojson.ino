@@ -3,6 +3,8 @@
   
   Copyright (C) 2020  Nicolas Bernaerts
     22/05/2020 - v1.0 - Creation 
+    12/09/2020 - v1.1 - Correction of PSTR bug 
+    19/09/2020 - v1.2 - Add MAC address to JSON 
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -27,6 +29,7 @@
 #define D_PAGE_INFO_JSON    "info.json"
 
 #define D_JSON_INFO_IP      "IP"
+#define D_JSON_INFO_MAC     "MAC"
 
 /**************************************************\
  *                  Functions
@@ -38,7 +41,9 @@ void InfoShowJSON ()
   String str_mqtt;
 
   // append to MQTT message
-  str_mqtt = String (mqtt_data) + ",\"" + String (D_JSON_INFO_IP) + "\":\"" + WiFi.localIP().toString() + "\"";
+  str_mqtt = String (mqtt_data);
+  str_mqtt += ",\"" + String (D_JSON_INFO_IP) + "\":\"" + WiFi.localIP().toString() + "\"";
+  str_mqtt += ",\"" + String (D_JSON_INFO_MAC) + "\":\"" + WiFi.macAddress() + "\"";
 
   // place JSON back to MQTT data
   snprintf_P (mqtt_data, sizeof(mqtt_data), str_mqtt.c_str ());
@@ -57,22 +62,22 @@ void InfoWebPageJson ()
   char stopic[TOPSZ];
 
   // generate version string
-  json_version = PSTR ("{");
-  json_version += PSTR ("\"Module\":\"") + ModuleName() + "\",";
-  json_version += PSTR ("\"") + String (D_PROGRAM_VERSION) + "\":\"" + my_version + "\",";
-  json_version += PSTR ("\"Extension type\":\"") + String (EXTENSION_NAME) + "\",";
-  json_version += PSTR ("\"Extension version\":\"") + String (EXTENSION_VERSION) + "\",";
-  json_version += PSTR ("\"Extension author\":\"") + String (EXTENSION_AUTHOR) + "\",";
-  json_version += PSTR ("\"") + String (D_UPTIME) + "\":\"" + GetUptime() + "\",";
-  json_version += PSTR ("\"") + String (D_FRIENDLY_NAME) + "\":\"" + SettingsText(SET_FRIENDLYNAME1) + "\",";
-  json_version += PSTR ("\"") + String (D_SSID) + "\":\"" + SettingsText(SET_STASSID1 + Settings.sta_active) + " (" + WifiGetRssiAsQuality(WiFi.RSSI()) + "%%)\",";
-  json_version += PSTR ("\"") + String (D_HOSTNAME) + "\":\"" + my_hostname + "\",";
-  json_version += PSTR ("\"") + String (D_IP_ADDRESS) + "\":\"" + WiFi.localIP().toString() + "\",";
-  json_version += PSTR ("\"") + String (D_MAC_ADDRESS) + "\":\"" + WiFi.macAddress() + "\",";
-  json_version += PSTR ("\"") + String (D_MQTT_HOST) + "\":\"" + SettingsText(SET_MQTT_HOST) + "\",";
-  json_version += PSTR ("\"") + String (D_MQTT_PORT) + "\":\"" + Settings.mqtt_port + "\",";
-  json_version += PSTR ("\"") + String (D_MQTT_FULL_TOPIC) + "\":\"" + GetTopic_P(stopic, CMND, mqtt_topic, "") + "\"";
-  json_version += PSTR ("}");
+  json_version  = "{";
+  json_version += "\"Module\":\"" + ModuleName() + "\",";
+  json_version += "\"" + String (D_PROGRAM_VERSION) + "\":\"" + my_version + "\",";
+  json_version += "\"Extension type\":\"" + String (EXTENSION_NAME) + "\",";
+  json_version += "\"Extension version\":\"" + String (EXTENSION_VERSION) + "\",";
+  json_version += "\"Extension author\":\"" + String (EXTENSION_AUTHOR) + "\",";
+  json_version += "\"" + String (D_UPTIME) + "\":\"" + GetUptime() + "\",";
+  json_version += "\"" + String (D_FRIENDLY_NAME) + "\":\"" + SettingsText(SET_DEVICENAME) + "\",";
+  json_version += "\"" + String (D_SSID) + "\":\"" + SettingsText(SET_STASSID1 + Settings.sta_active) + " (" + WifiGetRssiAsQuality(WiFi.RSSI()) + "%%)\",";
+  json_version += "\"" + String (D_HOSTNAME) + "\":\"" + my_hostname + "\",";
+  json_version += "\"" + String (D_IP_ADDRESS) + "\":\"" + WiFi.localIP().toString() + "\",";
+  json_version += "\"" + String (D_MAC_ADDRESS) + "\":\"" + WiFi.macAddress() + "\",";
+  json_version += "\"" + String (D_MQTT_HOST) + "\":\"" + SettingsText(SET_MQTT_HOST) + "\",";
+  json_version += "\"" + String (D_MQTT_PORT) + "\":\"" + Settings.mqtt_port + "\",";
+  json_version += "\"" + String (D_MQTT_FULL_TOPIC) + "\":\"" + GetTopic_P(stopic, CMND, mqtt_topic, "") + "\"";
+  json_version += "}";
 
   // publish public page
   WSContentBegin(200, CT_HTML);
@@ -99,7 +104,7 @@ bool Xdrv94 (uint8_t function)
 
 #ifdef USE_WEBSERVER
     case FUNC_WEB_ADD_HANDLER:
-      WebServer->on ("/" D_PAGE_INFO_JSON, InfoWebPageJson);
+      Webserver->on ("/" D_PAGE_INFO_JSON, InfoWebPageJson);
       break;
 #endif  // USE_WEBSERVER
   }
