@@ -20,7 +20,7 @@
     05/08/2020 - v4.0   - Major code rewrite, JSON section is now TIC, numbered like new official Teleinfo module
     24/08/2020 - v4.0.1 - Web sensor display update
     18/09/2020 - v4.1   - Based on Tasmota 8.4
-    07/10/2020 - v5.0   - Handle live to last year graphs with js auto update
+    07/10/2020 - v5.0   - Handle different graph periods, javascript auto update
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by

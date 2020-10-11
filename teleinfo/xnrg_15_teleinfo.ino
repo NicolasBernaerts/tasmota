@@ -20,7 +20,7 @@
     05/08/2020 - v4.0   - Major code rewrite, JSON section is now TIC, numbered like new official Teleinfo module
     24/08/2020 - v4.0.1 - Web sensor display update
     18/09/2020 - v4.1   - Based on Tasmota 8.4
-    07/10/2020 - v5.0   - Handle live to last year graphs with js auto update
+    07/10/2020 - v5.0   - Handle different graph periods, javascript auto update
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -118,8 +118,7 @@ enum TeleinfoMessagePart { TELEINFO_NONE, TELEINFO_ETIQUETTE, TELEINFO_DONNEE, T
 enum TeleinfoGraphPeriod { TELEINFO_LIVE, TELEINFO_DAY, TELEINFO_WEEK, TELEINFO_MONTH, TELEINFO_YEAR, TELEINFO_PERIOD_MAX };
 const char *const arr_period_cmnd[] PROGMEM = { "live", "day", "week", "month", "year" };
 const char *const arr_period_label[] PROGMEM = { "Live", "Day", "Week", "Month", "Year" };
-const long arr_period_sample[]  = { 5,    236,   1657,  7338,  86400 };       // number of seconds between samples
-const long arr_period_refresh[] = { 5000, 15000, 30000, 30000, 30000 };       // graph data refresh rate in ms
+const long arr_period_sample[] = { 5, 236, 1657, 7338, 86400 };       // number of seconds between samples
 
 // teleinfo driver status
 bool teleinfo_configured = false;
@@ -140,12 +139,15 @@ int  teleinfo_papp_last  = 0;           // last published apparent power
 int  teleinfo_papp_delta = 0;           // apparent power delta to publish
 
 // teleinfo data
-long teleinfo_adco     = 0;
-int  teleinfo_isousc   = 0;             // contract max current per phase
-int  teleinfo_ssousc   = 0;             // contract max power per phase
-int  teleinfo_papp     = 0;             // total apparent power
-int  teleinfo_iinst[3] = { 0, 0, 0 };   // instant current for each phase
-int  teleinfo_adir[3]  = { 0, 0, 0 };   // percentage of power for each phase
+long teleinfo_adco   = 0;
+int  teleinfo_isousc = 0;               // contract max current per phase
+int  teleinfo_ssousc = 0;               // contract max power per phase
+int  teleinfo_papp   = 0;               // total apparent power
+
+int  teleinfo_iinst[TELEINFO_PHASE_MAX] = { 0, 0, 0 };   // instant current for each phase
+int  teleinfo_adir[TELEINFO_PHASE_MAX]  = { 0, 0, 0 };   // percentage of power for each phase
+int  teleinfo_live_papp[TELEINFO_PHASE_MAX]  = { 0, 0, 0 };   // last live apparent power
+int  teleinfo_live_diff[TELEINFO_PHASE_MAX]  = { 0, 0, 0 };   // difference between last and previous apparent power
 
 // teleinfo power counters
 long teleinfo_total   = 0;
@@ -162,10 +164,10 @@ long teleinfo_ejphn   = 0;
 long teleinfo_ejphpm  = 0;
 
 // graph 
-int teleinfo_graph_index[TELEINFO_PERIOD_MAX];
-int teleinfo_graph_papp[TELEINFO_PERIOD_MAX][TELEINFO_PHASE_MAX];
-int teleinfo_graph_pdiff[TELEINFO_PERIOD_MAX][TELEINFO_PHASE_MAX];
-int teleinfo_graph_counter[TELEINFO_PERIOD_MAX];
+int teleinfo_graph_diff[TELEINFO_PHASE_MAX];                            // power difference since last value (in live only)
+int teleinfo_graph_index[TELEINFO_PERIOD_MAX];                          // current array index per refresh period
+int teleinfo_graph_counter[TELEINFO_PERIOD_MAX];                        // counter in seconds per refresh period 
+int teleinfo_graph_papp[TELEINFO_PERIOD_MAX][TELEINFO_PHASE_MAX];       // current apparent power per refresh period and per phase
 unsigned short arr_graph_papp[TELEINFO_PERIOD_MAX][TELEINFO_PHASE_MAX][TELEINFO_GRAPH_SAMPLE];
 
 // serial port
@@ -181,8 +183,6 @@ const char tic_icon_1[] PROGMEM = "C1xYvWbriSiuvsuoDtQvVV9Tekfs1anShFjZQNi49UUN3
 const char tic_icon_2[] PROGMEM = "U03DR7YsjBDkSfzKFg2oSYDCM3VoRxMC/kbrKzlx4ggPd7jiJHuPdAqx7zeSwwSaE7oKbF/ANWAUGYVrFfYaKOVtiMIOR+H4GjVLMP5kGbosy9Lh8NNHGDYVab3wdXOyJZykfUZQ2peWTa6QUCXe6T3RJzTfOf2lG/8qiFCAqXDgEDILRk2+bntFHnZOz/jlK5lw6yoIBAWwY8XZAdKVuX9wA/Wx/P2ZGzPdo9XrPCgkEJBEV51ROVV7J9ZcY5HCDAMDmHyEhHlds5PfbzU97m3YTzv2mNkFaBh3Bt8rPpz9Z96MA7ALc1FZ5hhD8jv5nsbEbid1TrMSL8/Jf8d3+Qwl7alKglFBoOIudHoCY3E8PsCPQaJsXY5RmmKUPVVtsvktF4B4hXtRpqI+0eVOM/TGhX6345AMqAGnrTqOJdEu97KBdQ39DnBO/+D/e8tL9d6KpL7uCyag2e8ZInoAWcskeW7H7OmO8J+S9aCNQoIEzcxEJ248aGl6LsQGFnwua1dvPc7M7GWO1clTByot4G8oRXzswfubVdCdG3gaFllDtG1rsD492egIp32JRqch0yKlwYouhC0Sw3143tfrBs7CBTEXnuYQK5uE24StHwOV/94ugW0KGtMZG8kxueCxLyEiT9uQ8VO6qO84TaAzz2VzGZ76Jy6wAcNH2BpV7MFIfEPetOEsM/k84tqSjFk739QHphxEKGqP6ajwtlp1qZZlnSlVOVonIhmXG1hUQNR9wJ0UoIU4VQDoHhFhQ/O6shkbVnwnPfJZ2rPTtUKwxTPmkXCoQSk1ANZ9PmuLfojtusUPOC8mvELeOEtyqkT0/f57qQV";
 const char tic_icon_3[] PROGMEM = "6vj/IqFLTKd2ZsVxRne0y6LqQ359kXgrjjsjR2vN8X9D38qsxfSENHRAAABhGlDQ1BJQ0MgcHJvZmlsZQAAeJx9kT1Iw0AcxV9TtSqtDmYQcchQnSyIijhqFYpQIdQKrTqYj35Bk4YkxcVRcC04+LFYdXBx1tXBVRAEP0CcHJ0UXaTE/yWFFjEeHPfj3b3H3TuAq5cVzeoYBzTdNlOJuJDJrgqhV/SARx8i6JIUy5gTxSR8x9c9Amy9i7Es/3N/joiasxQgIBDPKoZpE28QT2/aBuN9Yl4pSirxOfGYSRckfmS67PEb44LLHMvkzXRqnpgnFgptLLexUjQ14iniqKrplM9lPFYZbzHWylWleU/2wnBOX1lmOs1hJLCIJYgQIKOKEsqwEaNVJ8VCivbjPv4h1y+SSyZXCQo5FlCBBsn1g/3B726t/OSElxSOA50vjvMxAoR2gUbNcb6PHadxAgSfgSu95a/UgZlP0mstLXoE9G8DF9ctTd4DLneAwSdDMiVXCtLk8nng/Yy+KQsM3AK9a15vzX2cPgBp6ip5AxwcAqMFyl73eXd3e2//nmn29wMFd3J7E1jIhgAAAA9QTFRFAAAATYK9YYO1Z4Ox9+S5L/suVwAAAAF0Uk5TAEDm2GYAAAABYktHRACIBR1IAAAACXBIWXMAAC4jAAAuIwF4pT92AAAAB3RJTUUH5AkUFiUJGu7mDAAAAjZJREFUaN7tmVmSxCAIhpW+AHoC8f6HnCy9xBWRZHqmKrw41YYvP0YFHWP+voFzftY3bu7TgPXVtPmHWf/dZgOgFwCNToDTCpgFOCXgI8BrAagcwkmA/TqAtAB3";
 const char tic_icon_4[] PROGMEM = "IsCpAfg/AXQmwHwFYLUA0AKMGmAnPkKsSxgHuKDb1W0KADEAskfFY5gDrBRg82dJOoauKuGoMW55IrbnHpaTCTP3drq3TLzxuEWUBNhLCRxanjUCMUOe+RcEaGsrVnd1ejHlDLjSWgrDUACFBOoNcFVApvXYEyNl/VWAawJKJRcBkAGgCEDXAtZuH7sA4L5z5Tlkpgpy+QKZuYJcxgmm/yHZjMOsN2SSnudWLJM1PbfkkCkdkEnI/Qod8KozxktEMAqL5rbG2KLK3+o+7XuGiWtNj9kqkcUB73fauQl6eOVU0QoHwEzVmi7amcNHuqrlQUD6uDwIyt4nDQJywVYYRFlzySSQmwI8QmdvHIkBXLG/Cy8UaEnikRrpZSTpUC9BngnAkePqOQAU3mmoAXA6QHqnAR0BVgsYu1Xp1VlWDsDBErFJaPfO3v5YHvA5nbrOTBu6O+n0DiXzTp+y1NBVGrfddtuvWVwsvJvyx/Wfb3vT2Uv8Mz/k29DzQNc91z1PFjXAy/PBALzZAGHZnz8Av9Q9C8DD3uS3rwkAV88csP749mQAYVew/OmPAOvSBq8EkN8A5NMQBIDnGNQApFXAAugFECs43O3QPonSPE1JY8uboEGAzQB3ntvtB9E2jrV6Ej9WAAAAAElFTkSuQmCC";
-
-// icons associated to vmc
 const char* arr_tic_icon[] PROGMEM = {tic_icon_0, tic_icon_1, tic_icon_2, tic_icon_3, tic_icon_4};
 
 /*******************************************\
@@ -328,7 +328,6 @@ void TeleinfoGraphInit ()
     {
       // init max power per period
       teleinfo_graph_papp[period][phase]  = 0;
-      teleinfo_graph_pdiff[period][phase] = 0;
 
       // loop thru graph values
       for (index = 0; index < TELEINFO_GRAPH_SAMPLE; index++) arr_graph_papp[period][phase][index] = 0;
@@ -535,6 +534,14 @@ void TeleinfoUpdateGraphData (int graph_period)
   // set indexed graph values with current values
   for (phase = 0; phase < Energy.phase_count; phase++)
   {
+    // if live period, save difference with previous record
+    if (graph_period == TELEINFO_LIVE)
+    {
+      teleinfo_live_diff[phase] = teleinfo_graph_papp[TELEINFO_LIVE][phase] - teleinfo_live_papp[phase];
+      teleinfo_live_papp[phase] = teleinfo_graph_papp[TELEINFO_LIVE][phase];
+    }
+
+    // save graph data for current phase
     arr_graph_papp[graph_period][phase][index] = (unsigned short) teleinfo_graph_papp[graph_period][phase];
     teleinfo_graph_papp[graph_period][phase] = 0;
   }
@@ -718,8 +725,8 @@ void TeleinfoWebPageConfig ()
   WSContentStop ();
 }
 
-// Apparent power graph
-void TeleinfoWebGraphBase ()
+// Apparent power graph frame
+void TeleinfoWebGraphFrame ()
 {
   int index, phase, power_max, power_papp;
   int graph_left, graph_right, graph_width;  
@@ -753,7 +760,7 @@ void TeleinfoWebGraphBase ()
   WSContentSend_P (PSTR ("line.dash {stroke:grey;stroke-width:1;stroke-dasharray:8;}\n"));
   WSContentSend_P (PSTR ("line.time {stroke:white;stroke-width:1;}\n"));
   WSContentSend_P (PSTR ("text.power {font-size:20px;stroke:white;fill:white;}\n"));
-  WSContentSend_P (PSTR ("text.time {font-size:16px;fill:white;font-size:medium;}\n"));
+  WSContentSend_P (PSTR ("text.time {font-size:16px;fill:white;}\n"));
   WSContentSend_P (PSTR ("</style>\n"));
 
   // graph frame
@@ -777,12 +784,15 @@ void TeleinfoWebGraphBase ()
   WSContentEnd();
 }
 
-// Apparent power graph
+// Apparent power graph curve
 void TeleinfoWebGraphData ()
 {
-  int      index, phase, arridx, hour, power_papp, power_max;
-  int      graph_x, graph_y, graph_left, graph_right, graph_width, unit_width, shift_unit, shift_width;  
+  int      index, phase, arridx;
+  int      graph_left, graph_right, graph_width;  
+  int      graph_x, graph_y;  
+  int      unit_width, shift_unit, shift_width;  
   int      graph_period = TELEINFO_LIVE;  
+  int      power_papp, power_max;
   TIME_T   current_dst;
   uint32_t current_time;
   String   str_text;
@@ -810,28 +820,32 @@ void TeleinfoWebGraphData ()
 
   // SVG style 
   WSContentSend_P (PSTR ("<style type='text/css'>\n"));
-  WSContentSend_P (PSTR ("line.time {stroke:white;stroke-width:1;}\n"));
-  WSContentSend_P (PSTR ("text.time {font-size:16px;fill:grey;font-size:medium;}\n"));
+  WSContentSend_P (PSTR ("rect {fill:#333;stroke-width:2;opacity:0.5;}\n"));
+  WSContentSend_P (PSTR ("rect.phase1 {stroke:yellow;}\n"));
+  WSContentSend_P (PSTR ("rect.phase2 {stroke:orange;}\n"));
+  WSContentSend_P (PSTR ("rect.phase3 {stroke:red;}\n"));
   WSContentSend_P (PSTR ("polyline {fill:none;stroke-width:2;}\n"));
   WSContentSend_P (PSTR ("polyline.phase1 {stroke:yellow;}\n"));
   WSContentSend_P (PSTR ("polyline.phase2 {stroke:orange;}\n"));
   WSContentSend_P (PSTR ("polyline.phase3 {stroke:red;}\n"));
-  WSContentSend_P (PSTR ("text.phase1 {font-size:24px;stroke:yellow;fill:yellow;}\n"));
-  WSContentSend_P (PSTR ("text.phase2 {font-size:24px;stroke:orange;fill:orange;}\n"));
-  WSContentSend_P (PSTR ("text.phase3 {font-size:24px;stroke:red;fill:red;}\n"));
+  WSContentSend_P (PSTR ("text.phase1 {font-size:28px;stroke:yellow;fill:yellow;}\n"));
+  WSContentSend_P (PSTR ("text.phase2 {font-size:28px;stroke:orange;fill:orange;}\n"));
+  WSContentSend_P (PSTR ("text.phase3 {font-size:28px;stroke:red;fill:red;}\n"));
+  WSContentSend_P (PSTR ("text.diff-phase1 {font-size:16px;font-style:italic;stroke:yellow;fill:yellow;}\n"));
+  WSContentSend_P (PSTR ("text.diff-phase2 {font-size:16px;font-style:italic;stroke:orange;fill:orange;}\n"));
+  WSContentSend_P (PSTR ("text.diff-phase3 {font-size:16px;font-style:italic;stroke:red;fill:red;}\n"));
+  WSContentSend_P (PSTR ("line.time {stroke:white;stroke-width:1;}\n"));
+  WSContentSend_P (PSTR ("text.time {font-size:16px;fill:grey;}\n"));
   WSContentSend_P (PSTR ("</style>\n"));
 
-  // --------------------
-  //   Apparent power
-  // --------------------
+  // -----------------
+  //   Power curves
+  // -----------------
 
   // loop thru phasis
-  for (phase = 0; phase < Energy.phase_count; phase++)
+  for (phase = 0; phase < 3; phase++)
+//  for (phase = 0; phase < Energy.phase_count; phase++)
   {
-    // display apparent power of current phase
-    str_text = String (Energy.apparent_power[phase], 0);
-    WSContentSend_P (PSTR ("<text class='%s' x=%d%% y=%d%%>%s</text>\n"), arr_color_phase[phase], TELEINFO_GRAPH_PERCENT_STOP + 2, 76 - 25 * phase, str_text.c_str());
-
     // loop for the apparent power graph
     WSContentSend_P (PSTR ("<polyline class='%s' points='"), arr_color_phase[phase]);
     for (index = 0; index < TELEINFO_GRAPH_SAMPLE; index++)
@@ -976,6 +990,34 @@ void TeleinfoWebGraphData ()
       break;
   }
 
+  // ---------------
+  //     Values
+  // ---------------
+
+  // if live display, add instant apparent power and delte per phasis
+if (graph_period == TELEINFO_LIVE) for (phase = 0; phase < Energy.phase_count; phase++)
+  {
+    // get apparent power for current phasis
+    str_text = String (teleinfo_live_papp[phase]);
+
+    // calculate data position (centered if only one phasis)
+    if (Energy.phase_count == 1) graph_x = TELEINFO_GRAPH_PERCENT_START + 34 - str_text.length ();
+    else graph_x = TELEINFO_GRAPH_PERCENT_START + 7 + (27 * phase) - str_text.length ();
+    graph_y = 2;
+    unit_width = 11 + 2 * str_text.length ();
+
+    // display apparent power
+    WSContentSend_P ("<rect class='%s' x='%d%%' y='%d%%' width='%d%%' height='%d%%' rx='%d' ry='%d' />\n", arr_color_phase[phase], graph_x, graph_y, unit_width, 12, 10, 10);
+    WSContentSend_P ("<text class='%s' x='%d%%' y='%d%%'>%s VA</text>\n", arr_color_phase[phase], graph_x + 2, graph_y + 6, str_text.c_str ());
+
+    // if defined, display apparent power delta since last mesure
+    if (teleinfo_live_diff[phase] == 0) str_text = "---";
+    else if (teleinfo_live_diff[phase] < 0) str_text = "- " + String (abs (teleinfo_live_diff[phase]));
+    else str_text = "+ " + String (teleinfo_live_diff[phase]);
+    graph_x = ( graph_x * 2 + unit_width - 3 * str_text.length () / 2) / 2;
+    WSContentSend_P ("<text class='diff-%s' x='%d%%' y='%d%%'>%s</text>\n", arr_color_phase[phase], graph_x + 1, graph_y + 10, str_text.c_str ());
+  }
+
   // end of SVG graph
   WSContentSend_P (PSTR ("</svg>\n"));
   WSContentEnd();
@@ -986,11 +1028,17 @@ void TeleinfoWebPageGraph ()
 {
   int    index;
   int    graph_period = TELEINFO_LIVE;  
+  long   graph_refresh;
   String str_text;
 
   // check graph period to be displayed
   for (index = 0; index < TELEINFO_PERIOD_MAX; index++) if (Webserver->hasArg(arr_period_cmnd[index])) graph_period = index;
 
+  // calculate graph refresh cycle in ms (max is 60 sec)
+  graph_refresh  = (long) arr_period_sample[graph_period];
+  if (graph_refresh > 60) graph_refresh = 60;
+  graph_refresh *= 1000;
+  
   // beginning of form without authentification with 60 seconds auto refresh
   WSContentStart_P (D_TELEINFO_GRAPH, false);
   WSContentSend_P (PSTR ("</script>\n"));
@@ -1014,9 +1062,8 @@ void TeleinfoWebPageGraph ()
   WSContentSend_P (PSTR ("svgObject=document.getElementById(dataId);\n"));
   WSContentSend_P (PSTR ("svgObjectURL=svgObject.data;\n"));
   WSContentSend_P (PSTR ("svgObject.data=svgObjectURL.substring(0,svgObjectURL.indexOf('ts=')) + 'ts=' + now.getTime();\n"));
-  WSContentSend_P (PSTR ("setTimeout(function() {updateData();},%d);\n"), arr_period_refresh[graph_period]);
   WSContentSend_P (PSTR ("}\n"));
-  WSContentSend_P (PSTR ("setTimeout(function() {updateData();},%d);\n"), arr_period_refresh[graph_period]);
+  WSContentSend_P (PSTR ("setInterval(function() {updateData();},%d);\n"), graph_refresh);
   WSContentSend_P (PSTR ("</script>\n"));
 
   WSContentSend_P (PSTR ("</head>\n"));
@@ -1105,7 +1152,7 @@ bool Xsns99 (uint8_t function)
     case FUNC_WEB_ADD_HANDLER:
       Webserver->on ("/" D_PAGE_TELEINFO_CONFIG, TeleinfoWebPageConfig);
       Webserver->on ("/" D_PAGE_TELEINFO_GRAPH,  TeleinfoWebPageGraph);
-      Webserver->on ("/" D_PAGE_TELEINFO_BASE_SVG, TeleinfoWebGraphBase);
+      Webserver->on ("/" D_PAGE_TELEINFO_BASE_SVG, TeleinfoWebGraphFrame);
       Webserver->on ("/" D_PAGE_TELEINFO_DATA_SVG, TeleinfoWebGraphData);
       
       break;
