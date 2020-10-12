@@ -65,4 +65,5 @@ If you want to compile the firmware, don't forget to uncomment following line in
 Complete setup guide is available at http://www.bernaerts-nicolas.fr/iot/...
 
 ![Main page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/tasmota-teleinfo-main.png)
+
 ![Grah monophase](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/tasmota-teleinfo-graph-monophase.png) ![Grah triphase](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/tasmota-teleinfo-graph-triphase.png)
