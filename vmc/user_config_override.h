@@ -13,6 +13,7 @@
     26/05/2020 - v2.7 - Add Information JSON page
     15/09/2020 - v2.8 - Remove /json page, based on Tasmota 8.4
                         Add status icons and mode control
+    08/10/2020 - v3.0 - Handle graph with js auto update
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -61,7 +62,7 @@
 #define USE_HUMIDITY_MQTT                     // Add support for remote MQTT humididity acquisition  
 #define USE_VMC                               // Add support for VMC management
 
-#define EXTENSION_VERSION "2.8"               // version
+#define EXTENSION_VERSION "3.0"               // version
 #define EXTENSION_NAME "VMC"                  // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 

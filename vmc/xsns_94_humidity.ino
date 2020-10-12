@@ -40,7 +40,6 @@
 #define D_JSON_HUMIDITY_TOPIC    "Topic"
 #define D_JSON_HUMIDITY_KEY      "Key"
 
-#define D_HUMIDITY_CONFIGURE     "Remote Humidity Sensor"
 #define D_HUMIDITY_REMOTE        "Humidity remote sensor"
 #define D_HUMIDITY_TOPIC         "MQTT Topic"
 #define D_HUMIDITY_KEY           "MQTT JSON Key"
@@ -261,15 +260,28 @@ bool HumidityMqttData ()
 // humidity configuration button
 void HumidityWebButton ()
 {
-  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>"), D_PAGE_HUMIDITY, D_HUMIDITY_CONFIGURE);
+  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>"), D_PAGE_HUMIDITY, D_HUMIDITY_REMOTE);
+}
+
+// append Humidity sensor to main page
+bool HumidityWebSensor ()
+{
+  float  humidity;
+  String str_humidity;
+
+  // read humidity
+  humidity = HumidityGetValue ( );
+  str_humidity = String (humidity);
+
+  // display
+  if (!isnan(humidity)) WSContentSend_PD (PSTR("{s}%s{m}%s{e}"), D_HUMIDITY_REMOTE, str_humidity.c_str());
 }
 
 // Humidity MQTT setting web page
 void HumidityWebPage ()
 {
-  bool   state_pullup;
   char   argument[HUMIDITY_BUFFER_SIZE];
-  String str_topic, str_key, str_pullup;
+  String str_topic, str_key;
 
   // if access not allowed, close
   if (!HttpCheckPriviledgedAccess()) return;
@@ -287,7 +299,7 @@ void HumidityWebPage ()
   }
 
   // beginning of form
-  WSContentStart_P (D_HUMIDITY_CONFIGURE);
+  WSContentStart_P (D_HUMIDITY);
   WSContentSendStyle ();
   WSContentSend_P (PSTR("<form method='get' action='%s'>\n"), D_PAGE_HUMIDITY);
 
