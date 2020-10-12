@@ -843,8 +843,7 @@ void TeleinfoWebGraphData ()
   // -----------------
 
   // loop thru phasis
-  for (phase = 0; phase < 3; phase++)
-//  for (phase = 0; phase < Energy.phase_count; phase++)
+  for (phase = 0; phase < Energy.phase_count; phase++)
   {
     // loop for the apparent power graph
     WSContentSend_P (PSTR ("<polyline class='%s' points='"), arr_color_phase[phase]);
@@ -1012,8 +1011,8 @@ if (graph_period == TELEINFO_LIVE) for (phase = 0; phase < Energy.phase_count; p
 
     // if defined, display apparent power delta since last mesure
     if (teleinfo_live_diff[phase] == 0) str_text = "---";
-    else if (teleinfo_live_diff[phase] < 0) str_text = "- " + String (abs (teleinfo_live_diff[phase]));
-    else str_text = "+ " + String (teleinfo_live_diff[phase]);
+    else if (teleinfo_live_diff[phase] < 0) str_text = "- " + String (abs (teleinfo_live_diff[phase])) + " VA";
+    else str_text = "+ " + String (teleinfo_live_diff[phase]) + " VA";
     graph_x = ( graph_x * 2 + unit_width - 3 * str_text.length () / 2) / 2;
     WSContentSend_P ("<text class='diff-%s' x='%d%%' y='%d%%'>%s</text>\n", arr_color_phase[phase], graph_x + 1, graph_y + 10, str_text.c_str ());
   }
