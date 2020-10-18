@@ -32,6 +32,10 @@
     24/08/2020 - v6.5   - Add status icon to Web UI 
     12/09/2020 - v6.6   - Add offload icon status and based on Tasmota 8.4 
     19/09/2020 - v6.7   - Based on Offload 2.0 
+    10/10/2020 - v6.8   - Handle graph with javascript auto update 
+    14/10/2020 - v6.9   - Serve icons thru web server 
+    18/10/2020 - v6.10  - Handle priorities as list of device types
+                          Add randomisation to reconnexion
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -81,7 +85,7 @@
 #define USE_TEMPERATURE_MQTT                  // Add support for MQTT temperature sensor
 #define USE_PILOTWIRE                         // Add support for France Pilotwire protocol for electrical heaters
 
-#define EXTENSION_VERSION "6.7"               // version
+#define EXTENSION_VERSION "6.10"              // version
 #define EXTENSION_NAME    "Pilotwire"         // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
 
@@ -102,7 +106,7 @@
 #define FRIENDLY_NAME      "Fil Pilote"
 
 
-//#undef USE_ENERGY_SENSOR                      // Disable energy sensors
+//#undef USE_ENERGY_SENSOR                    // Disable energy sensors
 #undef USE_ARDUINO_OTA                        // support for Arduino OTA
 #undef USE_WPS                                // support for WPS as initial wifi configuration tool
 #undef USE_SMARTCONFIG                        // support for Wifi SmartConfig as initial wifi configuration tool
@@ -115,56 +119,56 @@
 #undef USE_EMULATION_WEMO                     // Belkin WeMo emulation for Alexa (+6k code, +2k mem common)
 #undef USE_CUSTOM                             // Custom features
 #undef USE_DISCOVERY                          // Discovery services for both MQTT and web server
-//#undef WEBSERVER_ADVERTISE                    // Provide access to webserver by name <Hostname>.local/
+//#undef WEBSERVER_ADVERTISE                  // Provide access to webserver by name <Hostname>.local/
 #undef MQTT_HOST_DISCOVERY                    // Find MQTT host server (overrides MQTT_HOST if found)
 //#undef USE_TIMERS                           // support for up to 16 timers
 //#undef USE_TIMERS_WEB                       // support for timer webpage
 //#undef USE_SUNRISE                          // support for Sunrise and sunset tools
-//#undef SUNRISE_DAWN_ANGLE DAWN_NORMAL         // Select desired Dawn Angle from
+//#undef SUNRISE_DAWN_ANGLE DAWN_NORMAL       // Select desired Dawn Angle from
 #undef USE_RULES                              // Disable support for rules
 
-#undef ROTARY_V1                                // Add support for Rotary Encoder as used in MI Desk Lamp (+0k8 code)
-#undef USE_SONOFF_RF                            // Add support for Sonoff Rf Bridge (+3k2 code)
+#undef ROTARY_V1                              // Add support for Rotary Encoder as used in MI Desk Lamp (+0k8 code)
+#undef USE_SONOFF_RF                          // Add support for Sonoff Rf Bridge (+3k2 code)
 #undef USE_RF_FLASH                           // Add support for flashing the EFM8BB1 chip on the Sonoff RF Bridge.
-#undef USE_SONOFF_SC                            // Add support for Sonoff Sc (+1k1 code)
-#undef USE_TUYA_MCU                             // Add support for Tuya Serial MCU
-#undef USE_ARMTRONIX_DIMMERS                    // Add support for Armtronix Dimmers (+1k4 code)
-#undef USE_PS_16_DZ                             // Add support for PS-16-DZ Dimmer (+2k code)
-#undef USE_SONOFF_IFAN                          // Add support for Sonoff iFan02 and iFan03 (+2k code)
-#undef USE_BUZZER                               // Add support for a buzzer (+0k6 code)
-#undef USE_ARILUX_RF                            // Add support for Arilux RF remote controller (+0k8 code, 252 iram (non 2.3.0))
-#undef USE_SHUTTER                              // Add Shutter support for up to 4 shutter with different motortypes (+11k code)
-#undef USE_DEEPSLEEP                            // Add support for deepsleep (+1k code)
-#undef USE_EXS_DIMMER                           // Add support for ES-Store WiFi Dimmer (+1k5 code)
-#undef USE_DEVICE_GROUPS                        // Add support for device groups (+5k5 code)
+#undef USE_SONOFF_SC                          // Add support for Sonoff Sc (+1k1 code)
+#undef USE_TUYA_MCU                           // Add support for Tuya Serial MCU
+#undef USE_ARMTRONIX_DIMMERS                  // Add support for Armtronix Dimmers (+1k4 code)
+#undef USE_PS_16_DZ                           // Add support for PS-16-DZ Dimmer (+2k code)
+#undef USE_SONOFF_IFAN                        // Add support for Sonoff iFan02 and iFan03 (+2k code)
+#undef USE_BUZZER                             // Add support for a buzzer (+0k6 code)
+#undef USE_ARILUX_RF                          // Add support for Arilux RF remote controller (+0k8 code, 252 iram (non 2.3.0))
+#undef USE_SHUTTER                            // Add Shutter support for up to 4 shutter with different motortypes (+11k code)
+#undef USE_DEEPSLEEP                          // Add support for deepsleep (+1k code)
+#undef USE_EXS_DIMMER                         // Add support for ES-Store WiFi Dimmer (+1k5 code)
+#undef USE_DEVICE_GROUPS                      // Add support for device groups (+5k5 code)
 #undef USE_DEVICE_GROUPS_SEND                 // Add support for the DevGroupSend command (+0k6 code)
-#undef USE_PWM_DIMMER                           // Add support for MJ-SD01/acenx/NTONPOWER PWM dimmers (+2k2 code, DGR=0k4)
+#undef USE_PWM_DIMMER                         // Add support for MJ-SD01/acenx/NTONPOWER PWM dimmers (+2k2 code, DGR=0k4)
 #undef USE_PWM_DIMMER_REMOTE                  // Add support for remote switches to PWM Dimmer (requires USE_DEVICE_GROUPS) (+0k9 code)
-#undef USE_SONOFF_D1                            // Add support for Sonoff D1 Dimmer (+0k7 code)
-#undef USE_WS2812                               // WS2812 Led string using library NeoPixelBus (+5k code, +1k mem, 232 iram) - Disable by //
-#undef USE_MY92X1                               // Add support for MY92X1 RGBCW led controller as used in Sonoff B1, Ailight and Lohas
-#undef USE_SM16716                              // Add support for SM16716 RGB LED controller (+0k7 code)
-#undef USE_SM2135                               // Add support for SM2135 RGBCW led control as used in Action LSC (+0k6 code)
-#undef USE_SONOFF_L1                            // Add support for Sonoff L1 led control
-#undef USE_ELECTRIQ_MOODL                       // Add support for ElectriQ iQ-wifiMOODL RGBW LED controller (+0k3 code)
-#undef USE_LIGHT_PALETTE                        // Add support for color palette (+0k7 code)
-#undef USE_DGR_LIGHT_SEQUENCE                   // Add support for device group light sequencing (requires USE_DEVICE_GROUPS) (+0k2 code)
+#undef USE_SONOFF_D1                          // Add support for Sonoff D1 Dimmer (+0k7 code)
+#undef USE_WS2812                             // WS2812 Led string using library NeoPixelBus (+5k code, +1k mem, 232 iram) - Disable by //
+#undef USE_MY92X1                             // Add support for MY92X1 RGBCW led controller as used in Sonoff B1, Ailight and Lohas
+#undef USE_SM16716                            // Add support for SM16716 RGB LED controller (+0k7 code)
+#undef USE_SM2135                             // Add support for SM2135 RGBCW led control as used in Action LSC (+0k6 code)
+#undef USE_SONOFF_L1                          // Add support for Sonoff L1 led control
+#undef USE_ELECTRIQ_MOODL                     // Add support for ElectriQ iQ-wifiMOODL RGBW LED controller (+0k3 code)
+#undef USE_LIGHT_PALETTE                      // Add support for color palette (+0k7 code)
+#undef USE_DGR_LIGHT_SEQUENCE                 // Add support for device group light sequencing (requires USE_DEVICE_GROUPS) (+0k2 code)
 
-#undef USE_COUNTER                              // Enable inputs as counter (+0k8 code)
-//#undef USE_DS18x20                              // Add support for DS18x20 sensors with id sort, single scan and read retry (+2k6 code)
-//#undef USE_DHT                                // Disable internal DHT sensor
+#undef USE_COUNTER                            // Enable inputs as counter (+0k8 code)
+//#undef USE_DS18x20                          // Add support for DS18x20 sensors with id sort, single scan and read retry (+2k6 code)
+//#undef USE_DHT                              // Disable internal DHT sensor
 
 #undef USE_I2C                                // Disable all I2C sensors and devices
 #undef USE_SPI                                // Disable all SPI devices
 
-#undef USE_ENERGY_MARGIN_DETECTION              // Add support for Energy Margin detection (+1k6 code)
+#undef USE_ENERGY_MARGIN_DETECTION            // Add support for Energy Margin detection (+1k6 code)
 #undef USE_ENERGY_POWER_LIMIT                 // Add additional support for Energy Power Limit detection (+1k2 code)
-#undef USE_PZEM004T                             // Add support for PZEM004T Energy monitor (+2k code)
-#undef USE_PZEM_AC                              // Add support for PZEM014,016 Energy monitor (+1k1 code)
-#undef USE_PZEM_DC                              // Add support for PZEM003,017 Energy monitor (+1k1 code)
-#undef USE_MCP39F501                            // Add support for MCP39F501 Energy monitor as used in Shelly 2 (+3k1 code)
+#undef USE_PZEM004T                           // Add support for PZEM004T Energy monitor (+2k code)
+#undef USE_PZEM_AC                            // Add support for PZEM014,016 Energy monitor (+1k1 code)
+#undef USE_PZEM_DC                            // Add support for PZEM003,017 Energy monitor (+1k1 code)
+#undef USE_MCP39F501                          // Add support for MCP39F501 Energy monitor as used in Shelly 2 (+3k1 code)
 
-#undef USE_IR_REMOTE                            // Send IR remote commands using library IRremoteESP8266 and ArduinoJson (+4k3 code, 0k3 mem, 48 iram)
+#undef USE_IR_REMOTE                          // Send IR remote commands using library IRremoteESP8266 and ArduinoJson (+4k3 code, 0k3 mem, 48 iram)
 #undef USE_IR_SEND_NEC                        // Support IRsend NEC protocol
 #undef USE_IR_SEND_RC5                        // Support IRsend Philips RC5 protocol
 #undef USE_IR_SEND_RC6                        // Support IRsend Philips RC6 protocol
