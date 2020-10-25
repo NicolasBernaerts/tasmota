@@ -11,7 +11,13 @@ To enable **Pilotwire** mode on a **Sonoff Basic** or **Sonoff Dual R2**, you ne
   * connect diodes on the Sonoff output port(s)
   * flash provided firmware
   * Setup configuration pages
-  
+
+Diode connexion should be done directly on the relay outputs :
+![Sonoff Basic](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/pilotwire/filpilote-diode-single.jpg)
+
+![Sonoff Dual](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/pilotwire/filpilote-diode-dual.jpg)
+
+
 You'll also get a **Thermostat** mode that will allow you to pilot the heater to maintain a target temperature in the room. To activate that mode, you'll need either to :
   * connect a **local DF18B20** temperature sensor (on **serial RX** for example)
   * declare a **MQTT remote** temperature sensor
