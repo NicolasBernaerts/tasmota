@@ -39,4 +39,4 @@ If you want to compile the firmware, don't forget to uncomment following line in
 
 Complete setup guide will be available at http://www.bernaerts-nicolas.fr/iot/...
 
-![Main page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload/tasmota-offload-main.png)   ![Control page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload/tasmota-offload-config.png)   ![Control page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload/tasmota-offload-control.png)
+![Main page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload/tasmota-offload-main.png)   ![Control page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload/tasmota-offload-config.png)   ![Control page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload/tasmota-offload-control.png) 
