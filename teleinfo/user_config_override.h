@@ -21,6 +21,8 @@
     24/08/2020 - v4.0.1 - Web sensor display update
     18/09/2020 - v4.1   - Based on Tasmota 8.4
     07/10/2020 - v5.0   - Handle different graph periods, javascript auto update
+    18/10/2020 - v5.1   - Expose icon on web server
+    25/10/2020 - v5.2   - Real time graph page update
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -68,7 +70,7 @@
 #define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_TELEINFO                          // Add support for Teleinfo
 
-#define EXTENSION_VERSION "5.0"               // version
+#define EXTENSION_VERSION "5.2"               // version
 #define EXTENSION_NAME "Teleinfo"             // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 
