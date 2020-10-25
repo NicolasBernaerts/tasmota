@@ -13,6 +13,7 @@ To enable **Pilotwire** mode on a **Sonoff Basic** or **Sonoff Dual R2**, you ne
   * Setup configuration pages
 
 Diode connexion should be done directly on the relay outputs :
+
 ![Sonoff Basic](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/pilotwire/filpilote-diode-single.jpg)
 
 ![Sonoff Dual](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/pilotwire/filpilote-diode-dual.jpg)
