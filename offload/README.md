@@ -5,6 +5,7 @@ This evolution of Tasmota firmware has been enhanced to handle automatic offload
 
 It has been designed on 2 different type of devices :
   * a **Sonoff Basic** : peak device power is declared
+  * a **Sonoff S26** : peak device power is declared
   * a **Sonoff POW R2** : peak device power is mesured 
 
 This firmware reads your contract power limit and your real time power consumption from your meter JSOn stream. As soon as you exceed your contract power, the device is offloaded, till your global power goes down enough to power back the device.
