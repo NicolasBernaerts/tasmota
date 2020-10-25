@@ -21,6 +21,7 @@
     15/10/2020 - v2.1   - Expose icons on web server
     16/10/2020 - v2.2   - Handle priorities as list of device types
                           Add randomisation to reconnexion
+    23/10/2020 - v2.3   - Update control page in real time
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -68,7 +69,7 @@
 #define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_OFFLOADING                        // Add support for MQTT maximum power offloading
 
-#define EXTENSION_VERSION "2.2"               // version
+#define EXTENSION_VERSION "2.3"               // version
 #define EXTENSION_NAME "Offloading"           // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 

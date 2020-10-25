@@ -512,7 +512,7 @@ void ExecuteCommandPower(uint32_t device, uint32_t state, uint32_t source)
 #ifdef USE_OFFLOADING
 
 // if offloading active, no action
-if ((OffloadIsOffloaded () == true) && (source != SRC_MAX)) return;
+if (OffloadIsOffloaded () && (source != SRC_MAX)) return;
 
 #endif  // USE_OFFLOADING
 
