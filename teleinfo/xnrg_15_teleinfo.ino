@@ -84,7 +84,7 @@
 #define TELEINFO_JSON_SINSTS         "SINSTS"
 #define TELEINFO_JSON_ADIR           "ADIR"
 
-#define D_TELEINFO_MODE              "Teleinfo counter"
+#define D_TELEINFO_MODE              "Teleinfo"
 #define D_TELEINFO_CONFIG            "Configure Teleinfo"
 #define D_TELEINFO_GRAPH             "Graph"
 #define D_TELEINFO_REFERENCE         "Contract n°"
@@ -99,13 +99,14 @@
 #define TELEINFO_MESSAGE_BUFFER_SIZE 64
 
 // form strings
-const char TELEINFO_INPUT_SELECT[] PROGMEM = "<input type='radio' name='%s' id='%d' value='%d' %s>%d %s";
-const char TELEINFO_FORM_START[] PROGMEM   = "<form method='get' action='%s'>";
-const char TELEINFO_FORM_STOP[] PROGMEM    = "</form>";
-const char TELEINFO_FIELD_START[] PROGMEM  = "<fieldset><legend><b>&nbsp;%s&nbsp;</b></legend><br />";
-const char TELEINFO_FIELD_STOP[] PROGMEM   = "</fieldset><br />";
-const char TELEINFO_HTML_POWER[] PROGMEM   = "<text class='power' x='%d%%' y='%d%%'>%d</text>\n";
-const char TELEINFO_HTML_DASH[] PROGMEM    = "<line class='dash' x1='%d%%' y1='%d%%' x2='%d%%' y2='%d%%' />\n";
+const char TELEINFO_INPUT_FIRST[] PROGMEM = "<p><input type='radio' name='%s' id='%d' value='%d' %s>%s</p>\n";
+const char TELEINFO_INPUT_NEXT[] PROGMEM  = "<p><input type='radio' name='%s' id='%d' value='%d' %s>%d %s</p>\n";
+const char TELEINFO_FORM_START[] PROGMEM  = "<form method='get' action='%s'>\n";
+const char TELEINFO_FORM_STOP[] PROGMEM   = "</form>\n";
+const char TELEINFO_FIELD_START[] PROGMEM = "<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n";
+const char TELEINFO_FIELD_STOP[] PROGMEM  = "</fieldset></p><br>\n";
+const char TELEINFO_HTML_POWER[] PROGMEM  = "<text class='power' x='%d%%' y='%d%%'>%d</text>\n";
+const char TELEINFO_HTML_DASH[] PROGMEM   = "<line class='dash' x1='%d%%' y1='%d%%' x2='%d%%' y2='%d%%' />\n";
 
 // graph colors
 const char *const arr_color_phase[] PROGMEM = { "ph1", "ph2", "ph3" };
@@ -732,6 +733,7 @@ void TeleinfoWebPageConfig ()
 
   // beginning of form
   WSContentStart_P (D_TELEINFO_CONFIG);
+
   WSContentSendStyle ();
   WSContentSend_P (TELEINFO_FORM_START, D_PAGE_TELEINFO_CONFIG);
 
@@ -741,21 +743,21 @@ void TeleinfoWebPageConfig ()
 
   // selection : disabled
   if (actual_mode == 0) str_text = "checked"; else str_text = "";
-  WSContentSend_P ("<input type='radio' name='%s' id='%d' value='%d' %s>%s", D_CMND_TELEINFO_MODE, 0, 0, str_text.c_str (), D_TELEINFO_DISABLED);
+  WSContentSend_P (TELEINFO_INPUT_FIRST, D_CMND_TELEINFO_MODE, 0, 0, str_text.c_str (), D_TELEINFO_DISABLED);
 
   // selection : available modes
   if (teleinfo_configured == true)
   {
     if (actual_mode == 1200) str_text = "checked"; else str_text = "";      // 1200 baud
-    WSContentSend_P (TELEINFO_INPUT_SELECT, D_CMND_TELEINFO_MODE, 1200, 1200, str_text.c_str (), 1200, D_TELEINFO_SPEED_HISTO);
+    WSContentSend_P (TELEINFO_INPUT_NEXT, D_CMND_TELEINFO_MODE, 1200, 1200, str_text.c_str (), 1200, D_TELEINFO_SPEED_HISTO);
     if (actual_mode == 2400) str_text = "checked"; else str_text = "";      // 2400 baud
-    WSContentSend_P (TELEINFO_INPUT_SELECT, D_CMND_TELEINFO_MODE, 2400, 2400, str_text.c_str (), 2400, D_TELEINFO_SPEED_DEFAULT);
+    WSContentSend_P (TELEINFO_INPUT_NEXT, D_CMND_TELEINFO_MODE, 2400, 2400, str_text.c_str (), 2400, D_TELEINFO_SPEED_DEFAULT);
     if (actual_mode == 4800) str_text = "checked"; else str_text = "";      // 4800 baud
-    WSContentSend_P (TELEINFO_INPUT_SELECT, D_CMND_TELEINFO_MODE, 4800, 4800, str_text.c_str (), 4800, D_TELEINFO_SPEED_DEFAULT);
+    WSContentSend_P (TELEINFO_INPUT_NEXT, D_CMND_TELEINFO_MODE, 4800, 4800, str_text.c_str (), 4800, D_TELEINFO_SPEED_DEFAULT);
     if (actual_mode == 9600) str_text = "checked"; else str_text = "";      // 9600 baud
-    WSContentSend_P (TELEINFO_INPUT_SELECT, D_CMND_TELEINFO_MODE, 9600, 9600, str_text.c_str (), 9600, D_TELEINFO_SPEED_STD);
+    WSContentSend_P (TELEINFO_INPUT_NEXT, D_CMND_TELEINFO_MODE, 9600, 9600, str_text.c_str (), 9600, D_TELEINFO_SPEED_STD);
     if (actual_mode == 19200) str_text = "checked"; else str_text = "";     // 19200 baud
-    WSContentSend_P (TELEINFO_INPUT_SELECT, D_CMND_TELEINFO_MODE, 19200, 19200, str_text.c_str (), 19200, D_TELEINFO_SPEED_DEFAULT);
+    WSContentSend_P (TELEINFO_INPUT_NEXT, D_CMND_TELEINFO_MODE, 19200, 19200, str_text.c_str (), 19200, D_TELEINFO_SPEED_DEFAULT);
   }
 
   // end of form
