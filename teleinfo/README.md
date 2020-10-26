@@ -3,7 +3,7 @@ Teleinfo Tasmota firmware for Linky energy meters
 
 This evolution of Tasmota firmware has been enhanced to handle France energy meters using **Teleinfo** protocol. These meters are widely known as **Linky**.
 
-It is a completly different implementation than the one published early 2020 by Charles Hallard which handles mono and tri-phases and provides some real time consumption graphs.
+It is a completly different implementation than the one published early 2020 by Charles Hallard. This implementation handles mono and tri-phases and provides some real time consumption graphs.
 
 It provides Teleinfo data thru MQTT to allow easy offloading of electrical appliances or heaters.
 Teleinfo data have been slightly adapted to handle easily mono-phase and tri-phase meters.
