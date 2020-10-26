@@ -349,7 +349,7 @@ void TeleinfoGraphInit ()
   }
 }
 
-void TeleinfoEvery250ms ()
+void TeleinfoEveryLoop ()
 {
   uint8_t  recv_serial, index;
   bool     checksum_ok, is_numeric;
@@ -357,7 +357,7 @@ void TeleinfoEvery250ms ()
   int      current_inst, current_total;
 
   // loop as long as serial port buffer is not empty and timeout not reached
-  while (teleinfo_serial->available () > 8)
+  while (teleinfo_serial->available ())
   {
     // read caracter
     recv_serial = teleinfo_serial->read ();
@@ -1147,9 +1147,6 @@ bool Xnrg15 (uint8_t function)
     case FUNC_INIT:
       TeleinfoInit ();
       break;
-    case FUNC_EVERY_250_MSECOND:
-      if ((teleinfo_enabled == true) && (uptime > 4)) TeleinfoEvery250ms ();
-      break;
   }
   return result;
 }
@@ -1165,11 +1162,14 @@ bool Xsns99 (uint8_t function)
     case FUNC_INIT:
       TeleinfoGraphInit ();
       break;
+    case FUNC_LOOP:
+      if (teleinfo_enabled && (uptime > 4)) TeleinfoEveryLoop ();
+      break;
     case FUNC_EVERY_SECOND:
       TeleinfoEverySecond ();
       break;
     case FUNC_JSON_APPEND:
-      if (teleinfo_enabled == true) TeleinfoShowJSON (true);
+      if (teleinfo_enabled) TeleinfoShowJSON (true);
       break;
 #ifdef USE_WEBSERVER
     case FUNC_WEB_ADD_HANDLER:
