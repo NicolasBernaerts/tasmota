@@ -1,9 +1,9 @@
-Tasmota firmware modified for France energy meters
+Tasmota firmware modified for Teleinfo energy meters
 =============
 
-This evolution of Tasmota firmware has been enhanced to handle France energy meters using **Teleinfo** protocol.
+This evolution of Tasmota firmware has been enhanced to handle France energy meters using **Teleinfo** protocol. These meters are widely known as **Linky**.
 
-It is a completly different implementation than the one published early 2020 by Charles Hallard. It replaces it.
+It is a completly different implementation than the one published early 2020 by Charles Hallard which handles mono and tri-phases and provides some real time consumption graphs.
 
 It provides Teleinfo data thru MQTT to allow easy offloading of electrical appliances or heaters.
 Teleinfo data have been slightly adapted to handle easily mono-phase and tri-phase meters.
@@ -27,7 +27,7 @@ This Tasmota firmware is based on sonoff original version **v8.1** modified with
   * standard energy MQTT message (IINST, SINSTS, ADIR, ...)
 
 You'll get one extra Web page on the device :
-  * **/graph** : 24h power consumption graph (updated every 5mn)
+  * **/graph** : live, daily, weekly, monthly or yearly graph
 
 Between your Energy meter and your Tasmota device, you'll need an adapter like this one :
 
