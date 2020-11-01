@@ -3,7 +3,7 @@ Teleinfo Tasmota firmware for Linky energy meters
 
 This evolution of Tasmota firmware has been enhanced to handle France energy meters using **Teleinfo** protocol. These meters are widely known as **Linky**.
 
-It is a completly different implementation than the one published early 2020 by Charles Hallard. This implementation handles mono and tri-phases and provides some real time consumption graphs.
+This implementation handles mono and tri-phases and provides some real time consumption graphs. Please note that it is a completly different implementation than the one published early 2020 by Charles Hallard. 
 
 It provides Teleinfo data thru MQTT to allow easy offloading of electrical appliances or heaters.
 Teleinfo data have been slightly adapted to handle easily mono-phase and tri-phase meters.
@@ -20,7 +20,7 @@ These meters are :
   * Classical electronic meter (white)
   * Linky meter (green)
 
-This Tasmota firmware is based on sonoff original version **v8.1** modified with :
+This Tasmota firmware is based on sonoff original version **v8.4** modified with :
   * serial as 7 bits, parity Even, 1 stop bit
   * default speed as 1200 or 9600 bauds
   * interface to handle teleinfo messages
@@ -28,10 +28,13 @@ This Tasmota firmware is based on sonoff original version **v8.1** modified with
 
 You'll get one extra Web page on the device :
   * **/graph** : live, daily, weekly, monthly or yearly graph
+  * **/tic** : real time display of received Teleinfo messages
 
 Between your Energy meter and your Tasmota device, you'll need an adapter like this one :
 
 ![Teleinfo adapter](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/teleinfo-serial-adapter.png)
+
+With modern Linky meters, **4.7k** resistor should be replaced by a **1.5k** resistor.
 
 You need to connect your adapter output **Tx** to your Tasmota **Rx** port.
 
@@ -64,6 +67,6 @@ If you want to compile the firmware, don't forget to uncomment following line in
 
 Complete setup guide is available at http://www.bernaerts-nicolas.fr/iot/...
 
-![Main page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/tasmota-teleinfo-main.png)   ![Config page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/tasmota-teleinfo-config.png)   ![Grah monophase](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/tasmota-teleinfo-graph.png)    
+![Main page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/tasmota-teleinfo-main.png)   ![Config page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/tasmota-teleinfo-config.png)
 
-![Grah triphase](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/tasmota-teleinfo-graph-triphase.png)
+![Grah message](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/tasmota-teleinfo-message.png)   ![Grah monophase](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/tasmota-teleinfo-graph.png)   ![Grah triphase](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/tasmota-teleinfo-graph-triphase.png)
