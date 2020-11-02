@@ -1,0 +1,92 @@
+#!/bin/bash
+# ----------------------------------------------------------
+# Helper script to flash ESP8266 or ESP32
+# Serial port is auto discovered if only 1 device connected
+#
+# Revision history :
+#   01/11/2020, V1.0 - Creation by N. Bernaerts
+# ----------------------------------------------------------
+
+# root of tools and images
+DEVICE="ESP8266"
+ROOT_TOOLS="$HOME/sources/ESP32"
+ESP32_BOOTLOADER="${ROOT_TOOLS}/bootloader_dout_40m.bin"
+ESP32_PARTITION="${ROOT_TOOLS}/partitions.bin"
+ESP32_BOOTAPP="${ROOT_TOOLS}/boot_app0.bin"
+
+# help message if no parameter
+if [ ${#} -eq 0 ];
+then
+    echo "Script to flash Tasmota devices"
+    echo "Options are :"
+    echo "  --esp            Flash ESP8266 device (default)"
+    echo "  --esp32          Flash ESP32 device"
+    echo "  --port <com>     Use specific COM port"
+    echo "  --baud <baud>    Use specific speed (in bauds)"
+    echo "  --erase          Erase device before flash"
+    echo "  --flash <file>   Path to image file"
+    echo "All tools should be placed under ${ROOT_TOOLS}"
+    exit 1
+fi
+
+# iterate thru parameters
+while test ${#} -gt 0
+do
+    case $1 in
+        --esp) DEVICE="ESP8266"; shift; ;;
+        --esp32) DEVICE="ESP32"; shift; ;;
+        --port) shift; PORT="$1"; shift; ;;
+        --baud) shift; BAUD="$1"; shift; ;;
+        --erase) ERASE="ok"; shift; ;;
+        --flash) FLASH="ok"; shift; IMAGE="$1"; shift; ;;
+        *) shift; ;;
+    esac
+done
+
+# check image file
+[ ! -f "${IMAGE}" ] && { echo "[error] Image file ${IMAGE} missing"; exit 1; }
+[ "${DEVICE}" = "ESP32" -a ! -f "${ESP32_BOOTLOADER}" ] && { echo "[error] Bootloader ${ESP32_BOOTLOADER} missing"; exit 1; }
+[ "${DEVICE}" = "ESP32" -a ! -f "${ESP32_PARTITION}" ] && { echo "[error] Partition table ${ESP32_PARTITION} missing"; exit 1; }
+[ "${DEVICE}" = "ESP32" -a ! -f "${ESP32_BOOTAPP}" ] && { echo "[error] Boot app ${ESP32_BOOTAPP} missing"; exit 1; }
+
+# if erase
+if [ "${ERASE}" = "ok" ]
+then
+	# wait for program mode
+	echo ""
+	echo "---- Erasing ----"
+	echo "  * Set ${DEVICE} in program mode"
+	echo "  * Connect serial port"
+	echo "  * press ENTER to erase"
+	read
+	echo ""
+
+	# erase
+	[ "${DEVICE}" = "ESP8266" ] && esptool erase_flash
+fi
+
+# if flash
+if [ "${FLASH}" = "ok" ]
+then
+	# wait for program mode
+	echo ""
+	echo "---- Flashing ----"
+	echo "  * Set ${DEVICE} in program mode"
+	echo "  * Connect serial port"
+	echo "  * press ENTER to erase"
+	read
+	echo ""
+
+	# general options
+	[ "${PORT}" != "" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "--port" "${PORT}" )
+	[ "${BAUD}" != "" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "--baud" "${BAUD}" )
+
+	# device option
+	[ "${DEVICE}" = "ESP8266" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "write_flash 0x0000" "${IMAGE}" )
+	[ "${DEVICE}" = "ESP32" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "--chip" "esp32" "--before" "default_reset" "--after" "hard_reset" "write_flash" "-z" "--flash_mode" "dout" "--flash_freq" "40m" "--flash_size" "detect" "0x1000" "${ESP32_BOOTLOADER}" "0x8000" "${ESP32_PARTITION}" "0xe000" "${ESP32_BOOTAPP}" "0x10000" "${IMAGE}" )
+
+	# flash image
+	esptool "${ARR_PARAM[@]}"
+fi
+
+
