@@ -87,7 +87,7 @@ then
 	echo ""
 	
 	# device option
-	[ "${DEVICE}" = "ESP8266" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "write_flash 0x0000" "${IMAGE}" )
+	[ "${DEVICE}" = "ESP8266" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "write_flash" "0x0000" "${IMAGE}" )
 	[ "${DEVICE}" = "ESP32" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "--chip" "esp32" "--before" "default_reset" "--after" "hard_reset" "write_flash" "-z" "--flash_mode" "dout" "--flash_freq" "40m" "--flash_size" "detect" "0x1000" "${ESP32_BOOTLOADER}" "0x8000" "${ESP32_PARTITION}" "0xe000" "${ESP32_BOOTAPP}" "0x10000" "${IMAGE}" )
 
 	# flash image
