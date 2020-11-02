@@ -49,6 +49,10 @@ done
 [ "${DEVICE}" = "ESP32" -a ! -f "${ESP32_PARTITION}" ] && { echo "[error] Partition table ${ESP32_PARTITION} missing"; exit 1; }
 [ "${DEVICE}" = "ESP32" -a ! -f "${ESP32_BOOTAPP}" ] && { echo "[error] Boot app ${ESP32_BOOTAPP} missing"; exit 1; }
 
+# general options
+[ "${PORT}" != "" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "--port" "${PORT}" )
+[ "${BAUD}" != "" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "--baud" "${BAUD}" )
+
 # if erase
 if [ "${ERASE}" = "ok" ]
 then
@@ -62,7 +66,7 @@ then
 	echo ""
 
 	# erase
-	[ "${DEVICE}" = "ESP8266" ] && esptool erase_flash
+	[ "${DEVICE}" = "ESP8266" ] && esptool "${ARR_PARAM[@]}" erase_flash
 fi
 
 # if flash
@@ -76,11 +80,7 @@ then
 	echo "  * press ENTER to erase"
 	read
 	echo ""
-
-	# general options
-	[ "${PORT}" != "" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "--port" "${PORT}" )
-	[ "${BAUD}" != "" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "--baud" "${BAUD}" )
-
+	
 	# device option
 	[ "${DEVICE}" = "ESP8266" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "write_flash 0x0000" "${IMAGE}" )
 	[ "${DEVICE}" = "ESP32" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "--chip" "esp32" "--before" "default_reset" "--after" "hard_reset" "write_flash" "-z" "--flash_mode" "dout" "--flash_freq" "40m" "--flash_size" "detect" "0x1000" "${ESP32_BOOTLOADER}" "0x8000" "${ESP32_PARTITION}" "0xe000" "${ESP32_BOOTAPP}" "0x10000" "${IMAGE}" )
