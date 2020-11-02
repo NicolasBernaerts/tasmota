@@ -7,18 +7,23 @@
 #   17/04/2019, V1.1 - Adjust timeout and retries
 #   18/04/2019, V1.2 - Add MQTT topic
 #   23/05/2020, V1.3 - Use /version page
+#   30/10/2020, V1.4 - Set retries to 2 for ESP32
 # ---------------------------------------------------
 
 #   Check tools availability
 command -v fping >/dev/null 2>&1 || { echo "[error] Please install fping"; exit 1; }
 command -v wget >/dev/null 2>&1 || { echo "[error] Please install wget"; exit 1; }
 
+# generate temporary files and directory
+TMP_DIR=$(mktemp -t -d "tasmota-XXXXXXXX")
+TMP_DATA="${TMP_DIR}/data.txt"
+
 # get first adapter netmask
 NETMASK=$(ip addr | grep inet | grep brd | head -n 1 | xargs | cut -d' ' -f2)
 echo "Netmask is ${NETMASK}"
 
 # load array from fping
-ARR_IP=( $(fping --addr --retry=2 --generate "${NETMASK}" 2>/dev/null | grep "alive" | cut -d' ' -f1) )
+ARR_IP=( $(fping --addr --generate "${NETMASK}" 2>/dev/null | grep "alive" | cut -d' ' -f1) )
 
 # display number of IP
 NBR_IP="${#ARR_IP[@]}"
@@ -31,31 +36,30 @@ do
 	echo -ne "${IP}\r"
 
 	# read page /version
-	TASMOTA_DATA=$(wget --quiet --tries=1 --timeout=5 -O - "http://${IP}/version" | tr -d "\"{}" | tr "," "\n")
-	TASMOTA_MODULE=$(echo "${TASMOTA_DATA}" | grep "Module:" | cut -d':' -f2)
+	wget --quiet --tries=2 --timeout=2 -O - "http://${IP}/info.json" | tr -d "\"{}" | tr "," "\n" > "${TMP_DATA}"
+	TASMOTA_MODULE=$(grep "Module:" "${TMP_DATA}" | cut -d':' -f2)
 
 	# if not available, read page /in (doesn't work if password set)
 	if [ "${TASMOTA_MODULE}" = "" ]
 	then
-		TASMOTA_DATA=$(wget --quiet --tries=1 --timeout=5 -O - "http://${IP}/in" | sed "s|}2|:|g" | sed "s|}1|\n|g" | tr ">" "\n")
-		TASMOTA_MODULE=$(wget --quiet --tries=1 --timeout=5 -O - "http://${IP}/" | grep "Tasmota" | tr "<" "\n" | grep "^h3" | cut -d'>' -f2 | sed "s| Module||g")
+		wget --quiet --tries=2 --timeout=2 -O "${TMP_DATA}" "http://${IP}/"
+		TASMOTA_MODULE=$(grep "Tasmota" "${TMP_DATA}" | tr '<' '\n' | grep "^h3" | cut -d'>' -f2 | sed "s| Module||g")
+
+		wget --quiet --tries=2 --timeout=2 -O - "http://${IP}/in" | sed "s|\}1|\n|g" | sed "s|\}2|\:|g" | tr '>' '\n' > "${TMP_DATA}"
 	fi
 
 	# if data are read, we are dealing with tasmota module
 	if [ "${TASMOTA_MODULE}" != "" ] 
 	then
 		# read data
-		TASMOTA_VERSION=$(echo "${TASMOTA_DATA}" | grep "Program Version:" | cut -d':' -f2)
-		TASMOTA_HOSTNAME=$(echo "${TASMOTA_DATA}" | grep "Hostname" | cut -d':' -f2)
-		TASMOTA_UPTIME=$(echo "${TASMOTA_DATA}" | grep "Uptime:" | cut -d':' -f2-)
-		TASMOTA_MQTT=$(echo "${TASMOTA_DATA}" | grep "MQTT Full Topic:" | cut -d':' -f2-)
-		EXTENSION_TYPE=$(echo "${TASMOTA_DATA}" | grep "Extension type:" | cut -d':' -f2)
-		EXTENSION_VERSION=$(echo "${TASMOTA_DATA}" | grep "Extension version:" | cut -d':' -f2)
-	fi
+		TASMOTA_VERSION=$(grep "Program Version:" "${TMP_DATA}" | cut -d':' -f2)
+		TASMOTA_HOSTNAME=$(grep "Hostname" "${TMP_DATA}" | cut -d':' -f2)
+		TASMOTA_UPTIME=$(grep "Uptime:" "${TMP_DATA}" | cut -d':' -f2-)
+		TASMOTA_MQTT=$(grep "MQTT Full Topic:" "${TMP_DATA}" | cut -d':' -f2-)
+		EXTENSION_TYPE=$(grep "Extension type:" "${TMP_DATA}" | cut -d':' -f2)
+		EXTENSION_VERSION=$(grep "Extension version:" "${TMP_DATA}" | cut -d':' -f2)
 
-	# display
-	if [ "${TASMOTA_MODULE}" != "" ]
-	then
+		# display
 		DISPLAY="${IP} [${TASMOTA_HOSTNAME}] ${TASMOTA_MODULE}, Tasmota ${TASMOTA_VERSION},"
 		[ "${EXTENSION_TYPE}" != "" ] && DISPLAY="${DISPLAY} ${EXTENSION_TYPE} ${EXTENSION_VERSION},"
 		DISPLAY="${DISPLAY} Up ${TASMOTA_UPTIME}, MQTT ${TASMOTA_MQTT}"
@@ -63,3 +67,5 @@ do
 	fi
 done
 
+# remove temporary directory
+rm -r "${TMP_DIR}"
