@@ -2,6 +2,11 @@
 # ----------------------------------------------------------
 # Helper script to flash ESP8266 or ESP32
 # Serial port is auto discovered if only 1 device connected
+# For ESP32, you need to provide 3 files :
+#   * bootloader
+#   * partition
+#   * boot application
+# These files should be stored under ROOT_TOOLS
 #
 # Revision history :
 #   01/11/2020, V1.0 - Creation by N. Bernaerts
