@@ -20,7 +20,7 @@ These meters are :
   * Classical electronic meter (white)
   * Linky meter (green)
 
-This Tasmota firmware is based on sonoff original version **v8.4** modified with :
+This Tasmota firmware is based on sonoff original version **v9.0** modified with :
   * serial as 7 bits, parity Even, 1 stop bit
   * default speed as 1200 or 9600 bauds
   * interface to handle teleinfo messages
