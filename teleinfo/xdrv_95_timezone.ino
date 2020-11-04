@@ -78,10 +78,6 @@ void TimezoneShowJSON (bool append)
 {
   String  str_json;
 
-  // start message  -->  {  or message,
-  if (append == false) str_json = "{";
-  else str_json = ",";
-
   // Timezone section start -->  "Timezone":{
   str_json += "\"" + String (D_JSON_TIMEZONE) + "\":{";
 
@@ -102,15 +98,11 @@ void TimezoneShowJSON (bool append)
   str_json += "}";
 
   // if append mode, add json string to MQTT message
-  if (append == true) ResponseAppend_P (str_json.c_str ());
-
-  // else, add last bracket and directly publish message
-  else 
-  {
-    str_json += "}";
-    Response_P (str_json.c_str ());
-    MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
-  }
+  if (append) ResponseAppend_P (PSTR(",%s"),str_json.c_str ());
+  else Response_P (PSTR("{%s}"),str_json.c_str ());
+  
+  // publish it if not in append mode
+  if (!append) MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
 }
 
 // init main status

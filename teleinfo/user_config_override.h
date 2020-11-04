@@ -1,7 +1,7 @@
 /*
   user_config_override.h - user configuration overrides my_user_config.h for Tasmota
 
-  Copyright (C) 2020  Theo Arends, Nicolas Bernaerts
+  Copyright (C) 2020  Nicolas Bernaerts
 
     05/05/2019 - v1.0   - Creation
     16/05/2019 - v1.1   - Add Tempo and EJP contracts
@@ -24,6 +24,7 @@
     18/10/2020 - v5.1   - Expose icon on web server
     25/10/2020 - v5.2   - Real time graph page update
     30/10/2020 - v5.3   - Add TIC message page
+    02/11/2020 - v5.4   - Tasmota 9.0 compatibility
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -51,8 +52,7 @@
  *   (1) copy this file to "user_config_override.h" (It will be ignored by Git)
  *   (2) define your own settings below
  *   (3) for platformio:
- *         define USE_CONFIG_OVERRIDE as a build flags.
- *         ie1 : export PLATFORMIO_BUILD_FLAGS='-DUSE_CONFIG_OVERRIDE'
+ *         All done.
  *       for Arduino IDE:
  *         enable define USE_CONFIG_OVERRIDE in my_user_config.h
  ******************************************************************************************************
@@ -71,7 +71,9 @@
 #define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_TELEINFO                          // Add support for Teleinfo
 
-#define EXTENSION_VERSION "5.3"               // version
+#define USE_ETHERNET                          // Add ethernet support for ESP32
+
+#define EXTENSION_VERSION "5.4"               // version
 #define EXTENSION_NAME "Teleinfo"             // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 

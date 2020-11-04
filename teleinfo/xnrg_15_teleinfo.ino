@@ -24,6 +24,7 @@
     18/10/2020 - v5.1   - Expose icon on web server
     25/10/2020 - v5.2   - Real time graph page update
     30/10/2020 - v5.3   - Add TIC message page
+    02/11/2020 - v5.4   - Tasmota 9.0 compatibility
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -55,8 +56,6 @@
 // declare teleinfo energy driver and sensor
 #define XNRG_15   15
 #define XSNS_99   99
-
-#include <TasmotaSerial.h>
 
 // teleinfo constant
 #define TELEINFO_VOLTAGE             230        // default contract voltage is 200V
@@ -127,9 +126,8 @@ const char *const arr_period_label[] PROGMEM = { "Live", "Day", "Week", "Month",
 const uint32_t arr_period_sample[] = { 5, 236, 1657, 7338, 86400 };       // number of seconds between samples
 
 // teleinfo driver status
-bool teleinfo_configured = false;
-bool teleinfo_enabled    = false;
-bool teleinfo_updated    = false;
+bool teleinfo_enabled = false;
+bool teleinfo_updated = false;
 
 // teleinfo data
 struct {
@@ -205,7 +203,7 @@ TasmotaSerial *teleinfo_serial = nullptr;
 \****************************************/
 
 // icon : teleinfo
-unsigned char teleinfo_icon_tic_png[] PROGMEM = {
+const char teleinfo_icon_tic_png[] PROGMEM = {
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x80, 0x04, 0x03, 0x00, 0x00, 0x00, 0x31, 0x10, 0x7c, 0xf8, 0x00, 0x00, 0x00, 0x12, 0x50, 0x4c, 0x54, 0x45, 0x00, 0x6f, 0x6c, 0x00, 0x00, 0x00, 0x4d, 0x82, 0xbd, 0x61, 0x83, 0xb5, 0x67, 0x83, 0xb1, 0xf7, 0xe4, 0xb9, 0xab, 0xda, 0xea, 0xec, 0x00, 0x00, 0x00, 0x01, 0x74, 0x52, 0x4e, 0x53, 0x00, 0x40, 0xe6, 0xd8, 0x66, 0x00, 0x00, 0x00, 0x01, 0x62, 0x4b, 0x47, 0x44, 0x00, 0x88, 0x05, 0x1d, 0x48, 0x00, 0x00, 0x00, 0x09, 0x70, 0x48, 0x59, 0x73, 0x00, 0x00, 0x2e, 0x23, 0x00, 0x00, 0x2e, 0x23, 0x01, 0x78, 0xa5, 0x3f, 0x76, 0x00, 0x00, 0x00, 0x07, 0x74, 0x49, 0x4d, 0x45, 0x07, 0xe4, 0x0a, 0x12, 0x17, 0x07, 0x09, 0xde, 0x55, 0xef, 0x17, 0x00, 0x00, 0x02, 0x37, 0x49, 0x44, 0x41, 0x54, 0x68, 0xde, 0xed, 0x99, 0x59, 0x6e, 0xc4, 0x20, 0x0c, 0x86, 0x11, 0x9e, 0x83, 0x58, 0x70, 0x01, 0x64, 0xee, 0x7f, 0xb7, 0x66, 0x99, 0x25, 0xac, 0xc6, 0x38, 0xe9, 0xb4, 0x52, 0xfc, 0x42, 0x35, 0xc4, 0x5f, 0x7e, 0x13, 0xc0, 0x86, 0x1a, 0xf3, 0xf7, 0x0d, 0x9c, 0xf3, 0xb3, 0xbe, 0x71, 0x73, 0x9f, 0x06, 0xac, 0xaf, 0xa6, 0xcd, 0x3f, 0xcc, 0xfa, 0xef, 0x36, 0x1b, 0x00, 0xbd, 0x00, 0x68, 0x74, 0x02, 0x9c, 0x56, 0xc0, 0x2c, 0xc0, 0x29, 0x01, 0x1f, 0x01, 0x5e, 0x0b, 0x40, 0xe5, 0x10, 0x4e, 0x02, 0xec, 0xd7, 0x01, 0xa4, 0x05, 0xb8, 0x13, 0x01, 0x4e, 0x0d, 0xc0, 0xff, 0x09, 0xa0, 0x33, 0x01, 0xe6, 0x2b, 0x00, 0xab, 0x05, 0x80, 0x16, 0x60, 0xd4, 0x00, 0x3b, 0xf1, 0x11, 0x62, 0x5d, 0xc2, 0x38, 0xc0, 0x05, 0xdd, 0xae,
   0x6e, 0x53, 0x00, 0x88, 0x01, 0x90, 0x3d, 0x2a, 0x1e, 0xc3, 0x1c, 0x60, 0xa5, 0x00, 0x9b, 0x3f, 0x4b, 0xd2, 0x31, 0x74, 0x55, 0x09, 0x47, 0x8d, 0x71, 0xcb, 0x13, 0xb1, 0x3d, 0xf7, 0xb0, 0x9c, 0x4c, 0x98, 0xb9, 0xb7, 0xd3, 0xbd, 0x65, 0xe2, 0x8d, 0xc7, 0x2d, 0xa2, 0x24, 0xc0, 0x5e, 0x4a, 0xe0, 0xd0, 0xf2, 0xac, 0x11, 0x88, 0x19, 0xf2, 0xcc, 0xbf, 0x20, 0x40, 0x5b, 0x5b, 0xb1, 0xba, 0xab, 0xd3, 0x8b, 0x29, 0x67, 0xc0, 0x95, 0xd6, 0x52, 0x18, 0x86, 0x02, 0x28, 0x24, 0x50, 0x6f, 0x80, 0xab, 0x02, 0x32, 0xad, 0xc7, 0x9e, 0x18, 0x29, 0xeb, 0xaf, 0x02, 0x5c, 0x13, 0x50, 0x2a, 0xb9, 0x08, 0x80, 0x0c, 0x00, 0x45, 0x00, 0xba, 0x16, 0xb0, 0x76, 0xfb, 0xd8, 0x05, 0x00, 0xf7, 0x9d, 0x2b, 0xcf, 0x21, 0x33, 0x55, 0x90, 0xcb, 0x17, 0xc8, 0xcc, 0x15, 0xe4, 0x32, 0x4e, 0x30, 0xfd, 0x0f, 0xc9, 0x66, 0x1c, 0x66, 0xbd, 0x21, 0x93, 0xf4, 0x3c, 0xb7, 0x62, 0x99, 0xac, 0xe9, 0xb9, 0x25, 0x87, 0x4c, 0xe9, 0x80, 0x4c, 0x42, 0xee, 0x57, 0xe8, 0x80, 0x57, 0x9d, 0x31, 0x5e, 0x22, 0x82, 0x51, 0x58, 0x34, 0xb7, 0x35, 0xc6, 0x16, 0x55, 0xfe, 0x56, 0xf7, 0x69, 0xdf, 0x33, 0x4c, 0x5c, 0x6b, 0x7a, 0xcc, 0x56, 0x89, 0x2c, 0x0e, 0x78, 0xbf, 0xd3, 0xce, 0x4d, 0xd0, 0xc3, 0x2b, 0xa7, 0x8a, 0x56, 0x38, 0x00, 0x66, 0xaa, 0xd6, 0x74, 0xd1, 0xce, 0x1c, 0x3e, 0xd2, 0x55, 0x2d, 0x0f, 0x02, 0xd2, 0xc7, 0xe5, 0x41, 0x50, 0xf6, 0x3e, 0x69, 0x10, 0x90, 0x0b, 0xb6, 0xc2, 0x20, 0xca, 0x9a, 0x4b, 0x26, 0x81, 0xdc, 0x14, 0xe0, 0x11, 0x3a, 0x7b, 0xe3, 0x48, 0x0c, 0xe0, 0x8a, 0xfd, 0x5d, 0x78, 0xa1, 0x40, 0x4b, 0x12, 0x8f, 0xd4, 0x48, 0x2f, 0x23, 0x49, 0x87, 0x7a,
   0x09, 0xf2, 0x4c, 0x00, 0x8e, 0x1c, 0x57, 0xcf, 0x01, 0xa0, 0xf0, 0x4e, 0x43, 0x0d, 0x80, 0xd3, 0x01, 0xd2, 0x3b, 0x0d, 0xe8, 0x08, 0xb0, 0x5a, 0xc0, 0xd8, 0xad, 0x4a, 0xaf, 0xce, 0xb2, 0x72, 0x00, 0x0e, 0x96, 0x88, 0x4d, 0x42, 0xbb, 0x77, 0xf6, 0xf6, 0xc7, 0xf2, 0x80, 0xcf, 0xe9, 0xd4, 0x75, 0x66, 0xda, 0xd0, 0xdd, 0x49, 0xa7, 0x77, 0x28, 0x99, 0x77, 0xfa, 0x94, 0xa5, 0x86, 0xae, 0xd2, 0xb8, 0xed, 0xb6, 0xdb, 0x7e, 0xcd, 0xe2, 0x62, 0xe1, 0xdd, 0x94, 0x3f, 0xae, 0xff, 0x7c, 0xdb, 0x9b, 0xce, 0x5e, 0xe2, 0x9f, 0xf9, 0x21, 0xdf, 0x86, 0x9e, 0x07, 0xba, 0xee, 0xb9, 0xee, 0x79, 0xb2, 0xa8, 0x01, 0x5e, 0x9e, 0x0f, 0x06, 0xe0, 0xcd, 0x06, 0x08, 0xcb, 0xfe, 0xfc, 0x01, 0xf8, 0xa5, 0xee, 0x59, 0x00, 0x1e, 0xf6, 0x26, 0xbf, 0x7d, 0x4d, 0x00, 0xb8, 0x7a, 0xe6, 0x80, 0xf5, 0xc7, 0xb7, 0x27, 0x03, 0x08, 0xbb, 0x82, 0xe5, 0x4f, 0x7f, 0x04, 0x58, 0x97, 0x36, 0x78, 0x25, 0x80, 0xfc, 0x06, 0x20, 0x9f, 0x86, 0x20, 0x00, 0x3c, 0xc7, 0xa0, 0x06, 0x20, 0xad, 0x02, 0x16, 0x40, 0x2f, 0x80, 0x58, 0xc1, 0xe1, 0x6e, 0x87, 0xf6, 0x49, 0x94, 0xe6, 0x69, 0x4a, 0x1a, 0x5b, 0xde, 0x04, 0x0d, 0x02, 0x6c, 0x06, 0xb8, 0xf3, 0xdc, 0x6e, 0x3f, 0x61, 0x43, 0x14, 0x0c, 0xfe, 0x63, 0x6f, 0x4d, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82
@@ -243,7 +241,7 @@ void TeleinfoSetMode (uint16_t new_mode)
       Settings.sbaudrate = new_mode;
 
       // ask for restart
-      restart_flag = 2;
+      TasmotaGlobal.restart_flag = 2;
     }
   }
 }
@@ -291,52 +289,48 @@ bool TeleinfoValidateNumeric (const char *pstr_value)
   return result;
 }
 
-bool TeleinfoPreInit ()
+void TeleinfoPreInit ()
 {
-  // if no energy sensor detected
-  if (!energy_flg)
+  // if PIN defined, set energy driver
+  if (!TasmotaGlobal.energy_driver && PinUsed(GPIO_TELEINFO_RX))
   {
-    // if serial RX and TX are configured
-    if (PinUsed(GPIO_TXD) && PinUsed(GPIO_RXD))
-    {
-      // set configuration flag
-      teleinfo_configured = true;
+    // energy driver is teleinfo meter
+    TasmotaGlobal.energy_driver = XNRG_15;
 
-      // set energy flag
-      energy_flg = XNRG_15;
-    }
+    // voltage not available in teleinfo
+    Energy.voltage_available = false;
   }
-  
-  return teleinfo_configured;
 }
 
 void TeleinfoInit ()
 {
   uint16_t teleinfo_mode;
 
-  // voltage not available in teleinfo
-  Energy.voltage_available = false;
-
   // get teleinfo speed
   teleinfo_mode = TeleinfoGetMode ();
 
   // if sensor has been pre initialised
-  if ((teleinfo_configured == true) && (teleinfo_mode > 0))
+  teleinfo_enabled = ((TasmotaGlobal.energy_driver == XNRG_15) && (teleinfo_mode > 0));
+  if (teleinfo_enabled)
   {
-    // set serial port
-    teleinfo_serial = new TasmotaSerial (Pin(GPIO_RXD), Pin(GPIO_TXD), 1);
-    
+    // start serial port
+    teleinfo_serial = new TasmotaSerial (Pin(GPIO_TELEINFO_RX), -1, 1);
+
     // flush and set speed
     Serial.flush ();
     Serial.begin (teleinfo_mode, SERIAL_7E1);
 
-    // check port allocated
+    // associate to hadware serial port and log
     teleinfo_enabled = teleinfo_serial->hardwareSerial ();
-    if ( teleinfo_enabled == true) ClaimSerial ();
+    if (teleinfo_enabled)
+    {
+      ClaimSerial ();
+      AddLog_P2(LOG_LEVEL_INFO, PSTR("TIC: Teleinfo Serial ready"));
+    }
   }
 
-  // if teleinfo is not enabled, reset energy flag
-  if ( teleinfo_enabled == false) energy_flg = ENERGY_NONE;
+  // else disable energy driver
+  else TasmotaGlobal.energy_driver = ENERGY_NONE;
 }
 
 void TeleinfoGraphInit ()
@@ -377,7 +371,7 @@ void TeleinfoGraphInit ()
   }
 }
 
-void TeleinfoEveryLoop ()
+void TeleinfoEvery50ms ()
 {
   bool     checksum_ok, is_numeric;
   uint8_t  recv_serial, index;
@@ -386,7 +380,7 @@ void TeleinfoEveryLoop ()
   float    power_apparent;
 
   // loop as long as serial port buffer is not empty and timeout not reached
-  while (teleinfo_serial->available ())
+  while (teleinfo_serial->available() > 0) 
   {
     // read caracter
     recv_serial = teleinfo_serial->read ();
@@ -564,7 +558,7 @@ void TeleinfoEveryLoop ()
         // if a line has started and caracter is printable, add it to current message part
         if ((teleinfo_line.part > TELEINFO_NONE) && isprint (recv_serial)) teleinfo_line.buffer += (char) recv_serial;
         break;
-      }
+    }
   }
 }
 
@@ -622,14 +616,11 @@ void TeleinfoShowJSON (bool append)
 {
   uint8_t index;
   long    power_percent;
-  String  str_json, str_mqtt, str_index;
+  String  str_json, str_index;
 
   // reset update flag and update published apparent power
   teleinfo_updated = false;
   teleinfo_papp_last = teleinfo_counter.papp;
-
-  // save mqtt_data
-  str_mqtt = mqtt_data;
 
   // if not in append mode, add current time
   if (append == false) str_json = "\"" + String (D_JSON_TIME) + "\":\"" + GetDateAndTime(DT_LOCAL) + "\",";
@@ -666,12 +657,11 @@ void TeleinfoShowJSON (bool append)
   str_json += "}";
 
   // generate MQTT message according to append mode
-  if (append == true) str_mqtt += "," + str_json;
-  else str_mqtt = "{" + str_json + "}";
+  if (append == true) ResponseAppend_P(PSTR(",%s"),str_json.c_str ());
+  else ResponseAppend_P(PSTR("{%s}"),str_json.c_str ());
 
-  // place JSON back to MQTT data and publish it if not in append mode
-  snprintf_P (mqtt_data, sizeof(mqtt_data), str_mqtt.c_str ());
-  if (append == false) MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
+  // publish it if not in append mode
+  if (!append) MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
 }
 
 /*********************************************\
@@ -681,14 +671,10 @@ void TeleinfoShowJSON (bool append)
 #ifdef USE_WEBSERVER
 
 // display offload icons
-void TeleinfoWebIconTic () { Webserver->send (200, "image/png", teleinfo_icon_tic_png, teleinfo_icon_tic_len); }
+void TeleinfoWebIconTic () { Webserver->send_P (200, PSTR ("image/png"), teleinfo_icon_tic_png, teleinfo_icon_tic_len); }
 
 // get tic raw message
-void TeleinfoWebTicUpdate ()
-{
-  // send result
-  Webserver->send (200, "text/plain", teleinfo_message.content.c_str (), teleinfo_message.content.length ());
-}
+void TeleinfoWebTicUpdate () { Webserver->send_P (200, PSTR ("text/plain"), teleinfo_message.content.c_str (), teleinfo_message.content.length ()); }
 
 // get status update
 void TeleinfoWebGraphUpdate ()
@@ -741,7 +727,7 @@ void TeleinfoWebGraphUpdate ()
   }
 
   // send result
-  Webserver->send (200, "text/plain", str_text.c_str (), str_text.length ());
+  Webserver->send_P (200, PSTR ("text/plain"), str_text.c_str (), str_text.length ());
 
   // reset update flags
   teleinfo_graph[graph_period].updated = 0;
@@ -806,19 +792,16 @@ void TeleinfoWebPageConfig ()
   WSContentSend_P (TELEINFO_INPUT_FIRST, D_CMND_TELEINFO_MODE, 0, 0, str_text.c_str (), D_TELEINFO_DISABLED);
 
   // selection : available modes
-  if (teleinfo_configured == true)
-  {
-    if (actual_mode == 1200) str_text = "checked"; else str_text = "";      // 1200 baud
-    WSContentSend_P (TELEINFO_INPUT_NEXT, D_CMND_TELEINFO_MODE, 1200, 1200, str_text.c_str (), 1200, D_TELEINFO_SPEED_HISTO);
-    if (actual_mode == 2400) str_text = "checked"; else str_text = "";      // 2400 baud
-    WSContentSend_P (TELEINFO_INPUT_NEXT, D_CMND_TELEINFO_MODE, 2400, 2400, str_text.c_str (), 2400, D_TELEINFO_SPEED_DEFAULT);
-    if (actual_mode == 4800) str_text = "checked"; else str_text = "";      // 4800 baud
-    WSContentSend_P (TELEINFO_INPUT_NEXT, D_CMND_TELEINFO_MODE, 4800, 4800, str_text.c_str (), 4800, D_TELEINFO_SPEED_DEFAULT);
-    if (actual_mode == 9600) str_text = "checked"; else str_text = "";      // 9600 baud
-    WSContentSend_P (TELEINFO_INPUT_NEXT, D_CMND_TELEINFO_MODE, 9600, 9600, str_text.c_str (), 9600, D_TELEINFO_SPEED_STD);
-    if (actual_mode == 19200) str_text = "checked"; else str_text = "";     // 19200 baud
-    WSContentSend_P (TELEINFO_INPUT_NEXT, D_CMND_TELEINFO_MODE, 19200, 19200, str_text.c_str (), 19200, D_TELEINFO_SPEED_DEFAULT);
-  }
+  if (actual_mode == 1200) str_text = "checked"; else str_text = "";      // 1200 baud
+  WSContentSend_P (TELEINFO_INPUT_NEXT, D_CMND_TELEINFO_MODE, 1200, 1200, str_text.c_str (), 1200, D_TELEINFO_SPEED_HISTO);
+  if (actual_mode == 2400) str_text = "checked"; else str_text = "";      // 2400 baud
+  WSContentSend_P (TELEINFO_INPUT_NEXT, D_CMND_TELEINFO_MODE, 2400, 2400, str_text.c_str (), 2400, D_TELEINFO_SPEED_DEFAULT);
+  if (actual_mode == 4800) str_text = "checked"; else str_text = "";      // 4800 baud
+  WSContentSend_P (TELEINFO_INPUT_NEXT, D_CMND_TELEINFO_MODE, 4800, 4800, str_text.c_str (), 4800, D_TELEINFO_SPEED_DEFAULT);
+  if (actual_mode == 9600) str_text = "checked"; else str_text = "";      // 9600 baud
+  WSContentSend_P (TELEINFO_INPUT_NEXT, D_CMND_TELEINFO_MODE, 9600, 9600, str_text.c_str (), 9600, D_TELEINFO_SPEED_STD);
+  if (actual_mode == 19200) str_text = "checked"; else str_text = "";     // 19200 baud
+  WSContentSend_P (TELEINFO_INPUT_NEXT, D_CMND_TELEINFO_MODE, 19200, 19200, str_text.c_str (), 19200, D_TELEINFO_SPEED_DEFAULT);
 
   // end of form
   WSContentSend_P (TELEINFO_FIELD_STOP);
@@ -1299,34 +1282,30 @@ void TeleinfoWebPageGraph ()
 // energy driver
 bool Xnrg15 (uint8_t function)
 {
-  bool result = false;
-  
   // swtich according to context
   switch (function)
   {
     case FUNC_PRE_INIT:
-      result = TeleinfoPreInit ();
+      TeleinfoPreInit ();
       break;
     case FUNC_INIT:
       TeleinfoInit ();
       break;
   }
-  return result;
+  return false;
 }
 
 // teleinfo sensor
 bool Xsns99 (uint8_t function)
 {
-  bool result = false;
-  
   // swtich according to context
   switch (function) 
   {
     case FUNC_INIT:
       TeleinfoGraphInit ();
       break;
-    case FUNC_LOOP:
-      if (teleinfo_enabled && (uptime > 4)) TeleinfoEveryLoop ();
+    case FUNC_EVERY_50_MSECOND:
+      if (teleinfo_enabled && (TasmotaGlobal.uptime > 4)) TeleinfoEvery50ms ();
       break;
     case FUNC_EVERY_SECOND:
       TeleinfoEverySecond ();
@@ -1361,7 +1340,7 @@ bool Xsns99 (uint8_t function)
       break;
 #endif  // USE_WEBSERVER
   }
-  return result;
+  return false;
 }
 
 #endif   // USE_TELEINFO
