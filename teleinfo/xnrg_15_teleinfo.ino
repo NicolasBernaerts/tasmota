@@ -657,8 +657,8 @@ void TeleinfoShowJSON (bool append)
   str_json += "}";
 
   // generate MQTT message according to append mode
-  if (append == true) ResponseAppend_P(PSTR(",%s"),str_json.c_str ());
-  else ResponseAppend_P(PSTR("{%s}"),str_json.c_str ());
+  if (append == true) ResponseAppend_P (PSTR(",%s"), str_json.c_str ());
+  else Response_P (PSTR("{%s}"), str_json.c_str ());
 
   // publish it if not in append mode
   if (!append) MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));

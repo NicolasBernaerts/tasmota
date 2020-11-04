@@ -99,7 +99,7 @@ void TimezoneShowJSON (bool append)
 
   // if append mode, add json string to MQTT message
   if (append) ResponseAppend_P (PSTR(",%s"),str_json.c_str ());
-  else Response_P (PSTR("{%s}"),str_json.c_str ());
+  else Response_P (PSTR("{%s}"), str_json.c_str ());
   
   // publish it if not in append mode
   if (!append) MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));

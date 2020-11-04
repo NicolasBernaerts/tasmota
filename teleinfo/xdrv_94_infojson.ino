@@ -45,7 +45,7 @@ void InfoShowJSON ()
   str_json += ",\"" + String (D_JSON_INFO_MAC) + "\":\"" + WiFi.macAddress() + "\"";
 
   // append JSON to MQTT message
-  ResponseAppend_P(PSTR("%s"),str_json.c_str ());
+  ResponseAppend_P (PSTR("%s"), str_json.c_str ());
 }
 
 /***********************************************\
