@@ -38,15 +38,14 @@
 // Show JSON status (for MQTT)
 void InfoShowJSON ()
 {
-  String str_mqtt;
+  String str_json;
 
   // append to MQTT message
-  str_mqtt = String (mqtt_data);
-  str_mqtt += ",\"" + String (D_JSON_INFO_IP) + "\":\"" + WiFi.localIP().toString() + "\"";
-  str_mqtt += ",\"" + String (D_JSON_INFO_MAC) + "\":\"" + WiFi.macAddress() + "\"";
+  str_json  = ",\"" + String (D_JSON_INFO_IP) + "\":\"" + WiFi.localIP().toString() + "\"";
+  str_json += ",\"" + String (D_JSON_INFO_MAC) + "\":\"" + WiFi.macAddress() + "\"";
 
-  // place JSON back to MQTT data
-  snprintf_P (mqtt_data, sizeof(mqtt_data), str_mqtt.c_str ());
+  // append JSON to MQTT message
+  ResponseAppend_P(PSTR("%s"),str_json.c_str ());
 }
 
 /***********************************************\
@@ -64,19 +63,19 @@ void InfoWebPageJson ()
   // generate version string
   json_version  = "{";
   json_version += "\"Module\":\"" + ModuleName() + "\",";
-  json_version += "\"" + String (D_PROGRAM_VERSION) + "\":\"" + my_version + "\",";
+  json_version += "\"" + String (D_PROGRAM_VERSION) + "\":\"" + String (TasmotaGlobal.version) + "\",";
   json_version += "\"Extension type\":\"" + String (EXTENSION_NAME) + "\",";
   json_version += "\"Extension version\":\"" + String (EXTENSION_VERSION) + "\",";
   json_version += "\"Extension author\":\"" + String (EXTENSION_AUTHOR) + "\",";
   json_version += "\"" + String (D_UPTIME) + "\":\"" + GetUptime() + "\",";
   json_version += "\"" + String (D_FRIENDLY_NAME) + "\":\"" + SettingsText(SET_DEVICENAME) + "\",";
   json_version += "\"" + String (D_SSID) + "\":\"" + SettingsText(SET_STASSID1 + Settings.sta_active) + " (" + WifiGetRssiAsQuality(WiFi.RSSI()) + "%%)\",";
-  json_version += "\"" + String (D_HOSTNAME) + "\":\"" + my_hostname + "\",";
+  json_version += "\"" + String (D_HOSTNAME) + "\":\"" + String (TasmotaGlobal.hostname) + "\",";
   json_version += "\"" + String (D_IP_ADDRESS) + "\":\"" + WiFi.localIP().toString() + "\",";
   json_version += "\"" + String (D_MAC_ADDRESS) + "\":\"" + WiFi.macAddress() + "\",";
   json_version += "\"" + String (D_MQTT_HOST) + "\":\"" + SettingsText(SET_MQTT_HOST) + "\",";
   json_version += "\"" + String (D_MQTT_PORT) + "\":\"" + Settings.mqtt_port + "\",";
-  json_version += "\"" + String (D_MQTT_FULL_TOPIC) + "\":\"" + GetTopic_P(stopic, CMND, mqtt_topic, "") + "\"";
+  json_version += "\"" + String (D_MQTT_FULL_TOPIC) + "\":\"" + GetTopic_P(stopic, CMND, TasmotaGlobal.mqtt_topic, "") + "\"";
   json_version += "}";
 
   // publish public page

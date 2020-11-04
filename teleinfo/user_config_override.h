@@ -71,8 +71,6 @@
 #define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_TELEINFO                          // Add support for Teleinfo
 
-#define USE_ETHERNET                          // Add ethernet support for ESP32
-
 #define EXTENSION_VERSION "5.4"               // version
 #define EXTENSION_NAME "Teleinfo"             // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
@@ -147,6 +145,8 @@
 
 #undef USE_I2C                                // Disable all I2C sensors and devices
 #undef USE_SPI                                // Disable all SPI devices
+
+#undef USE_SERIAL_BRIDGE                      // Disable support for software Serial Bridge (+0k8 code)
 
 #undef USE_ENERGY_MARGIN_DETECTION            // Add support for Energy Margin detection (+1k6 code)
 #undef USE_ENERGY_POWER_LIMIT                 // Add additional support for Energy Power Limit detection (+1k2 code)
