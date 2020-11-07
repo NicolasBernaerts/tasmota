@@ -22,6 +22,7 @@
     16/10/2020 - v2.2   - Handle priorities as list of device types
                           Add randomisation to reconnexion
     23/10/2020 - v2.3   - Update control page in real time
+    05/11/2020 - v2.4   - Tasmota 9.0 compatibility
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -69,7 +70,7 @@
 #define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_OFFLOADING                        // Add support for MQTT maximum power offloading
 
-#define EXTENSION_VERSION "2.3"               // version
+#define EXTENSION_VERSION "2.4"               // version
 #define EXTENSION_NAME "Offloading"           // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 
@@ -83,11 +84,11 @@
 #undef MQTT_PASS
 #define MQTT_PASS          ""
 #undef MQTT_TOPIC
-#define MQTT_TOPIC         "delestage_%06X"
+#define MQTT_TOPIC         "offload_%06X"
 #undef MQTT_FULLTOPIC
 #define MQTT_FULLTOPIC     "%topic%/%prefix%/"
 #undef FRIENDLY_NAME
-#define FRIENDLY_NAME      "Delestage"
+#define FRIENDLY_NAME      "Offload"
 
 //#undef USE_ENERGY_SENSOR                    // Disable energy sensors
 #undef USE_ARDUINO_OTA                        // support for Arduino OTA
@@ -144,6 +145,8 @@
 #undef USE_I2C                                // Disable all I2C sensors and devices
 #undef USE_SPI                                // Disable all SPI devices
 
+#undef USE_SERIAL_BRIDGE                      // Disable support for software Serial Bridge (+0k8 code)
+
 #undef USE_ENERGY_MARGIN_DETECTION            // Add support for Energy Margin detection (+1k6 code)
 #undef USE_ENERGY_POWER_LIMIT                 // Add additional support for Energy Power Limit detection (+1k2 code)
 #undef USE_PZEM004T                           // Add support for PZEM004T Energy monitor (+2k code)
@@ -164,3 +167,4 @@
 #endif
 
 #endif  // _USER_CONFIG_OVERRIDE_H_
+
