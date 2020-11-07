@@ -3,7 +3,8 @@ Teleinfo Tasmota firmware for Linky energy meters
 
 This evolution of Tasmota firmware has been enhanced to handle France energy meters using **Teleinfo** protocol. These meters are widely known as **Linky**.
 
-This implementation handles mono and tri-phases and provides some real time consumption graphs. Please note that it is a completly different implementation than the one published early 2020 by Charles Hallard. 
+This implementation handles single-phase (monophase) and three-phase (triphase). It provides some real time consumption graphs.
+Please note that it is a completly different implementation than the one published early 2020 by Charles Hallard. 
 
 It provides Teleinfo data thru MQTT to allow easy offloading of electrical appliances or heaters.
 Teleinfo data have been slightly adapted to handle easily mono-phase and tri-phase meters.
@@ -36,13 +37,10 @@ Between your Energy meter and your Tasmota device, you'll need an adapter like t
 
 With modern Linky meters, **4.7k** resistor should be replaced by a **1.5k** resistor.
 
-You need to connect your adapter output **Tx** to your Tasmota **Rx** port.
+You need to connect your adapter output **Tx** to your Tasmota **Rx** port and to declare in Tasmota :
+  * **RX GPIO3** to **TInfo RX**
 
-Then, you need to declare in Tasmota :
-  * **Serial Out** to **Serial Tx** (unused)
-  * **Serial In** to **Serial RX**
-
-Finaly, you need to select your Teleinfo adapter baud rate :
+Finaly, in **Configure Teleinfo** you need to select your Teleinfo adapter baud rate :
   * **Teleinfo 1200** (original white meter or green Linky)
   * **Teleinfo 9600**
 
@@ -59,10 +57,6 @@ MQTT result should look like that :
     compteur/tele/SENSOR = {"TIC":{"SINSTS":480,"SINSTS1":480,"IINST1":2.1,"ADIR1":8,"SINSTS2":0,"IINST2":0.0,"ADIR2":0,"SINSTS3":0,"IINST3":0.0,"ADIR3":0}}
     compteur/tele/SENSOR = {"TIC":{"SINSTS":480,"SINSTS1":160,"IINST1":0.7,"ADIR1":2,"SINSTS2":0,"IINST2":0.0,"ADIR2":0,"SINSTS3":320,"IINST3":1.4,"ADIR3":5}}
     compteur/tele/SENSOR = {"TIC":{"SINSTS":470,"SINSTS1":470,"IINST1":2.0,"ADIR1":7,"SINSTS2":0,"IINST2":0.0,"ADIR2":0,"SINSTS3":0,"IINST3":0.0,"ADIR3":0}}
-
-If you want to compile the firmware, don't forget to uncomment following line in **my_user_config.h**
-
-    #define USE_CONFIG_OVERRIDE             // Uncomment to use user_config_override.h file. See README.md
 
 
 Complete setup guide is available at http://www.bernaerts-nicolas.fr/iot/...
