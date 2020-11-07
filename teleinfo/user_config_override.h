@@ -1,7 +1,7 @@
 /*
   user_config_override.h - user configuration overrides my_user_config.h for Tasmota
 
-  Copyright (C) 2020  Nicolas Bernaerts
+  Copyright (C) 2020  Theo Arends, Nicolas Bernaerts
 
     05/05/2019 - v1.0   - Creation
     16/05/2019 - v1.1   - Add Tempo and EJP contracts
@@ -51,10 +51,7 @@
  *   To modify the stock configuration without changing the my_user_config.h file:
  *   (1) copy this file to "user_config_override.h" (It will be ignored by Git)
  *   (2) define your own settings below
- *   (3) for platformio:
- *         All done.
- *       for Arduino IDE:
- *         enable define USE_CONFIG_OVERRIDE in my_user_config.h
+ *
  ******************************************************************************************************
  * ATTENTION:
  *   - Changes to SECTION1 PARAMETER defines will only override flash settings if you change define CFG_HOLDER.
@@ -62,6 +59,7 @@
  *   - You still need to update my_user_config.h for major define USE_MQTT_TLS.
  *   - All parameters can be persistent changed online using commands via MQTT, WebConsole or Serial.
 \*****************************************************************************************************/
+
 
 /********************************************\
  *    Pilotwire firmware configuration

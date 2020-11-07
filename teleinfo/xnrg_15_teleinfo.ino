@@ -657,7 +657,7 @@ void TeleinfoShowJSON (bool append)
   str_json += "}";
 
   // generate MQTT message according to append mode
-  if (append == true) ResponseAppend_P (PSTR(",%s"), str_json.c_str ());
+  if (append) ResponseAppend_P (PSTR(",%s"), str_json.c_str ());
   else Response_P (PSTR("{%s}"), str_json.c_str ());
 
   // publish it if not in append mode
@@ -736,11 +736,11 @@ void TeleinfoWebGraphUpdate ()
 // append Teleinfo graph button to main page
 void TeleinfoWebMainButton ()
 {
-  // Teleinfo graph page button
-  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), D_PAGE_TELEINFO_GRAPH, D_TELEINFO_GRAPH);
-
   // Teleinfo message page button
   WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), D_PAGE_TELEINFO_TIC, D_TELEINFO_MESSAGE);
+
+  // Teleinfo graph page button
+  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), D_PAGE_TELEINFO_GRAPH, D_TELEINFO_GRAPH);
 }
 
 // append Teleinfo configuration button to configuration page
@@ -855,7 +855,7 @@ void TeleinfoWebPageTic ()
 
   // page style
   WSContentSend_P (PSTR ("<style>\n"));
-  WSContentSend_P (PSTR ("body {color:white;background-color:#303030;font-family:Arial, Helvetica, sans-serif;}\n"));
+  WSContentSend_P (PSTR ("body {color:white;background-color:#252525;font-family:Arial, Helvetica, sans-serif;}\n"));
   WSContentSend_P (PSTR ("div {width:100%;margin:12px auto;padding:3px 0px;text-align:center;vertical-align:middle;}\n"));
   WSContentSend_P (PSTR ("div.title {font-size:5vw;font-weight:bold;}\n"));
   WSContentSend_P (PSTR ("span {font-size:4vw;padding:0.5rem 1rem;border-radius:1rem;background:#4d82bd;}\n"));
@@ -1215,7 +1215,7 @@ void TeleinfoWebPageGraph ()
 
   // page style
   WSContentSend_P (PSTR ("<style>\n"));
-  WSContentSend_P (PSTR ("body {color:white;background-color:#303030;font-family:Arial, Helvetica, sans-serif;}\n"));
+  WSContentSend_P (PSTR ("body {color:white;background-color:#252525;font-family:Arial, Helvetica, sans-serif;}\n"));
   WSContentSend_P (PSTR ("div {width:100%%;margin:12px auto;padding:3px 0px;text-align:center;vertical-align:middle;}\n"));
   WSContentSend_P (PSTR (".title {font-size:5vw;font-weight:bold;}\n"));
   WSContentSend_P (PSTR ("div.papp {display:inline-block;width:auto;padding:0.25rem 0.75rem;margin:0.5rem;border-radius:8px;}\n"));
