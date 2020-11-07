@@ -12,7 +12,9 @@
     07/07/2020 - v1.6.1 - Enable discovery (mDNS)
     21/09/2020 - v1.7   - Add switch and icons on control page
                           Based on Tasmota 8.4
-
+    28/10/2020 - v1.8   - Real time graph page update
+    06/11/2020 - v1.9   - Tasmota 9.0 compatibility
+ 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
@@ -59,7 +61,7 @@
 #define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_MOTION                            // Add support for Motion detection
 
-#define EXTENSION_VERSION "1.7"               // version
+#define EXTENSION_VERSION "1.9"               // version
 #define EXTENSION_NAME "Motion"               // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 
@@ -131,12 +133,13 @@
 #undef USE_DS18x20                            // Add support for DS18x20 sensors with id sort, single scan and read retry (+2k6 code)
 #undef USE_DHT                                // Disable internal DHT sensor
 
+#undef USE_SPI                                // Disable all SPI devices
 #undef USE_I2C                                // Disable all I2C sensors and devices
 #define USE_SHT                                // [I2cDriver8] Enable SHT1X sensor (+1k4 code)
 #define USE_HTU                                // [I2cDriver9] Enable HTU21/SI7013/SI7020/SI7021 sensor (I2C address 0x40) (+1k5 code)
 #define USE_BMP                                // [I2cDriver10] Enable BMP085/BMP180/BMP280/BME280 sensors (I2C addresses 0x76 and 0x77) (+4k4 code)
 
-#undef USE_SPI                                // Disable all SPI devices
+#undef USE_SERIAL_BRIDGE                      // Disable support for software Serial Bridge (+0k8 code)
 
 #undef USE_ENERGY_MARGIN_DETECTION            // Add support for Energy Margin detection (+1k6 code)
 #undef USE_ENERGY_POWER_LIMIT                 // Add additional support for Energy Power Limit detection (+1k2 code)

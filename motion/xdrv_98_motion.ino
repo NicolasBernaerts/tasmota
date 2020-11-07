@@ -12,6 +12,8 @@
     07/07/2020 - v1.6.1 - Enable discovery (mDNS)
     21/09/2020 - v1.7   - Add switch and icons on control page
                           Based on Tasmota 8.4
+    28/10/2020 - v1.8   - Real time graph page update
+    06/11/2020 - v1.9   - Tasmota 9.0 compatibility
                    
   Input devices should be configured as followed :
    - Switch2 = Motion detector
@@ -49,17 +51,19 @@
 #define MOTION_JSON_UPDATE           5000        // update JSON every 5 sec
 #define MOTION_WEB_UPDATE            5           // update Graph Web page every 5 sec
 
-#define MOTION_GRAPH_STEP            2           // collect motion status every 2mn
-#define MOTION_GRAPH_SAMPLE          720         // 24 hours display with collect every 2 mn
 #define MOTION_GRAPH_WIDTH           800      
 #define MOTION_GRAPH_HEIGHT          400 
+#define MOTION_GRAPH_SAMPLE          800
+#define MOTION_GRAPH_REFRESH         108         // collect data every 108 sec to get 24h graph with 800 samples
 #define MOTION_GRAPH_PERCENT_START   10      
 #define MOTION_GRAPH_PERCENT_STOP    90      
 
 #define D_PAGE_MOTION_CONFIG         "config"
-#define D_PAGE_MOTION_TOGGLE         "toggle"
+#define D_PAGE_MOTION_ENABLE         "enable"
 #define D_PAGE_MOTION_CONTROL        "control"
 #define D_PAGE_MOTION_JSON           "json"
+#define D_PAGE_MOTION_BASE_SVG       "base.svg"
+#define D_PAGE_MOTION_DATA_SVG       "data.svg"
 
 #define D_CMND_MOTION_ENABLE         "enable"
 #define D_CMND_MOTION_FORCE          "force"
@@ -113,37 +117,60 @@ const char kMotionCommands[] PROGMEM = D_CMND_MOTION_ENABLE "|" D_CMND_MOTION_FO
 // form topic style
 const char MOTION_TOPIC_STYLE[] PROGMEM = "style='float:right;font-size:0.7rem;'";
 
-// graph data structure
-struct graph_value {
-    uint8_t is_enabled : 1;
-    uint8_t is_detected : 1;
-    uint8_t is_active : 1;
-}; 
+/****************************************\
+ *               Icons
+ * 
+ *      xxd -i -c 256 icon.png
+\****************************************/
 
-// light off icon
-const char light_off_0[] PROGMEM = "iVBORw0KGgoAAAANSUhEUgAAAIAAAACAAQMAAAD58POIAAAC4HpUWHRSYXcgcHJvZmlsZSB0eXBlIGV4aWYAAHja7ZdbktwgDEX/WUWWgCSEYDmYR1V2kOXnghn3YzqpyiQf+WhoG6PGV0IHmGnXf3wf7hsKZWEX1FLMMXqUkEPmgofkz3K25MO635lW/8Huri8YJkErZzf2Pb7ArrcXLGz78Wh3VrdO2kJ0Ca8i0/N8bjuiLSR82mn3Xd4vlHg3nX1x3bJb/LkfDMloCj3kiLuQ+HXn05OcV8GVcWdhDPTLoqhFRF7kz12pe5HA6+kpf/4jMrml4xT6mFZ8ytO2kz7Z5XLDDxERX575PiKTy8Wn/I3R0hj9nF0J0SFdcU/qYyrrCQMPpFPWaxHVcCmebdWMmnzxFdQapno4f6CTiZHxQYEaFRrUV1upIsTAnQ0tc2VZtiTGmSvSTxJmpcHmQKZJApsKcgIzX7HQ8punPzhL8NwII5kgRpPmfXXPhq/WB6Ex5jIn8unKFeLiub4QxiQ37xgFIDR2TnXll9zZ+OcywQoI6kpzwgSLP06JQ+m2tmRxFq8OQ4M/9wtZ2wJIEXwrgiEBAR9JlCJ5YzYi5DGBT0HkLIEPECB1yg1RchCJgJN4+sY7RmssK59mHC8AoRLFgAZbB7BC0BCx3xKWUHHYPkFVo5omzVqixBA1xmhxnlPFxIKpRTNLlq0kSSFpislSSjmVzFlwjKnLMVtO";
-const char light_off_1[] PROGMEM = "OedS4LSEAq2C8QWGgw85wqFHPOxIRz5KxfKpoWqN1WqquZbGTRqOANdis5ZabqVTx1LqoWuP3XrquZeBtTZkhKEjDhtp5FEuapvqI7Vncr+nRpsaL1BznN2owWz2IUHzONHJDMQ4EIjbJIAFzZOZTxQCT3KTmc8sTkQZUeqE02gSA8HQiXXQxe5G7pfcHLL7p9z4FTk30f0Lcm6iuyP3mdsLaq2s41YWoLkLkVOckILtN0ItnPDBn5Ovtc7/pcBb6C30FnoLvYXeQm+h/0pIBv55yPg59RMYVJG1wNq/pAAAAYRpQ0NQSUNDIHByb2ZpbGUAAHicfZE9SMNAHMVfU6UqFQeriDhkqE4WpIo4ahWKUCHUCq06mFz6BU0akhQXR8G14ODHYtXBxVlXB1dBEPwAcXJ0UnSREv/XFFrEeHDcj3f3HnfvAKFWYprVMQFoum0m4zExnVkVA6/oxgAGEUVEZpYxJ0kJeI6ve/j4ehfhWd7n/hy9atZigE8knmWGaRNvEE9v2gbnfeIQK8gq8TnxuEkXJH7kuuLyG+d8gwWeGTJTyXniELGYb2OljVnB1IiniMOqplO+kHZZ5bzFWStVWPOe/IXBrL6yzHWaI4hjEUuQIEJBBUWUYCNCq06KhSTtxzz8ww2/RC6FXEUwciygDA1yww/+B7+7tXKTUTcpGAM6XxznYxQI7AL1quN8HztO/QTwPwNXestfrgEzn6RXW1r4COjbBi6uW5qy";
-const char light_off_2[] PROGMEM = "B1zuAENPhmzKDclPU8jlgPcz+qYM0H8L9Ky5vTX3cfoApKirxA1wcAiM5Sl73ePdXe29/Xum2d8P2Why0HatJjcAAAAGUExURQAAAMzMzMhPwDIAAAABdFJOUwBA5thmAAAAAWJLR0QAiAUdSAAAAAlwSFlzAAAuIwAALiMBeKU/dgAAAAd0SU1FB+QJFRY3Hll1dH0AAAEXSURBVEjH7ZRBEoMgDEVhXLjkCNykuVnxaB7FI7hk4ZgKjuWHOMV20emiWckTkg/8YMw/fjl4leOeeRSAmGe5gnnBsd0AyxSz5wGAW7dJEwAfjQmYlaYdPiNsInoskyp0oNXmbwBdnh0A5HxUhPRzDbImX/brMnAAxoJ35UNZCKArmyEFzCmwZbu3GtzPgWmD5SugqePV5ugigBNTh6yvYayAujlXX/ZuBwDKMMpSdjmseMT6tCL6FI0btnw9WpvGozZod9geaeCxC9N0AdJRELZY0k6iK6NQvmu/i0Y+A6Kz0+82iBWwEtyagH4F1C+dPwGTAK4G6vm08m38KFRS1wRqyaUqw5tVFOjqHBcixBosTRAvZ38AMfuyChOeJEwAAAAASUVORK5CYII=";
-
-// light off icon
-const char light_on_0[] PROGMEM = "iVBORw0KGgoAAAANSUhEUgAAAIAAAACAAQMAAAD58POIAAAC5npUWHRSYXcgcHJvZmlsZSB0eXBlIGV4aWYAAHja7ZdLkt0gDEXnrCJLQBJCsBw+pio7yPJzwTy/T3dS6VQGGTy7bYwaX4l7MEm748f34b7hoCzBBbUUc4weR8ghc8FD8udxtuTDuj+EVv8p7q5fMEKCVs5uPPb4grjeX7Cw4/U57qxtnbSF6BJeh8zM87nviraQ8Bmn3Xd5v1Diw3T2xW3LbvHXfjCY0RV6wo4PIfHrzmcmOa+CK+POwhjoV0TRKxIkfPTPXdZ9YuD19OKfv1UmdztOodu04otPO076EpcrDT9VRHxl5seKTK8UH/wbo6cxjnN2JUQHu+Ke1G0q6wkDK+yU9VrEabgUz7bOjDP54huodUy1Ol/RycRwfFCgToUGHatt1FBi4IMNLXNjWbEkxpkb7KdpvAQabA5kuiTQaCAnCPNVC628eeZDsoTMnTCSCWI0aT6e7jXwt+eT0BhzmRP5dHmFuniuL5Qxyc07RgEIje2pLn/JnY1/PSZYAUFdNidMsPh6SlSl+9qSxVm8OgwN/vxeyPoWgEXIrSiGBAR8JFGK5I3ZiOBjAp+CylkCVxAgdcodVXIQiYCTeObGO0ZrLCufYWwvAKESxYAGnw5ghaAh4ntLWELFqWhQ1aimSbOWKDFEjTFanPtUMbFgatHMkmUrSVJImmKylFJOJXMWbGPqcsyW";
-const char light_on_1[] PROGMEM = "U865FCQtoUCrYHxBoHKVGqrWWK2mmmtpWD4tNG2xWUstt9K5S8cW4Hrs1lPPvRx0YCkd4dAjHnakIx9lYK0NGWHoiMNGGnmUi9qm+kztldzvqdGmxgvUHGd3agib3SRobic6mYEYBwJxmwSwoHky84lC4EluMvOZxYkoo0qdcDpNYiAYDmIddLG7k/slNwd3v8qNPyPnJrp/Qc5NdA/kPnL7hFova7uVBWh+hfAUO6Tg8xsxFcZPHXCoNl69+W/UH7fuqy+8hd5Cb6G30FvoLfQW+v+FBv4DkfEn1U9ib5Md89WKuQAAAYRpQ0NQSUNDIHByb2ZpbGUAAHicfZE9SMNAHMVfU6UqFQeriDhkqE4WpIo4ahWKUCHUCq06mFz6BU0akhQXR8G14ODHYtXBxVlXB1dBEPwAcXJ0UnSREv/XFFrEeHDcj3f3HnfvAKFWYprVMQFoum0m4zExnVkVA6/oxgAGEUVEZpYxJ0kJeI6ve/j4ehfhWd7n/hy9atZigE8knmWGaRNvEE9v2gbnfeIQK8gq8TnxuEkXJH7kuuLyG+d8gwWeGTJTyXniELGYb2OljVnB1IiniMOqplO+kHZZ5bzFWStVWPOe/IXBrL6yzHWaI4hjEUuQIEJBBUWUYCNCq06KhSTtxzz8ww2/RC6FXEUwciygDA1yww/+B7+7tXKTUTcpGAM6XxznYxQI7AL1quN8HztO/QTwPwNXestfrgEzn6RXW1r4COjb";
-const char light_on_2[] PROGMEM = "Bi6uW5qyB1zuAENPhmzKDclPU8jlgPcz+qYM0H8L9Ky5vTX3cfoApKirxA1wcAiM5Sl73ePdXe29/Xum2d8P2Why0HatJjcAAAAGUExURQAAAP//MzcLEUYAAAABdFJOUwBA5thmAAAAAWJLR0QAiAUdSAAAAAlwSFlzAAAuIwAALiMBeKU/dgAAAAd0SU1FB+QJFRY0LLqPdj4AAAGKSURBVEjH3ZRLcsMgDIbl8YJNJtwg3CRcpSexfTTnJu4NWLJgTJENQoBTu111qg0zn6PXL0UAb6yfKiD+K7gl8BHBI7bfmQhU0oRA9BdLBHKObwLpi5orX51Sd3Z/RyrE7c9KYADwK/FgTxDez8lzK1V7b6hQgDt47x0sub0uAF80743yXAC5hh8xD1AhwWgY0MsOycbQlnAMYIZ+ZVnXshXoXdks9LaQI8QzNVgKBZO6koG5ED0NRtSgz83oBsAhYCI/azAcA7AkcAJ6E1p4G4HTfj4GJoOpCOrqLOfAnoHvmtMXAVOsEbkdw1yBZnKyHva+Dgw0C9OsVOfSKiZbaRX5nvLFHUM8wVb7rnG1TU77wBLkZ27uiaWqF9MUS1WvHNWhFHoi0FmsXadpoFQo5xiV3JTB2gc6LKjPBmjZwxeHoyYN1TZMl2V/REDX4LaBkIj9twc+yH3+Z0D/FRAuXQHUAVgKIGuA57MAXXkbf2VNUHkKGpdLWaYfZmlAX8e4YKOtgTsF9nL0LxjZ7CIu";
-const char light_on_3[] PROGMEM = "/K0ZAAAAAElFTkSuQmCC";
-
-// motion icon
-const char motion_0[] PROGMEM = "iVBORw0KGgoAAAANSUhEUgAAAIAAAACAAQMAAAD58POIAAAC5npUWHRSYXcgcHJvZmlsZSB0eXBlIGV4aWYAAHja7ZdbstwqDEX/GUWGgCSEYDg8qzKDDD8b7HY/TudWnVv5yEebsgEZS2IvoLrd+PVzuh+4KEtwQS3FHKPHFXLIXNBI/riOmnzYzwfT7j/Z3fWCYRLUcnTjOMcX2PX+gYXTXp/tztrpJ52Ozhc3h7IiMxr9zOh0JHzY6ey7zEejxIfpnPdsnJdJ6/HqtR8MYnSFP2HHQ0j8fvIRSY674M54skQMJIloq9i2h6/6uUu6NwJerRf9fDvtcpfjcHSbVnzR6bSTvtdvq/SYEfEVmR8zMr1CfNVv9jTnOGZXQnSQK56Tuk1ltzAQkgbZn0UUw61o2y4ZJfniG6h1TLU6X9HJxFB8UqBOhSaNXTdqSDHwYEPN3Fi2LYlx5iYLQViFJpsDmS4JbBrICcx85UI7bl7xECwhcieMZIIzMH4u7tXwf8uToznXMify6dIKefFaX0hjkVtPjAIQmqemuvUld1T+9VpgBQR1y5wwweLr4aIq3deWbM7i1WFo8Md+IeunA0iE2IpkSEDARxKlSN6YjQg6JvApyJwlcAUBUqfckSUHwU4wTrxi4xujPZaVDzOOF4BQbBQDGmwdwApBQ8R+S1hCxaloUNWopkmzligxRI0xWlznVDGxYGrRzJJlK0lSSJpispRSTiVzFhxj6nL";
-const char motion_1[] PROGMEM = "MllPOuRQELaHAV8H4AkPlKjVUrbFaTTXX0rB8WmjaYrOWWm6lc5eOI8D12K2nnnsZNLCURhg64rCRRh5lYq1NmWHqjNNmmnmWi9pJ9ZnaK7n/pkYnNd6g1ji7U4PZ7OaC1nGiixmIcSAQt0UAC5oXM58oBF7kFjOfWZyIMrLUBafTIgaCYRDrpIvdndwfuTmo+11u/I6cW+j+Bjm30D2Q+8rtDbVe9nErG9DahdAUJ6Rg+42M+JzKbKXNihOLV9d/o3bf/eDj6OPo4+jj6OPo4+jj6N93JPgBgf+Q7jcd8pR3c5XVzAAAAYRpQ0NQSUNDIHByb2ZpbGUAAHicfZE9SMNAHMVfW6UqVQc7SHHIUJ0siBZx1CoUoUKoFVp1MLn0C5o0JCkujoJrwcGPxaqDi7OuDq6CIPgB4uTopOgiJf4vKbSI8eC4H+/uPe7eAf5Ghalm1wSgapaRTiaEbG5VCL6iFxEMIA6fxEx9ThRT8Bxf9/Dx9S7Gs7zP/Tn6lbzJAJ9APMt0wyLeIJ7etHTO+8RhVpIU4nPicYMuSPzIddnlN85Fh/08M2xk0vPEYWKh2MFyB7OSoRLHiaOKqlG+P+uywnmLs1qpsdY9+QtDeW1lmes0R5DEIpYgQoCMGsqowEKMVo0UE2naT3j4I45fJJdMrjIYORZQhQrJ8YP/we9uzcLUpJsUSgDdL7b9MQoEd4Fm3ba/j227eQIEnoErre2vNoCZT9LrbS16BA";
-const char motion_2[] PROGMEM = "xuAxfXbU3eAy53gOEnXTIkRwrQ9BcKwPsZfVMOGLoF+tbc3lr7OH0AMtRV6gY4OATGipS97vHuns7e/j3T6u8HaXFyo/QMiGIAAAAGUExURQAAAP+ZALt8vHEAAAABdFJOUwBA5thmAAAAAWJLR0QAiAUdSAAAAAlwSFlzAAAuIwAALiMBeKU/dgAAAAd0SU1FB+QJGg45BHDCQhcAAAHvSURBVEjH7dVBit0wDAZgGw9kU/AFCp4jdNlFaS5WxoFZzLJXMvQihl7AQzcuDVH1S07iJK99FLqcQHjke8mTLMl5xrwd/+uYT9eWTuBoOsJA6Qj+LgTK/wr+CulOHsM5U3dei1n+XIjH/uKBzw/6G0U+3vH5RfPQin3mM2rqy/bTGi/qB23xqPkNsLMmqqmPk3GzLkUXNybjqk1YPcBNAYCcRkKBfFKoiAoIgKEMFUEEss+Awp0l4ge9QGbgqFQBA8AXRBUoDHKbV5DHFX4SzSiKQjL+lWhpEBJD+K6AnCSZ8I0WOsHMy11hEojZWAWuQXhm4ITnFcZnquPcwwvVQCfwNO0QGRylFbg+X6larsgOnstxgfEM/ghcqmS2KE+YW9eFZcDA7PApoIId8KjPOwQBTIXdCtRgrxiafYGpgbQBkLa+4A4dh6GunTPxFzKTVkqzTfyxNbvBKzLTccBtJhYFnSCMVInLOlJVII8kQ5fbWFIOnFkbS8tNpcxtMYMM7mwx+1k27sSjLcPPd";
-const char motion_3[] PROGMEM = "zgZdq6NlUJw1wTipPsFXyu0DYSNvgH1gIsneVkgULv42MP7ttWxawUe2pbn+TKxf+cIlA5ivQFjD6hwD/YK+Qiy9LH+BeStdoFwAHMHHKrme0DlfZ8YYCjnP4Pp7Q/yxvEbGrauux+HTt4AAAAASUVORK5CYII=";
-
-// icons associated to motion detection
-enum MotionIcons { MOTION_LIGHT_OFF, MOTION_LIGHT_ON, MOTION_DETECTED };
-const char* motion_icon[][4] PROGMEM = { 
-  {light_off_0, light_off_1, light_off_2, nullptr   },    // LIGHT_OFF
-  {light_on_0,  light_on_1,  light_on_2,  light_on_3},    // LIGHT_ON
-  {motion_0,    motion_1,    motion_2,    motion_3  }     // MOTION_ON
+// bulb icons
+unsigned char motion_light_off_png[] PROGMEM = {
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x80, 0x02, 0x03, 0x00, 0x00, 0x00, 0xbe, 0x50, 0x89, 0x58, 0x00, 0x00, 0x00, 0x09, 0x50, 0x4c, 0x54, 0x45, 0x00, 0x00, 0xc0, 0x00, 0x00, 0x00, 0xcc, 0xcc, 0xcc, 0x22, 0x56, 0x0f, 0xb6, 0x00, 0x00, 0x00, 0x01, 0x74, 0x52, 0x4e, 0x53, 0x00, 0x40, 0xe6, 0xd8, 0x66, 0x00, 0x00, 0x00, 0x01, 0x62, 0x4b, 0x47, 0x44, 0x00, 0x88, 0x05, 0x1d, 0x48, 0x00, 0x00, 0x00, 0x09, 0x70, 0x48, 0x59, 0x73, 0x00, 0x00, 0x2e, 0x23, 0x00, 0x00, 0x2e, 0x23, 0x01, 0x78, 0xa5, 0x3f, 0x76, 0x00, 0x00, 0x00, 0x07, 0x74, 0x49, 0x4d, 0x45, 0x07, 0xe4, 0x0a, 0x12, 0x14, 0x0e, 0x09, 0x0d, 0xd1, 0xea, 0x07, 0x00, 0x00, 0x01, 0x1f, 0x49, 0x44, 0x41, 0x54, 0x58, 0xc3, 0xed, 0x96, 0x4b, 0x0e, 0xc4, 0x20, 0x08, 0x86, 0x8d, 0x4b, 0x8e, 0xe2, 0x29, 0x39, 0x0a, 0x4b, 0xc2, 0x29, 0x67, 0xd2, 0x9a, 0xd6, 0xb6, 0x3c, 0xda, 0xd1, 0xc9, 0x24, 0x13, 0x59, 0x99, 0xfa, 0x15, 0x7e, 0x7c, 0x80, 0x29, 0x4d, 0x9b, 0x36, 0x2d, 0x30, 0x11, 0x61, 0x6f, 0xbe, 0xbc, 0x01, 0x21, 0x7b, 0x1e, 0x64, 0x31, 0x37, 0x80, 0xeb, 0x22, 0x57, 0x40, 0x3c, 0x05, 0x0b, 0x85, 0x66, 0x04, 0x5e, 0xfd, 0xb0, 0x19, 0x01, 0xab, 0x23, 0x2b, 0x07, 0x3e, 0x80, 0x8a, 0x04, 0x3a, 0x0d, 0x2e, 0x12, 0x4e, 0xae, 0x2e, 0x12, 0xb6, 0xcf, 0x3a, 0x00, 0xbb, 0xe3, 0x22, 0x3a, 0x80, 0xca, 0xf0, 0xa0, 0x31, 0x05, 0x00, 0x37, 0x72, 0xb4, 0x34, 0x5a, 0x65, 0x3a, 0x40, 0x3a, 0xbc, 0xbb, 0x45, 0x35, 0x9c, 0x0e, 0x80, 0xb8, 0x59, 0x5a, 0x40, 0x7a, 0x00, 0x64, 0x65, 0x21,
+  0x80, 0x03, 0xa0, 0x3c, 0x02, 0xd2, 0x00, 0x80, 0xfe, 0x02, 0xe8, 0x5d, 0x87, 0x8f, 0x36, 0x2b, 0xde, 0xee, 0x47, 0x80, 0x76, 0xa2, 0xc2, 0x43, 0x7b, 0xe3, 0xd8, 0x93, 0x0f, 0x84, 0x37, 0xab, 0xfd, 0xa8, 0x5f, 0xde, 0xe6, 0xfa, 0xeb, 0x40, 0x58, 0x40, 0xc2, 0x12, 0xd4, 0xf8, 0x35, 0x2a, 0xe9, 0xa6, 0x32, 0x1b, 0xb5, 0xb8, 0xa9, 0x93, 0x64, 0x54, 0x5a, 0x3c, 0x0d, 0x2c, 0x95, 0x45, 0xac, 0x6a, 0x4f, 0x5e, 0xa1, 0xdd, 0x27, 0xb2, 0xd9, 0x93, 0xaa, 0x6b, 0x1b, 0xa8, 0xa7, 0x00, 0xcc, 0x96, 0x54, 0x67, 0x40, 0xec, 0xae, 0x87, 0x5e, 0x12, 0x5b, 0xf0, 0x62, 0x37, 0xe7, 0x9b, 0x80, 0xd3, 0xbc, 0xd7, 0x7f, 0x07, 0x00, 0xe8, 0x03, 0xd9, 0x01, 0xa0, 0x1f, 0x90, 0x09, 0xdc, 0x7a, 0x89, 0xe5, 0x7b, 0x00, 0xa7, 0xe0, 0x31, 0xc7, 0x1d, 0xcf, 0xc5, 0x35, 0xc6, 0x8f, 0xdf, 0xbc, 0xa1, 0x48, 0xe9, 0x06, 0xc2, 0x10, 0x83, 0xb2, 0xc0, 0xaf, 0x66, 0x11, 0x02, 0x10, 0x69, 0x18, 0x93, 0x27, 0x46, 0x00, 0x75, 0x03, 0xc3, 0x93, 0x78, 0x01, 0x94, 0x43, 0xf1, 0x8d, 0xf0, 0xb4, 0xa5, 0x88, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82
 };
+unsigned int motion_light_off_len = 431;
+
+unsigned char motion_light_on_png[] PROGMEM = {
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x80, 0x02, 0x03, 0x00, 0x00, 0x00, 0xbe, 0x50, 0x89, 0x58, 0x00, 0x00, 0x00, 0x09, 0x50, 0x4c, 0x54, 0x45, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0x33, 0x11, 0x0f, 0x41, 0x49, 0x00, 0x00, 0x00, 0x01, 0x74, 0x52, 0x4e, 0x53, 0x00, 0x40, 0xe6, 0xd8, 0x66, 0x00, 0x00, 0x00, 0x01, 0x62, 0x4b, 0x47, 0x44, 0x00, 0x88, 0x05, 0x1d, 0x48, 0x00, 0x00, 0x00, 0x09, 0x70, 0x48, 0x59, 0x73, 0x00, 0x00, 0x2e, 0x23, 0x00, 0x00, 0x2e, 0x23, 0x01, 0x78, 0xa5, 0x3f, 0x76, 0x00, 0x00, 0x00, 0x07, 0x74, 0x49, 0x4d, 0x45, 0x07, 0xe4, 0x0a, 0x12, 0x14, 0x0e, 0x1e, 0x8e, 0x02, 0x6f, 0xc0, 0x00, 0x00, 0x01, 0xa6, 0x49, 0x44, 0x41, 0x54, 0x58, 0xc3, 0xed, 0x96, 0x4b, 0x6e, 0xc4, 0x20, 0x0c, 0x40, 0x11, 0x4b, 0x9f, 0xa4, 0xe2, 0x94, 0x1c, 0xc5, 0x4b, 0xcb, 0xa7, 0x6c, 0xf8, 0x24, 0x21, 0xc6, 0xc6, 0x93, 0x66, 0xaa, 0x76, 0x31, 0x2c, 0x46, 0x99, 0xe4, 0xf9, 0x6f, 0x0c, 0x21, 0xdc, 0x5c, 0x90, 0x1d, 0x20, 0x7d, 0x80, 0xff, 0x0f, 0xa0, 0x04, 0xbe, 0xae, 0xdf, 0x23, 0x89, 0x72, 0x47, 0x16, 0x00, 0xcb, 0xbe, 0x98, 0x00, 0x61, 0x3b, 0x91, 0x90, 0x60, 0x14, 0xff, 0x25, 0x20, 0x24, 0xa2, 0x14, 0x90, 0x36, 0x41, 0x9a, 0x94, 0x4e, 0x24, 0x9e, 0x12, 0x71, 0xd5, 0x39, 0xb9, 0xb0, 0x3b, 0xc1, 0xdc, 0x3e, 0x4d, 0x2e, 0x6c, 0x56, 0xa9, 0x6a, 0xde, 0x16, 0x2a, 0x51, 0xf7, 0x5c, 0x02, 0xd7, 0xa5, 0xe4, 0xad, 0x2c, 0xaa, 0x06, 0xba, 0x0a, 0x52, 0x0b, 0x16, 0x3b, 0xc0, 0x66, 0xa9, 0xcb, 0xb7, 0x42, 0x59, 0x25,
+  0x6f, 0x11, 0x44, 0x66, 0xdd, 0x40, 0xf9, 0x92, 0xbb, 0x22, 0x63, 0xe7, 0x77, 0xc9, 0x68, 0xd9, 0x48, 0x7b, 0x76, 0x92, 0x92, 0xa6, 0xe6, 0x82, 0x50, 0x35, 0xb9, 0x40, 0x8b, 0x4a, 0x54, 0x39, 0x5c, 0xd4, 0xf2, 0xda, 0x02, 0xa0, 0x7a, 0x39, 0x88, 0x19, 0x00, 0x2d, 0x1a, 0x4e, 0x7a, 0xa6, 0x03, 0xb8, 0x6c, 0xa8, 0x6b, 0x8f, 0x24, 0x0f, 0x00, 0x5e, 0x46, 0x69, 0x01, 0xe1, 0x06, 0xa0, 0x35, 0x2d, 0x90, 0x03, 0xa4, 0x5b, 0x40, 0x90, 0x1b, 0x71, 0x6b, 0x05, 0x09, 0xc0, 0xd0, 0xbc, 0x05, 0xc8, 0x02, 0x40, 0x68, 0x1b, 0xe4, 0x75, 0x20, 0x68, 0x40, 0x5e, 0x38, 0x89, 0x5e, 0x14, 0xcf, 0x81, 0xfc, 0x10, 0xf8, 0x51, 0xb1, 0xfc, 0x72, 0xdf, 0x02, 0xb4, 0x8e, 0x72, 0x9b, 0xf6, 0x85, 0xb6, 0xc7, 0x35, 0xe0, 0xee, 0xac, 0xf1, 0xa5, 0xbe, 0x79, 0x87, 0xed, 0xaf, 0x03, 0xee, 0x00, 0x71, 0x47, 0xd0, 0xa0, 0xd7, 0x98, 0xa4, 0x87, 0x97, 0xd1, 0x98, 0xc5, 0xc3, 0x9c, 0x44, 0x63, 0xd2, 0x66, 0xf1, 0x20, 0x0e, 0x14, 0x38, 0x47, 0x71, 0x50, 0x54, 0x44, 0x3a, 0xbc, 0x64, 0xd2, 0x8e, 0xa4, 0xad, 0xa3, 0x8e, 0x69, 0x8f, 0xc6, 0xee, 0xee, 0xe1, 0x57, 0x00, 0xb5, 0x5a, 0xf5, 0x2e, 0x28, 0x79, 0x9c, 0x81, 0xa2, 0xb4, 0x67, 0xb8, 0x70, 0x73, 0xbd, 0x81, 0x8f, 0x9e, 0x29, 0x96, 0xe6, 0x96, 0x2a, 0x22, 0xdd, 0x72, 0x7b, 0xcc, 0x5a, 0xbb, 0x9c, 0xc0, 0xe4, 0x44, 0x93, 0x68, 0x6f, 0xeb, 0xaf, 0x74, 0xa2, 0x65, 0x26, 0x9d, 0x27, 0xff, 0x74, 0xc9, 0x21, 0x01, 0x4c, 0xb9, 0xc4, 0x01, 0xc8, 0xfd, 0xac, 0x37, 0x0e, 0x9d, 0xc8, 0xf6, 0x75, 0x0e, 0x9e, 0x03, 0xfc, 0x01, 0x1a, 0xb0, 0xbc, 0x46, 0x1d, 0x37, 0x2d, 0x0f, 0xa0, 0xc5, 0xb5, 0xdb, 0x05, 0xf6,
+  0xeb, 0xe2, 0xda, 0x46, 0xf8, 0xdb, 0xe5, 0x3a, 0xc9, 0x8f, 0x01, 0xd7, 0xc4, 0x9b, 0xa2, 0xc8, 0xbf, 0x1a, 0x85, 0x0b, 0x80, 0xe7, 0xc3, 0x7b, 0xe2, 0xcc, 0x1e, 0x80, 0x8f, 0x81, 0xb7, 0x07, 0xf1, 0x0d, 0x9c, 0xe2, 0x3e, 0x78, 0x2b, 0xc4, 0x8e, 0x3c, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82
+};
+unsigned int motion_light_on_len = 566;
+
+// power switch icons
+unsigned char motion_power_off_png[] PROGMEM = {
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x80, 0x02, 0x03, 0x00, 0x00, 0x00, 0xbe, 0x50, 0x89, 0x58, 0x00, 0x00, 0x00, 0x09, 0x50, 0x4c, 0x54, 0x45, 0x00, 0x00, 0x00, 0xc8, 0x00, 0x00, 0x99, 0x99, 0x99, 0xa5, 0x4a, 0xec, 0xd5, 0x00, 0x00, 0x00, 0x01, 0x74, 0x52, 0x4e, 0x53, 0x00, 0x40, 0xe6, 0xd8, 0x66, 0x00, 0x00, 0x00, 0x01, 0x62, 0x4b, 0x47, 0x44, 0x00, 0x88, 0x05, 0x1d, 0x48, 0x00, 0x00, 0x00, 0x09, 0x70, 0x48, 0x59, 0x73, 0x00, 0x00, 0x03, 0xbb, 0x00, 0x00, 0x03, 0xbb, 0x01, 0xae, 0xf7, 0x26, 0xa5, 0x00, 0x00, 0x00, 0x07, 0x74, 0x49, 0x4d, 0x45, 0x07, 0xe4, 0x0a, 0x16, 0x04, 0x1d, 0x09, 0xff, 0x7a, 0x9f, 0xb2, 0x00, 0x00, 0x01, 0xee, 0x49, 0x44, 0x41, 0x54, 0x58, 0xc3, 0xed, 0x97, 0x4d, 0x6e, 0xc4, 0x20, 0x0c, 0x85, 0x33, 0x48, 0xb3, 0x61, 0xdf, 0x4b, 0x70, 0x8a, 0x39, 0xc2, 0x2c, 0xca, 0x7d, 0x38, 0x0a, 0x4b, 0xe4, 0x53, 0x76, 0x32, 0x93, 0xe0, 0xe7, 0x1f, 0x28, 0x52, 0x2b, 0xb5, 0x95, 0xca, 0x2a, 0x38, 0x1f, 0xf8, 0x19, 0x88, 0x4d, 0xb6, 0x4d, 0xb4, 0x4b, 0xce, 0xb7, 0x6d, 0xd6, 0xae, 0x39, 0xdf, 0xa7, 0xc0, 0x5b, 0xce, 0xef, 0x53, 0x20, 0x3f, 0xda, 0xec, 0xfd, 0x65, 0x07, 0x6e, 0x5f, 0x01, 0xae, 0x3b, 0x70, 0xff, 0x07, 0x7e, 0x3b, 0x90, 0x0a, 0x02, 0xa1, 0xe9, 0xf7, 0x91, 0x08, 0x01, 0xa2, 0xaa, 0x00, 0x22, 0x2a, 0x0c, 0x04, 0x7a, 0xf2, 0xd0, 0x76, 0x4b, 0x65, 0x20, 0xbe, 0x78, 0x54, 0xf0, 0xb0, 0x34, 0x06, 0x8e, 0xae, 0xf4, 0xa0, 0x01, 0xd2, 0x1e, 0x76, 0xcb, 0x09, 0x3c, 0xbb, 0x45, 0xc6, 0x60, 0x81, 0xaa,
+  0x24, 0xec, 0x43, 0x0e, 0xe0, 0x35, 0x61, 0x53, 0x12, 0x0c, 0x40, 0x5a, 0x82, 0x01, 0x8a, 0x92, 0x60, 0x80, 0xba, 0x0e, 0x24, 0xf2, 0xa2, 0x00, 0x95, 0xe4, 0x03, 0xa4, 0x34, 0x5a, 0xa0, 0x48, 0x40, 0x2f, 0x35, 0x03, 0xb1, 0x6b, 0xc2, 0xdd, 0x04, 0x95, 0xcc, 0xe3, 0x79, 0x00, 0x95, 0x3d, 0x08, 0x3c, 0x51, 0x08, 0x70, 0xaf, 0x03, 0x49, 0x84, 0xc1, 0x0e, 0x3b, 0x10, 0x11, 0x80, 0x95, 0xe7, 0x53, 0x8d, 0x61, 0x00, 0xcd, 0xdf, 0x05, 0x86, 0x11, 0x59, 0x10, 0x03, 0xc9, 0x00, 0x55, 0x02, 0x60, 0xec, 0xc7, 0x49, 0x00, 0x78, 0xa8, 0x12, 0x0b, 0x86, 0x6f, 0x13, 0x00, 0x1a, 0x03, 0xa4, 0x59, 0x00, 0xd2, 0x3a, 0x10, 0x40, 0x2f, 0x00, 0xb1, 0x4b, 0x0f, 0xb0, 0x66, 0x00, 0x84, 0x75, 0x20, 0xc2, 0xb6, 0x60, 0x0a, 0xea, 0x9e, 0xbf, 0x09, 0x68, 0x16, 0x48, 0xcb, 0x40, 0x9a, 0x01, 0x0d, 0x49, 0x05, 0xc4, 0x1f, 0x02, 0xb0, 0xf2, 0x4a, 0xa0, 0x58, 0x20, 0x78, 0x00, 0x56, 0x7f, 0x1f, 0x80, 0xfb, 0x83, 0x0f, 0xc0, 0x0d, 0xa4, 0x03, 0x32, 0xe3, 0xf1, 0xfd, 0xe2, 0x4c, 0xcf, 0x36, 0x2f, 0x6b, 0x20, 0xcd, 0x80, 0xb6, 0x0c, 0x54, 0x0b, 0xc4, 0xbf, 0x07, 0x34, 0xa7, 0x56, 0x2f, 0x03, 0x71, 0x06, 0xd4, 0x65, 0x80, 0x2c, 0x40, 0xcb, 0x40, 0xf0, 0xf7, 0xdb, 0x4f, 0x20, 0x13, 0xa0, 0xba, 0xeb, 0xb4, 0x06, 0x6c, 0xe4, 0xc6, 0xe9, 0xe7, 0xc9, 0x09, 0x40, 0x6e, 0x94, 0xa4, 0xb3, 0xbd, 0x0e, 0xa2, 0xad, 0x01, 0xd1, 0x0b, 0x23, 0xfa, 0x25, 0x49, 0x6b, 0xac, 0x58, 0xf5, 0x3c, 0x8d, 0x45, 0x97, 0x45, 0x7b, 0x69, 0xd9, 0x74, 0x09, 0x94, 0xf5, 0xde, 0x94, 0x66, 0x7b, 0x27, 0x71, 0x7a, 0xce, 0x98, 0x64, 0x7c, 0x44, 0x09, 0x44, 0xe3, 0x43, 0x0d, 0x09,
+  0xea, 0xca, 0x62, 0x0c, 0x67, 0xbf, 0xa9, 0x09, 0x78, 0x04, 0x49, 0xc3, 0x39, 0x80, 0xb4, 0xcb, 0xd3, 0x42, 0x7a, 0xc6, 0x53, 0xe5, 0x61, 0xea, 0x78, 0xb5, 0xc0, 0xc3, 0x4b, 0xe0, 0xe7, 0xaa, 0x57, 0x5e, 0xb7, 0xa2, 0x17, 0x4e, 0x37, 0xbb, 0xf4, 0xb2, 0x35, 0xbb, 0x79, 0xb2, 0x55, 0xbb, 0xfd, 0x43, 0x09, 0xbe, 0x08, 0xe7, 0x08, 0x0e, 0x25, 0xb8, 0x3e, 0x8a, 0x77, 0x48, 0x87, 0x1e, 0x1c, 0x1f, 0xcd, 0xcd, 0x17, 0x63, 0x0f, 0x66, 0x8a, 0xe6, 0x67, 0x5e, 0x7f, 0x95, 0x5c, 0x99, 0xdb, 0x36, 0x9f, 0xa2, 0x7a, 0x7f, 0x5a, 0x9f, 0x4c, 0x20, 0x02, 0x29, 0x83, 0x9f, 0xb5, 0x71, 0x08, 0x92, 0x68, 0xe3, 0x9f, 0x41, 0xa7, 0x76, 0x7c, 0x00, 0x5f, 0xb2, 0xf7, 0x06, 0x2b, 0x96, 0x6a, 0x81, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82
+};
+unsigned int motion_power_off_len = 638;
+
+unsigned char motion_power_on_png[] PROGMEM = {
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x80, 0x02, 0x03, 0x00, 0x00, 0x00, 0xbe, 0x50, 0x89, 0x58, 0x00, 0x00, 0x00, 0x09, 0x50, 0x4c, 0x54, 0x45, 0x00, 0x00, 0x00, 0x99, 0x99, 0x99, 0x1c, 0xff, 0x00, 0x23, 0x4c, 0xe2, 0x62, 0x00, 0x00, 0x00, 0x01, 0x74, 0x52, 0x4e, 0x53, 0x00, 0x40, 0xe6, 0xd8, 0x66, 0x00, 0x00, 0x00, 0x01, 0x62, 0x4b, 0x47, 0x44, 0x00, 0x88, 0x05, 0x1d, 0x48, 0x00, 0x00, 0x00, 0x09, 0x70, 0x48, 0x59, 0x73, 0x00, 0x00, 0x03, 0xbb, 0x00, 0x00, 0x03, 0xbb, 0x01, 0xae, 0xf7, 0x26, 0xa5, 0x00, 0x00, 0x00, 0x07, 0x74, 0x49, 0x4d, 0x45, 0x07, 0xe4, 0x0a, 0x16, 0x04, 0x14, 0x17, 0xd4, 0xb7, 0x19, 0x98, 0x00, 0x00, 0x01, 0xee, 0x49, 0x44, 0x41, 0x54, 0x58, 0xc3, 0xed, 0x97, 0x4d, 0x6e, 0xc4, 0x20, 0x0c, 0x85, 0x61, 0x24, 0x36, 0xb3, 0xe7, 0x12, 0x3d, 0x05, 0x47, 0x60, 0x81, 0xef, 0x33, 0x47, 0x99, 0x65, 0x95, 0x53, 0x36, 0x99, 0x99, 0xe0, 0xe7, 0x1f, 0x28, 0x52, 0x2b, 0xb5, 0x95, 0xca, 0x2a, 0x38, 0x1f, 0xf8, 0x19, 0x88, 0x4d, 0x42, 0x10, 0xed, 0xb2, 0x6d, 0xb7, 0x30, 0x6b, 0xd7, 0x6d, 0xbb, 0x4f, 0x81, 0xb7, 0x6d, 0x7b, 0x9f, 0x02, 0xdb, 0xde, 0x66, 0xef, 0x2f, 0x07, 0x70, 0xfb, 0x0a, 0x70, 0x3d, 0x80, 0xfb, 0x3f, 0xf0, 0xdb, 0x81, 0x5c, 0x10, 0x88, 0x4d, 0xbf, 0x4f, 0x44, 0x08, 0x10, 0x55, 0x05, 0x10, 0x51, 0x61, 0x20, 0xd2, 0x83, 0x87, 0x76, 0x58, 0x2a, 0x03, 0xe9, 0xc9, 0xa3, 0x82, 0xdd, 0xd2, 0x18, 0x78, 0x75, 0xa5, 0x07, 0x0d, 0x90, 0xf6, 0x70, 0x58, 0x4e, 0xe0, 0xd1, 0x2d, 0x32, 0x06, 0x0b, 0x54,
+  0x25, 0xe1, 0x18, 0xf2, 0x02, 0x9e, 0x13, 0x36, 0x25, 0xc1, 0x00, 0xa4, 0x25, 0x18, 0xa0, 0x28, 0x09, 0x06, 0xa8, 0xeb, 0x40, 0x26, 0x2f, 0x0a, 0x50, 0x49, 0x3e, 0x40, 0x4a, 0xa3, 0x05, 0x8a, 0x04, 0xf4, 0x52, 0x33, 0x90, 0xba, 0x26, 0xdc, 0x4d, 0x50, 0xc9, 0x3c, 0x9e, 0x07, 0x50, 0xd9, 0x83, 0xc0, 0x13, 0x85, 0x00, 0xf7, 0x3a, 0x90, 0x45, 0x18, 0xec, 0xb0, 0x03, 0x09, 0x01, 0x58, 0x79, 0x3e, 0xd5, 0x18, 0x06, 0xd0, 0xfc, 0x5d, 0x60, 0x18, 0x89, 0x05, 0x31, 0x90, 0x0d, 0x50, 0x25, 0x00, 0xc6, 0x7e, 0x9c, 0x04, 0x80, 0x87, 0x2a, 0xb3, 0x60, 0xf8, 0x36, 0x01, 0xa0, 0x31, 0x40, 0x9a, 0x05, 0x20, 0xaf, 0x03, 0x11, 0xf4, 0x02, 0x90, 0xba, 0xf4, 0x08, 0x6b, 0x06, 0x40, 0x5c, 0x07, 0x12, 0x6c, 0x0b, 0xa6, 0xa0, 0xee, 0xf9, 0x9b, 0x80, 0x66, 0x81, 0xbc, 0x0c, 0xe4, 0x19, 0xd0, 0x90, 0x54, 0x40, 0xfa, 0x21, 0x00, 0x2b, 0xaf, 0x04, 0x8a, 0x05, 0xa2, 0x07, 0x60, 0xf5, 0xf7, 0x01, 0xb8, 0x3f, 0xf8, 0x00, 0xdc, 0x40, 0x3a, 0x20, 0x33, 0x1e, 0xdf, 0x2f, 0xce, 0xf4, 0x6c, 0xf3, 0xb2, 0x06, 0xf2, 0x0c, 0x68, 0xcb, 0x40, 0xb5, 0x40, 0xfa, 0x7b, 0x40, 0x73, 0x6a, 0xf5, 0x32, 0x90, 0x66, 0x40, 0x5d, 0x06, 0xc8, 0x02, 0xb4, 0x0c, 0x44, 0x7f, 0xbf, 0xfd, 0x04, 0x32, 0x01, 0xaa, 0xbb, 0x4e, 0x6b, 0x40, 0x20, 0x37, 0x4e, 0x3f, 0x4f, 0x4e, 0x00, 0x72, 0xa3, 0x24, 0x9d, 0xed, 0x75, 0x10, 0x6d, 0x0d, 0x48, 0x5e, 0x18, 0xc9, 0x2f, 0x49, 0x5a, 0x63, 0xc5, 0xaa, 0xe7, 0x69, 0x2c, 0xba, 0x2c, 0xda, 0x4b, 0x4b, 0xd0, 0x25, 0x50, 0xd6, 0x7b, 0x53, 0x9a, 0xed, 0x9d, 0xc4, 0xe9, 0x39, 0x63, 0xb2, 0xf1, 0x91, 0x24, 0x90, 0x8c, 0x0f, 0x35, 0x24,
+  0xaa, 0x2b, 0x8b, 0x31, 0x9c, 0xfd, 0xa6, 0x26, 0xe0, 0x11, 0x24, 0x0d, 0xe7, 0x00, 0xd2, 0x2e, 0x4f, 0x0b, 0xe9, 0x19, 0x4f, 0x95, 0x2f, 0x53, 0xc7, 0xab, 0x05, 0x76, 0x2f, 0x91, 0x9f, 0xab, 0x5e, 0x79, 0xdd, 0x8a, 0x5e, 0x38, 0xdd, 0xec, 0xd2, 0xcb, 0xd6, 0xec, 0xe6, 0xc9, 0x56, 0xed, 0xf6, 0x0f, 0x25, 0xf8, 0x22, 0x9c, 0x23, 0x38, 0x94, 0xe0, 0xfa, 0x28, 0xde, 0x21, 0x1d, 0x7a, 0x70, 0x7c, 0x34, 0x37, 0x5f, 0x8c, 0x3d, 0x98, 0x29, 0x9a, 0x9f, 0x79, 0xfd, 0x55, 0x72, 0x65, 0x86, 0x30, 0x9f, 0xa2, 0x7a, 0x7f, 0x5a, 0x9f, 0x4c, 0x20, 0x02, 0x29, 0x83, 0x9f, 0xb5, 0x71, 0x08, 0x92, 0x68, 0xe3, 0x9f, 0x41, 0xa7, 0x76, 0x7c, 0x00, 0x44, 0x1c, 0x9f, 0x8c, 0x04, 0x23, 0x3e, 0x65, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82
+};
+unsigned int motion_power_on_len = 638;
+
+unsigned char motion_power_disabled_png[] PROGMEM = {
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x80, 0x01, 0x03, 0x00, 0x00, 0x00, 0xf9, 0xf0, 0xf3, 0x88, 0x00, 0x00, 0x00, 0x06, 0x50, 0x4c, 0x54, 0x45, 0x00, 0x00, 0x00, 0x99, 0x99, 0x99, 0x7e, 0xf5, 0x20, 0x03, 0x00, 0x00, 0x00, 0x01, 0x74, 0x52, 0x4e, 0x53, 0x00, 0x40, 0xe6, 0xd8, 0x66, 0x00, 0x00, 0x00, 0x01, 0x62, 0x4b, 0x47, 0x44, 0x00, 0x88, 0x05, 0x1d, 0x48, 0x00, 0x00, 0x00, 0x09, 0x70, 0x48, 0x59, 0x73, 0x00, 0x00, 0x03, 0xbb, 0x00, 0x00, 0x03, 0xbb, 0x01, 0xae, 0xf7, 0x26, 0xa5, 0x00, 0x00, 0x00, 0x07, 0x74, 0x49, 0x4d, 0x45, 0x07, 0xe4, 0x0a, 0x1b, 0x07, 0x1c, 0x04, 0x68, 0xfc, 0xb4, 0xca, 0x00, 0x00, 0x01, 0xc4, 0x49, 0x44, 0x41, 0x54, 0x48, 0xc7, 0xdd, 0xd6, 0xbb, 0x71, 0xc3, 0x30, 0x0c, 0x06, 0x60, 0xe9, 0x58, 0xa8, 0xe4, 0x06, 0xf1, 0x28, 0x5c, 0x2b, 0x9d, 0x34, 0x1a, 0x47, 0xd1, 0x08, 0x2c, 0x55, 0xf8, 0x84, 0x18, 0x8f, 0x1f, 0x04, 0x7d, 0xbc, 0xa4, 0xc8, 0xa5, 0x09, 0x9b, 0x28, 0x9f, 0x6c, 0x02, 0x84, 0x48, 0xc8, 0xcb, 0xa2, 0xe3, 0x71, 0x2d, 0xe3, 0x28, 0xcf, 0x37, 0xd8, 0xef, 0x37, 0x20, 0x1a, 0xff, 0x5f, 0x89, 0x8e, 0xef, 0x21, 0x11, 0xd5, 0x7f, 0x0a, 0x9f, 0x0a, 0x1f, 0xfd, 0xb6, 0x82, 0x7f, 0x28, 0xd3, 0xc1, 0xb0, 0x52, 0x43, 0xc5, 0xa9, 0x32, 0x24, 0x42, 0xe5, 0x77, 0x3a, 0x19, 0x36, 0xba, 0xbd, 0xc0, 0x06, 0xe4, 0xf5, 0x6c, 0x0c, 0x19, 0x75, 0x4d, 0x1d, 0x34, 0xcc, 0xeb, 0xa3, 0x17, 0xc3, 0xe3, 0xf5, 0x55, 0x8b, 0xea, 0xd0, 0x2c, 0xaa, 0x83, 0xc6, 0x2d, 0x1d, 0x9e, 0x73, 0xd8, 0x7b, 0x94, 0xdb,
+  0xf2, 0x72, 0x20, 0xcb, 0xab, 0xc3, 0x61, 0x80, 0xd4, 0x05, 0x5e, 0xd7, 0x58, 0xad, 0xa6, 0x2a, 0x37, 0xb4, 0x1e, 0x9a, 0x2a, 0x83, 0x55, 0x4c, 0x41, 0xa2, 0x09, 0xec, 0x9a, 0x7b, 0xe6, 0x7c, 0x04, 0x8a, 0x82, 0x2c, 0x41, 0xc0, 0x16, 0x23, 0x2e, 0x90, 0x35, 0xf7, 0xc2, 0x53, 0x09, 0x6c, 0x0e, 0x55, 0x21, 0x29, 0xec, 0x9c, 0x9f, 0xc0, 0xaa, 0xab, 0xdb, 0x79, 0x49, 0xfa, 0x6c, 0x15, 0x28, 0x02, 0x2d, 0xc6, 0x0a, 0xfb, 0x14, 0x56, 0x99, 0x5a, 0xa1, 0xf0, 0xfc, 0xab, 0xa4, 0xa7, 0xf0, 0x98, 0x42, 0x92, 0x15, 0x29, 0x64, 0x4b, 0xef, 0x67, 0x38, 0x01, 0xdb, 0x14, 0xb6, 0x11, 0x4e, 0x55, 0x83, 0xf4, 0x2b, 0xd0, 0x93, 0x0d, 0x38, 0x00, 0x6b, 0x07, 0xed, 0x0e, 0x11, 0xa4, 0x7f, 0x44, 0x90, 0x0e, 0x23, 0x60, 0x1b, 0x3a, 0x37, 0xdb, 0xe4, 0x4b, 0x0e, 0x9d, 0x43, 0x60, 0x1b, 0xe1, 0x9c, 0x42, 0x0d, 0x67, 0xf3, 0xef, 0xe0, 0x04, 0x6c, 0x53, 0x48, 0x23, 0xd4, 0x29, 0xa0, 0x07, 0xc4, 0x67, 0x1b, 0x60, 0x25, 0x6f, 0x0a, 0x71, 0xc3, 0x8c, 0xe0, 0xfd, 0xb9, 0x4c, 0x61, 0x21, 0xef, 0x23, 0x71, 0x9f, 0x8e, 0x40, 0xbd, 0x97, 0x13, 0x4e, 0x03, 0x4a, 0x7a, 0xcf, 0xa0, 0x78, 0x41, 0x52, 0x38, 0x62, 0x58, 0xdb, 0x53, 0xd3, 0x6b, 0xbe, 0x94, 0x0b, 0xc7, 0xd4, 0x7b, 0x0f, 0x0e, 0x32, 0x12, 0x6d, 0x38, 0xea, 0xde, 0x6a, 0xd0, 0x0c, 0x90, 0x17, 0xba, 0x43, 0xb5, 0xa8, 0x02, 0xf8, 0xeb, 0x77, 0xb8, 0x8f, 0x5c, 0x16, 0xc4, 0x7b, 0xd0, 0x6d, 0x73, 0xea, 0x22, 0x88, 0xb0, 0x49, 0x6d, 0x76, 0xbe, 0xd3, 0x24, 0xbc, 0xc5, 0x2f, 0x7a, 0xc5, 0xee, 0xbd, 0xf0, 0x35, 0x2d, 0x4f, 0x69, 0x20, 0x97, 0x3a, 0x2e, 0x2c, 0x12, 0xa3, 0xa1, 0x0c, 0x18, 0x27,
+  0x0a, 0x85, 0x51, 0x51, 0x4a, 0x8c, 0xc3, 0x57, 0x69, 0xa3, 0x3f, 0x1f, 0x1d, 0x77, 0x7f, 0xe8, 0x31, 0x6a, 0x88, 0xdb, 0xfa, 0xd6, 0x8a, 0x51, 0x43, 0x98, 0x63, 0x19, 0x67, 0xed, 0xef, 0xf1, 0xa2, 0xd0, 0xdf, 0xf4, 0x79, 0x9c, 0xd3, 0x93, 0xaf, 0xf1, 0xad, 0x1f, 0xf2, 0xf4, 0xd4, 0xe2, 0xaf, 0x87, 0x2d, 0x66, 0x81, 0xc0, 0xe3, 0x8f, 0x87, 0x7e, 0x6a, 0xbe, 0x00, 0x33, 0x04, 0x64, 0xd8, 0xf9, 0x44, 0x4b, 0x1b, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82
+};
+unsigned int motion_power_disabled_len = 593;
+
+// motion icons
+unsigned char motion_detected_png[] PROGMEM = {
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x80, 0x01, 0x03, 0x00, 0x00, 0x00, 0xf9, 0xf0, 0xf3, 0x88, 0x00, 0x00, 0x00, 0x06, 0x50, 0x4c, 0x54, 0x45, 0xf5, 0x8b, 0x7f, 0xff, 0x99, 0x00, 0x0b, 0x49, 0x05, 0x92, 0x00, 0x00, 0x00, 0x01, 0x74, 0x52, 0x4e, 0x53, 0x00, 0x40, 0xe6, 0xd8, 0x66, 0x00, 0x00, 0x00, 0x01, 0x62, 0x4b, 0x47, 0x44, 0x00, 0x88, 0x05, 0x1d, 0x48, 0x00, 0x00, 0x00, 0x09, 0x70, 0x48, 0x59, 0x73, 0x00, 0x00, 0x2e, 0x23, 0x00, 0x00, 0x2e, 0x23, 0x01, 0x78, 0xa5, 0x3f, 0x76, 0x00, 0x00, 0x00, 0x07, 0x74, 0x49, 0x4d, 0x45, 0x07, 0xe4, 0x0a, 0x13, 0x14, 0x14, 0x09, 0x05, 0x40, 0x77, 0xb9, 0x00, 0x00, 0x01, 0xef, 0x49, 0x44, 0x41, 0x54, 0x48, 0xc7, 0xed, 0xd5, 0x41, 0x8a, 0xdd, 0x30, 0x0c, 0x06, 0x60, 0x1b, 0x0f, 0x64, 0x53, 0xf0, 0x05, 0x0a, 0x9e, 0x23, 0x74, 0xd9, 0x45, 0x69, 0x2e, 0x56, 0xc6, 0x81, 0x59, 0xcc, 0xb2, 0x57, 0x32, 0xf4, 0x22, 0x86, 0x5e, 0xc0, 0x43, 0x37, 0x2e, 0x0d, 0x51, 0xf5, 0x4b, 0x4e, 0xe2, 0x24, 0xaf, 0x7d, 0x14, 0xba, 0x9c, 0x40, 0x78, 0xe4, 0x7b, 0xc9, 0x93, 0x2c, 0xc9, 0x79, 0xc6, 0xbc, 0x1d, 0xff, 0xeb, 0x98, 0x4f, 0xd7, 0x96, 0x4e, 0xe0, 0x68, 0x3a, 0xc2, 0x40, 0xe9, 0x08, 0xfe, 0x2e, 0x04, 0xca, 0xff, 0x0a, 0xfe, 0x0a, 0xe9, 0x4e, 0x1e, 0xc3, 0x39, 0x53, 0x77, 0x5e, 0x8b, 0x59, 0xfe, 0x5c, 0x88, 0xc7, 0xfe, 0xe2, 0x81, 0xcf, 0x0f, 0xfa, 0x1b, 0x45, 0x3e, 0xde, 0xf1, 0xf9, 0x45, 0xf3, 0xd0, 0x8a, 0x7d, 0xe6, 0x33, 0x6a, 0xea, 0xcb, 0xf6, 0xd3, 0x1a, 0x2f, 0xea, 0x07, 0x6d, 0xf1,
+  0xa8, 0xf9, 0x0d, 0xb0, 0xb3, 0x26, 0xaa, 0xa9, 0x8f, 0x93, 0x71, 0xb3, 0x2e, 0x45, 0x17, 0x37, 0x26, 0xe3, 0xaa, 0x4d, 0x58, 0x3d, 0xc0, 0x4d, 0x01, 0x80, 0x9c, 0x46, 0x42, 0x81, 0x7c, 0x52, 0xa8, 0x88, 0x0a, 0x08, 0x80, 0xa1, 0x0c, 0x15, 0x41, 0x04, 0xb2, 0xcf, 0x80, 0xc2, 0x9d, 0x25, 0xe2, 0x07, 0xbd, 0x40, 0x66, 0xe0, 0xa8, 0x54, 0x01, 0x03, 0xc0, 0x17, 0x44, 0x15, 0x28, 0x0c, 0x72, 0x9b, 0x57, 0x90, 0xc7, 0x15, 0x7e, 0x12, 0xcd, 0x28, 0x8a, 0x42, 0x32, 0xfe, 0x95, 0x68, 0x69, 0x10, 0x12, 0x43, 0xf8, 0xae, 0x80, 0x9c, 0x24, 0x99, 0xf0, 0x8d, 0x16, 0x3a, 0xc1, 0xcc, 0xcb, 0x5d, 0x61, 0x12, 0x88, 0xd9, 0x58, 0x05, 0xae, 0x41, 0x78, 0x66, 0xe0, 0x84, 0xe7, 0x15, 0xc6, 0x67, 0xaa, 0xe3, 0xdc, 0xc3, 0x0b, 0xd5, 0x40, 0x27, 0xf0, 0x34, 0xed, 0x10, 0x19, 0x1c, 0xa5, 0x15, 0xb8, 0x3e, 0x5f, 0xa9, 0x5a, 0xae, 0xc8, 0x0e, 0x9e, 0xcb, 0x71, 0x81, 0xf1, 0x0c, 0xfe, 0x08, 0x5c, 0xaa, 0x64, 0xb6, 0x28, 0x4f, 0x98, 0x5b, 0xd7, 0x85, 0x65, 0xc0, 0xc0, 0xec, 0xf0, 0x29, 0xa0, 0x82, 0x1d, 0xf0, 0xa8, 0xcf, 0x3b, 0x04, 0x01, 0x4c, 0x85, 0xdd, 0x0a, 0xd4, 0x60, 0xaf, 0x18, 0x9a, 0x7d, 0x81, 0xa9, 0x81, 0xb4, 0x01, 0x90, 0xb6, 0xbe, 0xe0, 0x0e, 0x1d, 0x87, 0xa1, 0xae, 0x9d, 0x33, 0xf1, 0x17, 0x32, 0x93, 0x56, 0x4a, 0xb3, 0x4d, 0xfc, 0xb1, 0x35, 0xbb, 0xc1, 0x2b, 0x32, 0xd3, 0x71, 0xc0, 0x6d, 0x26, 0x16, 0x05, 0x9d, 0x20, 0x8c, 0x54, 0x89, 0xcb, 0x3a, 0x52, 0x55, 0x20, 0x8f, 0x24, 0x43, 0x97, 0xdb, 0x58, 0x52, 0x0e, 0x9c, 0x59, 0x1b, 0x4b, 0xcb, 0x4d, 0xa5, 0xcc, 0x6d, 0x31, 0x83, 0x0c, 0xee, 0x6c, 0x31, 0xfb, 0x59, 0x36, 0xee,
+  0xc4, 0xa3, 0x2d, 0xc3, 0xcf, 0x77, 0x38, 0x19, 0x76, 0xae, 0x8d, 0x95, 0x42, 0x70, 0xd7, 0x04, 0xe2, 0xa4, 0xfb, 0x05, 0x5f, 0x2b, 0xb4, 0x0d, 0x84, 0x8d, 0xbe, 0x01, 0xf5, 0x80, 0x8b, 0x27, 0x79, 0x59, 0x20, 0x50, 0xbb, 0xf8, 0xd8, 0xc3, 0xfb, 0xb6, 0xd5, 0xb1, 0x6b, 0x05, 0x1e, 0xda, 0x96, 0xe7, 0xf9, 0x32, 0xb1, 0x7f, 0xe7, 0x08, 0x94, 0x0e, 0x62, 0xbd, 0x01, 0x63, 0x0f, 0xa8, 0x70, 0x0f, 0xf6, 0x0a, 0xf9, 0x08, 0xb2, 0xf4, 0xb1, 0xfe, 0x05, 0xe4, 0xad, 0x76, 0x81, 0x70, 0x00, 0x73, 0x07, 0x1c, 0xaa, 0xe6, 0x7b, 0x40, 0xe5, 0x7d, 0x9f, 0x18, 0x60, 0x28, 0xe7, 0x3f, 0x83, 0xe9, 0xed, 0x0f, 0xf2, 0xc6, 0xf1, 0x1b, 0x1a, 0xb6, 0xae, 0xbb, 0x1f, 0x87, 0x4e, 0xde, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82
+};
+unsigned int motion_detected_len = 636;
+
+unsigned char motion_none_png[] PROGMEM = {
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x80, 0x01, 0x03, 0x00, 0x00, 0x00, 0xf9, 0xf0, 0xf3, 0x88, 0x00, 0x00, 0x00, 0x06, 0x50, 0x4c, 0x54, 0x45, 0x70, 0x4b, 0x56, 0x00, 0x00, 0x00, 0x6f, 0x00, 0x8d, 0x28, 0x00, 0x00, 0x00, 0x01, 0x74, 0x52, 0x4e, 0x53, 0x00, 0x40, 0xe6, 0xd8, 0x66, 0x00, 0x00, 0x00, 0x01, 0x62, 0x4b, 0x47, 0x44, 0x00, 0x88, 0x05, 0x1d, 0x48, 0x00, 0x00, 0x00, 0x09, 0x70, 0x48, 0x59, 0x73, 0x00, 0x00, 0x2e, 0x23, 0x00, 0x00, 0x2e, 0x23, 0x01, 0x78, 0xa5, 0x3f, 0x76, 0x00, 0x00, 0x00, 0x07, 0x74, 0x49, 0x4d, 0x45, 0x07, 0xe4, 0x0a, 0x13, 0x16, 0x15, 0x20, 0x5d, 0x6d, 0x0a, 0xfa, 0x00, 0x00, 0x00, 0x19, 0x74, 0x45, 0x58, 0x74, 0x43, 0x6f, 0x6d, 0x6d, 0x65, 0x6e, 0x74, 0x00, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x64, 0x20, 0x77, 0x69, 0x74, 0x68, 0x20, 0x47, 0x49, 0x4d, 0x50, 0x57, 0x81, 0x0e, 0x17, 0x00, 0x00, 0x00, 0x19, 0x49, 0x44, 0x41, 0x54, 0x48, 0xc7, 0x63, 0x60, 0x18, 0x05, 0xa3, 0x60, 0x14, 0x8c, 0x82, 0x51, 0x30, 0x0a, 0x46, 0xc1, 0x28, 0xa0, 0x2f, 0x00, 0x00, 0x08, 0x80, 0x00, 0x01, 0x6e, 0x2b, 0x1d, 0x54, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82
+};
+unsigned int motion_none_len = 203;
 
 /*************************************************\
  *               Variables
@@ -152,23 +179,43 @@ const char* motion_icon[][4] PROGMEM = {
 // detector states
 enum MotionStates { MOTION_OFF, MOTION_ON };
 enum MotionForce  { MOTION_FORCE_NONE, MOTION_FORCE_OFF, MOTION_FORCE_ON };
+enum MotionUpdate { MOTION_UPDATE_NONE, MOTION_UPDATE_OFF, MOTION_UPDATE_ON };
 
 // variables
-bool    motion_enabled     = true;                 // is motion detection enabled
-bool    motion_last_state  = false;                // last motion detection status
-bool    motion_update_json = false;                // data has been updated, needs JSON update
-uint8_t motion_forced      = MOTION_FORCE_NONE;    // relay state forced
-unsigned long motion_time_start  = ULONG_MAX;      // when tempo started
-unsigned long motion_time_update = ULONG_MAX;      // when JSON was last updated
+struct {
+  bool     is_enabled   = true;                 // is motion detection enabled
+  bool     is_detected  = false;                // current motion detection status
+  bool     relay_active = false;                // current relay status
+  bool     last_state   = false;                // last motion detection status
+  bool     update_json  = false;                // data has been updated, needs JSON update
+  uint8_t  forced_state = MOTION_FORCE_NONE;    // relay state forced
+  uint32_t time_start   = ULONG_MAX;            // when tempo started
+  uint32_t time_update  = ULONG_MAX;            // when JSON was last updated
+} motion_status;
+
+// web client status
+struct {
+  uint8_t light  = MOTION_UPDATE_NONE;
+  uint8_t motion = MOTION_UPDATE_NONE;
+  uint8_t graph  = MOTION_UPDATE_NONE;
+} motion_web;
+
+// graph data structure
+struct graph_value {
+    uint8_t is_enabled : 1;
+    uint8_t is_detected : 1;
+    uint8_t is_active : 1;
+}; 
 
 // graph data
-int  motion_graph_index;
-int  motion_graph_counter;
-int  motion_graph_refresh;
-bool motion_graph_enabled;
-bool motion_graph_detected;
-bool motion_graph_active;
-graph_value arr_graph_data[MOTION_GRAPH_SAMPLE];
+struct {
+  int  index;
+  int  counter;
+  bool enabled;
+  bool detected;
+  bool active;
+  graph_value arr_data[MOTION_GRAPH_SAMPLE];
+} motion_graph;
 
 /**************************************************\
  *                  Accessors
@@ -184,7 +231,7 @@ uint8_t MotionGetDetectionLevel ()
 void MotionSetDetectionLevel (uint8_t level)
 {
   Settings.energy_voltage_calibration= (unsigned long)level;
-  motion_update_json = true;
+  motion_status.update_json = true;
 }
 
 // get detection temporisation (in s)
@@ -197,7 +244,7 @@ unsigned long MotionGetTempo ()
 void MotionSetTempo (unsigned long new_tempo)
 {
   Settings.energy_power_calibration = new_tempo;
-  motion_update_json = true;
+  motion_status.update_json = true;
 }
 
 // get if tempo should be rearmed on detection
@@ -214,7 +261,7 @@ void MotionSetAutoRearm (const char* str_string)
   // check if state in ON
   if (str_command.equals ("1") || str_command.equalsIgnoreCase (D_JSON_MOTION_ON)) Settings.energy_current_calibration = 1;
   else if (str_command.equals ("0") || str_command.equalsIgnoreCase (D_JSON_MOTION_OFF)) Settings.energy_current_calibration = 0;
-  motion_update_json = true;
+  motion_status.update_json = true;
 }
 
 /***************************************\
@@ -224,44 +271,61 @@ void MotionSetAutoRearm (const char* str_string)
 // check if motion is detected
 bool MotionIsDetected ()
 {
-  bool motion_detected;
-
   // check if motion is detected according to detection level
-  motion_detected = (SwitchGetVirtual (MOTION_BUTTON) == MotionGetDetectionLevel ());
+  motion_status.is_detected = (SwitchGetVirtual (MOTION_BUTTON) == MotionGetDetectionLevel ());
 
-  // if change, ask for JSON update
-  if (motion_last_state != motion_detected) motion_update_json = true;
-  motion_last_state = motion_detected;
+  // if change,
+  if (motion_status.last_state != motion_status.is_detected)
+  {
+    // ask for JSON update
+    motion_status.update_json = true;
 
-  return motion_detected;
+    // set web update for motion
+    if (motion_status.is_detected) motion_web.motion = MOTION_UPDATE_ON; else motion_web.motion = MOTION_UPDATE_OFF;
+  }
+
+  // save new state
+  motion_status.last_state = motion_status.is_detected;
+
+  return motion_status.is_detected;
 }
 
 // get relay state
 bool MotionIsRelayActive ()
 {
-  uint8_t relay_condition;
-
   // read relay state
-  relay_condition = bitRead (power, 0);
+  motion_status.relay_active = (bitRead (TasmotaGlobal.power, 0) == 1);
 
-  return (relay_condition == 1);
+  return (motion_status.relay_active);
 }
 
 // set relay state
 void MotionSetRelay (bool new_state)
 {
-  // set relay state
-  if (new_state == false) ExecuteCommandPower (1, POWER_OFF, SRC_MAX);
-  else ExecuteCommandPower (1, POWER_ON, SRC_MAX);
-  motion_update_json = true;
+  // get relay state
+  MotionIsRelayActive ();
+
+  // if relay state has to change
+  if (motion_status.relay_active != new_state)
+  {
+    // set new relay state and web update
+    if (new_state) { ExecuteCommandPower (1, POWER_ON, SRC_MAX); motion_web.light = MOTION_UPDATE_ON; }
+    else { ExecuteCommandPower (1, POWER_OFF, SRC_MAX); motion_web.light = MOTION_UPDATE_OFF; }
+
+    // get new relay state and ask for JSON update
+    MotionIsRelayActive ();
+    motion_status.update_json = true;
+  }
 }
 
 // enable or disable motion detector (POWER_OFF = disable, POWER_ON = enable)
 void MotionEnable (uint32_t state)
 {
-  if (state == POWER_ON) motion_enabled = true;
-  else if (state == POWER_OFF) motion_enabled = false;
-  motion_update_json = true;
+  if (state == POWER_ON) motion_status.is_enabled = true;
+  else if (state == POWER_OFF) motion_status.is_enabled = false;
+
+  // update JSON
+  motion_status.update_json = true;
 }
 
 // enable or disable motion detector
@@ -270,26 +334,21 @@ void MotionEnable (const char* str_string)
   String str_command = str_string;
 
   // check if state in ON
-  if (str_command.equals ("1") || str_command.equalsIgnoreCase (D_JSON_MOTION_ON)) motion_enabled = true;
-  else if (str_command.equals ("0") || str_command.equalsIgnoreCase (D_JSON_MOTION_OFF)) motion_enabled = false;
-  motion_update_json = true;
+  if (str_command.equals ("1") || str_command.equalsIgnoreCase (D_JSON_MOTION_ON)) MotionEnable (POWER_ON);
+  else if (str_command.equals ("0") || str_command.equalsIgnoreCase (D_JSON_MOTION_OFF)) MotionEnable (POWER_OFF);
 }
 
 // switch forced state (ON or OFF)
 void MotionToggleSwitch ()
 {
   // toggle motion forced state
-  if (MotionIsRelayActive ())
-  {
-    motion_forced = MOTION_FORCE_OFF;
-    MotionSetRelay (false);
-  }
-  else 
-  {
-    motion_forced = MOTION_FORCE_ON;
-    MotionSetRelay (true);
-  }
-  motion_update_json = true;
+  MotionSetRelay (!motion_status.relay_active);
+
+  // update forced state
+  if (motion_status.relay_active) motion_status.forced_state = MOTION_FORCE_ON; else motion_status.forced_state = MOTION_FORCE_OFF;
+
+  // update JSON
+  motion_status.update_json = true;
 }
 
 // force state ON or OFF
@@ -298,18 +357,13 @@ void MotionForce (const char* str_string)
   String str_command = str_string;
 
   // check if state is forced ON
-  if (str_command.equals ("1") || str_command.equalsIgnoreCase (D_JSON_MOTION_ON))
-  {
-    motion_forced      = MOTION_FORCE_ON;
-    motion_update_json = true;
-  }
+  if (str_command.equals ("1") || str_command.equalsIgnoreCase (D_JSON_MOTION_ON)) motion_status.forced_state = MOTION_FORCE_ON;
 
   // else if state is forced OFF
-  else if (str_command.equals ("0") || str_command.equalsIgnoreCase (D_JSON_MOTION_OFF))
-  {
-    motion_forced      = MOTION_FORCE_OFF;
-    motion_update_json = true;
-  } 
+  else if (str_command.equals ("0") || str_command.equalsIgnoreCase (D_JSON_MOTION_OFF)) motion_status.forced_state = MOTION_FORCE_OFF;
+
+  // update JSON
+  motion_status.update_json = true;
 }
 
 // get motion status in readable format
@@ -318,13 +372,13 @@ String MotionGetStatus ()
   String str_status;
 
   // if relay is OFF
-  if (!MotionIsRelayActive ()) str_status = D_JSON_MOTION_OFF;
+  if (motion_status.relay_active == false) str_status = D_JSON_MOTION_OFF;
 
   // if tempo is forced ON
-  else if (motion_forced == MOTION_FORCE_ON) str_status = D_JSON_MOTION_FORCED;
+  else if (motion_status.forced_state == MOTION_FORCE_ON) str_status = D_JSON_MOTION_FORCED;
 
   // if motion is currently detected
-  else if (MotionIsDetected () && MotionGetAutoRearm ()) str_status = D_JSON_MOTION;
+  else if (motion_status.is_detected && MotionGetAutoRearm ()) str_status = D_JSON_MOTION;
 
   // else, temporisation is runnning
   else str_status = D_JSON_MOTION_TEMPO;
@@ -336,32 +390,28 @@ String MotionGetStatus ()
 String MotionGetTempoLeft ()
 {
   TIME_T   tempo_dst;
-  unsigned long time_tempo, time_now, time_left;
-  char     str_number[8];
+  uint32_t time_tempo, time_now, time_left;
   String   str_timeleft;
 
-  // if tempo is forced ON
-  if (motion_forced == MOTION_FORCE_ON) str_timeleft = D_MOTION_FORCED;
-
-  // else, if temporisation is runnning,
-  else if (motion_time_start != ULONG_MAX)
+  // if temporisation is runnning
+  if ((motion_status.forced_state != MOTION_FORCE_ON) && (motion_status.time_start != ULONG_MAX))
   {
     // get current time and current temporisation (convert from s to ms)
     time_now   = millis () / 1000;
     time_tempo = MotionGetTempo ();
  
     // if temporisation is not over
-    if (time_now < motion_time_start + time_tempo)
+    if (time_now < motion_status.time_start + time_tempo)
     {
       // convert to readable format
-      time_left = motion_time_start + time_tempo - time_now;
+      time_left = motion_status.time_start + time_tempo - time_now;
       BreakTime ((uint32_t) time_left, tempo_dst);
-      sprintf (str_number, "%02d", tempo_dst.minute);
-      str_timeleft = str_number + String (":");
-      sprintf (str_number, "%02d", tempo_dst.second);
-      str_timeleft += str_number;
+      if (tempo_dst.minute < 10) str_timeleft = "0";
+      str_timeleft += tempo_dst.minute;
+      str_timeleft += ":";
+      if (tempo_dst.second < 10) str_timeleft += "0";
+      str_timeleft += tempo_dst.second;
     }
-    else str_timeleft = "0:00";
   }
 
   return str_timeleft;
@@ -374,12 +424,9 @@ void MotionSetGraphData (int index, bool set_enabled, bool set_detected, bool se
   index = index % MOTION_GRAPH_SAMPLE;
 
   // generate stored value
-  if (set_enabled == true) arr_graph_data[index].is_enabled = 1;
-  else arr_graph_data[index].is_enabled = 0;
-  if (set_detected == true) arr_graph_data[index].is_detected = 1;
-  else arr_graph_data[index].is_detected = 0;
-  if (set_active == true) arr_graph_data[index].is_active = 1;
-  else arr_graph_data[index].is_active = 0;
+  if (set_enabled)  motion_graph.arr_data[index].is_enabled  = 1; else motion_graph.arr_data[index].is_enabled  = 0;
+  if (set_detected) motion_graph.arr_data[index].is_detected = 1; else motion_graph.arr_data[index].is_detected = 0;
+  if (set_active)   motion_graph.arr_data[index].is_active   = 1; else motion_graph.arr_data[index].is_active   = 0;
 }
 
 // Retrieve enabled state from graph data
@@ -387,7 +434,7 @@ bool MotionGetGraphEnabled (int index)
 {
   // force index in graph window and return result
   index = index % MOTION_GRAPH_SAMPLE;
-  return (arr_graph_data[index].is_enabled == 1);
+  return (motion_graph.arr_data[index].is_enabled == 1);
 }
 
 // Retrieve detected state from graph data
@@ -395,7 +442,7 @@ bool MotionGetGraphDetected (int index)
 {
   // force index in graph window and return result
   index = index % MOTION_GRAPH_SAMPLE;
-  return (arr_graph_data[index].is_detected == 1);
+  return (motion_graph.arr_data[index].is_detected == 1);
 }
 
 // Retrieve active state from graph data
@@ -403,12 +450,8 @@ bool MotionGetGraphActive (int index)
 {
   // force index in graph window and return result
   index = index % MOTION_GRAPH_SAMPLE;
-  return (arr_graph_data[index].is_active == 1);
+  return (motion_graph.arr_data[index].is_active == 1);
 }
-
-/**************************************************\
- *                  Functions
-\**************************************************/
 
 // Show JSON status (for MQTT)
 void MotionShowJSON (bool append)
@@ -416,7 +459,7 @@ void MotionShowJSON (bool append)
   TIME_T  tempo_dst;
   uint8_t  motion_level;
   unsigned long time_total;
-  String   str_json, str_mqtt, str_text;
+  String   str_json, str_text;
 
   // Motion detection section  -->  "Motion":{"Level":"High","Enabled":"ON","Detected":"ON","Light":"ON","Tempo":120,"Timeout":240,"Status":"Timer","Timeleft":"2:15"}
   str_json = "\"" + String (D_JSON_MOTION) + "\":{";
@@ -424,33 +467,27 @@ void MotionShowJSON (bool append)
   // detector active level (high or low)
   motion_level = MotionGetDetectionLevel ();
   str_json += "\"" + String (D_JSON_MOTION_LEVEL) + "\":\"";
-  if (motion_level == 0) str_json += D_JSON_MOTION_LOW;
-  else str_json += D_JSON_MOTION_HIGH;
+  if (motion_level == 0) str_json += D_JSON_MOTION_LOW; else str_json += D_JSON_MOTION_HIGH;
   str_json += "\",";
 
   // motion enabled
   str_json += "\"" + String (D_JSON_MOTION_ENABLED) + "\":\"";
-  if (motion_enabled == true) str_json += D_JSON_MOTION_ON;
-  else str_json += D_JSON_MOTION_OFF;
+  if (motion_status.is_enabled) str_json += D_JSON_MOTION_ON; else str_json += D_JSON_MOTION_OFF;
   str_json += "\",";
 
   // auto rearm on detection
-  MotionGetAutoRearm ();
   str_json += "\"" + String (D_JSON_MOTION_REARM) + "\":\"";
-  if (MotionGetAutoRearm ()) str_json += D_JSON_MOTION_ON;
-  else str_json += D_JSON_MOTION_OFF;
+  if (MotionGetAutoRearm ()) str_json += D_JSON_MOTION_ON; else str_json += D_JSON_MOTION_OFF;
   str_json += "\",";
 
   // motion detection status
   str_json += "\"" + String (D_JSON_MOTION_DETECTED) + "\":\"";
-  if (MotionIsDetected ()) str_json += D_JSON_MOTION_ON;
-  else str_json += D_JSON_MOTION_OFF;
+  if (motion_status.is_detected) str_json += D_JSON_MOTION_ON; else str_json += D_JSON_MOTION_OFF;
   str_json += "\",";
 
   // light status (relay)
   str_json += "\"" + String (D_JSON_MOTION_LIGHT) + "\":\"";
-  if (MotionIsRelayActive ()) str_json += D_JSON_MOTION_ON;
-  else str_json += D_JSON_MOTION_OFF;
+  if (motion_status.relay_active) str_json += D_JSON_MOTION_ON; else str_json += D_JSON_MOTION_OFF;
   str_json += "\",";
 
   // total temporisation
@@ -466,15 +503,14 @@ void MotionShowJSON (bool append)
   str_json += "\"" + String (D_JSON_MOTION_TIMELEFT) + "\":\"" + str_text + "\"}";
 
   // generate MQTT message according to append mode
-  if (append == true) str_mqtt = mqtt_data + String (",") + str_json;
-  else str_mqtt = "{" + str_json + "}";
+  if (append) ResponseAppend_P (PSTR(",%s"), str_json.c_str ());
+  else Response_P (PSTR("{%s}"), str_json.c_str ());
 
-  // place JSON back to MQTT data and publish it if not in append mode
-  snprintf_P (mqtt_data, sizeof(mqtt_data), str_mqtt.c_str ());
-  if (append == false) MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
+  // publish it if not in append mode
+  if (!append) MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
 
   // reset need for update
-  motion_update_json = false;
+  motion_status.update_json = false;
 }
 
 // Handle detector MQTT commands
@@ -521,37 +557,43 @@ bool MotionMqttCommand ()
 void MotionUpdateGraph ()
 {
   // set current graph value
-  MotionSetGraphData (motion_graph_index, motion_graph_enabled, motion_graph_detected, motion_graph_active);
-
-  // init current values
-  motion_graph_enabled  = false;
-  motion_graph_detected = false;
-  motion_graph_active   = false;
+  MotionSetGraphData (motion_graph.index, motion_graph.enabled, motion_graph.detected, motion_graph.active);
 
   // increase temperature data index and reset if max reached
-  motion_graph_index ++;
-  motion_graph_index = motion_graph_index % MOTION_GRAPH_SAMPLE;
+  motion_graph.index ++;
+  motion_graph.index = motion_graph.index % MOTION_GRAPH_SAMPLE;
+
+  // init current values
+  motion_graph.enabled  = false;
+  motion_graph.detected = false;
+  motion_graph.active   = false;
+
+  // set web graph update flag
+  motion_web.graph = MOTION_UPDATE_ON;
 }
 
 // update motion and relay state according to status
 void MotionEvery250ms ()
 {
-  bool relay_target = true;
-  unsigned long time_now, time_tempo;
+  bool     relay_target = true;
+  uint32_t time_now, time_tempo;
+
+  // check if motion detected
+  MotionIsDetected ();
 
   // if relay is forced ON : reset timer and keep ON
-  if (motion_forced == MOTION_FORCE_ON)
+  if (motion_status.forced_state == MOTION_FORCE_ON)
   {
-    motion_time_start = ULONG_MAX;
-    relay_target      = true;
+    relay_target = true;
+    motion_status.time_start = ULONG_MAX;
   }
 
   // else, if relay is forced OFF : reset timer and switch OFF
-  else if (motion_forced == MOTION_FORCE_OFF)
+  else if (motion_status.forced_state == MOTION_FORCE_OFF)
   {
-    motion_time_start = ULONG_MAX;
-    relay_target      = false;
-    motion_forced     = MOTION_FORCE_NONE;
+    relay_target = false;
+    motion_status.time_start = ULONG_MAX;
+    motion_status.forced_state = MOTION_FORCE_NONE;
   }
 
   // else check timeout
@@ -562,66 +604,65 @@ void MotionEvery250ms ()
     time_tempo = MotionGetTempo (); 
 
     // if motion enabled and detected, update timer and keep ON
-    if ((motion_enabled == true) && MotionIsDetected ())
+    if (motion_status.is_enabled && motion_status.is_detected)
     {
       // update start time on first detection
-      if (motion_time_start == ULONG_MAX) motion_time_start = time_now;
+      if (motion_status.time_start == ULONG_MAX) motion_status.time_start = time_now;
 
       // or if auto-rearm is set
-      else if (MotionGetAutoRearm ()) motion_time_start = time_now;
+      else if (MotionGetAutoRearm ()) motion_status.time_start = time_now;
     }
 
     // else, if temporisation is reached, switch OFF
-    else if ((motion_time_start != ULONG_MAX) && (time_now > motion_time_start + time_tempo))
+    else if ((motion_status.time_start != ULONG_MAX) && (time_now > motion_status.time_start + time_tempo))
     {
-      motion_time_start = ULONG_MAX;
-      relay_target      = false;
+      relay_target = false;
+      motion_status.time_start = ULONG_MAX;
     }
 
+    // else, if motion has just changed to OFF, update power switch status
+    else if ((motion_status.time_start != ULONG_MAX) && (time_now - motion_status.time_start == 1)) motion_web.light  = MOTION_UPDATE_ON;
+
     // else, if tempo not started, relay should be OFF
-    else if (motion_time_start == ULONG_MAX) relay_target = false;
+    else if (motion_status.time_start == ULONG_MAX) relay_target = false;
   }
 
   // if no timer, no JSON update timer
-  if (motion_time_start == ULONG_MAX) motion_time_update = ULONG_MAX;
+  if (motion_status.time_start == ULONG_MAX) motion_status.time_update = ULONG_MAX;
 
   // else, check for JSON update timer
   else
   {
     // if no JSON update started, start it
-    if (motion_time_update == ULONG_MAX) motion_time_update = time_now;
+    if (motion_status.time_update == ULONG_MAX) motion_status.time_update = time_now;
     
     // if JSON update delay is reached, ask for update
-    if (time_now > motion_time_update + MOTION_JSON_UPDATE)
+    if (time_now > motion_status.time_update + MOTION_JSON_UPDATE)
     {
-      motion_time_update = time_now;
-      motion_update_json = true;
+      motion_status.time_update = time_now;
+      motion_status.update_json = true;
     }
   }
 
   // if needed, change relay state
-  if (relay_target != MotionIsRelayActive ()) MotionSetRelay (relay_target);
+  if (relay_target != motion_status.relay_active) MotionSetRelay (relay_target);
 
   // if JSON update asked, do it
-  if (motion_update_json == true) MotionShowJSON (false);
+  if (motion_status.update_json) MotionShowJSON (false);
 }
 
 // update graph data
 void MotionEverySecond ()
 {
-  // check if motion is enabled
-  if (motion_graph_enabled == false) motion_graph_enabled = motion_enabled;
-
-  // check if motion is detected
-  if (motion_graph_detected == false) motion_graph_detected = MotionIsDetected ();
-
-  // check if relay is active
-  if (motion_graph_active == false) motion_graph_active = MotionIsRelayActive ();
+  // if needed, update the 3 status flags
+  if (motion_graph.enabled  == false) motion_graph.enabled  = motion_status.is_enabled;
+  if (motion_graph.detected == false) motion_graph.detected = motion_status.is_detected;
+  if (motion_graph.active   == false) motion_graph.active   = motion_status.relay_active;
 
   // increment delay counter and if delay reached, update history data
-  if (motion_graph_counter == 0) MotionUpdateGraph ();
-  motion_graph_counter ++;
-  motion_graph_counter = motion_graph_counter % motion_graph_refresh;
+  if (motion_graph.counter == 0) MotionUpdateGraph ();
+  motion_graph.counter ++;
+  motion_graph.counter = motion_graph.counter % MOTION_GRAPH_REFRESH;
 }
 
 // pre init main status
@@ -636,12 +677,11 @@ void MotionPreInit ()
   Settings.seriallog_level = 0;
   
   // initialise graph data
-  motion_graph_index   = 0;
-  motion_graph_counter = 0;
-  motion_graph_refresh = 60 * MOTION_GRAPH_STEP;
-  motion_graph_enabled  = false;  
-  motion_graph_detected = false;  
-  motion_graph_active   = false;  
+  motion_graph.index    = 0;
+  motion_graph.counter  = 0;
+  motion_graph.enabled  = false;  
+  motion_graph.detected = false;  
+  motion_graph.active   = false;  
   for (index = 0; index < MOTION_GRAPH_SAMPLE; index++) MotionSetGraphData (index, false, false, false);
 }
 
@@ -651,21 +691,65 @@ void MotionPreInit ()
 
 #ifdef USE_WEBSERVER
 
-// display base64 embeded icon
-void MotionWebDisplayIcon (uint8_t icon_index)
+void MotionWebIconLightOff () { Webserver->send (200, "image/png", motion_light_off_png, motion_light_off_len); }
+void MotionWebIconLightOn ()  { Webserver->send (200, "image/png", motion_light_on_png,  motion_light_on_len);  }
+void MotionWebIconLight ()
 {
-  uint8_t nbrItem, index;
-  String  str_class;
+  if (motion_status.relay_active) MotionWebIconLightOn (); 
+  else MotionWebIconLightOff ();
+}
 
-  // set image class
-  if (icon_index == MOTION_DETECTED) str_class = "motion";
-  else str_class = "light";
+void MotionWebIconPowerDisabled () { Webserver->send (200, "image/png", motion_power_disabled_png, motion_power_disabled_len); }
+void MotionWebIconPowerOff ()      { Webserver->send (200, "image/png", motion_power_off_png,      motion_power_off_len);      }
+void MotionWebIconPowerOn ()       { Webserver->send (200, "image/png", motion_power_on_png,       motion_power_on_len);       }
+void MotionWebIconPower ()
+{
+  // display power switch according to motion and relay state
+  if (motion_status.relay_active && motion_status.is_detected) MotionWebIconPowerDisabled ();
+  else if (motion_status.relay_active) MotionWebIconPowerOff (); else MotionWebIconPowerOn ();
+}
 
-  // display icon
-  WSContentSend_P (PSTR ("<img class='%s' src='data:image/png;base64,"), str_class.c_str ());
-  nbrItem = sizeof (motion_icon[icon_index]) / sizeof (char*);
-  for (index=0; index<nbrItem; index++) if (motion_icon[icon_index][index] != nullptr) WSContentSend_P (motion_icon[icon_index][index]);
-  WSContentSend_P (PSTR ("' >"));
+void MotionWebIconMotionOff () { Webserver->send (200, "image/png", motion_none_png,     motion_none_len);     }
+void MotionWebIconMotionOn  () { Webserver->send (200, "image/png", motion_detected_png, motion_detected_len); }
+void MotionWebIconMotion ()    { if (motion_status.is_detected) MotionWebIconMotionOn (); else MotionWebIconMotionOff (); }
+
+// update status for web client
+// format is A1;A2;A3;A4;A5
+// A1 : new relay status (0:off, 1:on, empty if no change)
+// A2 : new motion status (0:off, 1:on, empty if no change)
+// A3 : graph update (1:update, empty if no update)
+// A4 : new tempo left status (0:off, 1:running, empty if no change)
+// A5 : tempo label
+void MotionWebUpdate ()
+{
+  String str_text;
+
+  // A1 : relay status
+  if (motion_web.light == MOTION_UPDATE_OFF) str_text = "0";
+  else if (motion_web.light == MOTION_UPDATE_ON) str_text = "1";
+  str_text += ";";
+
+  // A2 : motion status
+  if (motion_web.motion == MOTION_UPDATE_OFF) str_text += "0";
+  else if (motion_web.motion == MOTION_UPDATE_ON) str_text += "1";
+  str_text += ";";
+
+  // A3 : graph update flag
+  if (motion_web.graph == MOTION_UPDATE_ON) str_text += "1";
+  str_text += ";";
+
+  // A4;A5 : tempo status
+  if (motion_web.motion == MOTION_UPDATE_ON) str_text += "1;";
+  else if ((motion_status.is_detected == false) && (motion_status.time_start != ULONG_MAX)) str_text += "1;" + MotionGetTempoLeft ();
+  else str_text += ";";
+
+  // send result
+  Webserver->send (200, "text/plain", str_text.c_str (), str_text.length ());
+
+  // reset web flags
+  motion_web.light  = MOTION_UPDATE_NONE;
+  motion_web.motion = MOTION_UPDATE_NONE;
+  motion_web.graph  = MOTION_UPDATE_NONE;
 }
 
 // detector main page switch button
@@ -673,9 +757,8 @@ void MotionWebMainButton ()
 {
   String str_state;
 
-  if (motion_enabled == false) str_state = D_MOTION_ENABLE;
-  else str_state = D_MOTION_DISABLE;
-  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s %s</button></form></p>"), D_PAGE_MOTION_TOGGLE, str_state.c_str (), D_MOTION_MOTION);
+  if (motion_status.is_enabled) str_state = D_MOTION_DISABLE; else str_state = D_MOTION_ENABLE;
+  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s %s</button></form></p>"), D_PAGE_MOTION_ENABLE, str_state.c_str (), D_MOTION_MOTION);
 
   // Motion control page button
   WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), D_PAGE_MOTION_CONTROL, D_MOTION_CONTROL);
@@ -693,8 +776,8 @@ bool MotionWebSensor ()
   String str_motion, str_time;
 
   // dislay motion detector state
-  if (motion_enabled == false) str_motion = D_MOTION_DISABLED;
-  else if (MotionIsDetected ()) str_motion = D_MOTION_ON;
+  if (motion_status.is_enabled == false) str_motion = D_MOTION_DISABLED;
+  else if (motion_status.is_detected) str_motion = D_MOTION_ON;
   else str_motion = D_MOTION_OFF;
   WSContentSend_PD (PSTR ("{s}%s{m}%s{e}"), D_MOTION_MOTION, str_motion.c_str ());
 
@@ -703,14 +786,14 @@ bool MotionWebSensor ()
   if (str_time != "") WSContentSend_PD (PSTR ("{s}%s{m}%s{e}"), D_MOTION_TEMPO, str_time.c_str ());
 }
 
-// Movement detector mode toggle 
-void MotionWebPageToggle ()
+// Enable/disable motion detector 
+void MotionWebPageEnable ()
 {
   // if access not allowed, close
   if (!HttpCheckPriviledgedAccess()) return;
 
   // invert mode
-  motion_enabled = !motion_enabled;
+  motion_status.is_enabled = !motion_status.is_enabled;
 
   // refresh immediatly on main page
   WSContentStart_P (D_MOTION_DETECTION, false);
@@ -753,7 +836,7 @@ void MotionWebPageConfigure ()
     WebGetArg (D_CMND_MOTION_MN, argument, MOTION_BUFFER_SIZE);
     if (strlen(argument) > 0) tempo_mn = atoi (argument);
     
-    // get number of seconds according to 'temposec' parameter
+    // get number of seconds according to 'sec' parameter
     WebGetArg (D_CMND_MOTION_SEC, argument, MOTION_BUFFER_SIZE);
     if (strlen(argument) > 0) tempo_sec = atoi (argument);
 
@@ -791,8 +874,7 @@ void MotionWebPageConfigure ()
   WSContentSend_P (PSTR ("<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>"), D_MOTION_TEMPO);
   WSContentSend_P (PSTR ("<p>minutes<span %s>%s</span><br><input type='number' name='%s' min='0' max='120' step='1' value='%d'></p>\n"), MOTION_TOPIC_STYLE, D_CMND_MOTION_TEMPO, D_CMND_MOTION_MN, tempo_mn);
   WSContentSend_P (PSTR ("<p>seconds<br><input type='number' name='%s' min='0' max='59' step='1' value='%d'></p>\n"), D_CMND_MOTION_SEC, tempo_sec);
-  if (rearm == true) str_checked = "checked";
-  else str_checked = "";
+  if (rearm == true) str_checked = "checked"; else str_checked = "";
   WSContentSend_P (PSTR ("<br>\n"));
   WSContentSend_P (PSTR ("<p><input name='%s' type='checkbox' %s>%s %s %s<span %s>%s</span></p>\n"), D_CMND_MOTION_REARM, str_checked.c_str (), D_MOTION_REARM, D_MOTION_ON, D_MOTION_DETECTION, MOTION_TOPIC_STYLE, D_CMND_MOTION_REARM);
   WSContentSend_P (PSTR ("</fieldset></p>\n"));
@@ -807,31 +889,61 @@ void MotionWebPageConfigure ()
   WSContentStop();
 }
 
-// Motion status graph display
-void MotionWebDisplayGraph ()
+// Motion graph frame
+void MotionWebGraphFrame ()
 {
-  TIME_T   current_dst;
-  uint32_t current_time;
-  int      index, array_idx;
-  int      graph_x, graph_y, graph_left, graph_right, graph_width, graph_low, graph_high, graph_hour;
-  bool     state_curr;
-  char     str_hour[4];
-
-  // boundaries of SVG graph
-  graph_left  = MOTION_GRAPH_PERCENT_START * MOTION_GRAPH_WIDTH / 100;
-  graph_right = MOTION_GRAPH_PERCENT_STOP * MOTION_GRAPH_WIDTH / 100;
-  graph_width = graph_right - graph_left;
-
   // start of SVG graph
-  WSContentSend_P (PSTR ("<svg viewBox='0 0 %d %d'>\n"), MOTION_GRAPH_WIDTH, MOTION_GRAPH_HEIGHT);
+  WSContentBegin(200, CT_HTML);
+  WSContentSend_P (PSTR ("<svg viewBox='%d %d %d %d' preserveAspectRatio='xMinYMinmeet'>\n"), 0, 0, MOTION_GRAPH_WIDTH, MOTION_GRAPH_HEIGHT);
+
+  // SVG style 
+  WSContentSend_P (PSTR ("<style>\n"));
+  WSContentSend_P (PSTR ("rect {stroke:grey;fill:none;}\n"));
+  WSContentSend_P (PSTR ("text.active {font-size:18px;fill:yellow;}\n"));
+  WSContentSend_P (PSTR ("text.detected {font-size:18px;fill:orange;}\n"));
+  WSContentSend_P (PSTR ("text.enabled {font-size:18px;fill:red;}\n"));
+  WSContentSend_P (PSTR ("</style>\n"));
 
   // graph curve zone
   WSContentSend_P (PSTR ("<rect x='%d%%' y='0%%' width='%d%%' height='100%%' rx='10' />\n"), MOTION_GRAPH_PERCENT_START, MOTION_GRAPH_PERCENT_STOP - MOTION_GRAPH_PERCENT_START);
 
   // graph label
-  WSContentSend_P (PSTR ("<text class='active' x='%d%%' y='%d%%'>%s</text>\n"), 0, 27, D_MOTION_COMMAND);
-  WSContentSend_P (PSTR ("<text class='enabled' x='%d%%' y='%d%%'>%s</text>\n"), 0, 59, D_MOTION_ENABLED);
-  WSContentSend_P (PSTR ("<text class='detected' x='%d%%' y='%d%%'>%s</text>\n"), 0, 92, D_MOTION_DETECTOR);
+  WSContentSend_P (PSTR ("<text class='%s' x='%d%%' y='%d%%'>%s</text>\n"), "active",   0, 27, D_MOTION_COMMAND);
+  WSContentSend_P (PSTR ("<text class='%s' x='%d%%' y='%d%%'>%s</text>\n"), "enabled",  0, 59, D_MOTION_ENABLED);
+  WSContentSend_P (PSTR ("<text class='%s' x='%d%%' y='%d%%'>%s</text>\n"), "detected", 0, 92, D_MOTION_DETECTOR);
+
+  // end of SVG graph
+  WSContentSend_P (PSTR ("</svg>\n"));
+  WSContentEnd();
+}
+
+// Motion graph data
+void MotionWebGraphData ()
+{
+  int      index, array_idx;
+  int      graph_x, graph_y, graph_left, graph_right, graph_width;
+  int      graph_low, graph_high;
+  int      unit_width, shift_unit, shift_width;
+  TIME_T   current_dst;
+  uint32_t current_time;
+
+  // start of SVG graph
+  WSContentBegin(200, CT_HTML);
+  WSContentSend_P (PSTR ("<svg viewBox='%d %d %d %d' preserveAspectRatio='xMinYMinmeet'>\n"), 0, 0, MOTION_GRAPH_WIDTH, MOTION_GRAPH_HEIGHT);
+
+  // page style
+  WSContentSend_P (PSTR ("<style>\n"));
+  WSContentSend_P (PSTR ("polyline.active {fill:none;stroke:yellow;}\n"));
+  WSContentSend_P (PSTR ("polyline.detected {fill:none;stroke:orange;}\n"));
+  WSContentSend_P (PSTR ("polyline.enabled {fill:none;stroke:red;}\n"));
+  WSContentSend_P (PSTR ("line.time {stroke:white;}\n"));
+  WSContentSend_P (PSTR ("text.time {font-size:16px;fill:white;}\n"));
+  WSContentSend_P (PSTR ("</style>\n"));
+
+  // boundaries of SVG graph
+  graph_left  = MOTION_GRAPH_PERCENT_START * MOTION_GRAPH_WIDTH / 100;
+  graph_right = MOTION_GRAPH_PERCENT_STOP * MOTION_GRAPH_WIDTH / 100;
+  graph_width = graph_right - graph_left;
 
   // ------------------
   //   Detector state
@@ -843,14 +955,10 @@ void MotionWebDisplayGraph ()
   WSContentSend_P (PSTR ("<polyline class='detected' points='"));
   for (index = 0; index < MOTION_GRAPH_SAMPLE; index++)
   {
-    // get current detection status
-    array_idx  = (index + motion_graph_index) % MOTION_GRAPH_SAMPLE;
-    state_curr = MotionGetGraphDetected (array_idx);
-
-    // calculate current position
-    graph_x = graph_left + (graph_width * index / MOTION_GRAPH_SAMPLE);
-    if (state_curr == true) graph_y = graph_high;
-    else graph_y = graph_low;
+    // calculate current position and get current detection status
+    graph_x   = graph_left + (graph_width * index / MOTION_GRAPH_SAMPLE);
+    array_idx = (index + motion_graph.index) % MOTION_GRAPH_SAMPLE;
+    if (MotionGetGraphDetected (array_idx)) graph_y = graph_high; else graph_y = graph_low;
 
     // add the point to the line
     WSContentSend_P (PSTR("%d,%d "), graph_x, graph_y);
@@ -867,14 +975,10 @@ void MotionWebDisplayGraph ()
   WSContentSend_P (PSTR ("<polyline class='enabled' points='"));
   for (index = 0; index < MOTION_GRAPH_SAMPLE; index++)
   {
-    // get current detection status
-    array_idx  = (index + motion_graph_index) % MOTION_GRAPH_SAMPLE;
-    state_curr = MotionGetGraphEnabled (array_idx);
-
-    // calculate current position
-    graph_x = graph_left + (graph_width * index / MOTION_GRAPH_SAMPLE);
-    if (state_curr == true) graph_y = graph_high;
-    else graph_y = graph_low;
+    // calculate current position and get current enabled status
+    graph_x   = graph_left + (graph_width * index / MOTION_GRAPH_SAMPLE);
+    array_idx = (index + motion_graph.index) % MOTION_GRAPH_SAMPLE;
+    if (MotionGetGraphEnabled (array_idx)) graph_y = graph_high; else graph_y = graph_low;
 
     // add the point to the line
     WSContentSend_P (PSTR ("%d,%d "), graph_x, graph_y);
@@ -891,144 +995,143 @@ void MotionWebDisplayGraph ()
   WSContentSend_P (PSTR ("<polyline class='active' points='"));
   for (index = 0; index < MOTION_GRAPH_SAMPLE; index++)
   {
-    // get current detection status
-    array_idx  = (index + motion_graph_index) % MOTION_GRAPH_SAMPLE;
-    state_curr = MotionGetGraphActive (array_idx);
-
-    // calculate current position
-    graph_x = graph_left + (graph_width * index / MOTION_GRAPH_SAMPLE);
-    if (state_curr == true) graph_y = graph_high;
-    else graph_y = graph_low;
+    // calculate current position and get current activation status
+    graph_x   = graph_left + (graph_width * index / MOTION_GRAPH_SAMPLE);
+    array_idx = (index + motion_graph.index) % MOTION_GRAPH_SAMPLE;
+    if (MotionGetGraphActive (array_idx)) graph_y = graph_high; else graph_y = graph_low;
 
     // add the point to the line
     WSContentSend_P (PSTR ("%d,%d "), graph_x, graph_y);
   }
   WSContentSend_P (PSTR ("'/>\n"));
 
-  // ------------
-  //     Time
-  // ------------
+  // ---------------
+  //   Time line
+  // ---------------
 
   // get current time
   current_time = LocalTime();
   BreakTime (current_time, current_dst);
 
-  // calculate width of remaining (minutes) till next hour
-  current_dst.hour = (current_dst.hour + 1) % 24;
-  graph_hour = ((60 - current_dst.minute) * graph_width / 1440) - 15; 
+  // calculate horizontal shift
+  unit_width  = graph_width / 6;
+  shift_unit  = current_dst.hour % 4;
+  shift_width = unit_width - (unit_width * shift_unit / 4) - (unit_width * current_dst.minute / 240);
 
-  // if shift is too small, shift to next hour
-  if (graph_hour < 0)
+  // calculate first time displayed by substracting (5 * 4h + shift) to current time
+  current_time -= (5 * 14400) + (shift_unit * 3600); 
+
+  // display 4 hours separation lines with hour
+  for (index = 0; index < 6; index++)
   {
-    current_dst.hour = (current_dst.hour + 1) % 24;
-    graph_hour += graph_width / 24; 
-  }
+    // convert back to date and increase time of 4h
+    BreakTime (current_time, current_dst);
+    current_time += 14400;
 
-  // dislay first time mark
-  graph_x = graph_left + graph_hour;
-  sprintf (str_hour, "%02d", current_dst.hour);
-  WSContentSend_P (PSTR ("<text class='time' x='%d' y='%d%%'>%sh</text>\n"), graph_x, 75, str_hour);
-
-  // dislay next 5 time marks (every 4 hours)
-  for (index = 0; index < 5; index++)
-  {
-    current_dst.hour = (current_dst.hour + 4) % 24;
-    graph_x += graph_width / 6;
-    sprintf (str_hour, "%02d", current_dst.hour);
-    WSContentSend_P (PSTR ("<text class='time' x='%d' y='%d%%'>%sh</text>\n"), graph_x, 75, str_hour);
+    // display separation line and time
+    graph_x = graph_left + shift_width + (index * unit_width);
+    WSContentSend_P (PSTR ("<line class='time' x1='%d' y1='%d%%' x2='%d' y2='%d%%' />\n"), graph_x, 49, graph_x, 51);
+    WSContentSend_P (PSTR ("<text class='time' x='%d' y='%d%%'>%02dh</text>\n"), graph_x - 15, 55, current_dst.hour);
   }
 
   // end of SVG graph
   WSContentSend_P (PSTR ("</svg>\n"));
+  WSContentEnd();
 }
 
 // Motion control public page
 void MotionWebPageControl ()
 {
-  bool   is_light;
-  String str_time;
+  bool updated = false;
 
-  // handle light switch
-  if (Webserver->hasArg(D_CMND_MOTION_TOGGLE)) MotionToggleSwitch (); 
+  // handle light switch (toggle state)
+  if (Webserver->hasArg(D_CMND_MOTION_TOGGLE)) { updated = true; MotionToggleSwitch (); }
 
-  // beginning of form without authentification with 5 seconds auto refresh
+  // beginning of page without authentification
   WSContentStart_P (D_MOTION, false);
   WSContentSend_P (PSTR ("</script>\n"));
-  WSContentSend_P (PSTR ("<meta http-equiv='refresh' content='%d;URL=/%s' />\n"), MOTION_WEB_UPDATE, D_PAGE_MOTION_CONTROL);
-  
-  // page style
-  WSContentSend_P (PSTR ("<style>\n"));
 
-  WSContentSend_P (PSTR ("body {color:white;background-color:#303030;font-family:Arial, Helvetica, sans-serif;}\n"));
-  WSContentSend_P (PSTR ("div {width:100%%;margin:auto;padding:3px 0px;text-align:center;vertical-align:middle;}\n"));
+  // if parameters have been updated, auto reload page
+  if (updated)
+  {
+    WSContentSend_P (PSTR ("<meta http-equiv='refresh' content='0;URL=/%s' />\n"), D_PAGE_MOTION_CONTROL);
+    WSContentSend_P (PSTR ("</head>\n"));
+    WSContentSend_P (PSTR ("<body bgcolor='#252525'></body>\n"));
+    WSContentSend_P (PSTR ("</html>\n"));
+    WSContentEnd ();
+  }
 
-  WSContentSend_P (PSTR (".title {font-size:5vh;}\n"));
-  WSContentSend_P (PSTR (".info {margin-top:10px; height:60px;}\n"));
+  // else, display control page
+  else
+  {
+    // page data refresh script
+    WSContentSend_P (PSTR ("<script type='text/javascript'>\n"));
+    WSContentSend_P (PSTR ("function update() {\n"));
+    WSContentSend_P (PSTR ("httpUpd=new XMLHttpRequest();\n"));
+    WSContentSend_P (PSTR ("httpUpd.onreadystatechange=function() {\n"));
+    WSContentSend_P (PSTR (" if (httpUpd.responseText.length>0) {\n"));
+    WSContentSend_P (PSTR ("  arr_param=httpUpd.responseText.split(';');\n"));
+    WSContentSend_P (PSTR ("  str_random=Math.floor(Math.random()*100000);\n"));
+    WSContentSend_P (PSTR ("  if (arr_param[0]!='') {\n"));
+    WSContentSend_P (PSTR ("   document.getElementById('light').setAttribute('src','light.png?rnd='+str_random);\n"));
+    WSContentSend_P (PSTR ("   document.getElementById('power').setAttribute('src','power.png?rnd='+str_random);\n"));
+    WSContentSend_P (PSTR ("  }\n"));
+    WSContentSend_P (PSTR ("  if (arr_param[1]!='') {document.getElementById('motion').setAttribute('src','motion.png?rnd='+str_random);}\n"));
+    WSContentSend_P (PSTR ("  if (arr_param[2]=='1') {document.getElementById('data').data='data.svg?rnd='+str_random;}\n"));
+    WSContentSend_P (PSTR ("  if (arr_param[3]!='') {document.getElementById('tempo').innerHTML=arr_param[4];}\n"));
+    WSContentSend_P (PSTR (" }\n"));
+    WSContentSend_P (PSTR ("}\n"));
+    WSContentSend_P (PSTR ("httpUpd.open('GET','motion.upd',true);\n"));
+    WSContentSend_P (PSTR ("httpUpd.send();\n"));
+    WSContentSend_P (PSTR ("}\n"));
+    WSContentSend_P (PSTR ("setInterval(function() {update();},1000);\n"));
+    WSContentSend_P (PSTR ("</script>\n"));
 
-  WSContentSend_P (PSTR ("div.status {width:128px;position:relative;padding:16px;}\n"));
-  WSContentSend_P (PSTR ("img.light {position:relative;top:0;left:0;height:92px;z-index:1;}\n"));
-  WSContentSend_P (PSTR ("img.motion {position:absolute;top:72px;left:-32px;height:48px;z-index:2;}\n"));
-  WSContentSend_P (PSTR ("span.timeleft {position:absolute;font-style:italic;top:88px;left:136px;z-index:2;font-size:24px;}\n"));
+    // page style
+    WSContentSend_P (PSTR ("<style>\n"));
+    WSContentSend_P (PSTR ("body {color:white;background-color:#252525;font-family:Arial, Helvetica, sans-serif;}\n"));
+    WSContentSend_P (PSTR ("div {width:100%%;margin:auto;padding:3px 0px;text-align:center;vertical-align:middle;}\n"));
+    WSContentSend_P (PSTR (".title {font-size:5vh;font-weight:bold;}\n"));
+    WSContentSend_P (PSTR ("div.status {width:128px;position:relative;padding:16px;}\n"));
+    WSContentSend_P (PSTR ("button.power {background:none;padding:8px;border-radius:32px;border:1px solid #666;}"));
+    WSContentSend_P (PSTR ("img.power {height:48px;}\n"));
+    WSContentSend_P (PSTR ("img.light {position:relative;top:0;left:0;height:92px;z-index:1;}\n"));
+    WSContentSend_P (PSTR ("img.motion {position:absolute;top:72px;left:-32px;height:48px;z-index:2;}\n"));
+    WSContentSend_P (PSTR ("span.tempo {position:absolute;top:88px;left:136px;z-index:2;font-size:24px;font-style:italic;color:#FFFF33;}\n"));
+    WSContentSend_P (PSTR (".svg-container {position:relative;vertical-align:middle;overflow:hidden;width:100%%;max-width:%dpx;padding-bottom:65%%;}\n"), MOTION_GRAPH_WIDTH);
+    WSContentSend_P (PSTR (".svg-content {display:inline-block;position:absolute;top:0;left:0;}\n"));
+    WSContentSend_P (PSTR ("</style>\n"));
+    WSContentSend_P (PSTR ("</head>\n"));
 
-  WSContentSend_P (PSTR (".time {font-size:20px;}\n"));
-  WSContentSend_P (PSTR (".bold {font-weight:bold;}\n"));
-  WSContentSend_P (PSTR (".yellow {color:#FFFF33;}\n"));
+    // page body
+    WSContentSend_P (PSTR ("<body>\n"));
+    WSContentSend_P (PSTR ("<form name='control' method='get' action='%s'>\n"), D_PAGE_MOTION_CONTROL);
 
-  WSContentSend_P (PSTR (".switch {text-align:left;font-size:24px;font-weight:bold;}\n"));
-  WSContentSend_P (PSTR (".toggle input {display:none;}\n"));
-  WSContentSend_P (PSTR (".toggle {position:relative;display:inline-block;width:140px;height:40px;margin:10px auto;}\n"));
-  WSContentSend_P (PSTR (".slide-off {position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#ff0000;border:1px solid #aaa;border-radius:5px;}\n"));
-  WSContentSend_P (PSTR (".slide-off:before {position:absolute;content:'';width:64px;height:34px;left:2px;top:2px;background-color:#eee;border-radius:5px;}\n"));
-  WSContentSend_P (PSTR (".slide-off:after {position:absolute;content:'Off';top:5px;right:20px;color:#fff;}\n"));
-  WSContentSend_P (PSTR (".slide-on {position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#8cbc13;border:1px solid #aaa;border-radius:5px;}\n"));
-  WSContentSend_P (PSTR (".slide-on:before {position:absolute;content:'';width:64px;height:34px;left:72px;top:2px;background-color:#eee;border-radius:5px;}\n"));
-  WSContentSend_P (PSTR (".slide-on:after {position:absolute;content:'On';top:5px;left:15px;color:#fff;}\n"));
+    // room name
+    WSContentSend_P (PSTR ("<div class='title bold'>%s</div>\n"), SettingsText(SET_DEVICENAME));
 
-  WSContentSend_P (PSTR (".graph {max-width:%dpx;}\n"), MOTION_GRAPH_WIDTH);
+    // light icon, motion and tempo
+    WSContentSend_P (PSTR ("<div class='status'>\n"));
+    WSContentSend_P (PSTR ("<img id='light' class='light' src='light.png?ts=0'>"));
+    WSContentSend_P (PSTR ("<img id='motion' class='motion' src='motion.png?ts=0'>"));
+    WSContentSend_P (PSTR ("<span id='tempo' class='tempo yellow'> </span>\n"));
+    WSContentSend_P (PSTR ("</div>\n"));
 
-  WSContentSend_P (PSTR ("rect.graph {stroke:grey;stroke-dasharray:1;fill:#101010;}\n"));
-  WSContentSend_P (PSTR ("line.dash {stroke:grey;stroke-width:1;stroke-dasharray:8;}\n"));
-  WSContentSend_P (PSTR ("polyline.active {fill:none;stroke:yellow;stroke-width:2;}\n"));
-  WSContentSend_P (PSTR ("polyline.detected {fill:none;stroke:orange;stroke-width:2;}\n"));
-  WSContentSend_P (PSTR ("polyline.enabled {fill:none;stroke:red;stroke-width:2;}\n"));
-  WSContentSend_P (PSTR ("text.active {stroke:yellow;fill:yellow;}\n"));
-  WSContentSend_P (PSTR ("text.detected {stroke:orange;fill:orange;}\n"));
-  WSContentSend_P (PSTR ("text.enabled {stroke:red;fill:red;}\n"));
-  WSContentSend_P (PSTR ("text.time {stroke:white;fill:white;}\n"));
+    // power switch
+    WSContentSend_P (PSTR ("<div>"));
+    WSContentSend_P (PSTR ("<button class='power' type='submit' name='toggle' title='Power'><img class='power' id='power' src='power.png?ts=0' /></button>\n"));
+    WSContentSend_P (PSTR ("</div>\n"));
 
-  WSContentSend_P (PSTR ("</style>\n</head>\n"));
+    // display graph base and data
+    WSContentSend_P (PSTR ("<div class='svg-container'>\n"));
+    WSContentSend_P (PSTR ("<object class='svg-content' id='base' type='image/svg+xml' width='%d%%' height='%d%%' data='%s'></object>\n"), 100, 100, D_PAGE_MOTION_BASE_SVG);
+    WSContentSend_P (PSTR ("<object class='svg-content' id='data' type='image/svg+xml' width='%d%%' height='%d%%' data='%s?ts=0'></object>\n"), 100, 100, D_PAGE_MOTION_DATA_SVG);
+    WSContentSend_P (PSTR ("</div>\n"));
 
-  // page body
-  WSContentSend_P (PSTR ("<body>\n"));
-  WSContentSend_P (PSTR ("<form name='control' method='get' action='%s'>\n"), D_PAGE_MOTION_CONTROL);
-
-  // room name
-  WSContentSend_P (PSTR ("<div class='title bold'>%s</div>\n"), SettingsText(SET_FRIENDLYNAME1));
-
-  // light icon, motion and tempo
-  is_light = MotionIsRelayActive ();
-  str_time = MotionGetTempoLeft ();
-  WSContentSend_P (PSTR ("<div class='status'>\n"));
-  if (is_light == true) MotionWebDisplayIcon (MOTION_LIGHT_ON);
-  else MotionWebDisplayIcon (MOTION_LIGHT_OFF);
-  if (MotionIsDetected ()) MotionWebDisplayIcon (MOTION_DETECTED);
-  if (str_time != "") WSContentSend_P (PSTR ("<span class='timeleft yellow'>%s</span>\n"), str_time.c_str ());
-  WSContentSend_P (PSTR ("</div>\n"));
-
-  // toggle switch
-  WSContentSend_P (PSTR ("<div>"));
-  if (is_light == true) WSContentSend_P (PSTR ("<label class='toggle'><input name='%s' type='submit'/><span class='slide-on switch'></span></label>"), D_CMND_MOTION_TOGGLE);
-  else WSContentSend_P (PSTR ("<label class='toggle'><input name='%s' type='submit'/><span class='slide-off switch'></span></label>"), D_CMND_MOTION_TOGGLE);
-  WSContentSend_P (PSTR ("</div>\n"));
-
-  // display graph
-  WSContentSend_P (PSTR ("<div class='graph'>\n"));
-  MotionWebDisplayGraph ();
-  WSContentSend_P (PSTR ("</div>\n"));
-
-  // end of page
-  WSContentSend_P (PSTR ("</form>\n"));
-  WSContentStop ();
+    // end of page
+    WSContentSend_P (PSTR ("</form>\n"));
+    WSContentStop ();
+  }
 }
 
 #endif  // USE_WEBSERVER
@@ -1074,9 +1177,22 @@ bool Xsns98 (uint8_t function)
 
 #ifdef USE_WEBSERVER
     case FUNC_WEB_ADD_HANDLER:
-      Webserver->on ("/" D_PAGE_MOTION_CONFIG, MotionWebPageConfigure);
-      Webserver->on ("/" D_PAGE_MOTION_TOGGLE, MotionWebPageToggle);
-      Webserver->on ("/" D_PAGE_MOTION_CONTROL, MotionWebPageControl);
+      Webserver->on ("/" D_PAGE_MOTION_CONFIG,   MotionWebPageConfigure);
+      Webserver->on ("/" D_PAGE_MOTION_ENABLE,   MotionWebPageEnable   );
+      Webserver->on ("/" D_PAGE_MOTION_CONTROL,  MotionWebPageControl  );
+      Webserver->on ("/" D_PAGE_MOTION_BASE_SVG, MotionWebGraphFrame   );
+      Webserver->on ("/" D_PAGE_MOTION_DATA_SVG, MotionWebGraphData    );
+      Webserver->on ("/light-off.png", MotionWebIconLightOff);
+      Webserver->on ("/light-on.png",  MotionWebIconLightOn );
+      Webserver->on ("/light.png",     MotionWebIconLight   );
+      Webserver->on ("/power-dis.png", MotionWebIconPowerDisabled);
+      Webserver->on ("/power-off.png", MotionWebIconPowerOff     );
+      Webserver->on ("/power-on.png",  MotionWebIconPowerOn      );
+      Webserver->on ("/power.png",     MotionWebIconPower        );
+      Webserver->on ("/motion-off.png", MotionWebIconMotionOff);
+      Webserver->on ("/motion-on.png",  MotionWebIconMotionOn );
+      Webserver->on ("/motion.png",     MotionWebIconMotion   );
+      Webserver->on ("/motion.upd", MotionWebUpdate );
       break;
     case FUNC_WEB_ADD_MAIN_BUTTON:
       MotionWebMainButton ();
