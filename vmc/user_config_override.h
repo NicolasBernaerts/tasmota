@@ -14,6 +14,9 @@
     15/09/2020 - v2.8 - Remove /json page, based on Tasmota 8.4
                         Add status icons and mode control
     08/10/2020 - v3.0 - Handle graph with js auto update
+    18/10/2020 - v3.1 - Expose icons on web server
+    30/10/2020 - v3.2 - Real time graph page update
+    05/11/2020 - v3.3 - Tasmota 9.0 compatibility
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -62,7 +65,7 @@
 #define USE_HUMIDITY_MQTT                     // Add support for remote MQTT humididity acquisition  
 #define USE_VMC                               // Add support for VMC management
 
-#define EXTENSION_VERSION "3.0"               // version
+#define EXTENSION_VERSION "3.3"               // version
 #define EXTENSION_NAME "VMC"                  // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 
@@ -140,6 +143,8 @@
 #define USE_BMP                                // [I2cDriver10] Enable BMP085/BMP180/BMP280/BME280 sensors (I2C addresses 0x76 and 0x77) (+4k4 code)
 
 #undef USE_SPI                                // Disable all SPI devices
+
+#undef USE_SERIAL_BRIDGE                      // Disable support for software Serial Bridge (+0k8 code)
 
 #undef USE_ENERGY_MARGIN_DETECTION            // Add support for Energy Margin detection (+1k6 code)
 #undef USE_ENERGY_POWER_LIMIT                 // Add additional support for Energy Power Limit detection (+1k2 code)

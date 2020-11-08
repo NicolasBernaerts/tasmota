@@ -15,6 +15,8 @@
     15/09/2020 - v2.8 - Remove /json page, based on Tasmota 8.4
                         Add status icons and mode control
     08/10/2020 - v3.0 - Handle graph with js auto update
+    18/10/2020 - v3.1 - Expose icons on web server
+    30/10/2020 - v3.2 - Real time graph page update
 
   Settings are stored using weighting scale parameters :
     - Settings.weight_reference   = VMC mode
@@ -120,61 +122,76 @@ enum VmcCommands { CMND_VMC_MODE, CMND_VMC_TARGET, CMND_VMC_THRESHOLD, CMND_VMC_
 const char kVmcCommands[] PROGMEM = D_CMND_VMC_MODE "|" D_CMND_VMC_TARGET "|" D_CMND_VMC_THRESHOLD "|" D_CMND_VMC_LOW "|" D_CMND_VMC_HIGH "|" D_CMND_VMC_AUTO;
 
 // HTML chains
-const char VMC_LINE_DASH[] PROGMEM = "<line class='dash' x1='%d' y1='%d%%' x2='%d' y2='%d%%' />\n";
+const char VMC_LINE_DASH[]        PROGMEM = "<line class='dash' x1='%d' y1='%d%%' x2='%d' y2='%d%%' />\n";
 const char VMC_TEXT_TEMPERATURE[] PROGMEM = "<text class='temperature' x='%d%%' y='%d%%'>%s°C</text>\n";
-const char VMC_TEXT_HUMIDITY[] PROGMEM = "<text class='humidity' x='%d%%' y='%d%%'>%d %%</text>\n";
-const char VMC_TEXT_TIME[] PROGMEM = "<text class='time' x='%d' y='%d%%'>%sh</text>\n";
-const char VMC_INPUT_BUTTON[] PROGMEM = "<button name='%s' class='button %s'>%s</button>\n";
-const char VMC_INPUT_NUMBER[] PROGMEM = "<p>%s<br/><input type='number' name='%s' min='0' max='%d' step='1' value='%d'></p>\n";
+const char VMC_TEXT_HUMIDITY[]    PROGMEM = "<text class='humidity' x='%d%%' y='%d%%'>%d %%</text>\n";
+const char VMC_TEXT_TIME[]        PROGMEM = "<text class='time' x='%d' y='%d%%'>%sh</text>\n";
+const char VMC_INPUT_BUTTON[]     PROGMEM = "<button name='%s' class='button %s'>%s</button>\n";
+const char VMC_INPUT_NUMBER[]     PROGMEM = "<p>%s<br/><input type='number' name='%s' min='0' max='%d' step='1' value='%d'></p>\n";
+const char VMC_INPUT_OPTION[]     PROGMEM = "<option value='%d' %s>%s</option>";
 
 /****************************************\
  *               Icons
 \****************************************/
 
 // icon : fan off
-const char fan_icon_off_0[] PROGMEM = "iVBORw0KGgoAAAANSUhEUgAAAIAAAACAAQMAAAD58POIAAABhWlDQ1BJQ0MgcHJvZmlsZQAAKJF9kT1Iw0AcxV9bpSoVh1YQcchQxcGCqIijVqEIFUKt0KqDyaVf0KQhSXFxFFwLDn4sVh1cnHV1cBUEwQ8QJ0cnRRcp8X9JoUWMB8f9eHfvcfcO8NfLTDU7xgFVs4xUIi5ksqtC8BXdCKMfo5iWmKnPiWISnuPrHj6+3sV4lve5P0evkjMZ4BOIZ5luWMQbxNObls55nzjCipJCfE48ZtAFiR+5Lrv8xrngsJ9nRox0ap44QiwU2lhuY1Y0VOIp4qiiapTvz7iscN7irJarrHlP/sJQTltZ5jrNISSwiCWIECCjihLKsBCjVSPFRIr24x7+QccvkksmVwmMHAuoQIXk+MH/4He3Zn5ywk0KxYHOF9v+GAaCu0CjZtvfx7bdOAECz8CV1vJX6sDMJ+m1lhY9Avq2gYvrlibvAZc7wMCTLhmSIwVo+vN54P2MvikLhG+BnjW3t+Y+Th+ANHWVvAEODoGRAmWve7y7q723f880+/sBz1ByzGUugtQAAAAGUExURWyJf/8AAOtjICoAAAABdFJOUwBA5thmAAAAAWJLR0QAiAUdSAAAAAlwSFlzAAAN1wAADdcBQiibeAAAAAd0SU1FB+QJExU1Jf1lHl4AAAIASURBVEjHzZYxkuQgDEWhHDj0EbiJfTGXcbbX8g32CswNqNqEwIVWX3i6LTEzTjZYqoPmFSAh6SM7980YiwGRdjUfiJLeQaT3BKJTgaVOVZ+ZHGkgv9vg9UHZPQ3wbHM6DBjvYMiPIP0bMD2";
-const char fan_icon_off_1[] PROGMEM = "D3YDwCBZngAoQ7rLdgc8So5+BV4niWQdw7m0UsazSMHbgUGDVt4ebPdAlNZtc8917oKsy7E9gOjqwmFJP83t7eYFR6juSRBlA6tsTHRfggq+ig4yQMViIWCRNB/6csRarpyJlz4tHFgTX/JQGiClWlsjhQnLhcDDGgH9uzLh2LLDocfhQUAWBcOAv7PQC+DQ2/ru2BM2u2btUeAKw9xipga1pUpyUBAHInnplbJX40KdutwawqXwN5qv4fgItuIhNvoPYgvMC/uX71mp+pE/XLtB8x5611UX8w7OA6zXg6QN3wyGnFNtEO3H+QkXEpneEBwLgJ27gtVGSc3DFD5XdTC3lsUwZucWB67KL9YSMIDYrrI3iShS8wtoggQ2w2ICTv62OVtFLeOvsNAJyp9GcKx3w5QloqeOWBuQrhTewOfOidGB25hFajIAsOIxOORpayTzrgH4NFvcENvPAolnoR+g0oOsNPcj/cffQvSFbUEyzwOVUs/BVYnQb5EZdHzFH07O/6Opd39fvuqdqvh1C+u4z4y+xi3oCpU+XTQAAAABJRU5ErkJggg==";
+unsigned char vmc_icon_off_png[] PROGMEM = {
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x80, 0x01, 0x03, 0x00, 0x00, 0x00, 0xf9, 0xf0, 0xf3, 0x88, 0x00, 0x00, 0x00, 0x06, 0x50, 0x4c, 0x54, 0x45, 0x48, 0xbe, 0x55, 0xc8, 0x00, 0x00, 0x8a, 0xf4, 0xbf, 0xd3, 0x00, 0x00, 0x00, 0x01, 0x74, 0x52, 0x4e, 0x53, 0x00, 0x40, 0xe6, 0xd8, 0x66, 0x00, 0x00, 0x00, 0x01, 0x62, 0x4b, 0x47, 0x44, 0x00, 0x88, 0x05, 0x1d, 0x48, 0x00, 0x00, 0x00, 0x09, 0x70, 0x48, 0x59, 0x73, 0x00, 0x00, 0x0d, 0xd7, 0x00, 0x00, 0x0d, 0xd7, 0x01, 0x42, 0x28, 0x9b, 0x78, 0x00, 0x00, 0x00, 0x07, 0x74, 0x49, 0x4d, 0x45, 0x07, 0xe4, 0x0a, 0x12, 0x15, 0x0d, 0x24, 0x62, 0xe1, 0x8f, 0x86, 0x00, 0x00, 0x02, 0x00, 0x49, 0x44, 0x41, 0x54, 0x48, 0xc7, 0xcd, 0x96, 0x31, 0x92, 0xe4, 0x20, 0x0c, 0x45, 0xa1, 0x1c, 0x38, 0xf4, 0x11, 0xb8, 0x89, 0x7d, 0x31, 0x97, 0x71, 0xb6, 0xd7, 0xf2, 0x0d, 0xf6, 0x0a, 0xcc, 0x0d, 0xa8, 0xda, 0x84, 0xc0, 0x85, 0x56, 0x5f, 0x78, 0xba, 0x2d, 0x31, 0x33, 0x4e, 0x36, 0x58, 0xaa, 0x83, 0xe6, 0x15, 0x20, 0x21, 0xe9, 0x23, 0x3b, 0xf7, 0xcd, 0x18, 0x8b, 0x01, 0x91, 0x76, 0x35, 0x1f, 0x88, 0x92, 0xde, 0x41, 0xa4, 0xf7, 0x04, 0xa2, 0x53, 0x81, 0xa5, 0x4e, 0x55, 0x9f, 0x99, 0x1c, 0x69, 0x20, 0xbf, 0xdb, 0xe0, 0xf5, 0x41, 0xd9, 0x3d, 0x0d, 0xf0, 0x6c, 0x73, 0x3a, 0x0c, 0x18, 0xef, 0x60, 0xc8, 0x8f, 0x20, 0xfd, 0x1b, 0x30, 0x3d, 0x83, 0xdd, 0x80, 0xf0, 0x08, 0x16, 0x67, 0x80, 0x0a, 0x10, 0xee, 0xb2, 0xdd, 0x81, 0xcf, 0x12, 0xa3, 0x9f, 0x81, 0x57, 0x89, 0xe2, 0x59, 0x07, 0x70, 0xee, 0x6d, 0x14,
+  0xb1, 0xac, 0xd2, 0x30, 0x76, 0xe0, 0x50, 0x60, 0xd5, 0xb7, 0x87, 0x9b, 0x3d, 0xd0, 0x25, 0x35, 0x9b, 0x5c, 0xf3, 0xdd, 0x7b, 0xa0, 0xab, 0x32, 0xec, 0x4f, 0x60, 0x3a, 0x3a, 0xb0, 0x98, 0x52, 0x4f, 0xf3, 0x7b, 0x7b, 0x79, 0x81, 0x51, 0xea, 0x3b, 0x92, 0x44, 0x19, 0x40, 0xea, 0xdb, 0x13, 0x1d, 0x17, 0xe0, 0x82, 0xaf, 0xa2, 0x83, 0x8c, 0x90, 0x31, 0x58, 0x88, 0x58, 0x24, 0x4d, 0x07, 0xfe, 0x9c, 0xb1, 0x16, 0xab, 0xa7, 0x22, 0x65, 0xcf, 0x8b, 0x47, 0x16, 0x04, 0xd7, 0xfc, 0x94, 0x06, 0x88, 0x29, 0x56, 0x96, 0xc8, 0xe1, 0x42, 0x72, 0xe1, 0x70, 0x30, 0xc6, 0x80, 0x7f, 0x6e, 0xcc, 0xb8, 0x76, 0x2c, 0xb0, 0xe8, 0x71, 0xf8, 0x50, 0x50, 0x05, 0x81, 0x70, 0xe0, 0x2f, 0xec, 0xf4, 0x02, 0xf8, 0x34, 0x36, 0xfe, 0xbb, 0xb6, 0x04, 0xcd, 0xae, 0xd9, 0xbb, 0x54, 0x78, 0x02, 0xb0, 0xf7, 0x18, 0xa9, 0x81, 0xad, 0x69, 0x52, 0x9c, 0x94, 0x04, 0x01, 0xc8, 0x9e, 0x7a, 0x65, 0x6c, 0x95, 0xf8, 0xd0, 0xa7, 0x6e, 0xb7, 0x06, 0xb0, 0xa9, 0x7c, 0x0d, 0xe6, 0xab, 0xf8, 0x7e, 0x02, 0x2d, 0xb8, 0x88, 0x4d, 0xbe, 0x83, 0xd8, 0x82, 0xf3, 0x02, 0xfe, 0xe5, 0xfb, 0xd6, 0x6a, 0x7e, 0xa4, 0x4f, 0xd7, 0x2e, 0xd0, 0x7c, 0xc7, 0x9e, 0xb5, 0xd5, 0x45, 0xfc, 0xc3, 0xb3, 0x80, 0xeb, 0x35, 0xe0, 0xe9, 0x03, 0x77, 0xc3, 0x21, 0xa7, 0x14, 0xdb, 0x44, 0x3b, 0x71, 0xfe, 0x42, 0x45, 0xc4, 0xa6, 0x77, 0x84, 0x07, 0x02, 0xe0, 0x27, 0x6e, 0xe0, 0xb5, 0x51, 0x92, 0x73, 0x70, 0xc5, 0x0f, 0x95, 0xdd, 0x4c, 0x2d, 0xe5, 0xb1, 0x4c, 0x19, 0xb9, 0x85, 0xbd, 0x75, 0xd9, 0xc5, 0x7a, 0x42, 0x46, 0x10, 0x9b, 0x15, 0xd6, 0x46, 0x71, 0x25, 0x0a, 0x5e, 0x61, 0x6d, 0x90, 0xc0,
+  0x06, 0x58, 0x6c, 0xc0, 0xc9, 0xdf, 0x56, 0x47, 0xab, 0xe8, 0x25, 0xbc, 0x75, 0x76, 0x1a, 0x01, 0xb9, 0xd3, 0x68, 0xce, 0x95, 0x0e, 0xf8, 0xf2, 0x04, 0xb4, 0xd4, 0x71, 0x4b, 0x03, 0xf2, 0x95, 0xc2, 0x1b, 0xd8, 0x9c, 0x79, 0x51, 0x3a, 0x30, 0x3b, 0xf3, 0x08, 0x2d, 0x46, 0x40, 0x16, 0x1c, 0x46, 0xa7, 0x1c, 0x0d, 0xad, 0x64, 0x9e, 0x75, 0x40, 0xbf, 0x06, 0x8b, 0x7b, 0x02, 0x9b, 0x79, 0x60, 0xd1, 0x2c, 0xf4, 0x23, 0x74, 0x1a, 0xd0, 0xf5, 0x86, 0x1e, 0xe4, 0xff, 0xb8, 0x7b, 0xe8, 0xde, 0x90, 0x2d, 0x28, 0xa6, 0x59, 0xe0, 0x72, 0xaa, 0x59, 0xf8, 0x2a, 0x31, 0xba, 0x0d, 0x72, 0xa3, 0xae, 0x8f, 0x98, 0xa3, 0xe9, 0xd9, 0x5f, 0x74, 0xf5, 0xae, 0xef, 0xeb, 0x77, 0xdd, 0x53, 0x35, 0xdf, 0x0e, 0x21, 0x7d, 0xf7, 0x99, 0xf1, 0x17, 0x88, 0xda, 0x7a, 0x42, 0xbe, 0x93, 0x4f, 0xfd, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82
+};
+unsigned int vmc_icon_off_len = 653;
 
 // icon : fan slow speed
-const char fan_icon_low_0[] PROGMEM = "iVBORw0KGgoAAAANSUhEUgAAAIAAAACAAQMAAAD58POIAAAC5XpUWHRSYXcgcHJvZmlsZSB0eXBlIGV4aWYAAHja7ZdbsuMqDEX/GUUPAUkIieFgHlU9gx5+b2zHeZz0rTq3+qM/YsoGFCyJvYAkYfz6OcMPXFQkhaTmueQccaWSClc0PB7XUVNM+/PBtPef7OH6gGES1HJ08zjHV9j1/oKl074924O104+fjs4Pbg5lRWY0+pnR6Uj4sNPZD4WPRs0P0znveUvXjuq1nwxidIU/4cBDSOL+5COSHHfFXfAkKWugCNoq6bB81S9c0r0R8Gq96BfbaZe7HIej27Tyi06nnfS9frtKjxkRX5H5MSPTK8RX/Wb3Occxu5pygFz5nNRtKnsLAzfIKftrGcVwK9q2l4LiscYGah1T3ULc0CnEUHxSok6VJo29btSQYuLBhpq5sew2F+PCDTAI4qPQZAsg08VBpYGcwMxXLrTHLSsegjkid8JIJjgD4+cSXg3/tzw5mnMtc6Lol1bIi9f6QhqL3HpiFIDQPDXVXV8KRxVfrwVWQFB3mR0TrHE7XGxK97UlO2eJGjA0xWO/kPXTASRCbEUyJCAQM4lSpmjMRgQdHXwqMmdJvIEAaVDuyJKTSAYc5xUb7xjtY1n5MON4AQiVLAY02DqAlZKmjP3mWEI1qGhS1aymrkVrlpyy5pwtr3OqmlgytWxmbsWqiydXz27uXrwWLoJjTEPJxYqXUmpF0JoqfFWMrzBsvMmWNt3yZptvZasNy6elpi03a95Kq527dBwBoedu3XvpddDAUhpp6MjDho8y6sRamzLT1JmnTZ9l1ov";
-const char fan_icon_low_1[] PROGMEM = "aSfWZ2iu5/6ZGJzXeQa1xdqcGs9nNBa3jRBczEONEIG6LABY0L2bRKSVe5BazWFiCiDKy1AWn0yIGgmkQ66SL3Z3cH7kFqPtdbvyOXFjo/ga5sNA9kPvK7Q21XvfjVnZAaxdCU5yQgu1Xhlf2Otto02tcbXw/facO333h4+jj6OPo4+jj6OPo4+ifdyQTPyDwpy/8BuLlk7Z8Fy7MAAABhWlDQ1BJQ0MgcHJvZmlsZQAAeJx9kT1Iw0AcxV9bpSoVh1YQcchQxcGCqIijVqEIFUKt0KqDyaVf0KQhSXFxFFwLDn4sVh1cnHV1cBUEwQ8QJ0cnRRcp8X9JoUWMB8f9eHfvcfcO8NfLTDU7xgFVs4xUIi5ksqtC8BXdCKMfo5iWmKnPiWISnuPrHj6+3sV4lve5P0evkjMZ4BOIZ5luWMQbxNObls55nzjCipJCfE48ZtAFiR+5Lrv8xrngsJ9nRox0ap44QiwU2lhuY1Y0VOIp4qiiapTvz7iscN7irJarrHlP/sJQTltZ5jrNISSwiCWIECCjihLKsBCjVSPFRIr24x7+QccvkksmVwmMHAuoQIXk+MH/4He3Zn5ywk0KxYHOF9v+GAaCu0CjZtvfx7bdOAECz8CV1vJX6sDMJ+m1lhY9Avq2gYvrlibvAZc7wMCTLhmSIwVo+vN54P2MvikLhG+BnjW3t+Y+Th+ANHWVvAEODoGRAmWve7y7q723f880+/sBz1ByzG39SBMAAAAGUExURQhFfzPMAKsZn9oAAAABdFJOUwBA5thmAAAAAWJLR0QAiAUdSAAAAAlwSFlzAAAN1wAADdcBQiibeAAAAAd0SU";
-const char fan_icon_low_2[] PROGMEM = "1FB+QJExU2FIeWTacAAAJHSURBVEjHzZY9bh0hEMcHUZA04QKWuYaL1e6VXLpY7ZIqZXKDXIUb+ArkBkRuiISYzMB71g5r+zUpgl7D7/ExH/9hFuCdYfIAdvRirhGj3IEo9zjEIsBSbZVnRkAJ2u8waL0T95YBKLrThgGYI9DpJoj/BtjbwA/A3QQLDEAEiH3ZjkClFqOPgRKJotkJ8LmHkdvNIg3mBIIAq/SezTwDKal5yDX57n6MYJIa824Wpv/0Tgb5OThhmfkeFnW03Zo4w9VdR4G4Z/BEeo5N9gCTTjNM0PStEAM8MLgjwddWBwkeVZ7h04JIRdLqIKky81pebTPJnpRe6a/CmrdR49cAe6USCeAiuAAYG6AfmMRx2OkyREWHg86sAod84DcuQ9UAnUaXP9eeoBn6fZcqLAzIeh6xg63XZDOyJYhB21MvGVtbPPBat1sHvCm/DeaL+D4CPT8cm3QEew/OK1Cvtm9d8wavpl1At533rF0o+wvNHLvXgcJf7BsfUprYLHqk/LnKEbNcOy3CWiMDeuI0rWXgMZDidSUzI6fcUPht4tyy1eviLd8eOSNYHmF1/gvbF5ob8QFWG+54tW9WklYITLy6+RHhHlYTn7q8uuigmHisMeOL/h1FqWf9Ih62lNUfUR9rlnULU5alDp9HQMW/jmCD4UU5gRmGR2iRL/8JkKoFoGTI0qbZCcjXYIFbYBseWG4W8hEqAzj1hjNI/3H3kL0hjSAPzYKdE81C1RajwyClS33saR969htd/dT35buusA7fDi6+95nxF/d4jePtG0K3AAAAAElFTkSuQmCC";
+unsigned char vmc_icon_slow_png[] PROGMEM = {
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x80, 0x02, 0x03, 0x00, 0x00, 0x00, 0xbe, 0x50, 0x89, 0x58, 0x00, 0x00, 0x00, 0x09, 0x50, 0x4c, 0x54, 0x45, 0x00, 0x00, 0x00, 0x08, 0x45, 0x7f, 0x33, 0xcc, 0x00, 0x8d, 0x1d, 0xcf, 0xd5, 0x00, 0x00, 0x00, 0x01, 0x74, 0x52, 0x4e, 0x53, 0x00, 0x40, 0xe6, 0xd8, 0x66, 0x00, 0x00, 0x00, 0x01, 0x62, 0x4b, 0x47, 0x44, 0x00, 0x88, 0x05, 0x1d, 0x48, 0x00, 0x00, 0x00, 0x09, 0x70, 0x48, 0x59, 0x73, 0x00, 0x00, 0x0d, 0xd7, 0x00, 0x00, 0x0d, 0xd7, 0x01, 0x42, 0x28, 0x9b, 0x78, 0x00, 0x00, 0x00, 0x07, 0x74, 0x49, 0x4d, 0x45, 0x07, 0xe4, 0x0a, 0x12, 0x14, 0x15, 0x14, 0xc7, 0xe1, 0x4d, 0x44, 0x00, 0x00, 0x02, 0x5c, 0x49, 0x44, 0x41, 0x54, 0x58, 0xc3, 0xe5, 0x97, 0x4b, 0x6e, 0xc4, 0x30, 0x08, 0x86, 0x23, 0x2f, 0x7d, 0x14, 0x4e, 0x69, 0xcd, 0x49, 0x58, 0x5a, 0x9c, 0xb2, 0xe6, 0x65, 0x7b, 0xda, 0x80, 0xdb, 0x66, 0x53, 0xa9, 0x91, 0x5a, 0x69, 0xe2, 0x2f, 0x18, 0x08, 0xfc, 0x38, 0xd7, 0xf5, 0xc3, 0x0b, 0xa8, 0x1d, 0xd6, 0x29, 0x25, 0xea, 0x58, 0xa7, 0x7e, 0x30, 0x90, 0x99, 0x28, 0xb2, 0x4e, 0x98, 0xed, 0xd0, 0xaf, 0x6c, 0x0f, 0x90, 0x35, 0xa2, 0x04, 0x58, 0xff, 0x6f, 0x2f, 0x35, 0x5e, 0x62, 0x2f, 0xd5, 0xbd, 0x18, 0xf0, 0x95, 0x30, 0x0c, 0x07, 0x00, 0xc3, 0x28, 0xaf, 0xa7, 0x40, 0xff, 0x3b, 0x00, 0x3d, 0x07, 0x5a, 0x0e, 0x94, 0xc7, 0x40, 0x0d, 0xeb, 0xc1, 0x80, 0xb8, 0x60, 0xec, 0x51, 0xe8, 0x71, 0x51, 0xe7, 0x51, 0x7e, 0x17, 0x48, 0x4a, 0x52, 0x97, 0x8e, 0x40, 0x1c, 0xa5, 0xe5, 0xb8, 0x26, 0xcd,
+  0x2b, 0xee, 0xc1, 0x11, 0xc0, 0xa4, 0xfb, 0x31, 0x8d, 0xd2, 0xac, 0x9f, 0x81, 0x44, 0x82, 0x38, 0x80, 0x92, 0x02, 0xc4, 0xc0, 0xeb, 0x04, 0x54, 0xbc, 0xb2, 0x54, 0x0e, 0x20, 0x7e, 0xdd, 0x2f, 0x01, 0x92, 0xa2, 0xc5, 0x11, 0xe2, 0x00, 0xc2, 0x54, 0x41, 0x1b, 0xc0, 0xf0, 0xa3, 0x44, 0x7b, 0x10, 0x27, 0x82, 0x3d, 0xa0, 0x2f, 0xf2, 0x29, 0x9b, 0x8e, 0x07, 0x0d, 0x80, 0xa6, 0xaa, 0xdb, 0x97, 0xfe, 0xaa, 0x0b, 0x6c, 0x9f, 0x01, 0x0e, 0x74, 0x89, 0x72, 0x71, 0xf5, 0xad, 0xcd, 0x81, 0x82, 0xa6, 0xda, 0x7d, 0x2a, 0x3c, 0x9b, 0x00, 0x49, 0x84, 0x64, 0xa1, 0xe9, 0x4d, 0x35, 0x31, 0x15, 0x5e, 0xd2, 0x88, 0x02, 0x98, 0xaa, 0xab, 0x65, 0x5e, 0x14, 0x63, 0xaa, 0xd3, 0x62, 0x16, 0x74, 0xcd, 0xb4, 0xbb, 0xcb, 0x36, 0xad, 0xe0, 0x74, 0xbd, 0xd8, 0xb3, 0x45, 0x7f, 0xa8, 0x99, 0x7e, 0x2d, 0x60, 0x46, 0x08, 0xe4, 0xef, 0x1f, 0x2c, 0x24, 0xf1, 0xb7, 0x90, 0x4f, 0x84, 0x4a, 0xcd, 0xda, 0xc0, 0xee, 0x89, 0x73, 0x0d, 0xe6, 0x54, 0x2a, 0x13, 0x30, 0xb7, 0x24, 0x3a, 0xdc, 0x66, 0x0e, 0x03, 0x7d, 0x1f, 0x57, 0x5b, 0xf8, 0xde, 0x08, 0xb5, 0xef, 0x03, 0x8f, 0xe8, 0x7d, 0x30, 0x0e, 0xc0, 0x1b, 0xa9, 0xdc, 0x19, 0xe0, 0xd2, 0x98, 0x9d, 0x56, 0x6e, 0x0c, 0x08, 0xb0, 0xca, 0x67, 0xcf, 0xef, 0xea, 0x94, 0xbd, 0xbe, 0xca, 0xe7, 0x1d, 0xce, 0x40, 0xed, 0x6f, 0xdd, 0xfe, 0x3b, 0x60, 0x6f, 0x13, 0x2f, 0x13, 0x8a, 0x80, 0x95, 0x2c, 0xbc, 0x05, 0x6e, 0x72, 0xc5, 0x65, 0x4e, 0x37, 0x06, 0x56, 0xc5, 0xef, 0xc0, 0xfb, 0xfb, 0x42, 0xcf, 0xe4, 0x12, 0x8c, 0x61, 0x40, 0x5f, 0xb7, 0xa0, 0xfd, 0x0b, 0x30, 0xee, 0xf6, 0xe2, 0xdb, 0xbb, 0x17, 0x6c, 0xc8, 0x3d,
+  0x26, 0x2d, 0x6f, 0xf2, 0x0a, 0xeb, 0xae, 0xbd, 0xb3, 0x3e, 0xb7, 0x72, 0xad, 0x9c, 0x12, 0x07, 0xc0, 0x14, 0x9a, 0xf4, 0x87, 0x02, 0x6c, 0x0b, 0x4d, 0xb7, 0xab, 0x35, 0xc6, 0xec, 0x18, 0xed, 0x42, 0xd0, 0x1d, 0xf7, 0xfc, 0xca, 0x0a, 0xd6, 0xd9, 0x85, 0x33, 0x1d, 0x1e, 0x38, 0x08, 0x20, 0xdb, 0xba, 0x31, 0x0d, 0xc0, 0x3b, 0xbd, 0x36, 0x89, 0x9b, 0xf3, 0x80, 0x6e, 0x79, 0x09, 0x04, 0xa9, 0x6c, 0x28, 0xa0, 0x4a, 0xb9, 0x5e, 0xab, 0xb9, 0xce, 0xda, 0xa5, 0x55, 0x0c, 0x6d, 0x97, 0xa6, 0x5d, 0xc4, 0xac, 0x0f, 0x28, 0x94, 0x41, 0xb1, 0x4f, 0xa1, 0x0c, 0x8e, 0xd2, 0x90, 0x66, 0xad, 0xf1, 0x41, 0xeb, 0x12, 0x2d, 0x7e, 0xb5, 0x78, 0x24, 0x09, 0x10, 0x0f, 0x8c, 0x8a, 0x92, 0xc6, 0x64, 0x26, 0xbd, 0x4e, 0x40, 0xa1, 0xc3, 0x5c, 0x54, 0xa0, 0xe7, 0x33, 0xe9, 0x0c, 0x64, 0xc3, 0x5b, 0xd6, 0xb2, 0xf1, 0x0f, 0x47, 0x00, 0xd7, 0x49, 0x25, 0x1e, 0xff, 0xcf, 0xcf, 0x28, 0xc9, 0x78, 0x37, 0xf7, 0x1e, 0x00, 0x96, 0xc3, 0xf8, 0x6d, 0xad, 0x9e, 0x4f, 0x0f, 0xff, 0x31, 0x70, 0x3c, 0xdb, 0x7f, 0x03, 0x78, 0x7c, 0xf8, 0xff, 0x57, 0x5f, 0x07, 0xc9, 0xd9, 0x9e, 0x8e, 0x40, 0xcb, 0x0f, 0xff, 0xf6, 0x28, 0x24, 0x40, 0xdf, 0xca, 0xe6, 0xb6, 0x60, 0xa4, 0x77, 0x13, 0x7d, 0x18, 0x82, 0xc9, 0x7f, 0x98, 0x7f, 0x55, 0x9f, 0xbf, 0x9a, 0x8f, 0xdf, 0xdd, 0x89, 0x02, 0x6d, 0xe3, 0xee, 0x10, 0xe9, 0x4f, 0xae, 0x0f, 0x17, 0xcb, 0x13, 0x7f, 0xc5, 0xaa, 0x53, 0x50, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82
+};
+unsigned int vmc_icon_slow_len = 748;
 
 // icon : fan fast speed
-const char fan_icon_high_0[] PROGMEM = "iVBORw0KGgoAAAANSUhEUgAAAIAAAACAAQMAAAD58POIAAAC5npUWHRSYXcgcHJvZmlsZSB0eXBlIGV4aWYAAHja7ZdbsuMqDEX/GUUPAUkIieFgHlU9gx5+b2zHeZz0rTq3+qM/YsqAFSyJvYAkYfz6OcMPXFQkhaTmueQccaWSCld0PB7X0VJMe/1g2p+f7OH6gGEStHI85nGOr7Dr/QVLp317tgdrpx8/HZ0f3BzKiszo9DOj05HwYafzORQ+OjU/TOe85y1dO5rX52QQoyv8CQceQhL3mo9IctwVd0FNUtZAEfRVEuok8lW/cEn3RsCr96JfbKdd7nIcjm7Tyi86nXbS9/rtKj1mRHxF5seMTK8QX/Wb3eccx+xqygFy5XNSt6nsPQzcIOehRkYx3Iq+7aWgeKyxgVrHVLcQNzwUYig+KVGnSpPG3jZqSDHxYEPL3Fh2m4tx4QYYBOFRaLIFkOnioNJATmDmKxfa45YVD8EckTthJBOcgfFzCa+G/1ueHM25ljlR9Esr5MVrfSGNRW7VGAUgNE9NddeXwtHE12uBFRDUXWbHBGvcDheb0n1tyc5ZogYMTfHYL2T9dACJEFuRDAkIxEyilCkasxFBRwefisxZEm8gQBqUO7JkLPsMOM4rNt4x2sey8mHG8QIQKlkMaLB1ACslTRn7zbGEalDRpKpZTV2L1iw5Zc05W17nVDWxZGrZzNyKVRdPrp7d3L14LVwEx5iGkosVL6XUiqA1VfiqGF9h2HiTLW265c0238pWG5ZPS01bbta8lVY7d+k4AkLP3br30uuggaU00tCRhw0fZdSJtTZlpqkzT5s+y6w";
-const char fan_icon_high_1[] PROGMEM = "XtZPqM7VXcv9NjU5qvINa4+xODWazmwtax4kuZiDGiUDcFgEsaF7MolNKvMgtZrGwBBFlZKkLTqdFDATTINZJF7s7uT9yC1D3u9z4Hbmw0P0NcmGheyD3ldsbar3ux63sgNYuhKY4IQXbrwyv7HW20abXuPr4fvpOG777wsfRx9HH0cfRx9HH0cfRP+9IJn5AFPyl+g25AJOz9gVREgAAAYVpQ0NQSUNDIHByb2ZpbGUAAHicfZE9SMNAHMVfW6UqFYdWEHHIUMXBgqiIo1ahCBVCrdCqg8mlX9CkIUlxcRRcCw5+LFYdXJx1dXAVBMEPECdHJ0UXKfF/SaFFjAfH/Xh373H3DvDXy0w1O8YBVbOMVCIuZLKrQvAV3QijH6OYlpipz4liEp7j6x4+vt7FeJb3uT9Hr5IzGeATiGeZbljEG8TTm5bOeZ84woqSQnxOPGbQBYkfuS67/Ma54LCfZ0aMdGqeOEIsFNpYbmNWNFTiKeKoomqU78+4rHDe4qyWq6x5T/7CUE5bWeY6zSEksIgliBAgo4oSyrAQo1UjxUSK9uMe/kHHL5JLJlcJjBwLqECF5PjB/+B3t2Z+csJNCsWBzhfb/hgGgrtAo2bb38e23TgBAs/AldbyV+rAzCfptZYWPQL6toGL65Ym7wGXO8DAky4ZkiMFaPrzeeD9jL4pC4RvgZ41t7fmPk4fgDR1lbwBDg6BkQJlr3u8u6u9t3/PNPv7Ac9Qcsxt/UgTAAAABlBMVEWZiH8zzABspnZWAAAAAXRSTlMAQObYZgAAAAFiS0dEAIgFHUgAAAAJcEhZcwAADdcAAA3XAUIom3gAAAAHdE";
-const char fan_icon_high_2[] PROGMEM = "lNRQfkCRMVNi3Yk8WvAAADWUlEQVRIx32WX4rbMBDGxxVULZRVDxCiK/QxBWP3KD1CHlMwsfu0j9sDlPYqgj3AXkF7Ay95ccFY/Wb0J3HSbQiE/CLNjOT5vgnRKy89XYE+DKvvKgS/3hHCeo8NYV6BdjHLOqansAbyvnhhvV3lna9AhZzGXQF9CU4jwNNF4RGcl5hHHEQ/juc6FQN3Lr6LoDnniKBUojwD40piPURQ5TsyJGCgnGYrABEOOUkGOc0ooOW9MasX0HP0CBwphDt+IRUBPiqAeeSfpAyizwxwFJ/KoG/4dWooFbKl6mUCMLmQmtTzhLg4Si1gh3QAHuk3AvaIMpP2iHCXCt0ycIgQS/XY2vFjqbkCKfRARwbbWCrAyGDgexmkcoRv+PR6kNrVoBzObn+QcgI0LwSoebMXoPm6bMP5GLxFsOr3YOWSvwq4I/XkLCrbCyCcQD+4Frk+pUvekNG+KU/FTjvaMjign720/Y5qNTY4ivR3FYKjHYMNGn4RHYy05xt914YAkYgOxmpueC2vNhPaHp2+4KeZe954Fb476hdIxJH1ZB0FLwBv0iPfQ49kIVQITmriLrCBA96zDCsBiIbkTyKpibtG8iUVztJGvQAfwTFqUoqUfmMge5bUgJ20SMi6PUbAm6Z/g0Zi/B/Edua7GS9BHy+ngKrUfuTDiZ+k0hKItfOeLnpAf8I3y8eLoArPfDYOMospmDAEGIxd+MYMa0duWKnAABansJbBEByUpBaU6VEZOqufzMjPlqvu2sFwds9PJMx76uxwx/U5OYbfUWfchlcPUiV3v3E1r5ZzeLR9p/2BPtqp2MGs/";
-const char fan_icon_high_3[] PROGMEM = "QhtxdcHtP2sXnwC0rh+UqfcuNLa41T9ya0tzd9NbHY+qQHyqCccPMlDBPSeQRKQSAz20GWJiQgr0WFR5YEd5ZhlKkIGaLKQReowobZInc1AM8hmwHYBwdliF4jg8TDsfTYUWM6Ix2UfsuUgEm6UzK9sSsjVsu/9zLaFakwr9pmMDR9vjuL8yfrYaBdxfl3sk4cFl1IMNs2GulhwAofyVNg+tSt2ABsXUGwcRi+gGP3NKLgZFrfj5GbgqBPPhouRRBFcjlt/Nfi4jjWYKOrkchKupmm1yB1dvNDp6xHdj/3VzP7HVL+Z+24FqrBc/Xew/rW/GX8BCz3v9cz3fz0AAAAASUVORK5CYII=";
-
-// icons associated to vmc
-const char* vmc_fan_icon[][4] PROGMEM = { 
-  {fan_icon_off_0,  fan_icon_off_1,  nullptr,         nullptr        },    // VMC_STATE_OFF
-  {fan_icon_low_0,  fan_icon_low_1,  fan_icon_low_2,  nullptr        },    // VMC_STATE_SLOW
-  {fan_icon_high_0, fan_icon_high_1, fan_icon_high_2, fan_icon_high_3}     // VMC_STATE_FAST
+unsigned char vmc_icon_fast_png[] PROGMEM = {
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x80, 0x02, 0x03, 0x00, 0x00, 0x00, 0xbe, 0x50, 0x89, 0x58, 0x00, 0x00, 0x00, 0x09, 0x50, 0x4c, 0x54, 0x45, 0x00, 0x00, 0x00, 0x99, 0x88, 0x7f, 0x33, 0xcc, 0x00, 0x4a, 0xa2, 0x26, 0x59, 0x00, 0x00, 0x00, 0x01, 0x74, 0x52, 0x4e, 0x53, 0x00, 0x40, 0xe6, 0xd8, 0x66, 0x00, 0x00, 0x00, 0x01, 0x62, 0x4b, 0x47, 0x44, 0x00, 0x88, 0x05, 0x1d, 0x48, 0x00, 0x00, 0x00, 0x09, 0x70, 0x48, 0x59, 0x73, 0x00, 0x00, 0x0d, 0xd7, 0x00, 0x00, 0x0d, 0xd7, 0x01, 0x42, 0x28, 0x9b, 0x78, 0x00, 0x00, 0x00, 0x07, 0x74, 0x49, 0x4d, 0x45, 0x07, 0xe4, 0x0a, 0x12, 0x14, 0x15, 0x01, 0xaa, 0x3c, 0xa9, 0xaf, 0x00, 0x00, 0x03, 0x67, 0x49, 0x44, 0x41, 0x54, 0x58, 0xc3, 0x9d, 0x57, 0x49, 0x8e, 0xe5, 0x20, 0x0c, 0x8d, 0x58, 0xb5, 0x38, 0x45, 0x2f, 0x4b, 0x3e, 0x25, 0xca, 0x49, 0x58, 0x5a, 0x3e, 0x65, 0x83, 0x27, 0xcc, 0x90, 0x44, 0xd5, 0x5f, 0xaa, 0x92, 0x12, 0x5e, 0x3c, 0x3c, 0xcc, 0xb3, 0xb9, 0xae, 0x5f, 0xfe, 0x80, 0xca, 0xc7, 0x3a, 0xbd, 0x22, 0x72, 0x5b, 0x27, 0xfc, 0x30, 0xf0, 0x66, 0x22, 0xf1, 0x3a, 0xd5, 0x37, 0x0f, 0x78, 0xbd, 0xf9, 0x00, 0x5e, 0x23, 0x7a, 0x01, 0x8c, 0xff, 0xc7, 0x9f, 0x18, 0x4f, 0xcf, 0x51, 0x4a, 0x78, 0xcf, 0x00, 0x5b, 0x79, 0x4c, 0xc3, 0x00, 0xf0, 0x00, 0xa0, 0xac, 0xd1, 0x41, 0xa5, 0x33, 0x09, 0x01, 0x50, 0x8f, 0x11, 0x66, 0x34, 0x40, 0xa6, 0x93, 0x81, 0x6b, 0x00, 0x4e, 0x71, 0xb6, 0xb7, 0x01, 0x90, 0xf1, 0x94, 0x41, 0x00, 0xec, 0x5c, 0xf4, 0x45, 0x03, 0x74, 0xfb, 0x5b, 0xaa, 0x50,
+  0x66, 0x40, 0x5a, 0x7d, 0xd0, 0x15, 0x00, 0x45, 0x5f, 0xc4, 0x10, 0x70, 0x00, 0xc4, 0x3f, 0x94, 0x35, 0x87, 0x05, 0xb0, 0xe4, 0x41, 0xd7, 0x78, 0xa7, 0x2c, 0xd1, 0xe6, 0xc1, 0x00, 0x5a, 0x30, 0x93, 0x8f, 0x54, 0xc3, 0xa7, 0x80, 0x7f, 0xf9, 0x29, 0x02, 0xe4, 0x21, 0xa9, 0x6d, 0xd9, 0xcc, 0x14, 0x99, 0x00, 0x46, 0xdd, 0x0e, 0xe0, 0x35, 0x5c, 0x63, 0x04, 0x01, 0xb4, 0x24, 0x24, 0x18, 0x5a, 0x62, 0x4c, 0x24, 0xf9, 0xf5, 0xff, 0x2b, 0x13, 0x59, 0x58, 0x50, 0x02, 0xc8, 0x68, 0xa9, 0x73, 0x8c, 0xa0, 0x1f, 0x76, 0xfb, 0x62, 0xb2, 0xce, 0x31, 0x92, 0x96, 0x33, 0xa0, 0xf9, 0xc7, 0x29, 0xc6, 0xfe, 0x91, 0x00, 0xaa, 0xf9, 0x1f, 0x51, 0xa2, 0x7a, 0xe4, 0x35, 0x72, 0xff, 0x30, 0xf1, 0xd8, 0xbf, 0x11, 0xeb, 0xd5, 0x77, 0xb7, 0x44, 0x00, 0xb9, 0xfb, 0xe2, 0xf5, 0x51, 0x42, 0x12, 0x5e, 0x10, 0x5a, 0x8d, 0xdd, 0xa0, 0xa7, 0xd1, 0x01, 0x42, 0x05, 0x75, 0xc0, 0x6d, 0xd4, 0x38, 0x00, 0xcc, 0x9c, 0x00, 0x18, 0xcb, 0x8b, 0x18, 0x00, 0x60, 0xb5, 0xd4, 0x00, 0x68, 0x99, 0x19, 0xe0, 0xc7, 0xa8, 0xb8, 0x19, 0x30, 0x8a, 0xf6, 0x27, 0x00, 0x84, 0x0a, 0xea, 0x47, 0x46, 0xa9, 0x0a, 0x80, 0x41, 0x45, 0x03, 0xb4, 0x38, 0x24, 0xa3, 0xa5, 0xec, 0x85, 0x8a, 0x46, 0x44, 0x8f, 0x80, 0x36, 0xf9, 0x2c, 0x4a, 0x85, 0x02, 0x78, 0x27, 0xc0, 0x05, 0xb3, 0xeb, 0xaf, 0x52, 0xa1, 0x1a, 0xd0, 0x13, 0x1d, 0xa2, 0x9c, 0x4c, 0x7d, 0x1b, 0x48, 0x01, 0xcd, 0xa1, 0xa8, 0x36, 0xba, 0xc2, 0x93, 0xc4, 0x6d, 0xf5, 0x58, 0xe4, 0xa5, 0x98, 0x70, 0x85, 0x67, 0x1a, 0x45, 0x87, 0x54, 0xd5, 0xc5, 0x72, 0x5f, 0x64, 0x63, 0xa2, 0xd3, 0x6c, 0x16, 0x64, 0x4d, 0xb5, 0x1b, 0xd9,
+  0x4d, 0x11, 0x2a, 0x18, 0x90, 0xf4, 0xdb, 0x24, 0x0f, 0x62, 0x06, 0xaf, 0x01, 0xf0, 0x0c, 0x81, 0x5c, 0x0d, 0x34, 0x25, 0x8e, 0x37, 0x91, 0x75, 0x84, 0x4c, 0x45, 0x4f, 0xac, 0xbe, 0xe3, 0xe0, 0x0a, 0x78, 0x57, 0x4a, 0x0e, 0xd0, 0xb0, 0x38, 0xbb, 0x1a, 0x7a, 0xce, 0xd0, 0x3e, 0x4f, 0x6c, 0x6e, 0x6b, 0x14, 0xd4, 0x33, 0xac, 0x63, 0xec, 0x20, 0x80, 0xd7, 0x66, 0xa2, 0x44, 0xed, 0x32, 0x40, 0x40, 0xe0, 0x24, 0x6e, 0x41, 0x52, 0x23, 0xbf, 0x06, 0xc0, 0x49, 0x73, 0xd3, 0xea, 0xe1, 0x1b, 0x90, 0x71, 0xc4, 0xf0, 0xdf, 0x80, 0x28, 0xb9, 0x56, 0x26, 0xf4, 0x04, 0x18, 0x64, 0xd5, 0x23, 0xe0, 0xc0, 0x55, 0x2f, 0x73, 0x3a, 0x18, 0x18, 0x15, 0x1f, 0x01, 0xf3, 0x7e, 0xd5, 0xbd, 0x7d, 0x35, 0x03, 0xb2, 0xdd, 0x0c, 0xc5, 0x0d, 0xd0, 0xde, 0x62, 0x32, 0xf7, 0x16, 0x45, 0x37, 0x64, 0x11, 0x93, 0x94, 0x37, 0x59, 0x85, 0xa1, 0x35, 0x1f, 0xaf, 0xcf, 0x50, 0xae, 0xb9, 0x53, 0x62, 0x00, 0x50, 0x85, 0x26, 0x79, 0x20, 0x15, 0x40, 0x0e, 0x93, 0x33, 0xc8, 0x7a, 0x30, 0xfc, 0xc4, 0xc8, 0x29, 0x04, 0xf1, 0x18, 0xf9, 0x25, 0x6d, 0xfc, 0x76, 0x0a, 0x9d, 0x0e, 0x4b, 0x9c, 0xb5, 0xac, 0xb2, 0x5b, 0x33, 0x26, 0x09, 0xd8, 0x49, 0xef, 0x1a, 0x21, 0x93, 0x41, 0xaa, 0x66, 0x79, 0x08, 0x04, 0xb9, 0x9c, 0xf7, 0x4a, 0xaf, 0x7e, 0xca, 0x42, 0x86, 0xac, 0x5d, 0x52, 0xc5, 0xac, 0xc3, 0x2c, 0x4d, 0x5b, 0x83, 0x97, 0x73, 0x40, 0x6b, 0xdb, 0x6c, 0x3f, 0xed, 0x08, 0x7c, 0xfc, 0xe6, 0x5e, 0x10, 0x85, 0x14, 0xf9, 0x2c, 0x52, 0x5e, 0x85, 0xd4, 0xa5, 0x98, 0x55, 0xb8, 0xc9, 0xfd, 0x2a, 0xc5, 0x2e, 0xe6, 0x6d, 0x80, 0x2a, 0xb6, 0xbd, 0xb8, 0xa8, 0xbd, 0xb4, 0x83,
+  0xca, 0x34, 0x6e, 0xed, 0xc0, 0x1b, 0xca, 0x75, 0x3b, 0x60, 0x6a, 0x28, 0xde, 0x92, 0xa4, 0xff, 0x7b, 0x5f, 0x74, 0x80, 0x37, 0x35, 0x05, 0xe0, 0xda, 0xd4, 0xbc, 0x2d, 0xca, 0xfe, 0x03, 0xae, 0x6d, 0xd1, 0x1b, 0xab, 0x16, 0x08, 0xae, 0x8d, 0xd5, 0x5b, 0xb3, 0x9c, 0x22, 0x6e, 0xff, 0x73, 0x6b, 0xb6, 0xe6, 0x2e, 0xee, 0x3b, 0x60, 0x69, 0xee, 0x36, 0x1e, 0x48, 0x02, 0x89, 0xb6, 0xf1, 0x20, 0xdb, 0x98, 0xa5, 0x0a, 0x5d, 0xd6, 0x01, 0x43, 0x47, 0x94, 0xcb, 0x67, 0x94, 0x6d, 0x58, 0x93, 0x21, 0xa7, 0xea, 0x36, 0xd0, 0xbd, 0x0e, 0x39, 0x3a, 0x26, 0xd9, 0xd4, 0x4b, 0xf7, 0x36, 0x26, 0x09, 0x25, 0x0e, 0x28, 0xdb, 0xa0, 0x25, 0x0f, 0x7f, 0x54, 0xaf, 0xa4, 0xd8, 0xa7, 0x9a, 0xd3, 0xf9, 0x73, 0x9c, 0xf9, 0x89, 0xc7, 0x11, 0xd0, 0x50, 0x0d, 0x1f, 0xec, 0xa6, 0x81, 0x73, 0x9a, 0xed, 0x73, 0xdd, 0x47, 0xd6, 0x09, 0x00, 0xfb, 0x99, 0x70, 0xab, 0x50, 0xf7, 0xa1, 0x57, 0xc6, 0xe6, 0x00, 0xd8, 0xc6, 0x66, 0x2e, 0x82, 0x00, 0xd8, 0x06, 0xef, 0xcf, 0xd1, 0xfd, 0x73, 0xf8, 0xff, 0xbe, 0x3e, 0x7c, 0x5e, 0x40, 0xfa, 0x66, 0xfa, 0xf0, 0x7f, 0xbe, 0x27, 0x45, 0xc0, 0xc3, 0x5d, 0x10, 0xaf, 0xf7, 0x8b, 0x98, 0x7a, 0x7e, 0x03, 0x94, 0x80, 0x7b, 0xbe, 0xa9, 0xc1, 0x0b, 0x00, 0x43, 0xd9, 0x1c, 0xf3, 0xe0, 0xd3, 0xf5, 0x72, 0xa5, 0x6d, 0x82, 0xd9, 0xff, 0xea, 0xfb, 0xad, 0xfa, 0xfb, 0xd6, 0xfc, 0x79, 0xef, 0xae, 0x2f, 0x80, 0xf4, 0x61, 0xc0, 0x33, 0xfd, 0xcd, 0xef, 0x1f, 0xf7, 0x65, 0x90, 0xab, 0xe0, 0xbc, 0x56, 0x6a, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82
 };
+unsigned int vmc_icon_fast_len = 1015;
 
 /*************************************************\
  *               Variables
 \*************************************************/
 
-// variables
-uint8_t  vmc_devices_present;            // number of relays on the devices
-uint8_t  vmc_humidity_source;            // humidity source
-float    vmc_current_temperature;        // last temperature read
-uint8_t  vmc_current_humidity;           // last read humidity level
-uint8_t  vmc_current_target;             // last target humidity level
+// global variables
+struct {
+  uint8_t humidity_source = VMC_SOURCE_NONE;     // humidity source
+  uint8_t humidity    = UINT8_MAX;               // last read humidity level
+  uint8_t target      = UINT8_MAX;               // last target humidity level
+  float   temperature = NAN;                     // last temperature read
+} vmc_status;
+
+// web client status
+struct {
+  bool state       = false;
+  bool temperature = false;
+  bool humidity    = false;
+  bool graph       = false;
+} vmc_web;
 
 // graph variables
-uint32_t vmc_graph_index;
-uint32_t vmc_graph_counter;
-float    vmc_graph_temperature;
-uint8_t  vmc_graph_humidity;
-uint8_t  vmc_graph_target;
-uint8_t  vmc_graph_state;
-float    arr_temperature[VMC_GRAPH_SAMPLE];
-uint8_t  arr_humidity[VMC_GRAPH_SAMPLE];
-uint8_t  arr_target[VMC_GRAPH_SAMPLE];
-uint8_t  arr_state[VMC_GRAPH_SAMPLE];
+struct {
+  uint32_t index    = 0;
+  uint32_t counter  = 0;
+  uint8_t  humidity = UINT8_MAX;
+  uint8_t  target   = UINT8_MAX;
+  uint8_t  state    = VMC_STATE_NONE;
+  float    temperature = NAN;
+  uint8_t  arr_state[VMC_GRAPH_SAMPLE];
+  uint8_t  arr_humidity[VMC_GRAPH_SAMPLE];
+  uint8_t  arr_target[VMC_GRAPH_SAMPLE];
+  float    arr_temperature[VMC_GRAPH_SAMPLE];
+} vmc_graph;
 
 /**************************************************\
  *                  Accessors
@@ -213,18 +230,18 @@ uint8_t VmcGetRelayState ()
   uint8_t relay_state = VMC_STATE_OFF;
 
   // set number of relay to read status
-  devices_present = vmc_devices_present;
+  //devices_present = vmc_devices_present;
 
   // read relay states
-  vmc_relay1 = bitRead (power, 0);
-  if (vmc_devices_present == 2) vmc_relay2 = bitRead (power, 1);
+  vmc_relay1 = bitRead (TasmotaGlobal.power, 0);
+  if (TasmotaGlobal.devices_present == 2) vmc_relay2 = bitRead (TasmotaGlobal.power, 1);
 
   // convert to vmc state
   if ((vmc_relay1 == 0) && (vmc_relay2 == 1)) relay_state = VMC_STATE_LOW;
   else if (vmc_relay1 == 1) relay_state = VMC_STATE_HIGH;
   
   // reset number of relay
-  devices_present = 0;
+//  devices_present = 0;
 
   return relay_state;
 }
@@ -233,27 +250,27 @@ uint8_t VmcGetRelayState ()
 void VmcSetRelayState (uint8_t new_state)
 {
   // set number of relay to start command
-  devices_present = vmc_devices_present;
+//  devices_present = vmc_devices_present;
 
   // set relays
   switch (new_state)
   {
     case VMC_STATE_OFF:  // VMC disabled
       ExecuteCommandPower (1, POWER_OFF, SRC_IGNORE);
-      if (devices_present == 2) ExecuteCommandPower (2, POWER_OFF, SRC_IGNORE);
+      if (TasmotaGlobal.devices_present == 2) ExecuteCommandPower (2, POWER_OFF, SRC_IGNORE);
       break;
     case VMC_STATE_LOW:  // VMC low speed
       ExecuteCommandPower (1, POWER_OFF, SRC_IGNORE);
-      if (devices_present == 2) ExecuteCommandPower (2, POWER_ON, SRC_IGNORE);
+      if (TasmotaGlobal.devices_present == 2) ExecuteCommandPower (2, POWER_ON, SRC_IGNORE);
       break;
     case VMC_STATE_HIGH:  // VMC high speed
-      if (devices_present == 2) ExecuteCommandPower (2, POWER_OFF, SRC_IGNORE);
+      if (TasmotaGlobal.devices_present == 2) ExecuteCommandPower (2, POWER_OFF, SRC_IGNORE);
       ExecuteCommandPower (1, POWER_ON, SRC_IGNORE);
       break;
   }
 
   // reset number of relay
-  devices_present = 0;
+//  devices_present = 0;
 }
 
 // get vmc actual mode
@@ -280,6 +297,9 @@ void VmcSetMode (uint8_t new_mode)
   // if forced mode, set relay state accordingly
   if (new_mode == VMC_MODE_LOW) VmcSetRelayState (VMC_STATE_LOW);
   else if (new_mode == VMC_MODE_HIGH) VmcSetRelayState (VMC_STATE_HIGH);
+
+  // set web update flag
+  vmc_web.state = true;
 }
 
 // get current temperature
@@ -305,7 +325,7 @@ uint8_t VmcGetHumidity ()
   float   humidity = NAN;
 
   // read humidity from local sensor
-  vmc_humidity_source = VMC_SOURCE_LOCAL;
+  vmc_status.humidity_source = VMC_SOURCE_LOCAL;
 
 #ifdef USE_DHT
   // if dht sensor present, read it 
@@ -315,7 +335,7 @@ uint8_t VmcGetHumidity ()
   // if not available, read MQTT humidity
   if (isnan (humidity))
   {
-    vmc_humidity_source = VMC_SOURCE_REMOTE;
+    vmc_status.humidity_source = VMC_SOURCE_REMOTE;
     humidity = HumidityGetValue ();
   }
 
@@ -372,10 +392,7 @@ void VmcShowJSON (bool append)
 {
   uint8_t humidity, vmc_value, vmc_mode;
   float   temperature;
-  String  str_mqtt, str_json, str_text;
-
-  // save MQTT data
-  str_mqtt = mqtt_data;
+  String  str_json, str_text;
 
   // get mode and humidity
   vmc_mode = VmcGetMode ();
@@ -383,20 +400,18 @@ void VmcShowJSON (bool append)
 
   // vmc mode  -->  "VMC":{"Relay":2,"Mode":4,"Label":"Automatic","Humidity":70.5,"Target":50,"Temperature":18.4}
   str_json  = "\"" + String (D_JSON_VMC) + "\":{";
-  str_json += "\"" + String (D_JSON_VMC_RELAY) + "\":" + String (vmc_devices_present) + ",";
-  str_json += "\"" + String (D_JSON_VMC_MODE) + "\":" + String (vmc_mode) + ",";
+  str_json += "\"" + String (D_JSON_VMC_RELAY) + "\":"   + String (TasmotaGlobal.devices_present) + ",";
+  str_json += "\"" + String (D_JSON_VMC_MODE)  + "\":"   + String (vmc_mode) + ",";
   str_json += "\"" + String (D_JSON_VMC_LABEL) + "\":\"" + str_text + "\",";
 
   // temperature
   temperature = VmcGetTemperature ();
-  if (!isnan(temperature)) str_text = String (temperature, 1);
-  else str_text = "n/a";
+  if (!isnan(temperature)) str_text = String (temperature, 1); else str_text = "n/a";
   str_json += "\"" + String (D_JSON_VMC_TEMPERATURE) + "\":" + str_text + ",";
 
   // humidity level
   humidity = VmcGetHumidity ();
-  if (humidity != UINT8_MAX) str_text = String (humidity);
-  else str_text = "n/a";
+  if (humidity != UINT8_MAX) str_text = String (humidity); else str_text = "n/a";
   str_json += "\"" + String (D_JSON_VMC_HUMIDITY) + "\":" + str_text + ",";
 
   // target humidity
@@ -417,27 +432,19 @@ void VmcShowJSON (bool append)
     // relay state  -->  ,"State":{"Mode":1,"Label":"On"}
     str_json += ",";
     str_json += "\"" + String (D_JSON_VMC_STATE) + "\":{";
-    str_json += "\"" + String (D_JSON_VMC_MODE) + "\":" + String (vmc_value) + ",";
+    str_json += "\"" + String (D_JSON_VMC_MODE)  + "\":"   + String (vmc_value) + ",";
     str_json += "\"" + String (D_JSON_VMC_LABEL) + "\":\"" + str_text + "\"}";
   }
 
   // add remote humidity to JSON
-  snprintf_P(mqtt_data, sizeof(mqtt_data), str_json.c_str());
   HumidityShowJSON (true);
-  str_json = mqtt_data;
 
-  // generate MQTT message and publish if needed
-  if (append == false) 
-  {
-    str_mqtt = "{" + str_json + "}";
-    snprintf_P(mqtt_data, sizeof(mqtt_data), str_mqtt.c_str());
-    MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
-  }
-  else
-  {
-    str_mqtt += "," + str_json;
-    snprintf_P(mqtt_data, sizeof(mqtt_data), str_mqtt.c_str());
-  }
+  // if append mode, add json string to MQTT message
+  if (append) ResponseAppend_P (PSTR(",%s"), str_json.c_str ());
+  else Response_P (PSTR("{%s}"), str_json.c_str ());
+  
+  // publish it if not in append mode
+  if (!append) MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
 }
 
 // Handle VMC MQTT commands
@@ -486,20 +493,23 @@ bool VmcCommand ()
 void VmcUpdateGraphData ()
 {
   // set indexed graph values with current values
-  arr_temperature[vmc_graph_index] = vmc_graph_temperature;
-  arr_humidity[vmc_graph_index] = vmc_graph_humidity;
-  arr_target[vmc_graph_index] = vmc_graph_target;
-  arr_state[vmc_graph_index] = vmc_graph_state;
+  vmc_graph.arr_temperature[vmc_graph.index] = vmc_graph.temperature;
+  vmc_graph.arr_humidity[vmc_graph.index] = vmc_graph.humidity;
+  vmc_graph.arr_target[vmc_graph.index] = vmc_graph.target;
+  vmc_graph.arr_state[vmc_graph.index] = vmc_graph.state;
 
   // init current values
-  vmc_graph_temperature = NAN;
-  vmc_graph_humidity    = UINT8_MAX;
-  vmc_graph_target      = UINT8_MAX;
-  vmc_graph_state       = VMC_STATE_OFF;
+  vmc_graph.temperature = NAN;
+  vmc_graph.humidity    = UINT8_MAX;
+  vmc_graph.target      = UINT8_MAX;
+  vmc_graph.state       = VMC_STATE_OFF;
 
-  // increase temperature data index and reset if max reached
-  vmc_graph_index ++;
-  vmc_graph_index = vmc_graph_index % VMC_GRAPH_SAMPLE;
+  // increase graph data index and reset if max reached
+  vmc_graph.index ++;
+  vmc_graph.index = vmc_graph.index % VMC_GRAPH_SAMPLE;
+
+  // ask for graph update
+  vmc_web.graph = true;
 }
 
 void VmcEverySecond ()
@@ -513,42 +523,43 @@ void VmcEverySecond ()
   if (!isnan(temperature))
   {
     // if temperature was previously mesured, compare
-    if (!isnan(vmc_current_temperature))
+    if (!isnan(vmc_status.temperature))
     {
       // update JSN if temperature is at least 0.2°C different
-      compar_current = floor (vmc_current_temperature * 20);
-      compar_read    = floor (temperature * 20);
+      compar_current = floor (10 * vmc_status.temperature);
+      compar_read    = floor (10 * temperature);
       compar_diff    = abs (compar_current - compar_read);
-      if (compar_diff > 2)
-      {
-        vmc_current_temperature = temperature;
-        need_update = true;
-      }
+      if (compar_diff >= 2) need_update = true;
     }
 
     // else, temperature is the mesured temperature
-    else
+    else need_update = true;
+
+    // if needed, update temperature value
+    if (need_update)
     {
-      vmc_current_temperature = temperature;
+      vmc_status.temperature = temperature;
+      vmc_web.temperature    = true;
+    }
+
+    // update graph value
+    if (!isnan(vmc_graph.temperature)) vmc_graph.temperature = min (vmc_graph.temperature, temperature); else vmc_graph.temperature = temperature;
+  }
+
+  // update current humidity
+  humidity = VmcGetHumidity ();
+  if (humidity != UINT8_MAX)
+  {
+    // save current value and ask for JSON update if any change
+    if (vmc_status.humidity != humidity)
+    {
+      vmc_status.humidity = humidity;
+      vmc_web.humidity    = true;
       need_update = true;
     }
 
     // update graph value
-    if (!isnan(vmc_graph_temperature)) vmc_graph_temperature = min (vmc_graph_temperature, temperature);
-    else vmc_graph_temperature = temperature;
-  }
-
-  // update current humidity
-  humidity = VmcGetHumidity ( );
-  if (humidity != UINT8_MAX)
-  {
-    // save current value and ask for JSON update if any change
-    if (vmc_current_humidity != humidity) need_update = true;
-    vmc_current_humidity = humidity;
-
-    // update graph value
-    if (vmc_graph_humidity != UINT8_MAX) vmc_graph_humidity = max (vmc_graph_humidity, humidity);
-    else vmc_graph_humidity = humidity;
+    if (vmc_graph.humidity != UINT8_MAX) vmc_graph.humidity = max (vmc_graph.humidity, humidity); else vmc_graph.humidity = humidity;
   }
 
   // update target humidity
@@ -556,21 +567,20 @@ void VmcEverySecond ()
   if (target != UINT8_MAX)
   {
     // save current value and ask for JSON update if any change
-    if (vmc_current_target != target) need_update = true;
-    vmc_current_target = target;
+    if (vmc_status.target != target) need_update = true;
+    vmc_status.target = target;
 
     // update graph value
-    if (vmc_graph_target != UINT8_MAX) vmc_graph_target = min (vmc_graph_target, target);
-    else vmc_graph_target = target;
+    if (vmc_graph.target != UINT8_MAX) vmc_graph.target = min (vmc_graph.target, target); else vmc_graph.target = target;
   } 
 
   // update relay state
   actual_state = VmcGetRelayState ();
-  if (vmc_graph_state != VMC_STATE_HIGH) vmc_graph_state = actual_state;
+  if (vmc_graph.state != VMC_STATE_HIGH) vmc_graph.state = actual_state;
 
   // get VMC mode and consider as low if mode disabled and single relay
   vmc_mode = VmcGetMode ();
-  if ((vmc_mode == VMC_MODE_DISABLED) && (vmc_devices_present == 1)) vmc_mode = VMC_MODE_LOW;
+  if ((vmc_mode == VMC_MODE_DISABLED) && (TasmotaGlobal.devices_present == 1)) vmc_mode = VMC_MODE_LOW;
 
   // determine relay target state according to vmc mode
   target_state = actual_state;
@@ -598,6 +608,7 @@ void VmcEverySecond ()
   if (actual_state != target_state)
   {
     VmcSetRelayState (target_state);
+    vmc_web.state = true;
     need_update = true;
   }
   
@@ -605,9 +616,9 @@ void VmcEverySecond ()
   if (need_update == true) VmcShowJSON (false);
 
   // increment delay counter and if delay reached, update history data
-  if (vmc_graph_counter == 0) VmcUpdateGraphData ();
-  vmc_graph_counter ++;
-  vmc_graph_counter = vmc_graph_counter % VMC_GRAPH_REFRESH;
+  if (vmc_graph.counter == 0) VmcUpdateGraphData ();
+  vmc_graph.counter ++;
+  vmc_graph.counter = vmc_graph.counter % VMC_GRAPH_REFRESH;
 }
 
 void VmcInit ()
@@ -615,28 +626,16 @@ void VmcInit ()
   int index;
 
   // save number of devices and set it to 0 to avoid direct command
-  vmc_devices_present = devices_present;
-  devices_present = 0;
-
-  // init default values
-  vmc_humidity_source     = VMC_SOURCE_NONE;
-  vmc_current_temperature = NAN;
-  vmc_current_humidity    = UINT8_MAX;
-  vmc_current_target      = UINT8_MAX;
-  vmc_graph_temperature = NAN;
-  vmc_graph_humidity    = UINT8_MAX;
-  vmc_graph_target      = UINT8_MAX;
-  vmc_graph_state       = VMC_STATE_NONE;
-  vmc_graph_index       = 0;
-  vmc_graph_counter     = 0;
+// vmc_devices_present = devices_present;
+//  devices_present = 0;
 
   // initialise graph data
   for (index = 0; index < VMC_GRAPH_SAMPLE; index++)
   {
-    arr_temperature[index] = NAN;
-    arr_humidity[index] = UINT8_MAX;
-    arr_target[index] = UINT8_MAX;
-    arr_state[index] = VMC_STATE_NONE;
+    vmc_graph.arr_temperature[index] = NAN;
+    vmc_graph.arr_humidity[index] = UINT8_MAX;
+    vmc_graph.arr_target[index] = UINT8_MAX;
+    vmc_graph.arr_state[index] = VMC_STATE_NONE;
   }
 }
 
@@ -646,71 +645,58 @@ void VmcInit ()
 
 #ifdef USE_WEBSERVER
 
-// display base64 embeded icon
-void VmcWebDisplayIcon (uint8_t icon_height, uint8_t icon_index)
+// display offload icons
+void VmceWebIconOff ()  { Webserver->send (200, "image/png", vmc_icon_off_png,  vmc_icon_off_len);  }
+void VmceWebIconLow ()  { Webserver->send (200, "image/png", vmc_icon_slow_png, vmc_icon_slow_len); }
+void VmceWebIconHigh () { Webserver->send (200, "image/png", vmc_icon_fast_png, vmc_icon_fast_len); }
+void VmceWebIconState ()
 {
-  uint8_t nbrItem, index;
+  uint8_t  device_state = VmcGetRelayState ();
 
-  // display icon
-  if (icon_index < VMC_STATE_MAX)
-  {
-    // start of img declaration
-    WSContentSend_P (PSTR ("<img "));
-    if (icon_height != 0) WSContentSend_P (PSTR ("height=%d "), icon_height);
-    WSContentSend_P (PSTR ("src='data:image/png;base64,"));
-
-    // loop thru base64 parts
-    nbrItem = sizeof (vmc_fan_icon[icon_index]) / sizeof (char*);
-    for (index=0; index<nbrItem; index++)
-      if (vmc_fan_icon[icon_index][index] != nullptr) WSContentSend_P (vmc_fan_icon[icon_index][index]);
-
-    // end of img declaration
-    WSContentSend_P (PSTR ("' >"));
-  }
+  if (device_state == VMC_STATE_HIGH) VmceWebIconHigh ();
+  else if (device_state == VMC_STATE_LOW) VmceWebIconLow ();
+  else VmceWebIconOff ();
 }
 
-// VMC mode select combo
-void VmcWebSelectMode (bool autosubmit)
+// update status for web client
+// format is A1;A2;A3;A4
+// A1 : icon update (1:update, empty if no change)
+// A2 : new temperature value (empty if no change)
+// A3 : new humidity value (empty if no change)
+// A4 : graph update (1:update, empty if no update)
+void VmcWebUpdate ()
 {
-  uint8_t vmc_mode, humidity;
-  char    argument[VMC_BUFFER_SIZE];
+  String str_text;
 
-  // get mode and humidity
-  vmc_mode = VmcGetMode ();
-  humidity = VmcGetHumidity ();
+  // A1 : icon state update
+  if (vmc_web.state) str_text = "1";
+  str_text += ";";
 
-  // selection : beginning
-  WSContentSend_P (PSTR ("<select name='%s'"), D_CMND_VMC_MODE);
-  if (autosubmit == true) WSContentSend_P (PSTR (" onchange='this.form.submit()'"));
-  WSContentSend_P (PSTR (">"));
-  
-  // selection : disabled
-  if (vmc_mode == VMC_MODE_DISABLED) strcpy (argument, "selected"); else strcpy (argument, "");
-  WSContentSend_P (PSTR ("<option value='%d' %s>%s</option>"), VMC_MODE_DISABLED, argument, D_VMC_DISABLED);
+  // A2 : temperature value
+  if (vmc_web.temperature) str_text += String (VmcGetTemperature (), 1);
+  str_text += ";";
 
-  // selection : low speed
-  if (vmc_mode == VMC_MODE_LOW) strcpy (argument, "selected"); else strcpy (argument, "");
-  WSContentSend_P (PSTR ("<option value='%d' %s>%s</option>"), VMC_MODE_LOW, argument, D_VMC_LOW);
+  // A3 : humidity value
+  if (vmc_web.humidity) str_text += String (VmcGetHumidity ());
+  str_text += ";";
 
-  // selection : high speed
-  if (vmc_mode == VMC_MODE_HIGH) strcpy (argument, "selected"); else strcpy (argument, "");
-  WSContentSend_P (PSTR ("<option value='%d' %s>%s</option>"), VMC_MODE_HIGH, argument, D_VMC_HIGH);
+  // A4 : graph update
+  if (vmc_web.graph) str_text += "1";
 
-  // selection : automatic
-  if (humidity != UINT8_MAX) 
-  {
-    if (vmc_mode == VMC_MODE_AUTO) strcpy (argument, "selected"); else strcpy (argument, "");
-    WSContentSend_P (PSTR("<option value='%d' %s>%s</option>"), VMC_MODE_AUTO, argument, D_VMC_AUTO);
-  }
+  // send result
+  Webserver->send (200, "text/plain", str_text.c_str (), str_text.length ());
 
-  // selection : end
-  WSContentSend_P (PSTR ("</select>"));
+  // reset web flags
+  vmc_web.state       = false;
+  vmc_web.temperature = false;
+  vmc_web.humidity    = false;
+  vmc_web.graph       = false;
 }
 
 // append VMC control button to main page
 void VmcWebMainButton ()
 {
-    // VMC control page button
+  // VMC control page button
   WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), D_PAGE_VMC_CONTROL, D_VMC_CONTROL);
 }
 
@@ -724,27 +710,22 @@ void VmcWebConfigButton ()
 // append VMC state to main page
 bool VmcWebSensor ()
 {
-  uint8_t  mode, state, humidity, target;
-  String   str_title, str_text, str_value, str_source, str_color;
-
-  // get VMC mode
-  mode = VmcGetMode ();
-
-  // -----------------------
-  //   Humidity and Target 
-  // -----------------------
+  uint8_t mode, humidity, target;
+  String  str_title, str_text, str_value, str_source, str_color;
 
   // if automatic mode, display humidity and target humidity
+  mode = VmcGetMode ();
   if (mode == VMC_MODE_AUTO)
   {
     // read current and target humidity
     humidity = VmcGetHumidity ();
-    target = VmcGetTargetHumidity ();
+    target   = VmcGetTargetHumidity ();
 
     // handle sensor source
-    switch (vmc_humidity_source)
+    switch (vmc_status.humidity_source)
     {
       case VMC_SOURCE_NONE:  // no humidity source available 
+        str_source = "";
         str_value  = "--";
         break;
       case VMC_SOURCE_LOCAL:  // local humidity source used 
@@ -766,22 +747,16 @@ bool VmcWebSensor ()
     WSContentSend_PD (PSTR("{s}%s{m}%s{e}"), str_title.c_str(), str_text.c_str());
   }
 
-  // --------------
-  //   VMC state 
-  // --------------
-
   // display vmc icon status
-  state = VmcGetRelayState ();
-  WSContentSend_PD (PSTR("<tr><td colspan=2 style='width:100%;text-align:center;padding:10px;'>"));
-  VmcWebDisplayIcon (64, state);
-  WSContentSend_PD (PSTR("</td></tr>\n"));
+  WSContentSend_PD (PSTR("<tr><td colspan=2 style='width:100%;text-align:center;padding:10px;'><img height=64 src='state.png' ></td></tr>\n"));
 }
 
 // VMC web page
 void VmcWebPageConfig ()
 {
-  uint8_t value;
+  uint8_t value, humidity;
   char    argument[VMC_BUFFER_SIZE];
+  String  str_text;
 
   // if access not allowed, close
   if (!HttpCheckPriviledgedAccess()) return;
@@ -809,10 +784,31 @@ void VmcWebPageConfig ()
 
   WSContentSend_P (PSTR ("<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n"), D_VMC_PARAMETERS);
 
-  // select mode
-  WSContentSend_P (PSTR ("<p>%s<br/>"), D_VMC_MODE);
-  VmcWebSelectMode (false);
-  WSContentSend_P (PSTR ("</p>\n"));
+  // get mode and humidity
+  value    = VmcGetMode ();
+  humidity = VmcGetHumidity ();
+
+  // selection : start
+  WSContentSend_P (PSTR ("<p>%s<br/><select name='%s'>"), D_VMC_MODE, D_CMND_VMC_MODE);
+  
+  // selection : disabled
+  if (value == VMC_MODE_DISABLED) str_text = "selected"; else str_text = "";
+  WSContentSend_P (VMC_INPUT_OPTION, VMC_MODE_DISABLED, str_text.c_str (), D_VMC_DISABLED);
+
+  // selection : low speed
+  if (value == VMC_MODE_LOW) str_text = "selected"; else str_text = "";
+  WSContentSend_P (VMC_INPUT_OPTION, VMC_MODE_LOW, str_text.c_str (), D_VMC_LOW);
+
+  // selection : high speed
+  if (value == VMC_MODE_HIGH) str_text = "selected"; else str_text = "";
+  WSContentSend_P (VMC_INPUT_OPTION, VMC_MODE_HIGH, str_text.c_str (), D_VMC_HIGH);
+
+  // selection : automatic
+  if (value == VMC_MODE_AUTO) str_text = "selected"; else str_text = "";
+  if (humidity != UINT8_MAX) WSContentSend_P (VMC_INPUT_OPTION, VMC_MODE_AUTO, str_text.c_str (), D_VMC_AUTO);
+
+  // selection : end
+  WSContentSend_P (PSTR ("</select></p>\n"));
 
   // target humidity label and input
   value = VmcGetTargetHumidity ();
@@ -860,10 +856,10 @@ void VmcWebGraphFrame ()
   for (index = 0; index < VMC_GRAPH_SAMPLE; index++)
   {
     // if needed, adjust minimum and maximum temperature
-    if (!isnan (arr_temperature[index]))
+    if (!isnan (vmc_graph.arr_temperature[index]))
     {
-      if (temp_min > arr_temperature[index]) temp_min = floor (arr_temperature[index]);
-      if (temp_max < arr_temperature[index]) temp_max = ceil (arr_temperature[index]);
+      if (temp_min > vmc_graph.arr_temperature[index]) temp_min = floor (vmc_graph.arr_temperature[index]);
+      if (temp_max < vmc_graph.arr_temperature[index]) temp_max = ceil (vmc_graph.arr_temperature[index]);
     } 
   }
   temp_scope = temp_max - temp_min;
@@ -882,11 +878,11 @@ void VmcWebGraphFrame ()
   WSContentSend_P (VMC_LINE_DASH, graph_left, 75, graph_right, 75);
 
   // temperature units
-  WSContentSend_P (VMC_TEXT_TEMPERATURE, 2, 4,  String (temp_max,                     1).c_str ());
+  WSContentSend_P (VMC_TEXT_TEMPERATURE, 2, 4,  String (temp_max, 1).c_str ());
   WSContentSend_P (VMC_TEXT_TEMPERATURE, 2, 27, String (temp_min + temp_scope * 0.75, 1).c_str ());
   WSContentSend_P (VMC_TEXT_TEMPERATURE, 2, 52, String (temp_min + temp_scope * 0.50, 1).c_str ());
   WSContentSend_P (VMC_TEXT_TEMPERATURE, 2, 77, String (temp_min + temp_scope * 0.25, 1).c_str ());
-  WSContentSend_P (VMC_TEXT_TEMPERATURE, 2, 99, String (temp_min,                     1).c_str ());
+  WSContentSend_P (VMC_TEXT_TEMPERATURE, 2, 99, String (temp_min, 1).c_str ());
 
   // humidity units
   WSContentSend_P (VMC_TEXT_HUMIDITY, VMC_GRAPH_PERCENT_STOP + 2, 4, 100);
@@ -925,10 +921,10 @@ void VmcWebGraphData ()
   for (index = 0; index < VMC_GRAPH_SAMPLE; index++)
   {
     // if needed, adjust minimum and maximum temperature
-    if (!isnan (arr_temperature[index]))
+    if (!isnan (vmc_graph.arr_temperature[index]))
     {
-      if (temp_min > arr_temperature[index]) temp_min = floor (arr_temperature[index]);
-      if (temp_max < arr_temperature[index]) temp_max = ceil (arr_temperature[index]);
+      if (temp_min > vmc_graph.arr_temperature[index]) temp_min = floor (vmc_graph.arr_temperature[index]);
+      if (temp_max < vmc_graph.arr_temperature[index]) temp_max = ceil (vmc_graph.arr_temperature[index]);
     } 
   }
   temp_scope = temp_max - temp_min;
@@ -951,11 +947,6 @@ void VmcWebGraphData ()
   WSContentSend_P (PSTR ("polyline.humidity {stroke:orange;}\n"));
   WSContentSend_P (PSTR ("line.time {stroke:white;stroke-width:1;}\n"));
   WSContentSend_P (PSTR ("text.time {font-size:16px;fill:white;}\n"));
-  WSContentSend_P (PSTR ("rect {fill:#333;stroke-width:2;opacity:0.5;}\n"));
-  WSContentSend_P (PSTR ("rect.temperature {stroke:yellow;}\n"));
-  WSContentSend_P (PSTR ("rect.humidity {stroke:orange;}\n"));
-  WSContentSend_P (PSTR ("text.temperature {font-size:28px;fill:yellow;stroke:yellow;}\n"));
-  WSContentSend_P (PSTR ("text.humidity {font-size:28px;fill:orange;stroke:orange;}\n"));
   WSContentSend_P (PSTR ("</style>\n"));
 
   // ---------------
@@ -967,13 +958,13 @@ void VmcWebGraphData ()
   for (index = 0; index < VMC_GRAPH_SAMPLE; index++)
   {
     // get array index and read vmc state
-    array_idx  = (index + vmc_graph_index) % VMC_GRAPH_SAMPLE;
-    if (arr_state[array_idx] != VMC_STATE_NONE)
+    array_idx  = (index + vmc_graph.index) % VMC_GRAPH_SAMPLE;
+    if (vmc_graph.arr_state[array_idx] != VMC_STATE_NONE)
     {
       // calculate current position and add the point to the line
       graph_x = graph_left + (graph_width * index / VMC_GRAPH_SAMPLE);
-      if (arr_state[array_idx] == VMC_STATE_HIGH) graph_y = graph_high;
-      else if (arr_state[array_idx] == VMC_STATE_LOW) graph_y = graph_low;
+      if (vmc_graph.arr_state[array_idx] == VMC_STATE_HIGH) graph_y = graph_high;
+      else if (vmc_graph.arr_state[array_idx] == VMC_STATE_LOW) graph_y = graph_low;
       else graph_y = graph_off;
       WSContentSend_P (PSTR("%d,%d "), graph_x, graph_y);
     }
@@ -985,12 +976,12 @@ void VmcWebGraphData ()
   for (index = 0; index < VMC_GRAPH_SAMPLE; index++)
   {
     // if humidity has been mesured
-    array_idx = (index + vmc_graph_index) % VMC_GRAPH_SAMPLE;
-    if (arr_target[array_idx] != UINT8_MAX)
+    array_idx = (index + vmc_graph.index) % VMC_GRAPH_SAMPLE;
+    if (vmc_graph.arr_target[array_idx] != UINT8_MAX)
     {
       // calculate current position and add the point to the line
       graph_x = graph_left + (graph_width * index / VMC_GRAPH_SAMPLE);
-      graph_y = VMC_GRAPH_HEIGHT - (arr_target[array_idx] * VMC_GRAPH_HEIGHT / 100);
+      graph_y = VMC_GRAPH_HEIGHT - (vmc_graph.arr_target[array_idx] * VMC_GRAPH_HEIGHT / 100);
       WSContentSend_P (PSTR("%d,%d "), graph_x, graph_y);
     }
   }
@@ -1001,12 +992,12 @@ void VmcWebGraphData ()
   for (index = 0; index < VMC_GRAPH_SAMPLE; index++)
   {
     // if temperature has been mesured
-    array_idx   = (index + vmc_graph_index) % VMC_GRAPH_SAMPLE;
-    if (!isnan (arr_temperature[array_idx]))
+    array_idx   = (index + vmc_graph.index) % VMC_GRAPH_SAMPLE;
+    if (!isnan (vmc_graph.arr_temperature[array_idx]))
     {
       // calculate current position and add the point to the line
       graph_x = graph_left + (graph_width * index / VMC_GRAPH_SAMPLE);
-      graph_y = VMC_GRAPH_HEIGHT - int (((arr_temperature[array_idx] - temp_min) / temp_scope) * VMC_GRAPH_HEIGHT);
+      graph_y = VMC_GRAPH_HEIGHT - int (((vmc_graph.arr_temperature[array_idx] - temp_min) / temp_scope) * VMC_GRAPH_HEIGHT);
       WSContentSend_P (PSTR("%d,%d "), graph_x, graph_y);
     }
   }
@@ -1017,12 +1008,12 @@ void VmcWebGraphData ()
   for (index = 0; index < VMC_GRAPH_SAMPLE; index++)
   {
     // if temperature value is defined
-    array_idx = (index + vmc_graph_index) % VMC_GRAPH_SAMPLE;
-    if (arr_humidity[array_idx] != UINT8_MAX)
+    array_idx = (index + vmc_graph.index) % VMC_GRAPH_SAMPLE;
+    if (vmc_graph.arr_humidity[array_idx] != UINT8_MAX)
     {
       // calculate current position and add the point to the line
       graph_x = graph_left + (graph_width * index / VMC_GRAPH_SAMPLE);
-      graph_y = VMC_GRAPH_HEIGHT - (arr_humidity[array_idx] * VMC_GRAPH_HEIGHT / 100);
+      graph_y = VMC_GRAPH_HEIGHT - (vmc_graph.arr_humidity[array_idx] * VMC_GRAPH_HEIGHT / 100);
       WSContentSend_P (PSTR("%d,%d "), graph_x, graph_y);
     }
   }
@@ -1057,34 +1048,6 @@ void VmcWebGraphData ()
     WSContentSend_P (PSTR ("<text class='time' x='%d' y='%d%%'>%02dh</text>\n"), graph_x - 15, 55, current_dst.hour);
   }
 
-  // ---------------
-  //     Values
-  // ---------------
-
-  // current temperature
-  temperature = VmcGetTemperature ();
-  if (!isnan (temperature))
-  {
-    graph_x = 22;
-    graph_y = 2;
-    str_text = String (temperature, 1) + " °C";
-    unit_width = 2 + 2 * str_text.length ();
-    WSContentSend_P ("<rect class='temperature' x='%d%%' y='%d%%' width='%d%%' height='%d%%' rx='%d' ry='%d' />\n", graph_x, graph_y, unit_width, 10, 10, 10);
-    WSContentSend_P ("<text class='temperature' x='%d%%' y='%d%%'>%s</text>\n", graph_x + 2, graph_y + 7,str_text.c_str ());
-  }
-
-  // current humidity
-  humidity = VmcGetHumidity ();
-  if (humidity != UINT8_MAX) 
-  {
-    graph_x = 66;
-    graph_y = 2;
-    str_text = String (humidity) + " %";
-    unit_width = 5 + 2 * str_text.length ();
-    WSContentSend_P ("<rect class='humidity' x='%d%%' y='%d%%' width='%d%%' height='%d%%' rx='%d' ry='%d' />\n", graph_x, graph_y, unit_width, 10, 10, 10);
-    WSContentSend_P ("<text class='humidity' x='%d%%' y='%d%%'>%d %%</text>\n", graph_x + 2, graph_y + 7, humidity);
-  }
-
   // end of SVG graph
   WSContentSend_P (PSTR ("</svg>\n"));
   WSContentEnd();
@@ -1093,78 +1056,108 @@ void VmcWebGraphData ()
 // VMC control public web page
 void VmcWebPageControl ()
 {
-  uint8_t vmc_mode, relay_state;
+  bool    updated = false;
+  uint8_t vmc_mode;
   String  str_text;
 
   // check if vmc state has changed
-  if (Webserver->hasArg(D_CMND_VMC_LOW)) VmcSetMode (VMC_MODE_LOW);
-  else if (Webserver->hasArg(D_CMND_VMC_HIGH)) VmcSetMode (VMC_MODE_HIGH);
-  else if (Webserver->hasArg(D_CMND_VMC_AUTO)) VmcSetMode (VMC_MODE_AUTO);
+  if (Webserver->hasArg(D_CMND_VMC_LOW)) { updated = true; VmcSetMode (VMC_MODE_LOW); }
+  else if (Webserver->hasArg(D_CMND_VMC_HIGH)) { updated = true; VmcSetMode (VMC_MODE_HIGH); }
+  else if (Webserver->hasArg(D_CMND_VMC_AUTO)) { updated = true; VmcSetMode (VMC_MODE_AUTO); }
 
   // beginning of form without authentification with 60 seconds auto refresh
   WSContentStart_P (D_VMC_CONTROL, false);
   WSContentSend_P (PSTR ("</script>\n"));
 
-  // page data refresh script
-  WSContentSend_P (PSTR ("<script type='text/javascript'>\n"));
-  WSContentSend_P (PSTR ("function updateData() {\n"));
-  WSContentSend_P (PSTR ("dataId='data';\n"));
-  WSContentSend_P (PSTR ("now=new Date();\n"));
-  WSContentSend_P (PSTR ("svgObject=document.getElementById(dataId);\n"));
-  WSContentSend_P (PSTR ("svgObjectURL=svgObject.data;\n"));
-  WSContentSend_P (PSTR ("svgObject.data=svgObjectURL.substring(0,svgObjectURL.indexOf('ts=')) + 'ts=' + now.getTime();\n"));
-  WSContentSend_P (PSTR ("}\n"));
-  WSContentSend_P (PSTR ("setInterval(function() {updateData();},%d);\n"), 10000);
-  WSContentSend_P (PSTR ("</script>\n"));
+  // if parameters have been updated, auto reload page
+  if (updated)
+  {
+    WSContentSend_P (PSTR ("<meta http-equiv='refresh' content='0;URL=/%s' />\n"), D_PAGE_VMC_CONTROL);
+    WSContentSend_P (PSTR ("</head>\n"));
+    WSContentSend_P (PSTR ("<body bgcolor='#252525'></body>\n"));
+    WSContentSend_P (PSTR ("</html>\n"));
+    WSContentEnd ();
+  }
 
-  // page style
-  WSContentSend_P (PSTR ("<style>\n"));
-  WSContentSend_P (PSTR ("body {color:white;background-color:#303030;font-family:Arial, Helvetica, sans-serif;}\n"));
-  WSContentSend_P (PSTR ("div {width:100%;margin:6px auto;padding:3px 0px;text-align:center;vertical-align:middle;}\n"));
-  WSContentSend_P (PSTR ("img {height:12vh;}\n"));
-  WSContentSend_P (PSTR ("span {display:inline-block;font-size:5vw;width:20vw;vertical-align:middle;}\n"));
-  WSContentSend_P (PSTR (".title {font-size:6vw;font-weight:bold;}\n"));
-  WSContentSend_P (PSTR (".button {font-size:3vw;padding:0.5rem 1rem;border:1px #666 solid;background:none;color:#fff;border-radius:8px;}\n"));
-  WSContentSend_P (PSTR (".active {background:#666;}\n"));
-  WSContentSend_P (PSTR (".svg-container {position:relative;vertical-align:middle;overflow:hidden;width:100%%;max-width:%dpx;padding-bottom:65%%;}\n"), VMC_GRAPH_WIDTH);
-  WSContentSend_P (PSTR (".svg-content {display:inline-block;position:absolute;top:0;left:0;}\n"));
-  WSContentSend_P (PSTR ("</style>\n"));
+  // else, display control page
+  else
+  {
+    // page data refresh script
+    WSContentSend_P (PSTR ("<script type='text/javascript'>\n"));
+    WSContentSend_P (PSTR ("function update() {\n"));
+    WSContentSend_P (PSTR ("httpUpd=new XMLHttpRequest();\n"));
+    WSContentSend_P (PSTR ("httpUpd.onreadystatechange=function() {\n"));
+    WSContentSend_P (PSTR (" if (httpUpd.responseText.length>0) {\n"));
+    WSContentSend_P (PSTR ("  arr_param=httpUpd.responseText.split(';');\n"));
+    WSContentSend_P (PSTR ("  str_random=Math.floor(Math.random()*100000);\n"));
+    WSContentSend_P (PSTR ("  if (arr_param[0]==1) {document.getElementById('state').setAttribute('src','state.png?rnd='+str_random);}\n"));
+    WSContentSend_P (PSTR ("  if (arr_param[1]!='') {document.getElementById('temp').innerHTML=arr_param[1]+' °C';}\n"));
+    WSContentSend_P (PSTR ("  if (arr_param[2]!='') {document.getElementById('humi').innerHTML=arr_param[2]+' %%';}\n"));
+    WSContentSend_P (PSTR ("  if (arr_param[3]==1) {document.getElementById('data').data='data.svg?rnd='+str_random;}\n"));
+    WSContentSend_P (PSTR (" }\n"));
+    WSContentSend_P (PSTR ("}\n"));
+    WSContentSend_P (PSTR ("httpUpd.open('GET','vmc.upd',true);\n"));
+    WSContentSend_P (PSTR ("httpUpd.send();\n"));
+    WSContentSend_P (PSTR ("}\n"));
+    WSContentSend_P (PSTR ("setInterval(function() {update();},1000);\n"));
+    WSContentSend_P (PSTR ("</script>\n"));
 
-  WSContentSend_P (PSTR ("</head>\n"));
+    // page style
+    WSContentSend_P (PSTR ("<style>\n"));
+    WSContentSend_P (PSTR ("body {color:white;background-color:#252525;font-family:Arial, Helvetica, sans-serif;}\n"));
+    WSContentSend_P (PSTR ("div {width:100%%;margin:1rem auto;padding:3px 0px;text-align:center;vertical-align:middle;}\n"));
+    WSContentSend_P (PSTR ("img {height:64px;}\n"));
+    WSContentSend_P (PSTR ("span {font-size:4vw;padding:0.25rem 1rem;margin:0.5rem;border-radius:8px;width:auto;}\n"));
+    WSContentSend_P (PSTR ("span.temp {color:yellow;border:1px yellow solid;}\n"));
+    WSContentSend_P (PSTR ("span.humi {color:orange;border:1px orange solid;}\n"));
+    WSContentSend_P (PSTR (".title {font-size:6vw;font-weight:bold;}\n"));
+    WSContentSend_P (PSTR (".button {font-size:3vw;padding:0.5rem 1rem;border:1px #666 solid;background:none;color:#fff;border-radius:8px;}\n"));
+    WSContentSend_P (PSTR (".active {background:#666;}\n"));
+    WSContentSend_P (PSTR (".svg-container {position:relative;vertical-align:middle;overflow:hidden;width:100%%;max-width:%dpx;padding-bottom:65%%;}\n"), VMC_GRAPH_WIDTH);
+    WSContentSend_P (PSTR (".svg-content {display:inline-block;position:absolute;top:0;left:0;}\n"));
+    WSContentSend_P (PSTR ("</style>\n"));
 
-  // page body
-  WSContentSend_P (PSTR ("<body>\n"));
-  WSContentSend_P (PSTR ("<form name='%s' method='get' action='%s'>\n"), D_PAGE_VMC_CONTROL, D_PAGE_VMC_CONTROL);
+    WSContentSend_P (PSTR ("</head>\n"));
 
-  // room name
-  WSContentSend_P (PSTR ("<div class='title'>%s</div>\n"), SettingsText(SET_DEVICENAME));
+    // page body
+    WSContentSend_P (PSTR ("<body>\n"));
+    WSContentSend_P (PSTR ("<form name='%s' method='get' action='%s'>\n"), D_PAGE_VMC_CONTROL, D_PAGE_VMC_CONTROL);
 
-  // display icon
-  relay_state = VmcGetRelayState ();
-  WSContentSend_P (PSTR ("<div>"));
-  VmcWebDisplayIcon (64, relay_state);
-  WSContentSend_P (PSTR ("</div>\n"));
+    // room name
+    WSContentSend_P (PSTR ("<div class='title'>%s</div>\n"), SettingsText(SET_DEVICENAME));
 
-  // display vmc mode selector
-  vmc_mode = VmcGetMode ();
-  WSContentSend_P (PSTR ("<div>\n"));
-  if (vmc_mode == VMC_MODE_AUTO) str_text="active"; else str_text="";
-  WSContentSend_P (VMC_INPUT_BUTTON, D_CMND_VMC_AUTO, str_text.c_str (), D_VMC_BTN_AUTO);
-  if (vmc_mode == VMC_MODE_LOW) str_text="active"; else str_text="";
-  WSContentSend_P (VMC_INPUT_BUTTON, D_CMND_VMC_LOW, str_text.c_str (), D_VMC_BTN_LOW);
-  if (vmc_mode == VMC_MODE_HIGH) str_text="active"; else str_text="";
-  WSContentSend_P (VMC_INPUT_BUTTON, D_CMND_VMC_HIGH, str_text.c_str (), D_VMC_BTN_HIGH);
-  WSContentSend_P (PSTR ("</div>\n"));
+    // vmc icon status
+    WSContentSend_PD (PSTR("<div><img id='state' src='state.png?rnd=0'></div>\n"));
 
-  // display graph base and data
-  WSContentSend_P (PSTR ("<div class='svg-container'>\n"));
-  WSContentSend_P (PSTR ("<object class='svg-content' id='base' type='image/svg+xml' width='%d%%' height='%d%%' data='%s'></object>\n"), 100, 100, D_PAGE_VMC_BASE_SVG);
-  WSContentSend_P (PSTR ("<object class='svg-content' id='data' type='image/svg+xml' width='%d%%' height='%d%%' data='%s?ts=0'></object>\n"), 100, 100, D_PAGE_VMC_DATA_SVG);
-  WSContentSend_P (PSTR ("</div>\n"));
+    // vmc mode selector
+    vmc_mode = VmcGetMode ();
+    WSContentSend_P (PSTR ("<div>\n"));
+    if (vmc_mode == VMC_MODE_AUTO) str_text="active"; else str_text="";
+    WSContentSend_P (VMC_INPUT_BUTTON, D_CMND_VMC_AUTO, str_text.c_str (), D_VMC_BTN_AUTO);
+    if (vmc_mode == VMC_MODE_LOW) str_text="active"; else str_text="";
+    WSContentSend_P (VMC_INPUT_BUTTON, D_CMND_VMC_LOW, str_text.c_str (), D_VMC_BTN_LOW);
+    if (vmc_mode == VMC_MODE_HIGH) str_text="active"; else str_text="";
+    WSContentSend_P (VMC_INPUT_BUTTON, D_CMND_VMC_HIGH, str_text.c_str (), D_VMC_BTN_HIGH);
+    WSContentSend_P (PSTR ("</div>\n"));
 
-  // end of page
-  WSContentSend_P (PSTR ("</form>\n"));
-  WSContentStop ();
+    // temperature and humidity values
+    WSContentSend_P (PSTR ("<div>"));
+    str_text = String (VmcGetTemperature (), 1);
+    WSContentSend_P (PSTR ("<span class='temp' id='temp'>%s °C</span>"), str_text.c_str ());
+    str_text = String (VmcGetHumidity ());
+    WSContentSend_P (PSTR ("<span class='humi' id='humi'>%s %%</span>"), str_text.c_str ());
+    WSContentSend_P (PSTR ("</div>\n"));
+
+    // graph base and data
+    WSContentSend_P (PSTR ("<div class='svg-container'>\n"));
+    WSContentSend_P (PSTR ("<object class='svg-content' id='base' type='image/svg+xml' width='%d%%' height='%d%%' data='%s'></object>\n"), 100, 100, D_PAGE_VMC_BASE_SVG);
+    WSContentSend_P (PSTR ("<object class='svg-content' id='data' type='image/svg+xml' width='%d%%' height='%d%%' data='%s?rnd=0'></object>\n"), 100, 100, D_PAGE_VMC_DATA_SVG);
+    WSContentSend_P (PSTR ("</div>\n"));
+
+    // end of page
+    WSContentSend_P (PSTR ("</form>\n"));
+    WSContentStop ();
+  }
 }
 
 #endif  // USE_WEBSERVER
@@ -1195,10 +1188,21 @@ bool Xsns98 (byte callback_id)
 
 #ifdef USE_WEBSERVER
     case FUNC_WEB_ADD_HANDLER:
+      // pages
       Webserver->on ("/" D_PAGE_VMC_CONFIG,  VmcWebPageConfig);
       Webserver->on ("/" D_PAGE_VMC_CONTROL, VmcWebPageControl);
       Webserver->on ("/" D_PAGE_VMC_BASE_SVG, VmcWebGraphFrame);
       Webserver->on ("/" D_PAGE_VMC_DATA_SVG, VmcWebGraphData);
+
+      // icons
+      Webserver->on ("/off.png", VmceWebIconOff);
+      Webserver->on ("/low.png", VmceWebIconLow);
+      Webserver->on ("/high.png", VmceWebIconHigh);
+      Webserver->on ("/state.png", VmceWebIconState);
+
+      // update status
+      Webserver->on ("/vmc.upd", VmcWebUpdate);
+
       break;
     case FUNC_WEB_SENSOR:
       VmcWebSensor ();
