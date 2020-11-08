@@ -36,6 +36,7 @@
     14/10/2020 - v6.9   - Serve icons thru web server 
     18/10/2020 - v6.10  - Handle priorities as list of device types
                           Add randomisation to reconnexion
+    04/11/2020 - v6.11  - Tasmota 9.0 compatibility
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -85,7 +86,7 @@
 #define USE_TEMPERATURE_MQTT                  // Add support for MQTT temperature sensor
 #define USE_PILOTWIRE                         // Add support for France Pilotwire protocol for electrical heaters
 
-#define EXTENSION_VERSION "6.10"              // version
+#define EXTENSION_VERSION "6.11"              // version
 #define EXTENSION_NAME    "Pilotwire"         // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
 
@@ -121,6 +122,7 @@
 #undef USE_DISCOVERY                          // Discovery services for both MQTT and web server
 //#undef WEBSERVER_ADVERTISE                  // Provide access to webserver by name <Hostname>.local/
 #undef MQTT_HOST_DISCOVERY                    // Find MQTT host server (overrides MQTT_HOST if found)
+#define USE_TIMERS_WEB                        // timer web config
 //#undef USE_TIMERS                           // support for up to 16 timers
 //#undef USE_TIMERS_WEB                       // support for timer webpage
 //#undef USE_SUNRISE                          // support for Sunrise and sunset tools
@@ -161,6 +163,8 @@
 #undef USE_I2C                                // Disable all I2C sensors and devices
 #undef USE_SPI                                // Disable all SPI devices
 
+#undef USE_SERIAL_BRIDGE                      // Disable support for software Serial Bridge (+0k8 code)
+
 #undef USE_ENERGY_MARGIN_DETECTION            // Add support for Energy Margin detection (+1k6 code)
 #undef USE_ENERGY_POWER_LIMIT                 // Add additional support for Energy Power Limit detection (+1k2 code)
 #undef USE_PZEM004T                           // Add support for PZEM004T Energy monitor (+2k code)
@@ -181,3 +185,4 @@
 #endif
 
 #endif  // _USER_CONFIG_OVERRIDE_H_
+

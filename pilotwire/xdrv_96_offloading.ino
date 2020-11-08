@@ -21,7 +21,8 @@
     15/10/2020 - v2.1   - Expose icons on web server
     16/10/2020 - v2.2   - Handle priorities as list of device types
                           Add randomisation to reconnexion
-    23/10/2020 - v2.3   - Update control page every second
+    23/10/2020 - v2.3   - Update control page in real time
+    05/11/2020 - v2.4   - Tasmota 9.0 compatibility
                    
   Settings are stored using unused KNX parameters :
     - Settings.knx_GA_addr[0]   = Power of plugged appliance (W) 
@@ -137,23 +138,24 @@ const char OFFLOAD_FIELDSET_STOP[]  PROGMEM = "</fieldset></p>\n";
 const char OFFLOAD_INPUT_NUMBER[]   PROGMEM = "<p class='%s'>%s<span class='key'>%s</span><br><input class='%s' type='number' name='%s' id='%s' min='%d' max='%d' step='%d' value='%d'></p>\n";
 const char OFFLOAD_INPUT_TEXT[]     PROGMEM = "<p>%s<span class='key'>%s</span><br><input name='%s' value='%s' placeholder='%s'></p>\n";
 
-// switching off/on priorities 
-enum OffloadPriorities { OFFLOAD_PRIORITY_APPLIANCE, OFFLOAD_PRIORITY_FRIDGE, OFFLOAD_PRIORITY_WASHING, OFFLOAD_PRIORITY_DISH, OFFLOAD_PRIORITY_DRIER, OFFLOAD_PRIORITY_WATER, OFFLOAD_PRIORITY_IRON, OFFLOAD_PRIORITY_BATHROOM, OFFLOAD_PRIORITY_LIVING, OFFLOAD_PRIORITY_ROOM, OFFLOAD_PRIORITY_KITCHEN, OFFLOAD_PRIORITY_MAX };
+// definition of types of device with associated delays
+enum OffloadDevices { OFFLOAD_PRIORITY_APPLIANCE, OFFLOAD_PRIORITY_FRIDGE, OFFLOAD_PRIORITY_WASHING, OFFLOAD_PRIORITY_DISH, OFFLOAD_PRIORITY_DRIER, OFFLOAD_PRIORITY_CUMULUS, OFFLOAD_PRIORITY_IRON, OFFLOAD_PRIORITY_BATHROOM, OFFLOAD_PRIORITY_OFFICE, OFFLOAD_PRIORITY_LIVING, OFFLOAD_PRIORITY_ROOM, OFFLOAD_PRIORITY_KITCHEN, OFFLOAD_PRIORITY_MAX };
 const char offload_priority_appliance[] PROGMEM = "Misc appliance";
 const char offload_priority_fridge[]    PROGMEM = "Fridge";
 const char offload_priority_washing[]   PROGMEM = "Washing machine";
 const char offload_priority_dish[]      PROGMEM = "Dish washer";
 const char offload_priority_drier[]     PROGMEM = "Drier";
-const char offload_priority_water[]     PROGMEM = "Water heater";
+const char offload_priority_cumulus[]   PROGMEM = "Cumulus";
 const char offload_priority_iron[]      PROGMEM = "Iron";
 const char offload_priority_bathroom[]  PROGMEM = "Bathroom heater";
+const char offload_priority_office[]    PROGMEM = "Office heater";
 const char offload_priority_living[]    PROGMEM = "Living room heater";
 const char offload_priority_room[]      PROGMEM = "Sleeping room heater";
 const char offload_priority_kitchen[]   PROGMEM = "Kitchen heater";
-const char* const arr_offload_priority_label[] PROGMEM = { offload_priority_appliance, offload_priority_fridge, offload_priority_washing, offload_priority_dish, offload_priority_drier, offload_priority_water, offload_priority_iron, offload_priority_bathroom, offload_priority_living, offload_priority_room, offload_priority_kitchen };
-const uint8_t arr_offload_priority_before[] = { 0,  0, 8,  4,  4,  0,  4,  0,  0,  0,  0   };
-const uint8_t arr_offload_priority_after[]  = { 15, 5, 20, 30, 25, 35, 10, 50, 60, 90, 120 };
-const uint8_t arr_offload_priority_random[] = { 5,  5, 5 , 5,  5,  5,  5,  10, 30, 30, 30  };
+const char* const arr_offload_device_label[] PROGMEM = { offload_priority_appliance, offload_priority_fridge, offload_priority_washing, offload_priority_dish, offload_priority_drier, offload_priority_cumulus, offload_priority_iron, offload_priority_bathroom, offload_priority_office, offload_priority_living, offload_priority_room, offload_priority_kitchen };
+const uint8_t arr_offload_delay_before[] = { 0,  0, 8,  4,  4,  0,  4,  0,  0,  0,  0,   0   };
+const uint8_t arr_offload_delay_after[]  = { 15, 5, 20, 30, 25, 35, 10, 50, 60, 90, 120, 150 };
+const uint8_t arr_offload_delay_random[] = { 5,  5, 5 , 5,  5,  5,  5,  10, 30, 30, 30,  30  };
 
 /****************************************\
  *               Icons
@@ -215,22 +217,27 @@ unsigned int offload_power_on_len = 638;
 enum OffloadStages { OFFLOAD_NONE, OFFLOAD_BEFORE, OFFLOAD_ACTIVE, OFFLOAD_AFTER };
 
 // variables
-bool     offload_relay_managed    = true;               // flag to define if relay is managed directly
-bool     offload_topic_subscribed = false;              // flag for power subscription
-bool     offload_just_set         = false;              // flag to signal that offload has just been set
-bool     offload_just_removed     = false;              // flag to signal that offload has just been removed
-bool     offload_web_updated      = true;               // flag to uddate web client
-int      offload_power_inst       = 0;                  // actual phase instant power (retrieved thru MQTT)
-uint8_t  offload_relay_state      = 0;                  // relay state before offloading
-uint8_t  offload_stage            = OFFLOAD_NONE;       // current offloading state
-uint8_t  offload_message_left     = 0;                  // number of JSON messages to send
-uint8_t  offload_message_delay    = 0;                  // delay before next JSON message (seconds)
-uint32_t offload_message_time     = 0;                  // time of last message
-ulong    offload_stage_time       = 0;                  // time of current stage
-ulong    offload_removal_delay    = 0;                  // delay before removing offload (seconds)
+struct {
+  uint8_t  stage         = OFFLOAD_NONE;      // current offloading state
+  uint8_t  relay_state   = 0;                 // relay state before offloading
+  uint8_t  message_left  = 0;                 // number of JSON messages to send
+  uint8_t  message_delay = 0;                 // delay before next JSON message (seconds)
+  uint16_t power_inst    = 0;                 // actual phase instant power (retrieved thru MQTT)
+  uint32_t time_message  = 0;                 // time of last message
+  uint32_t time_stage    = 0;                 // time of current stage
+  uint32_t delay_removal = 0;                 // delay before removing offload (seconds)
+} offload_status;
+
+struct {
+  bool relay_managed    = true;               // flag to define if relay is managed directly
+  bool topic_subscribed = false;              // flag for power subscription
+  bool just_set         = false;              // flag to signal that offload has just been set
+  bool just_removed     = false;              // flag to signal that offload has just been removed
+  bool web_updated      = true;               // flag to uddate web client
+} offload_flag;
 
 // list of available choices in the configuration page
-uint8_t arr_offload_priority_available[OFFLOAD_PRIORITY_MAX] = { OFFLOAD_PRIORITY_APPLIANCE, OFFLOAD_PRIORITY_FRIDGE, OFFLOAD_PRIORITY_WASHING, OFFLOAD_PRIORITY_DISH, OFFLOAD_PRIORITY_DRIER, OFFLOAD_PRIORITY_WATER, OFFLOAD_PRIORITY_IRON, OFFLOAD_PRIORITY_BATHROOM, OFFLOAD_PRIORITY_LIVING, OFFLOAD_PRIORITY_ROOM, OFFLOAD_PRIORITY_KITCHEN };
+uint8_t arr_offload_priority_available[OFFLOAD_PRIORITY_MAX] = { OFFLOAD_PRIORITY_APPLIANCE, OFFLOAD_PRIORITY_FRIDGE, OFFLOAD_PRIORITY_WASHING, OFFLOAD_PRIORITY_DISH, OFFLOAD_PRIORITY_DRIER, OFFLOAD_PRIORITY_CUMULUS, OFFLOAD_PRIORITY_IRON, OFFLOAD_PRIORITY_OFFICE, OFFLOAD_PRIORITY_LIVING, OFFLOAD_PRIORITY_ROOM, OFFLOAD_PRIORITY_BATHROOM, OFFLOAD_PRIORITY_KITCHEN };
 
 /**************************************************\
  *                  Accessors
@@ -366,9 +373,9 @@ void OffloadSetDeviceType (uint16_t new_type)
     Settings.knx_GA_addr[7] = new_type;
 
     // save associated delays
-    OffloadSetDelayBeforeOffload (arr_offload_priority_before[new_type]);
-    OffloadSetDelayBeforeRemoval (arr_offload_priority_after[new_type]);
-    OffloadSetDelayRandom (arr_offload_priority_random[new_type]);
+    OffloadSetDelayBeforeOffload (arr_offload_delay_before[new_type]);
+    OffloadSetDelayBeforeRemoval (arr_offload_delay_after[new_type]);
+    OffloadSetDelayRandom (arr_offload_delay_random[new_type]);
   }
 }
 
@@ -456,7 +463,7 @@ uint16_t OffloadGetMaxPower ()
 // get offload state
 bool OffloadIsOffloaded ()
 {
-  return (offload_stage >= OFFLOAD_ACTIVE);
+  return (offload_status.stage >= OFFLOAD_ACTIVE);
 }
 
 // get offload newly set state
@@ -465,8 +472,8 @@ bool OffloadJustSet ()
   bool result;
 
   // get the flag and reset it
-  result = offload_just_set;
-  offload_just_set = false;
+  result = offload_flag.just_set;
+  offload_flag.just_set = false;
 
   return (result);
 }
@@ -477,8 +484,8 @@ bool OffloadJustRemoved ()
   bool result;
 
   // get the flag and reset it
-  result = offload_just_removed;
-  offload_just_removed = false;
+  result = offload_flag.just_removed;
+  offload_flag.just_removed = false;
 
   return (result);
 }
@@ -486,42 +493,42 @@ bool OffloadJustRemoved ()
 // set relay managed mode
 void OffloadSetRelayMode (bool is_managed)
 {
-  offload_relay_managed = is_managed;
+  offload_flag.relay_managed = is_managed;
 }
 
 // activate offload state
 bool OffloadActivate ()
 {
   // set flag to signal offload has just been set
-  offload_just_set     = true;
-  offload_just_removed = false;
+  offload_flag.just_set     = true;
+  offload_flag.just_removed = false;
 
   // read relay state and switch off if needed
-  if (offload_relay_managed == true)
+  if (offload_flag.relay_managed == true)
   {
     // save relay state
-    offload_relay_state = bitRead (power, 0);
+    offload_status.relay_state = bitRead (TasmotaGlobal.power, 0);
 
     // if relay is ON, switch off
-    if (offload_relay_state == 1) ExecuteCommandPower (1, POWER_OFF, SRC_MAX);
+    if (offload_status.relay_state == 1) ExecuteCommandPower (1, POWER_OFF, SRC_MAX);
   }
 
   // get relay state and log
-  AddLog_P2(LOG_LEVEL_INFO, PSTR("PWR: Offload starts (relay = %d)"), offload_relay_state);
+  AddLog_P2(LOG_LEVEL_INFO, PSTR("PWR: Offload starts (relay = %d)"), offload_status.relay_state);
 }
 
 // remove offload state
 void OffloadRemove ()
 {
   // set flag to signal offload has just been removed
-  offload_just_removed = true;
-  offload_just_set     = false;
+  offload_flag.just_removed = true;
+  offload_flag.just_set     = false;
 
   // if relay managed and it was ON, switch it back
-  if ((offload_relay_managed == true) && (offload_relay_state == 1)) ExecuteCommandPower (1, POWER_ON, SRC_MAX);
+  if ((offload_flag.relay_managed) && (offload_status.relay_state == 1)) ExecuteCommandPower (1, POWER_ON, SRC_MAX);
 
   // log offloading removal
-  AddLog_P2(LOG_LEVEL_INFO, PSTR("PWR: Offload stops (relay = %d)"), offload_relay_state);
+  AddLog_P2(LOG_LEVEL_INFO, PSTR("PWR: Offload stops (relay = %d)"), offload_status.relay_state);
 }
 
 // Show JSON status (for MQTT)
@@ -533,7 +540,7 @@ void OffloadShowJSON (bool append)
   String   str_mqtt, str_json, str_status;
 
   // web client needs update
-  offload_web_updated = true;
+  offload_flag.web_updated = true;
 
   // read data
   is_offloaded    = OffloadIsOffloaded ();
@@ -551,10 +558,9 @@ void OffloadShowJSON (bool append)
   str_json = "\"" + String (D_JSON_OFFLOAD) + "\":{";
   
   // dynamic data
-  if (is_offloaded == true) str_status = MQTT_STATUS_ON;
-  else str_status = MQTT_STATUS_OFF;
+  if (is_offloaded == true) str_status = MQTT_STATUS_ON; else str_status = MQTT_STATUS_OFF;
   str_json += "\"" + String (D_JSON_OFFLOAD_STATE) + "\":\"" + str_status + "\"";
-  str_json += ",\"" + String (D_JSON_OFFLOAD_STAGE) + "\":" + String (offload_stage);
+  str_json += ",\"" + String (D_JSON_OFFLOAD_STAGE) + "\":" + String (offload_status.stage);
   
   // static data
   if (append == true) 
@@ -574,12 +580,11 @@ void OffloadShowJSON (bool append)
   str_json += "}";
 
   // generate MQTT message according to append mode
-  if (append == true) str_mqtt = String (mqtt_data) + "," + str_json;
-  else str_mqtt = "{" + str_json + "}";
+  if (append) ResponseAppend_P (PSTR(",%s"), str_json.c_str ());
+  else Response_P (PSTR("{%s}"), str_json.c_str ());
 
-  // place JSON back to MQTT data and publish it if not in append mode
-  snprintf_P (mqtt_data, sizeof(mqtt_data), str_mqtt.c_str ());
-  if (append == false) MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
+  // publish it if not in append mode
+  if (!append) MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
 }
 
 // check and update MQTT power subsciption after disconnexion
@@ -593,7 +598,7 @@ void OffloadCheckConnexion ()
   if (is_connected)
   {
     // if still no subsciption to power topic
-    if (offload_topic_subscribed == false)
+    if (offload_flag.topic_subscribed == false)
     {
       // check power topic availability
       str_topic = OffloadGetPowerTopic (false);
@@ -603,30 +608,30 @@ void OffloadCheckConnexion ()
         MqttSubscribe(str_topic.c_str ());
 
         // subscription done
-        offload_topic_subscribed = true;
+        offload_flag.topic_subscribed = true;
 
         // log
         AddLog_P2(LOG_LEVEL_INFO, PSTR("MQT: Subscribed to %s"), str_topic.c_str ());
       }
     }
   }
-  else offload_topic_subscribed = false;
+  else offload_flag.topic_subscribed = false;
 
   // check if offload JSON messages need to be sent
-  if (offload_message_left > 0)
+  if (offload_status.message_left > 0)
   {
     // decrement delay
-    offload_message_delay--;
+    offload_status.message_delay--;
 
     // if delay is reached
-    if (offload_message_delay == 0)
+    if (offload_status.message_delay == 0)
     {
       // send MQTT message
       OffloadShowJSON (false);
 
       // update counters
-      offload_message_left--;
-      if (offload_message_left > 0) offload_message_delay = OFFLOAD_MESSAGE_DELAY;
+      offload_status.message_left--;
+      if (offload_status.message_left > 0) offload_status.message_delay = OFFLOAD_MESSAGE_DELAY;
     }
   }
 }
@@ -676,7 +681,7 @@ bool OffloadMqttData ()
   {
     // log and counter increment
     AddLog_P2(LOG_LEVEL_INFO, PSTR("MQT: Received %s"), str_topic.c_str ());
-    offload_message_time = LocalTime ();
+    offload_status.time_message = LocalTime ();
 
     // get message data (removing SPACE and QUOTE)
     str_data  = XdrvMailbox.data;
@@ -689,7 +694,7 @@ bool OffloadMqttData ()
     if (idx_value >= 0) idx_value = str_data.indexOf (':', idx_value + 1);
     if (idx_value >= 0)
     {
-      offload_power_inst = str_data.substring (idx_value + 1).toInt ();
+      offload_status.power_inst = str_data.substring (idx_value + 1).toInt ();
       data_handled = true;
     }
 
@@ -713,10 +718,10 @@ void OffloadEvery250ms ()
 {
   uint8_t  prev_stage, next_stage;
   uint16_t power_mesured, power_device, power_max;
-  ulong    time_end, time_now;
+  uint32_t time_end, time_now;
 
   // if relay state changed, set udate web flag
-  if (offload_relay_state != bitRead (power, 0)) offload_web_updated = true;
+  if (offload_status.relay_state != bitRead (TasmotaGlobal.power, 0)) offload_flag.web_updated = true;
 
   // get device power and global power limit
   power_device = OffloadGetDevicePower ();
@@ -742,22 +747,22 @@ void OffloadEvery250ms ()
   if ((power_max > 0) && (power_device > 0))
   {
     // set previous and next state to current state
-    prev_stage = offload_stage;
-    next_stage = offload_stage;
+    prev_stage = offload_status.stage;
+    next_stage = offload_status.stage;
   
     // switch according to current state
-    switch (offload_stage)
+    switch (offload_status.stage)
     { 
       // actually not offloaded
       case OFFLOAD_NONE:
         // save relay state
-        offload_relay_state = bitRead (power, 0);
+        offload_status.relay_state = bitRead (TasmotaGlobal.power, 0);
 
         // if overload is detected
-        if (offload_power_inst > power_max)
+        if (offload_status.power_inst > power_max)
         { 
           // set time for effective offloading calculation
-          offload_stage_time = time_now;
+          offload_status.time_stage = time_now;
 
           // next state is before offloading
           next_stage = OFFLOAD_BEFORE;
@@ -767,15 +772,15 @@ void OffloadEvery250ms ()
       // pending offloading
       case OFFLOAD_BEFORE:
         // save relay state
-        offload_relay_state = bitRead (power, 0);
+        offload_status.relay_state = bitRead (TasmotaGlobal.power, 0);
 
         // if house power has gone down, remove pending offloading
-        if (offload_power_inst <= power_max) next_stage = OFFLOAD_NONE;
+        if (offload_status.power_inst <= power_max) next_stage = OFFLOAD_NONE;
 
         // else if delay is reached, set active offloading
         else
         {
-          time_end = offload_stage_time + (ulong) OffloadGetDelayBeforeOffload ();
+          time_end = offload_status.time_stage + (uint32_t) OffloadGetDelayBeforeOffload ();
           if (time_end < time_now)
           {
             // set next stage as offloading
@@ -790,14 +795,13 @@ void OffloadEvery250ms ()
       // offloading is active
       case OFFLOAD_ACTIVE:
         // calculate maximum power allowed when substracting device power
-        if (power_max > power_device) power_max -= power_device;
-        else power_max = 0;
+        if (power_max > power_device) power_max -= power_device; else power_max = 0;
 
         // if instant power is under this value, prepare to remove offload
-        if (offload_power_inst <= power_max)
+        if (offload_status.power_inst <= power_max)
         {
           // set time for removing offloading calculation
-          offload_stage_time = time_now;
+          offload_status.time_stage = time_now;
 
           // set stage to after offloading
           next_stage = OFFLOAD_AFTER;
@@ -807,16 +811,15 @@ void OffloadEvery250ms ()
       // actually just after offloading should stop
       case OFFLOAD_AFTER:
         // calculate maximum power allowed when substracting device power
-        if (power_max > power_device) power_max -= power_device;
-        else power_max = 0;
+        if (power_max > power_device) power_max -= power_device; else power_max = 0;
 
         // if house power has gone again too high, offloading back again
-        if (offload_power_inst > power_max) next_stage = OFFLOAD_ACTIVE;
+        if (offload_status.power_inst > power_max) next_stage = OFFLOAD_ACTIVE;
         
         // else if delay is reached, set active offloading
         else
         {
-          time_end = offload_stage_time + offload_removal_delay;
+          time_end = offload_status.time_stage + offload_status.delay_removal;
           if (time_end < time_now)
           {
             // set stage to after offloading
@@ -830,7 +833,7 @@ void OffloadEvery250ms ()
     }
 
     // update offloading state
-    offload_stage = next_stage;
+    offload_status.stage = next_stage;
 
     // if state has changed,
     if (next_stage != prev_stage)
@@ -839,8 +842,8 @@ void OffloadEvery250ms ()
       OffloadShowJSON (false);
 
       // set counters of JSON message update
-      offload_message_left  = OFFLOAD_MESSAGE_LEFT;
-      offload_message_delay = OFFLOAD_MESSAGE_DELAY;
+      offload_status.message_left  = OFFLOAD_MESSAGE_LEFT;
+      offload_status.message_delay = OFFLOAD_MESSAGE_DELAY;
     } 
   }
 }
@@ -849,8 +852,8 @@ void OffloadEvery250ms ()
 void OffloadInit ()
 {
   // calculate offload removal delay including randomisation
-  offload_removal_delay = (ulong) OffloadGetDelayBeforeRemoval ();
-  offload_removal_delay += (ulong) random (0, OffloadGetDelayRandom ());
+  offload_status.delay_removal  = (uint32_t) OffloadGetDelayBeforeRemoval ();
+  offload_status.delay_removal += (uint32_t) random (0, OffloadGetDelayRandom ());
 }
 
 /***********************************************\
@@ -860,39 +863,37 @@ void OffloadInit ()
 #ifdef USE_WEBSERVER
 
 // offload icon
-void OffloadWebIconOffload () { Webserver->send (200, "image/png", offload_icon_png, offload_icon_len); }
+void OffloadWebIconOffload ()     { Webserver->send (200, "image/png", offload_icon_png, offload_icon_len); }
 
 // plug icons
-void OffloadWebIconPlugOff () { Webserver->send (200, "image/png", offload_plug_off_png, offload_plug_off_len); }
-void OffloadWebIconPlugOn () { Webserver->send (200, "image/png", offload_plug_on_png,   offload_plug_on_len);   }
+void OffloadWebIconPlugOff ()     { Webserver->send (200, "image/png", offload_plug_off_png, offload_plug_off_len); }
+void OffloadWebIconPlugOn ()      { Webserver->send (200, "image/png", offload_plug_on_png,   offload_plug_on_len);   }
 void OffloadWebIconPlugOffload () { Webserver->send (200, "image/png", offload_plug_offload_png, offload_plug_offload_len); }
 void OffloadWebIconPlug ()
 {
   if (OffloadIsOffloaded ()) OffloadWebIconPlugOffload ();
-  else if (bitRead (power, 0) == 1) OffloadWebIconPlugOn ();
+  else if (bitRead (TasmotaGlobal.power, 0) == 1) OffloadWebIconPlugOn ();
   else OffloadWebIconPlugOff ();
 }
 
 // power switch icons
 void OffloadWebIconPowerOff () { Webserver->send (200, "image/png", offload_power_off_png, offload_power_off_len); }
-void OffloadWebIconPowerOn () { Webserver->send (200, "image/png", offload_power_on_png, offload_power_on_len); }
+void OffloadWebIconPowerOn ()  { Webserver->send (200, "image/png", offload_power_on_png, offload_power_on_len); }
 void OffloadWebIconPower () 
 { 
   uint8_t relay_state;
 
   // read real relay state or saved one if currently offloaded
-  relay_state = bitRead (power, 0);
-  if (OffloadIsOffloaded ()) relay_state = offload_relay_state;
+  relay_state = bitRead (TasmotaGlobal.power, 0);
+  if (OffloadIsOffloaded ()) relay_state = offload_status.relay_state;
 
-  if (relay_state == 1) OffloadWebIconPowerOff ();
-  else OffloadWebIconPowerOn ();
+  if (relay_state == 1) OffloadWebIconPowerOff (); else OffloadWebIconPowerOn ();
 }
 
 void OffloadWebUpdated ()
 {
-  if (offload_web_updated) Webserver->send (200, "text/plain", "1", 1);
-  else Webserver->send (200, "text/plain", "0", 1);
-  offload_web_updated = false;
+  if (offload_flag.web_updated) Webserver->send (200, "text/plain", "1", 1); else Webserver->send (200, "text/plain", "0", 1);
+  offload_flag.web_updated = false;
 }
 
 // append offload control button to main page
@@ -911,18 +912,18 @@ void OffloadWebConfigButton ()
 bool OffloadWebSensor ()
 {
   uint16_t index, device_power;
-  ulong    time_now, time_left, time_end;
+  uint32_t time_now, time_left, time_end;
   String   str_title, str_text;
   uint32_t message_delay;
   TIME_T   message_dst;
 
   // display device type
   index = OffloadGetDeviceType ();
-  WSContentSend_PD (PSTR("{s}%s{m}%s{e}"), D_OFFLOAD_DEVICE, arr_offload_priority_label[index]);
+  WSContentSend_PD (PSTR("{s}%s %s{m}%s{e}"), D_OFFLOAD_DEVICE, D_OFFLOAD_TYPE, arr_offload_device_label[index]);
 
   // display appliance type
-  time_left = (ulong) OffloadGetDelayBeforeOffload ();
-  WSContentSend_PD (PSTR("{s}%s <small>(Off/On)</small>{m}%d / %d %s{e}"), D_OFFLOAD_DELAY, time_left, offload_removal_delay, D_OFFLOAD_UNIT_SEC);
+  time_left = (uint32_t) OffloadGetDelayBeforeOffload ();
+  WSContentSend_PD (PSTR("{s}%s <small>(Off/On)</small>{m}%d / %d %s{e}"), D_OFFLOAD_DELAY, time_left, offload_status.delay_removal, D_OFFLOAD_UNIT_SEC);
 
   // device power
   index = OffloadGetPhase ();
@@ -930,14 +931,14 @@ bool OffloadWebSensor ()
   WSContentSend_PD (PSTR("{s}%s <small><i>[phase %d]</i></small>{m}%d W{e}"), D_OFFLOAD_POWER, index, device_power);
 
   // if house power is subscribed, display power
-  if (offload_topic_subscribed == true)
+  if (offload_flag.topic_subscribed)
   {
     // calculate delay since last power message
     str_text = "...";
-    if (offload_message_time > 0)
+    if (offload_status.time_message > 0)
     {
       // calculate delay
-      message_delay = LocalTime() - offload_message_time;
+      message_delay = LocalTime() - offload_status.time_message;
       BreakTime (message_delay, message_dst);
 
       // generate readable format
@@ -949,7 +950,7 @@ bool OffloadWebSensor ()
 
     // display current power and max power limit
     device_power = OffloadGetMaxPower ();
-    if (device_power > 0) WSContentSend_PD (PSTR("{s}%s <small><i>[%s]</i></small>{m}<b>%d</b> / %d W{e}"), D_OFFLOAD_CONTRACT, str_text.c_str (), offload_power_inst, device_power);
+    if (device_power > 0) WSContentSend_PD (PSTR("{s}%s <small><i>[%s]</i></small>{m}<b>%d</b> / %d W{e}"), D_OFFLOAD_CONTRACT, str_text.c_str (), offload_status.power_inst, device_power);
 
     // switch according to current state
     time_now  = millis () / 1000;
@@ -957,18 +958,18 @@ bool OffloadWebSensor ()
     str_text  = "";
     str_title = D_OFFLOAD;
     
-    switch (offload_stage)
+    switch (offload_status.stage)
     { 
       // calculate number of ms left before offloading
       case OFFLOAD_BEFORE:
-        time_end = offload_stage_time + (ulong) OffloadGetDelayBeforeOffload ();
+        time_end = offload_status.time_stage + (uint32_t) OffloadGetDelayBeforeOffload ();
         if (time_end > time_now) time_left = time_end - time_now;
         str_text = "<span style='color:orange;'>Starting in <b>" + String (time_left) + " sec.</b></span>";
         break;
 
       // calculate number of ms left before offload removal
       case OFFLOAD_AFTER:
-        time_end = offload_stage_time + offload_removal_delay;
+        time_end = offload_status.time_stage + offload_status.delay_removal;
         if (time_end > time_now) time_left = time_end - time_now;
         str_text = "<span style='color:red;'>Ending in <b>" + String (time_left) + " sec.</b></span>";
         break;
@@ -1076,7 +1077,7 @@ void OffloadWebPageConfig ()
     if (device < OFFLOAD_PRIORITY_MAX)
     {
       if (device == result) str_text = "selected"; else str_text = "";
-      WSContentSend_P (PSTR("<option value='%d' %s>%s</option>\n"), device, str_text.c_str (), arr_offload_priority_label[device]);
+      WSContentSend_P (PSTR("<option value='%d' %s>%s</option>\n"), device, str_text.c_str (), arr_offload_device_label[device]);
     }
   }
   WSContentSend_P (PSTR("</select>\n"));
@@ -1161,16 +1162,16 @@ void OffloadWebPageConfig ()
 
   WSContentSend_P (PSTR("<script type='text/javascript'>\n"));
 
-  WSContentSend_P (PSTR("var arr_delay_before = [%d"), arr_offload_priority_before[0]);
-  for (index = 1; index < OFFLOAD_PRIORITY_MAX; index ++) WSContentSend_P (PSTR(",%d"), arr_offload_priority_before[index]);
+  WSContentSend_P (PSTR("var arr_delay_before = [%d"), arr_offload_delay_before[0]);
+  for (index = 1; index < OFFLOAD_PRIORITY_MAX; index ++) WSContentSend_P (PSTR(",%d"), arr_offload_delay_before[index]);
   WSContentSend_P (PSTR("];\n"));
 
-  WSContentSend_P (PSTR("var arr_delay_after = [%d"), arr_offload_priority_after[0]);
-  for (index = 1; index < OFFLOAD_PRIORITY_MAX; index ++) WSContentSend_P (PSTR(",%d"), arr_offload_priority_after[index]);
+  WSContentSend_P (PSTR("var arr_delay_after = [%d"), arr_offload_delay_after[0]);
+  for (index = 1; index < OFFLOAD_PRIORITY_MAX; index ++) WSContentSend_P (PSTR(",%d"), arr_offload_delay_after[index]);
   WSContentSend_P (PSTR("];\n"));
 
-  WSContentSend_P (PSTR("var arr_delay_random = [%d"), arr_offload_priority_random[0]);
-  for (index = 1; index < OFFLOAD_PRIORITY_MAX; index ++) WSContentSend_P (PSTR(",%d"), arr_offload_priority_random[index]);
+  WSContentSend_P (PSTR("var arr_delay_random = [%d"), arr_offload_delay_random[0]);
+  for (index = 1; index < OFFLOAD_PRIORITY_MAX; index ++) WSContentSend_P (PSTR(",%d"), arr_offload_delay_random[index]);
   WSContentSend_P (PSTR("];\n"));
 
   WSContentSend_P (PSTR("var device_type  = document.getElementById ('type');\n"));
@@ -1201,75 +1202,89 @@ void OffloadWebPageConfig ()
 // Offloading public configuration page
 void OffloadWebPageControl ()
 {
+  bool updated = false;
+
   // if switch has been switched OFF
   if (Webserver->hasArg(D_CMND_OFFLOAD_TOGGLE))
   {
-    if (OffloadIsOffloaded ())
-    {
-      if ( offload_relay_state == 0) offload_relay_state = 1;
-      else offload_relay_state = 0;
-    }
-    else
-    {
-      if (bitRead (power, 0) == 1) ExecuteCommandPower (1, POWER_OFF, SRC_MAX);
-      else ExecuteCommandPower (1, POWER_ON, SRC_MAX);
-    }
+    // status updated
+    updated = true;
+
+    // if device is actually offloaded, set next state
+    if (OffloadIsOffloaded ()) { if ( offload_status.relay_state == 0) offload_status.relay_state = 1; else offload_status.relay_state = 0; }
+
+    // else set current state
+    else { if (bitRead (TasmotaGlobal.power, 0) == 1) ExecuteCommandPower (1, POWER_OFF, SRC_MAX); else ExecuteCommandPower (1, POWER_ON, SRC_MAX); }
   }
 
   // beginning of form without authentification
   WSContentStart_P (D_OFFLOAD_CONTROL, false);
   WSContentSend_P (PSTR ("</script>\n"));
 
-  // check for update every second
-  WSContentSend_P (PSTR ("<script type='text/javascript'>\n"));
-  WSContentSend_P (PSTR ("function updTempo() {\n"));
-  WSContentSend_P (PSTR (" upd=new XMLHttpRequest();\n"));
-  WSContentSend_P (PSTR (" upd.onreadystatechange=function(){\n"));
-  WSContentSend_P (PSTR (" if (upd.responseText == 1) {\n"));
-  WSContentSend_P (PSTR ("  now=new Date();\n"));
-  WSContentSend_P (PSTR ("  plugImg=document.getElementById('plug');\n"));
-  WSContentSend_P (PSTR ("  plugURL=plugImg.getAttribute('src');\n"));
-  WSContentSend_P (PSTR ("  plugURL=plugURL.substring(0,plugURL.indexOf('ts=')) + 'ts=' + now.getTime();\n"));
-  WSContentSend_P (PSTR ("  plugImg.setAttribute('src', plugURL);\n"));
-  WSContentSend_P (PSTR ("  powerImg=document.getElementById('power');\n"));
-  WSContentSend_P (PSTR ("  powerURL=powerImg.getAttribute('src');\n"));
-  WSContentSend_P (PSTR ("  powerURL=powerURL.substring(0,powerURL.indexOf('ts=')) + 'ts=' + now.getTime();\n"));
-  WSContentSend_P (PSTR ("  powerImg.setAttribute('src', powerURL);\n"));
-  WSContentSend_P (PSTR ("  }\n"));
-  WSContentSend_P (PSTR (" }\n"));
-  WSContentSend_P (PSTR (" upd.open('GET','offload.upd',true);\n"));
-  WSContentSend_P (PSTR (" upd.send();\n"));
-  WSContentSend_P (PSTR ("}\n"));
-  WSContentSend_P (PSTR ("setInterval(function() {updTempo();},%d);\n"), 1000);
-  WSContentSend_P (PSTR ("</script>\n"));
+  // if parameters have been updated, auto reload page
+  if (updated)
+  {
+    WSContentSend_P (PSTR ("<meta http-equiv='refresh' content='0;URL=/%s' />\n"), D_PAGE_OFFLOAD_CONTROL);
+    WSContentSend_P (PSTR ("</head>\n"));
+    WSContentSend_P (PSTR ("<body bgcolor='#252525'></body>\n"));
+    WSContentSend_P (PSTR ("</html>\n"));
+    WSContentEnd ();
+  }
 
-  // page style
-  WSContentSend_P (PSTR ("<style>\n"));
-  WSContentSend_P (PSTR ("body {color:white;background-color:#303030;font-family:Arial, Helvetica, sans-serif;}\n"));
-  WSContentSend_P (PSTR ("div {width:100%%;margin:auto;padding:3px 0px;text-align:center;vertical-align:middle;}\n"));
-  WSContentSend_P (PSTR ("button.power {background:none;padding:8px;margin:16px;border-radius:32px;border:1px solid #666;}\n"));
-  WSContentSend_P (PSTR (".title {margin:20px auto;font-size:5vh;}\n"));
-  WSContentSend_P (PSTR ("img.plug {height:128px;margin:30px auto;}\n"));
-  WSContentSend_P (PSTR ("img.power {height:48px;}\n"));
-  WSContentSend_P (PSTR ("</style>\n"));
-  WSContentSend_P (PSTR ("</head>\n"));
+  // else, display control page
+  else
+  {
+    // check for update every second
+    WSContentSend_P (PSTR ("<script type='text/javascript'>\n"));
+    WSContentSend_P (PSTR ("function updTempo() {\n"));
+    WSContentSend_P (PSTR (" upd=new XMLHttpRequest();\n"));
+    WSContentSend_P (PSTR (" upd.onreadystatechange=function(){\n"));
+    WSContentSend_P (PSTR (" if (upd.responseText == 1) {\n"));
+    WSContentSend_P (PSTR ("  now=new Date();\n"));
+    WSContentSend_P (PSTR ("  plugImg=document.getElementById('plug');\n"));
+    WSContentSend_P (PSTR ("  plugURL=plugImg.getAttribute('src');\n"));
+    WSContentSend_P (PSTR ("  plugURL=plugURL.substring(0,plugURL.indexOf('ts=')) + 'ts=' + now.getTime();\n"));
+    WSContentSend_P (PSTR ("  plugImg.setAttribute('src', plugURL);\n"));
+    WSContentSend_P (PSTR ("  powerImg=document.getElementById('power');\n"));
+    WSContentSend_P (PSTR ("  powerURL=powerImg.getAttribute('src');\n"));
+    WSContentSend_P (PSTR ("  powerURL=powerURL.substring(0,powerURL.indexOf('ts=')) + 'ts=' + now.getTime();\n"));
+    WSContentSend_P (PSTR ("  powerImg.setAttribute('src', powerURL);\n"));
+    WSContentSend_P (PSTR ("  }\n"));
+    WSContentSend_P (PSTR (" }\n"));
+    WSContentSend_P (PSTR (" upd.open('GET','offload.upd',true);\n"));
+    WSContentSend_P (PSTR (" upd.send();\n"));
+    WSContentSend_P (PSTR ("}\n"));
+    WSContentSend_P (PSTR ("setInterval(function() {updTempo();},%d);\n"), 1000);
+    WSContentSend_P (PSTR ("</script>\n"));
 
-  // page body
-  WSContentSend_P (PSTR ("<body>\n"));
-  WSContentSend_P (PSTR ("<form method='get' action='%s'>\n"), D_PAGE_OFFLOAD_CONTROL);
+    // page style
+    WSContentSend_P (PSTR ("<style>\n"));
+    WSContentSend_P (PSTR ("body {color:white;background-color:#252525;font-family:Arial, Helvetica, sans-serif;}\n"));
+    WSContentSend_P (PSTR ("div {width:100%%;margin:auto;padding:3px 0px;text-align:center;vertical-align:middle;}\n"));
+    WSContentSend_P (PSTR ("button.power {background:none;padding:8px;margin:16px;border-radius:32px;border:1px solid #666;}\n"));
+    WSContentSend_P (PSTR (".title {margin:20px auto;font-size:5vh;}\n"));
+    WSContentSend_P (PSTR ("img.plug {height:128px;margin:30px auto;}\n"));
+    WSContentSend_P (PSTR ("img.power {height:48px;}\n"));
+    WSContentSend_P (PSTR ("</style>\n"));
+    WSContentSend_P (PSTR ("</head>\n"));
 
-  // device name
-  WSContentSend_P (PSTR ("<div class='title bold'>%s</div>\n"), SettingsText(SET_FRIENDLYNAME1));
+    // page body
+    WSContentSend_P (PSTR ("<body>\n"));
+    WSContentSend_P (PSTR ("<form method='get' action='%s'>\n"), D_PAGE_OFFLOAD_CONTROL);
 
-  // information about current offloading
-  WSContentSend_P (PSTR ("<div class='icon'><img class='plug' id='plug' src='plug.png?ts=0'></div>\n"));
+    // device name
+    WSContentSend_P (PSTR ("<div class='title bold'>%s</div>\n"), SettingsText(SET_DEVICENAME));
 
-  // display switch button
-  WSContentSend_P (PSTR ("<div><button class='power' type='submit' name='%s' title='%s'><img class='power' id='power' src='power.png?ts=0' /></button>"), D_CMND_OFFLOAD_TOGGLE,  D_OFFLOAD_TOGGLE);
+    // information about current offloading
+    WSContentSend_P (PSTR ("<div class='icon'><img class='plug' id='plug' src='plug.png?ts=0'></div>\n"));
 
-  // end of page
-  WSContentSend_P (PSTR ("</form>\n"));
-  WSContentStop ();
+    // display switch button
+    WSContentSend_P (PSTR ("<div><button class='power' type='submit' name='%s' title='%s'><img class='power' id='power' src='power.png?ts=0' /></button>"), D_CMND_OFFLOAD_TOGGLE,  D_OFFLOAD_TOGGLE);
+
+    // end of page
+    WSContentSend_P (PSTR ("</form>\n"));
+    WSContentStop ();
+  }
 }
 
 #endif  // USE_WEBSERVER
@@ -1320,7 +1335,7 @@ bool Xsns96 (uint8_t function)
 #ifdef USE_WEBSERVER
     case FUNC_WEB_ADD_HANDLER:
       Webserver->on ("/" D_PAGE_OFFLOAD_CONFIG, OffloadWebPageConfig);
-      if (offload_relay_managed == true) Webserver->on ("/" D_PAGE_OFFLOAD_CONTROL, OffloadWebPageControl);
+      if (offload_flag.relay_managed) Webserver->on ("/" D_PAGE_OFFLOAD_CONTROL, OffloadWebPageControl);
       Webserver->on ("/offload.png", OffloadWebIconOffload);
       Webserver->on ("/plug-off.png", OffloadWebIconPlugOff);
       Webserver->on ("/plug-on.png", OffloadWebIconPlugOn);
@@ -1332,7 +1347,7 @@ bool Xsns96 (uint8_t function)
       Webserver->on ("/offload.upd", OffloadWebUpdated);
       break;
     case FUNC_WEB_ADD_MAIN_BUTTON:
-      if (offload_relay_managed == true) OffloadWebControlButton ();
+      if (offload_flag.relay_managed) OffloadWebControlButton ();
       break;
     case FUNC_WEB_ADD_BUTTON:
       OffloadWebConfigButton ();

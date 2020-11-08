@@ -133,24 +133,18 @@ void TemperatureShowJSON (bool append)
     str_topic = TemperatureGetMqttTopic ();
     str_key   = TemperatureGetMqttKey ();
 
-    // start message  -->  {  or message,
-    if (append == false) str_json = "{";
-    else str_json = String (mqtt_data) + ",";
-
     // temperature  -->  "Temperature":{"Value":18.5,"Topic":"mqtt/topic/of/temperature","Key":"Temp"}
-    str_json += "\"" + String (D_JSON_TEMPERATURE) + "\":{";
+    str_json  = "\"" + String (D_JSON_TEMPERATURE) + "\":{";
     str_json += "\"" + String (D_JSON_TEMPERATURE_VALUE) + "\":" + String (temperature,1) + ",";
     str_json += "\"" + String (D_JSON_TEMPERATURE_TOPIC) + "\":\"" + str_topic + "\",";
     str_json += "\"" + String (D_JSON_TEMPERATURE_KEY) + "\":\"" + str_key + "\"}";
 
-    // if not in append mode, add last bracket 
-    if (append == false) str_json += "}";
-
-    // add json string to MQTT message
-    snprintf_P (mqtt_data, sizeof(mqtt_data), str_json.c_str ());
+    // if append mode, add json string to MQTT message
+    if (append) ResponseAppend_P (PSTR(",%s"), str_json.c_str ());
+    else Response_P (PSTR("{%s}"), str_json.c_str ());
 
     // if not in append mode, publish message 
-    if (append == false) MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
+    if (!append) MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
   }
 }
 
