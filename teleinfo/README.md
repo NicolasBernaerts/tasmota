@@ -42,7 +42,7 @@ With modern Linky meters, **4.7k** resistor should be replaced by a **1.5k** res
 You need to connect your adapter output **Tx** to any available port of your Tasmota device. This port should be declared as **TInfo RX**.
 For example, you can use :
   * ESP8266 : **GPIO03 RXD** port
-  * WT32-ETH01 : **GPI36** port
+  * WT32-ETH01 : **GPIO36** port
   * Olimex ESP32-POE : **GPIO02** port
 
 Finaly, in **Configure Teleinfo** you need to select your Teleinfo adapter baud rate :
