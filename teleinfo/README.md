@@ -6,6 +6,8 @@ This evolution of Tasmota firmware has been enhanced to handle France energy met
 This implementation handles single-phase (monophase) and three-phase (triphase). It provides some real time consumption graphs.
 Please note that it is a completly different implementation than the one published early 2020 by Charles Hallard. 
 
+Since **v6.0** onward, it is compatible with **ESP8266** and **ESP32** chipsets.
+
 It provides Teleinfo data thru MQTT to allow easy offloading of electrical appliances or heaters.
 Teleinfo data have been slightly adapted to handle easily mono-phase and tri-phase meters.
 Data provided are :
@@ -37,16 +39,21 @@ Between your Energy meter and your Tasmota device, you'll need an adapter like t
 
 With modern Linky meters, **4.7k** resistor should be replaced by a **1.5k** resistor.
 
-You need to connect your adapter output **Tx** to your Tasmota **Rx** port and to declare in Tasmota :
-  * **RX GPIO3** to **TInfo RX**
+You need to connect your adapter output **Tx** to any available port of your Tasmota device. This port should be declared as **TInfo RX**.
+For example, you can use :
+  * ESP8266 : **GPIO03 RXD** port
+  * WT32-ETH01 : **GPI36** port
+  * Olimex ESP32-POE : **GPIO02** port
 
 Finaly, in **Configure Teleinfo** you need to select your Teleinfo adapter baud rate :
   * **Teleinfo 1200** (original white meter or green Linky)
   * **Teleinfo 9600**
 
+If you are using an **ESP32** device, you can use its Ethernet port after selecting the proper board on the **Configure ESP32** menu.
+
 Teleinfo protocol is described in this document : https://www.enedis.fr/sites/default/files/Enedis-NOI-CPT_54E.pdf
 
-Pre-compiled version is available under **tasmota.bin**
+Pre-compiled version is available under **tasmota.bin** and **tasmota32.bin**.
 
 MQTT result should look like that :
 
