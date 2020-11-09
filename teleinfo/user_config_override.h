@@ -25,6 +25,7 @@
     25/10/2020 - v5.2   - Real time graph page update
     30/10/2020 - v5.3   - Add TIC message page
     02/11/2020 - v5.4   - Tasmota 9.0 compatibility
+    09/11/2020 - v6.0   - Handle ESP32 ethernet devices with board selection
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -60,22 +61,23 @@
  *   - All parameters can be persistent changed online using commands via MQTT, WebConsole or Serial.
 \*****************************************************************************************************/
 
-
 /********************************************\
  *    Pilotwire firmware configuration
 \********************************************/
+
+#define USE_ETHERNET                          // Add support for ESP32 Ethernet physical port
 
 #define USE_INFOJSON                          // Add support for Information JSON page
 #define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_TELEINFO                          // Add support for Teleinfo
 
-#define EXTENSION_VERSION "5.4"               // version
+#define EXTENSION_VERSION "6.0"               // version
 #define EXTENSION_NAME "Teleinfo"             // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 
 // MQTT default
 #undef MQTT_HOST
-#define MQTT_HOST          "openhab.local"
+#define MQTT_HOST          "openhab"
 #undef MQTT_PORT
 #define MQTT_PORT          1883              
 #undef MQTT_USER

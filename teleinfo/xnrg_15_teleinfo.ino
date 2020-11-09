@@ -25,6 +25,7 @@
     25/10/2020 - v5.2   - Real time graph page update
     30/10/2020 - v5.3   - Add TIC message page
     02/11/2020 - v5.4   - Tasmota 9.0 compatibility
+    09/11/2020 - v6.0   - Handle ESP32 ethernet devices with board selection
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -41,6 +42,10 @@
 #ifdef USE_ENERGY_SENSOR
 #ifdef USE_TELEINFO
 
+#ifdef ESP32
+#include <HardwareSerial.h>
+#endif
+
 /*********************************************************************************************\
  * Teleinfo historical
  * docs https://www.enedis.fr/sites/default/files/Enedis-NOI-CPT_54E.pdf
@@ -55,7 +60,7 @@
 
 // declare teleinfo energy driver and sensor
 #define XNRG_15   15
-#define XSNS_99   99
+#define XSNS_15   15
 
 // teleinfo constant
 #define TELEINFO_VOLTAGE             230        // default contract voltage is 200V
@@ -67,6 +72,7 @@
 #define D_PAGE_TELEINFO_BASE_SVG     "base.svg"
 #define D_PAGE_TELEINFO_DATA_SVG     "data.svg"
 #define D_CMND_TELEINFO_MODE         "mode"
+#define D_CMND_TELEINFO_ETH          "eth"
 
 // graph data
 #define TELEINFO_GRAPH_SAMPLE        365         // 1 day per year
@@ -87,10 +93,11 @@
 
 #define D_TELEINFO_MODE              "Teleinfo"
 #define D_TELEINFO_CONFIG            "Configure Teleinfo"
+#define D_TELEINFO_BOARD             "Ethernet board"
 #define D_TELEINFO_GRAPH             "Graph"
 #define D_TELEINFO_MESSAGE           "Message"
 #define D_TELEINFO_REFERENCE         "Contract n°"
-#define D_TELEINFO_TIC               "TIC received"
+#define D_TELEINFO_TIC               "TIC frames"
 #define D_TELEINFO_DISABLED          "Désactivé"
 #define D_TELEINFO_SPEED_DEFAULT     "bauds"
 #define D_TELEINFO_SPEED_HISTO       "bauds (Historique)"
@@ -101,8 +108,8 @@
 #define TELEINFO_MESSAGE_BUFFER_SIZE 64
 
 // form strings
-const char TELEINFO_INPUT_FIRST[] PROGMEM = "<p><input type='radio' name='%s' id='%d' value='%d' %s>%s</p>\n";
-const char TELEINFO_INPUT_NEXT[] PROGMEM  = "<p><input type='radio' name='%s' id='%d' value='%d' %s>%d %s</p>\n";
+const char TELEINFO_INPUT_TEXT[] PROGMEM  = "<p><input type='radio' name='%s' value='%d' %s>%s</p>\n";
+const char TELEINFO_INPUT_VALUE[] PROGMEM = "<p><input type='radio' name='%s' value='%d' %s>%d %s</p>\n";
 const char TELEINFO_FORM_START[] PROGMEM  = "<form method='get' action='%s'>\n";
 const char TELEINFO_FORM_STOP[] PROGMEM   = "</form>\n";
 const char TELEINFO_FIELD_START[] PROGMEM = "<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n";
@@ -195,8 +202,10 @@ struct tic_period {
 }; 
 tic_period teleinfo_graph[TELEINFO_PERIOD_MAX];
 
+#ifdef ESP32
 // serial port
-TasmotaSerial *teleinfo_serial = nullptr;
+HardwareSerial *teleinfo_serial = nullptr;
+#endif
 
 /****************************************\
  *               Icons
@@ -313,20 +322,19 @@ void TeleinfoInit ()
   teleinfo_enabled = ((TasmotaGlobal.energy_driver == XNRG_15) && (teleinfo_mode > 0));
   if (teleinfo_enabled)
   {
-    // start serial port
-    teleinfo_serial = new TasmotaSerial (Pin(GPIO_TELEINFO_RX), -1, 1);
-
-    // flush and set speed
+#ifdef ESP8266
+    // start ESP8266 serial port
     Serial.flush ();
     Serial.begin (teleinfo_mode, SERIAL_7E1);
+    ClaimSerial ();
+#else  // ESP32
+    // start ESP32 serial port
+    teleinfo_serial = new HardwareSerial(2);
+    teleinfo_serial->begin(teleinfo_mode, SERIAL_7E1, Pin(GPIO_TELEINFO_RX), -1);
+#endif // ESP286 & ESP32
 
-    // associate to hadware serial port and log
-    teleinfo_enabled = teleinfo_serial->hardwareSerial ();
-    if (teleinfo_enabled)
-    {
-      ClaimSerial ();
-      AddLog_P2(LOG_LEVEL_INFO, PSTR("TIC: Teleinfo Serial ready"));
-    }
+    // log
+    AddLog_P2(LOG_LEVEL_INFO, PSTR("TIC: Teleinfo Serial ready"));
   }
 
   // else disable energy driver
@@ -380,10 +388,18 @@ void TeleinfoEvery50ms ()
   float    power_apparent;
 
   // loop as long as serial port buffer is not empty and timeout not reached
+#ifdef ESP8266
+  while (Serial.available() > 0) 
+#else  // ESP32
   while (teleinfo_serial->available() > 0) 
+#endif // ESP286 & ESP32
   {
     // read caracter
-    recv_serial = teleinfo_serial->read ();
+#ifdef ESP8266
+    recv_serial = Serial.read ();
+#else  // ESP32
+    recv_serial = teleinfo_serial->read(); 
+#endif // ESP286 & ESP32
     switch (recv_serial)
     {
       // ---------------------------
@@ -564,8 +580,7 @@ void TeleinfoEvery50ms ()
 
 void TeleinfoEverySecond ()
 {
-  uint8_t  period, phase; 
-//  uint16_t power;
+  uint8_t period, phase;
 
   // loop thru the periods and the phases, to update apparent power to the max on the period
   for (period = 0; period < TELEINFO_PERIOD_MAX; period++)
@@ -753,19 +768,20 @@ void TeleinfoWebButton ()
 // append Teleinfo state to main page
 bool TeleinfoWebSensor ()
 {
+  // display teleinfo icon
+  //WSContentSend_PD (PSTR("<tr><td colspan=2 style='width:100%;text-align:center;padding:10px;'><img height=64 src='tic.png'></td></tr>\n"));
+
   // display last TIC data received
   WSContentSend_PD (PSTR("{s}%s{m}%d{e}"), D_TELEINFO_TIC, teleinfo_message.count);
-
-  // display teleinfo icon
-  WSContentSend_PD (PSTR("<tr><td colspan=2 style='width:100%;text-align:center;padding:10px;'><img height=64 src='tic.png'></td></tr>\n"));
 }
 
 // Teleinfo web page
 void TeleinfoWebPageConfig ()
 {
-  uint16_t actual_mode;
+  bool     need_restart = false;
+  uint16_t value;
+  char     argument[LOGSZ];
   String   str_text;
-  char     argument[TELEINFO_MESSAGE_BUFFER_SIZE];
 
   // if access not allowed, close
   if (!HttpCheckPriviledgedAccess()) return;
@@ -773,37 +789,38 @@ void TeleinfoWebPageConfig ()
   // get teleinfo mode according to MODE parameter
   if (Webserver->hasArg(D_CMND_TELEINFO_MODE))
   {
+    // set teleinfo speed
     WebGetArg (D_CMND_TELEINFO_MODE, argument, TELEINFO_MESSAGE_BUFFER_SIZE);
-    TeleinfoSetMode ((uint16_t) atoi (argument)); 
+    TeleinfoSetMode ((uint16_t) atoi (argument));
+
+    // ask for reboot
+    WebRestart(1);
   }
 
   // beginning of form
   WSContentStart_P (D_TELEINFO_CONFIG);
-
   WSContentSendStyle ();
   WSContentSend_P (TELEINFO_FORM_START, D_PAGE_TELEINFO_CONFIG);
 
-  // mode selection
-  actual_mode = TeleinfoGetMode ();
+  // speed selection form : start
+  value = TeleinfoGetMode ();
   WSContentSend_P (TELEINFO_FIELD_START, D_TELEINFO_MODE);
 
-  // selection : disabled
-  if (actual_mode == 0) str_text = "checked"; else str_text = "";
-  WSContentSend_P (TELEINFO_INPUT_FIRST, D_CMND_TELEINFO_MODE, 0, 0, str_text.c_str (), D_TELEINFO_DISABLED);
+  // speed selection form : available modes
+  if (value == 0) str_text = "checked"; else str_text = "";
+  WSContentSend_P (TELEINFO_INPUT_TEXT, D_CMND_TELEINFO_MODE, 0, str_text.c_str (), D_TELEINFO_DISABLED);
+  if (value == 1200) str_text = "checked"; else str_text = "";      // 1200 baud
+  WSContentSend_P (TELEINFO_INPUT_VALUE, D_CMND_TELEINFO_MODE, 1200, str_text.c_str (), 1200, D_TELEINFO_SPEED_HISTO);
+  if (value == 2400) str_text = "checked"; else str_text = "";      // 2400 baud
+  WSContentSend_P (TELEINFO_INPUT_VALUE, D_CMND_TELEINFO_MODE, 2400, str_text.c_str (), 2400, D_TELEINFO_SPEED_DEFAULT);
+  if (value == 4800) str_text = "checked"; else str_text = "";      // 4800 baud
+  WSContentSend_P (TELEINFO_INPUT_VALUE, D_CMND_TELEINFO_MODE, 4800, str_text.c_str (), 4800, D_TELEINFO_SPEED_DEFAULT);
+  if (value == 9600) str_text = "checked"; else str_text = "";      // 9600 baud
+  WSContentSend_P (TELEINFO_INPUT_VALUE, D_CMND_TELEINFO_MODE, 9600, str_text.c_str (), 9600, D_TELEINFO_SPEED_STD);
+  if (value == 19200) str_text = "checked"; else str_text = "";     // 19200 baud
+  WSContentSend_P (TELEINFO_INPUT_VALUE, D_CMND_TELEINFO_MODE, 19200, str_text.c_str (), 19200, D_TELEINFO_SPEED_DEFAULT);
 
-  // selection : available modes
-  if (actual_mode == 1200) str_text = "checked"; else str_text = "";      // 1200 baud
-  WSContentSend_P (TELEINFO_INPUT_NEXT, D_CMND_TELEINFO_MODE, 1200, 1200, str_text.c_str (), 1200, D_TELEINFO_SPEED_HISTO);
-  if (actual_mode == 2400) str_text = "checked"; else str_text = "";      // 2400 baud
-  WSContentSend_P (TELEINFO_INPUT_NEXT, D_CMND_TELEINFO_MODE, 2400, 2400, str_text.c_str (), 2400, D_TELEINFO_SPEED_DEFAULT);
-  if (actual_mode == 4800) str_text = "checked"; else str_text = "";      // 4800 baud
-  WSContentSend_P (TELEINFO_INPUT_NEXT, D_CMND_TELEINFO_MODE, 4800, 4800, str_text.c_str (), 4800, D_TELEINFO_SPEED_DEFAULT);
-  if (actual_mode == 9600) str_text = "checked"; else str_text = "";      // 9600 baud
-  WSContentSend_P (TELEINFO_INPUT_NEXT, D_CMND_TELEINFO_MODE, 9600, 9600, str_text.c_str (), 9600, D_TELEINFO_SPEED_STD);
-  if (actual_mode == 19200) str_text = "checked"; else str_text = "";     // 19200 baud
-  WSContentSend_P (TELEINFO_INPUT_NEXT, D_CMND_TELEINFO_MODE, 19200, 19200, str_text.c_str (), 19200, D_TELEINFO_SPEED_DEFAULT);
-
-  // end of form
+  // speed selection form : end
   WSContentSend_P (TELEINFO_FIELD_STOP);
 
   // save button
@@ -1296,7 +1313,7 @@ bool Xnrg15 (uint8_t function)
 }
 
 // teleinfo sensor
-bool Xsns99 (uint8_t function)
+bool Xsns15 (uint8_t function)
 {
   // swtich according to context
   switch (function) 
