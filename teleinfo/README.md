@@ -68,6 +68,6 @@ MQTT result should look like that :
 
 Complete setup guide is available at http://www.bernaerts-nicolas.fr/iot/...
 
-![Main page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/tasmota-teleinfo-main.png)   ![Config page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/tasmota-teleinfo-config.png)
+![Main page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-main.png)   ![Config page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-config.png)   ![Board page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-board.png)
 
-![Grah message](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/tasmota-teleinfo-message.png)   ![Grah monophase](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/tasmota-teleinfo-graph.png)   ![Grah triphase](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/tasmota-teleinfo-graph-triphase.png)
+![Grah message](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-message.png)   ![Grah monophase](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-graph.png)   ![Grah triphase](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-graph-triphase.png)
