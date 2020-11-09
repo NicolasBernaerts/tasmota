@@ -35,7 +35,7 @@ You'll get one extra Web page on the device :
 
 Between your Energy meter and your Tasmota device, you'll need an adapter like this one :
 
-![Teleinfo adapter](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/teleinfo-serial-adapter.png)
+![Teleinfo adapter](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/teleinfo-serial-adapter.png)
 
 With modern Linky meters, **4.7k** resistor should be replaced by a **1.5k** resistor.
 
