@@ -1,4 +1,4 @@
-Tasmota firmware modified for device Offloading in case of power overload
+Tasmota modified for Device Offloading
 =============
 
 This evolution of Tasmota firmware has been enhanced to handle automatic offload when your power contract is exceeded. It has been designed and tested with a French electronic meter called Linky, but it should work on any meter interface able to provide a JSON stream.
