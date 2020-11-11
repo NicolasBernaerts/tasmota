@@ -23,6 +23,7 @@
                           Add randomisation to reconnexion
     23/10/2020 - v2.3   - Update control page in real time
     05/11/2020 - v2.4   - Tasmota 9.0 compatibility
+    11/11/2020 - v2.5   - Add offload history pages (/histo and /histo.json)
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -70,7 +71,7 @@
 #define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_OFFLOADING                        // Add support for MQTT maximum power offloading
 
-#define EXTENSION_VERSION "2.4"               // version
+#define EXTENSION_VERSION "2.5"               // version
 #define EXTENSION_NAME "Offloading"           // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 
