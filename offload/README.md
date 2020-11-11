@@ -15,7 +15,7 @@ It you avoid any power stripping.
 
 You can select de delay before offloading the device and the delay before bringing back power when global power is low enough.
 
-This Tasmota firmware is based on version **v8.4** modified to handle **Offloading** with :
+This Tasmota firmware is based on version **v9.1** modified to handle **Offloading** with :
   * Web configuration interface
   * extension of JSON for MQTT status
   * new specific MQTT commands
@@ -35,10 +35,6 @@ MQTT JSON result should look like that :
     iron/tele/SENSOR {"Time":"2020-10-25T16:45:48","Offload":{"State":"OFF","Stage":0,"Phase":1,"Before":4,"After":10,"Device":2500,"Max":6600,"Contract":6000,"Adjust":10,"Topic":"compteur/tele/SENSOR","KeyInst":"SINSTS1","KeyMax":"SSOUSC"},"IP":"192.168.1.77","MAC":"A4:CF:xx:xx:xx:2E"}
 
 Pre-compiled version of Tasmota handling fil pilote is available : **tasmota.bin**
-
-If you want to compile the firmware, don't forget to uncomment following line in **my_user_config.h**
-
-    #define USE_CONFIG_OVERRIDE             // Uncomment to use user_config_override.h file. See README.md
 
 Complete setup guide will be available at http://www.bernaerts-nicolas.fr/iot/...
 
