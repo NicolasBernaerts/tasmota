@@ -31,6 +31,7 @@
     18/10/2020 - v6.10 - Handle priorities as list of device types
                          Add randomisation to reconnexion
     04/11/2020 - v6.11 - Tasmota 9.0 compatibility
+    11/11/2020 - v6.12 - Update to Offload v2.5
 
   Settings are stored using weighting scale parameters :
     - Settings.weight_reference             = Fil pilote mode
@@ -881,13 +882,16 @@ void PilotwireInit ()
   // offload : module is not managing the relay
   OffloadSetRelayMode (false);
 
+  // offload : remove all device types
+  for (index = 0; index < OFFLOAD_DEVICE_MAX; index++) OffloadSetAvailableDevice (index, OFFLOAD_DEVICE_MAX);
+
   // offload : declare available device types
-  for (index = 0; index < OFFLOAD_PRIORITY_MAX; index++) OffloadSetAvailableDevice (index, OFFLOAD_PRIORITY_MAX);
-  OffloadSetAvailableDevice (0, OFFLOAD_PRIORITY_ROOM);
-  OffloadSetAvailableDevice (1, OFFLOAD_PRIORITY_OFFICE);
-  OffloadSetAvailableDevice (2, OFFLOAD_PRIORITY_LIVING);
-  OffloadSetAvailableDevice (3, OFFLOAD_PRIORITY_BATHROOM);
-  OffloadSetAvailableDevice (4, OFFLOAD_PRIORITY_KITCHEN);
+  index = 0;
+  OffloadSetAvailableDevice (index++, OFFLOAD_DEVICE_ROOM);
+  OffloadSetAvailableDevice (index++, OFFLOAD_DEVICE_OFFICE);
+  OffloadSetAvailableDevice (index++, OFFLOAD_DEVICE_LIVING);
+  OffloadSetAvailableDevice (index++, OFFLOAD_DEVICE_BATHROOM);
+  OffloadSetAvailableDevice (index++, OFFLOAD_DEVICE_KITCHEN);
 
   // init default values
   pilotwire_value.temperature_source = PILOTWIRE_SOURCE_NONE;
@@ -899,6 +903,10 @@ void PilotwireInit ()
     pilotwire_graph.arr_target[index] = SHRT_MAX;
     pilotwire_graph.arr_state[index]  = PILOTWIRE_DISABLED;
   }
+
+  // force user template for Pilotwire (to overcome Tasmota default)
+  SettingsUpdateText (SET_TEMPLATE_NAME, "Sonoff Pilotwire");
+  if (Settings.user_template.gp.io[13] == 320) Settings.user_template.gp.io[13] = 288;
 }
 
 /***********************************************\

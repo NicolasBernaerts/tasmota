@@ -37,6 +37,7 @@
     18/10/2020 - v6.10  - Handle priorities as list of device types
                           Add randomisation to reconnexion
     04/11/2020 - v6.11  - Tasmota 9.0 compatibility
+    11/11/2020 - v6.12 - Update to Offload v2.5
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -86,13 +87,13 @@
 #define USE_TEMPERATURE_MQTT                  // Add support for MQTT temperature sensor
 #define USE_PILOTWIRE                         // Add support for France Pilotwire protocol for electrical heaters
 
-#define EXTENSION_VERSION "6.11"              // version
+#define EXTENSION_VERSION "6.12"              // version
 #define EXTENSION_NAME    "Pilotwire"         // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
 
 // MQTT default
 #undef MQTT_HOST
-#define MQTT_HOST          "openhab.local"
+#define MQTT_HOST          "openhab"
 #undef MQTT_PORT
 #define MQTT_PORT          1883              
 #undef MQTT_USER
@@ -106,6 +107,10 @@
 #undef FRIENDLY_NAME
 #define FRIENDLY_NAME      "Fil Pilote"
 
+// default template : Sonoff Basic with non inverted LED
+#define USER_TEMPLATE "{\"NAME\":\"Sonoff Basic Pilotwire\",\"GPIO\":[32,1,1,1,1,0,0,0,224,288,1,0,0,0],\"FLAG\":0,\"BASE\":1}"
+#undef FALLBACK_MODULE
+#define FALLBACK_MODULE  USER_MODULE
 
 //#undef USE_ENERGY_SENSOR                    // Disable energy sensors
 #undef USE_ARDUINO_OTA                        // support for Arduino OTA
