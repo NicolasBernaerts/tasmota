@@ -21,7 +21,9 @@ This Tasmota firmware is based on version **v8.4** modified to handle **Offloadi
   * new specific MQTT commands
   * automatic offload when global power is overloading your contract
   * **/control** public page to control device
-  * **/info.json** public page to get device main caracteristics
+  * **/history** public page to view 10 last offload events
+  * **/info.json** public page to get device main caracteristics as JSON
+  * **/history.json** public page to get 10 last offload events as JSON
 
 MQTT JSON result should look like that :
 
@@ -41,4 +43,5 @@ If you want to compile the firmware, don't forget to uncomment following line in
 Complete setup guide will be available at http://www.bernaerts-nicolas.fr/iot/...
 
 ![Main page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload/screen/tasmota-offload-main.png)  ![Control page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload/screen/tasmota-offload-config.png)
+
 ![History page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload/screen/tasmota-offload-history.png)  ![Control page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload/screen/tasmota-offload-control.png) 
