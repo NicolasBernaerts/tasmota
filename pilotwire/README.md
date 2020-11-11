@@ -14,9 +14,9 @@ To enable **Pilotwire** mode on a **Sonoff Basic** or **Sonoff Dual R2**, you ne
 
 Typical diodes to use are **1N4004**. Connexion should be done directly on the relay outputs :
 
-![Sonoff Basic](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/pilotwire/filpilote-diode-single.jpg)
+![Sonoff Basic](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/pilotwire/screen/filpilote-diode-single.jpg)
 
-![Sonoff Dual](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/pilotwire/filpilote-diode-dual.jpg)
+![Sonoff Dual](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/pilotwire/screen/filpilote-diode-dual.jpg)
 
 
 You'll also get a **Thermostat** mode that will allow you to pilot the heater to maintain a target temperature in the room. To activate that mode, you'll need either to :
@@ -59,4 +59,4 @@ If you want to comile the firmware, don't forget to uncomment following line in 
 
 Complete setup guide will be available at http://www.bernaerts-nicolas.fr/iot/...
 
-![Main page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/pilotwire/tasmota-pilotwire-main.png)   ![Config page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/pilotwire/tasmota-pilotwire-config.png)   ![Control page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/pilotwire/tasmota-pilotwire-control.png)
+![Main page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/screen/pilotwire/tasmota-pilotwire-main.png)   ![Config page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/pilotwire/screen/tasmota-pilotwire-config.png)   ![Control page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/pilotwire/screen/tasmota-pilotwire-control.png)
