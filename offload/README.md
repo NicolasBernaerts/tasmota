@@ -15,7 +15,7 @@ It you avoid any power stripping.
 
 You can select de delay before offloading the device and the delay before bringing back power when global power is low enough.
 
-This Tasmota firmware is based on version **v9.1** modified to handle **Offloading** with :
+This firmware is based on Tasmota **v9.1** modified to handle **Offloading** with :
   * Web configuration interface
   * extension of JSON for MQTT status
   * new specific MQTT commands
