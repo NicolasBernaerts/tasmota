@@ -1,4 +1,4 @@
-Tasmota firmware modified for France Fil Pilote heater protocol
+Tasmota modified for Pilotwire (Fil Pilote) heater protocol
 =============
 
 This evolution of Tasmota firmware has been enhanced to handle France electrical heaters **Fil Pilote** protocol on **Sonoff Basic** and **Sonoff Dual R2**.
