@@ -57,4 +57,4 @@ Pre-compiled version of Tasmota handling fil pilote is available : **tasmota.bin
 
 Complete setup guide will be available at http://www.bernaerts-nicolas.fr/iot/...
 
-![Main page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/screen/pilotwire/tasmota-pilotwire-main.png)   ![Config page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/pilotwire/screen/tasmota-pilotwire-config.png)   ![Control page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/pilotwire/screen/tasmota-pilotwire-control.png)
+![Main page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/pilotwire/screen/tasmota-pilotwire-main.png)   ![Config page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/pilotwire/screen/tasmota-pilotwire-config.png)   ![Control page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/pilotwire/screen/tasmota-pilotwire-control.png)
