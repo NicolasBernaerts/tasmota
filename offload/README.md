@@ -1,25 +1,30 @@
-Tasmota firmware modified for Plug Offload
+Tasmota firmware modified for device Offloading in case of power overload
 =============
 
 This evolution of Tasmota firmware has been enhanced to handle automatic offload when your power contract is exceeded. It has been designed and tested with a French electronic meter called Linky, but it should work on any meter interface able to provide a JSON stream.
 
-It has been designed on 2 different type of devices :
+It has been designed and tested on different devices :
   * a **Sonoff Basic** : peak device power is declared
   * a **Sonoff S26** : peak device power is declared
   * a **Sonoff POW R2** : peak device power is mesured 
 
-This firmware reads your contract power limit and your real time power consumption from your meter JSOn stream. As soon as you exceed your contract power, the device is offloaded, till your global power goes down enough to power back the device.
+This firmware reads your contract power limit and your real time power consumption from your meter JSON stream.
 
-It you avoid any power stripping.
+As soon as you exceed your contract power, the device is offloaded, till your global power goes down enough to power back the device.
 
+It should avoid any power stripping.
 
-You can select de delay before offloading the device and the delay before bringing back power when global power is low enough.
+You can select the type of device connected to your Tasmota IOT.
+
+Each type of device will have its own priority rules :
+  * the delay before offloading
+  * the delay before offloading removal when global power is back to normal
 
 This firmware is based on Tasmota **v9.1** modified to handle **Offloading** with :
+  * automatic offload when global power is overloading your contract
   * Web configuration interface
   * extension of JSON for MQTT status
   * new specific MQTT commands
-  * automatic offload when global power is overloading your contract
   * **/control** public page to control device
   * **/history** public page to view 10 last offload events
   * **/info.json** public page to get device main caracteristics as JSON
