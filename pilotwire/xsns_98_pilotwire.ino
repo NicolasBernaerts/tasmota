@@ -67,6 +67,7 @@
 #define D_PAGE_PILOTWIRE_CONFIG         "config"
 #define D_PAGE_PILOTWIRE_CONTROL        "control"
 #define D_PAGE_PILOTWIRE_SWITCH         "mode"
+#define D_PAGE_PILOTWIRE_DATA           "data.json"
 #define D_PAGE_PILOTWIRE_BASE_SVG       "base.svg"
 #define D_PAGE_PILOTWIRE_DATA_SVG       "data.svg"
 
@@ -904,7 +905,7 @@ void PilotwireInit ()
     pilotwire_graph.arr_state[index]  = PILOTWIRE_DISABLED;
   }
 
-  // force user template for Pilotwire (to overcome Tasmota default)
+  // user template for Pilotwire (force non inverted LED)
   SettingsUpdateText (SET_TEMPLATE_NAME, "Sonoff Pilotwire");
   if (Settings.user_template.gp.io[13] == 320) Settings.user_template.gp.io[13] = 288;
 }
@@ -992,30 +993,6 @@ void PilotwireWebUpdate ()
   pilotwire_updated.graph = false;
 }
 
-// append pilotwire control button to main page
-void PilotwireWebMainButton ()
-{
-  String str_text;
-
-  // heater mode switch button
-  if (pilotwire_value.outside_mode) str_text = D_PILOTWIRE_NORMAL; else str_text = D_PILOTWIRE_OUTSIDE;
-  str_text += " " + String (D_PILOTWIRE_MODE);
-  WSContentSend_P (D_CONF_BUTTON, D_PAGE_PILOTWIRE_SWITCH, str_text.c_str());
-
-  // heater control page button
-  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), D_PAGE_PILOTWIRE_CONTROL, D_PILOTWIRE_CONTROL);
-}
-
-// append pilotwire configuration button to configuration page
-void PilotwireWebConfigButton ()
-{
-  String str_text;
-
-  // heater configuration button
-  str_text = D_PILOTWIRE_CONFIGURE + String (" ") + D_PILOTWIRE;
-  WSContentSend_P (D_CONF_BUTTON, D_PAGE_PILOTWIRE_CONFIG, str_text.c_str ());
-}
-
 // append pilot wire state to main page
 bool PilotwireWebSensor ()
 {
@@ -1059,6 +1036,54 @@ bool PilotwireWebSensor ()
 
   // display heater icon status
   WSContentSend_PD (PSTR("<tr><td colspan=2 style='width:100%%;text-align:center;padding:10px;'><img height=64 src='pw-mode.png'></td></tr>\n"));
+}
+
+// Data history JSON page
+void PilotwireWebPageDataJson ()
+{
+  bool     first_value;
+  uint16_t index, index_array;
+  float    value;
+  String   str_value;
+
+  // start of data page
+  WSContentBegin(200, CT_HTML);
+
+  // loop thru temperature array
+  WSContentSend_P (PSTR("{\"temperature\":["));
+  first_value = true;
+  for (index = 1; index <= PILOTWIRE_GRAPH_SAMPLE; index++)
+  {
+    index_array = (index + pilotwire_graph.index) % PILOTWIRE_GRAPH_SAMPLE;
+    if (pilotwire_graph.arr_temp[index_array] != SHRT_MAX)
+    {
+      value = (float)pilotwire_graph.arr_temp[index_array] / 10;
+      if (first_value) str_value = String (value, 1); else str_value = "," + String (value, 1);
+      WSContentSend_P (PSTR("%s"), str_value.c_str ());
+      first_value = false;
+    }
+  }
+  WSContentSend_P (PSTR("]"));
+
+  // loop thru target temperature array
+  WSContentSend_P (PSTR(",\"target\":["));
+  first_value = true;
+  for (index = 1; index <= PILOTWIRE_GRAPH_SAMPLE; index++)
+  {
+    index_array = (index + pilotwire_graph.index) % PILOTWIRE_GRAPH_SAMPLE;
+    if (pilotwire_graph.arr_temp[index_array] != SHRT_MAX)
+    {
+      value = (float)pilotwire_graph.arr_target[index_array] / 10;
+      if (first_value) str_value = String (value, 1); else str_value = "," + String (value, 1);
+      WSContentSend_P (PSTR("%s"), str_value.c_str ());
+      first_value = false;
+    }
+  }
+  WSContentSend_P (PSTR("]"));
+
+  // end of page
+  WSContentSend_P (PSTR("}"));
+  WSContentEnd();
 }
 
 // Pilot Wire heater mode switch page
@@ -1639,6 +1664,7 @@ bool Xsns98 (uint8_t function)
       // pages
       Webserver->on ("/" D_PAGE_PILOTWIRE_CONFIG, PilotwireWebPageConfigure);
       Webserver->on ("/" D_PAGE_PILOTWIRE_SWITCH, PilotwireWebPageSwitchMode);
+      Webserver->on ("/" D_PAGE_PILOTWIRE_DATA,   PilotwireWebPageDataJson);
       Webserver->on ("/" D_PAGE_PILOTWIRE_CONTROL, PilotwireWebPageControl);
       Webserver->on ("/" D_PAGE_PILOTWIRE_BASE_SVG, PilotwireWebGraphFrame);
       Webserver->on ("/" D_PAGE_PILOTWIRE_DATA_SVG, PilotwireWebGraphData);
@@ -1659,10 +1685,12 @@ bool Xsns98 (uint8_t function)
       PilotwireWebSensor ();
       break;
     case FUNC_WEB_ADD_MAIN_BUTTON:
-      PilotwireWebMainButton ();
+      if (pilotwire_value.outside_mode) WSContentSend_P (D_CONF_BUTTON, D_PAGE_PILOTWIRE_SWITCH, D_PILOTWIRE_NORMAL " " D_PILOTWIRE_MODE); 
+      else WSContentSend_P (D_CONF_BUTTON, D_PAGE_PILOTWIRE_SWITCH, D_PILOTWIRE_OUTSIDE " " D_PILOTWIRE_MODE);
+      WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), D_PAGE_PILOTWIRE_CONTROL, D_PILOTWIRE_CONTROL);
       break;
     case FUNC_WEB_ADD_BUTTON:
-      PilotwireWebConfigButton ();
+      WSContentSend_P (D_CONF_BUTTON, D_PAGE_PILOTWIRE_CONFIG, D_PILOTWIRE_CONFIGURE " " D_PILOTWIRE);
       break;
 #endif  // USE_Webserver
 
