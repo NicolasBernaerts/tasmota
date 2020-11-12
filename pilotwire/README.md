@@ -38,6 +38,7 @@ This firmware is based on Tasmota **v9.1** modified to handle **Pilotwire** with
   * **/control** public page to control thermostat
   * **/histo** public page to get offloading history
   * **/info.json** to get device main caracteristics
+  * **/data.json** to get device daily temperature and target temperature in JSON format
   * **/histo.json** to get offload history in JSON format 
 
 MQTT JSON result should look like that :
