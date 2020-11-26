@@ -1,2 +1,2 @@
-===== Tasmota firmware modified for ICSE014A, ICSE013A and ICSE012A =====
-
+Tasmota modified for ICSE014A, ICSE013A and ICSE012A
+=============
