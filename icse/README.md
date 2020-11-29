@@ -18,7 +18,7 @@ Firmware is configured to use the Normally Open (NO) contact of the relays.
 
 It has been tested succesfully with few days stability on a **HW-149** board, based on ICSE014A.
 
-Here is an example of working interface board for ESP01 :
+Here is an example of working interface board for **ESP-01** :
 
 ![ESP01 interface](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/icse/tasmota-icse-diagram.png)
 
