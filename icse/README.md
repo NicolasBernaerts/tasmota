@@ -12,9 +12,9 @@ These boards are quite cheap, but not hyper reactive. So you should expect aroun
 
 This firmware detects the board connected to the serial port and setup the number of relays accordingly.
 
-firmware is cnfigured to use the Normally open (NO) contact on the relays.
+Firmware is configured to use the Normally Open (NO) contact of the relays.
 
-It has been tested on **HW-149** board based on ICSE014A.
+It has been tested succesfully with few days stability on a **HW-149** board, based on ICSE014A.
 
 Here is an example of working interface board for ESP01 :
 
