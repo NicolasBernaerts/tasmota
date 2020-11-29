@@ -6,8 +6,7 @@ This firmware is a modified version of **Tasmota 9.1.0** wich handle **ICSE01xA*
   * ICSE013A : 2 relays
   * ICSE014A : 8 relays
 
-**ICSE01xA** chipstet protocol is not really documented.\
-Some very usefull info are available on this [stackoverflow page](https://stackoverflow.com/questions/26913755/need-help-understading-sending-bytes-to-serial-port).
+**ICSE01xA** chipstet protocol is very badly documented. But some very usefull informations are available on this [stackoverflow page](https://stackoverflow.com/questions/26913755/need-help-understading-sending-bytes-to-serial-port).
 
 These boards are quite cheap, but not hyper reactive. So you should expect around 8 seconds to fully initialise the board.
 
