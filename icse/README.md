@@ -6,6 +6,8 @@ This firmware is a modified version of **Tasmota 9.1.0** wich handle **ICSE01xA*
   * ICSE013A : 2 relays
   * ICSE014A : 8 relays
 
+As ICSE01xA board works on 5V input, if you plan to use it with a Sonoff Basic (or similar), you'll need an interface board to adjust **Rx** and **Tx** from 5V (ICSE) to 3.3V (Sonoff) levels.
+
 **ICSE01xA** chipstet protocol is very badly documented. But some very usefull informations are available on this [stackoverflow page](https://stackoverflow.com/questions/26913755/need-help-understading-sending-bytes-to-serial-port).
 
 These boards are quite cheap, but not hyper reactive. So you should expect around 8 seconds to fully initialise the board.
@@ -27,4 +29,3 @@ Here is an example of PCB board that just fits and works :
 
 ![ESP01 board](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/icse/tasmota-icse-pcb.png)
 
-As ICSE01xA board works on 5v, if you plan to use it with a Sonoff Basic (or similar), you'll need an interface board to adjust Rx and Tx from 5V (ICSE) to 3.3V (Sonoff).
