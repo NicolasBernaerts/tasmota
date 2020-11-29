@@ -1,7 +1,7 @@
 Tasmota modified for ICSE014A, ICSE013A and ICSE012A
 =============
 
-This firmware is a modified version of Tasmota wich handle **ICSE01xA** based serial relay boards :
+This firmware is a modified version of **Tasmota 9.1.0** wich handle **ICSE01xA** based serial relay boards :
   * ICSE012A : 4 relays
   * ICSE013A : 2 relays
   * ICSE014A : 8 relays
