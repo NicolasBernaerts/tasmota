@@ -26,3 +26,5 @@ You just need a 5V / 1A USB charger for the complete setup.
 Here is an example of PCB board that just fits and works :
 
 ![ESP01 board](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/icse/tasmota-icse-pcb.png)
+
+As ICSE01xA board works on 5v, if you plan to use it with a Sonoff Basic (or similar), you'll need an interface board to adjust Rx and Tx from 5V (ICSE) to 3.3V (Sonoff).
