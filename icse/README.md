@@ -20,7 +20,8 @@ Here is an example of working interface board for ESP01 :
 
 ![ESP01 interface](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/icse/tasmota-icse-diagram.png)
 
-On this diagram, power supply comes fully from the micro-USB port of the ICSE01xA board. You just need a 5V / 1A USB charger for the complete setup.
+On this diagram, power supply comes fully from the micro-USB port of the ICSE01xA board. \
+You just need a 5V / 1A USB charger for the complete setup.
 
 Here is an example of PCB board that just fits and works :
 
