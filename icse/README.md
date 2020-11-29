@@ -19,3 +19,9 @@ It has been tested on **HW-149** board based on ICSE014A.
 Here is an example of working interface board for ESP01 :
 
 ![ESP01 interface](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/icse/tasmota-icse-diagram.png)
+
+Power supply for the complete setup comes from the micro-USB port of the ICSE01xA board.
+
+Here is an example of PCB board that just fit and works :
+
+![ESP01 board](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/icse/tasmota-icse-pcb.png)
