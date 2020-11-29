@@ -12,7 +12,7 @@ These boards are quite cheap, but not hyper reactive. So you should expect aroun
 
 This firmware detects the board connected to the serial port and setup the number of relays accordingly.
 
-On the relays, you should use the Normally open (NO) contact.
+firmware is cnfigured to use the Normally open (NO) contact on the relays.
 
 It has been tested on **HW-149** board based on ICSE014A.
 
