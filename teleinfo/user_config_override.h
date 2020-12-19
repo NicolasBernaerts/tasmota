@@ -26,6 +26,8 @@
     30/10/2020 - v5.3   - Add TIC message page
     02/11/2020 - v5.4   - Tasmota 9.0 compatibility
     09/11/2020 - v6.0   - Handle ESP32 ethernet devices with board selection
+    11/11/2020 - v6.1   - Add data.json page
+    20/11/2020 - v6.2   - Correct checksum bug
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -71,7 +73,7 @@
 #define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_TELEINFO                          // Add support for Teleinfo
 
-#define EXTENSION_VERSION "6.0"               // version
+#define EXTENSION_VERSION "6.2"               // version
 #define EXTENSION_NAME "Teleinfo"             // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 
@@ -96,16 +98,16 @@
 #undef USE_WPS                                // support for WPS as initial wifi configuration tool
 #undef USE_SMARTCONFIG                        // support for Wifi SmartConfig as initial wifi configuration tool
 #undef USE_DOMOTICZ                           // Domoticz
-#undef USE_HOME_ASSISTANT                     // Home Assistant
+//#undef USE_HOME_ASSISTANT                     // Home Assistant
 #undef USE_MQTT_TLS                           // TLS support won't work as the MQTTHost is not set
 #undef USE_KNX                                // KNX IP Protocol Support
 //#undef USE_WEBSERVER                        // Webserver
 #undef USE_EMULATION_HUE                      // Hue Bridge emulation for Alexa (+14k code, +2k mem common)
 #undef USE_EMULATION_WEMO                     // Belkin WeMo emulation for Alexa (+6k code, +2k mem common)
 #undef USE_CUSTOM                             // Custom features
-#undef USE_DISCOVERY                          // Discovery services for both MQTT and web server
+//#undef USE_DISCOVERY                          // Discovery services for both MQTT and web server
 //#undef WEBSERVER_ADVERTISE                  // Provide access to webserver by name <Hostname>.local/
-#undef MQTT_HOST_DISCOVERY                    // Find MQTT host server (overrides MQTT_HOST if found)
+//#undef MQTT_HOST_DISCOVERY                    // Find MQTT host server (overrides MQTT_HOST if found)
 //#undef USE_TIMERS                           // support for up to 16 timers
 //#undef USE_TIMERS_WEB                       // support for timer webpage
 //#undef USE_SUNRISE                          // support for Sunrise and sunset tools
