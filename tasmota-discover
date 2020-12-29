@@ -15,6 +15,7 @@
 command -v fping >/dev/null 2>&1 || { echo "[error] Please install fping"; exit 1; }
 command -v arp >/dev/null 2>&1 || { echo "[error] Please install arp"; exit 1; }
 command -v wget >/dev/null 2>&1 || { echo "[error] Please install wget"; exit 1; }
+command -v nmblookup >/dev/null 2>&1 && IS_NMBLOOKUP="ok"
 
 # check --all
 [ "$1" = "--all" ] && LIST_ALL="ok"
@@ -40,25 +41,23 @@ NBR_DEVICE="${#ARR_IP[@]}"
 echo "Devices :"
 
 # loop thru IP addresses
-for IP in "${ARR_IP[@]}"
+for DEVICE_IP in "${ARR_IP[@]}"
 do
 	# display current IP
-	#echo -ne "${IP}\r"
-
-	# get hostname from arp
-	IP_HOST=$(grep "(${IP})" "${TMP_ARP}" | cut -d' ' -f1)
+	DEVICE_HOSTNAME=""
+	DEVICE_DESCRIPTION=""
 
 	# read page /version
-	wget --quiet --tries=2 --timeout=2 -O - "http://${IP}/info.json" | tr -d "\"{}" | tr "," "\n" > "${TMP_DATA}"
+	wget --quiet --tries=2 --timeout=2 -O - "http://${DEVICE_IP}/info.json" | tr -d "\"{}" | tr "," "\n" > "${TMP_DATA}"
 	TASMOTA_MODULE=$(grep "Module:" "${TMP_DATA}" | cut -d':' -f2)
 
 	# if not available, read page /in (doesn't work if password set)
 	if [ "${TASMOTA_MODULE}" = "" ]
 	then
-		wget --quiet --tries=2 --timeout=2 -O "${TMP_DATA}" "http://${IP}/"
+		wget --quiet --tries=2 --timeout=2 -O "${TMP_DATA}" "http://${DEVICE_IP}/"
 		TASMOTA_MODULE=$(grep "Tasmota" "${TMP_DATA}" | tr '<' '\n' | grep "^h3" | cut -d'>' -f2 | sed "s| Module||g")
 
-		wget --quiet --tries=2 --timeout=2 -O - "http://${IP}/in" | sed "s|\}1|\n|g" | sed "s|\}2|\:|g" | tr '>' '\n' > "${TMP_DATA}"
+		wget --quiet --tries=2 --timeout=2 -O - "http://${DEVICE_IP}/in" | sed "s|\}1|\n|g" | sed "s|\}2|\:|g" | tr '>' '\n' > "${TMP_DATA}"
 	fi
 
 	# if data are read, we are dealing with tasmota module
@@ -68,24 +67,30 @@ do
 		NBR_TASMOTA=$((NBR_TASMOTA + 1))
 
 		# read data
+		DEVICE_HOSTNAME=$(grep "Hostname" "${TMP_DATA}" | cut -d':' -f2)
 		TASMOTA_VERSION=$(grep "Program Version:" "${TMP_DATA}" | cut -d':' -f2)
-		TASMOTA_HOSTNAME=$(grep "Hostname" "${TMP_DATA}" | cut -d':' -f2)
 		TASMOTA_UPTIME=$(grep "Uptime:" "${TMP_DATA}" | cut -d':' -f2-)
 		TASMOTA_MQTT=$(grep "MQTT Full Topic:" "${TMP_DATA}" | cut -d':' -f2-)
 		EXTENSION_TYPE=$(grep "Extension type:" "${TMP_DATA}" | cut -d':' -f2)
 		EXTENSION_VERSION=$(grep "Extension version:" "${TMP_DATA}" | cut -d':' -f2)
 
 		# display
-		DISPLAY=" ${IP} [${TASMOTA_HOSTNAME}] ${TASMOTA_MODULE}, Tasmota ${TASMOTA_VERSION},"
-		[ "${EXTENSION_TYPE}" != "" ] && DISPLAY="${DISPLAY} ${EXTENSION_TYPE} ${EXTENSION_VERSION},"
-		DISPLAY="${DISPLAY} Up ${TASMOTA_UPTIME}, MQTT ${TASMOTA_MQTT}"
-		echo "${DISPLAY}"
+		DEVICE_DESCRIPTION="${TASMOTA_MODULE}, Tasmota ${TASMOTA_VERSION},"
+		[ "${EXTENSION_TYPE}" != "" ] && DEVICE_DESCRIPTION="${DEVICE_DESCRIPTION} ${EXTENSION_TYPE} ${EXTENSION_VERSION},"
+		DEVICE_DESCRIPTION="${DEVICE_DESCRIPTION} Up ${TASMOTA_UPTIME}, MQTT ${TASMOTA_MQTT}"
 
 	elif [ "${LIST_ALL}" = "ok" ]
 	then
-		# display
-		echo " ${IP} [${IP_HOST}]"
+		# get hostname from arp
+		DEVICE_HOSTNAME=$(grep "(${DEVICE_IP})" "${TMP_ARP}" | cut -d' ' -f1)
+
+		# if no hostname try nmblookup
+		[ "${DEVICE_HOSTNAME}" = "?" -a "${IS_NMBLOOKUP}" = "ok" ] && DEVICE_HOSTNAME=$(nmblookup -A ${DEVICE_IP} | grep "<00>" | grep -v "<GROUP>" | xargs | cut -d' ' -f1)
 	fi
+
+	# display
+	DEVICE_HOSTNAME=$(echo "${DEVICE_HOSTNAME}" | tr '[:upper:]' '[:lower:]')
+	echo " ${DEVICE_IP} [${DEVICE_HOSTNAME}] ${DEVICE_DESCRIPTION}"
 done
 
 echo "Found :"
