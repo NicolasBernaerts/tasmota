@@ -9,6 +9,7 @@
 #   23/05/2020, V1.3 - Use /version page
 #   30/10/2020, V1.4 - Set retries to 2 for ESP32
 #   29/12/2020, v1.5 - Add --all parameter to list all network devices
+#                      Update wget tries and timeout
 # ---------------------------------------------------
 
 #   Check tools availability
@@ -30,7 +31,7 @@ NETMASK=$(ip addr | grep inet | grep brd | head -n 1 | xargs | cut -d' ' -f2)
 echo "Netmask is ${NETMASK}"
 
 # list all IP from LAN with fping
-ARR_IP=( $(fping --addr --generate "${NETMASK}" 2>/dev/null | grep "alive" | cut -d' ' -f1) )
+ARR_IP=( $(fping --addr --retry=3 --alive --generate "${NETMASK}" 2>/dev/null | sort --numeric-sort) )
 
 # list hostnames with arp
 arp -a > "${TMP_ARP}"
@@ -47,20 +48,24 @@ do
 	DEVICE_HOSTNAME=""
 	DEVICE_DESCRIPTION=""
 
-	# read page /version
-	wget --quiet --tries=2 --timeout=2 -O - "http://${DEVICE_IP}/info.json" | tr -d "\"{}" | tr "," "\n" > "${TMP_DATA}"
+	# read info.json page
+	wget --quiet --tries=1 --timeout=4 -O - "http://${DEVICE_IP}/info.json" | tr -d "\"{}" | tr "," "\n" > "${TMP_DATA}"
+
+	# detect tasmota module in info.json page
 	TASMOTA_MODULE=$(grep "Module:" "${TMP_DATA}" | cut -d':' -f2)
 
-	# if not available, read page /in (doesn't work if password set)
+	# if not available, read original tasmota information page (doesn't work if password set)
 	if [ "${TASMOTA_MODULE}" = "" ]
 	then
-		wget --quiet --tries=2 --timeout=2 -O "${TMP_DATA}" "http://${DEVICE_IP}/"
+		# retrieve tasmota module from home page
+		wget --quiet --tries=1 --timeout=4 -O "${TMP_DATA}" "http://${DEVICE_IP}/"
 		TASMOTA_MODULE=$(grep "Tasmota" "${TMP_DATA}" | tr '<' '\n' | grep "^h3" | cut -d'>' -f2 | sed "s| Module||g")
 
-		wget --quiet --tries=2 --timeout=2 -O - "http://${DEVICE_IP}/in" | sed "s|\}1|\n|g" | sed "s|\}2|\:|g" | tr '>' '\n' > "${TMP_DATA}"
+		# read original information page
+		wget --quiet --tries=1 --timeout=4 -O - "http://${DEVICE_IP}/in" | sed "s|\}1|\n|g" | sed "s|\}2|\:|g" | tr '>' '\n' > "${TMP_DATA}"
 	fi
 
-	# if data are read, we are dealing with tasmota module
+	# if tasmota module is recognised
 	if [ "${TASMOTA_MODULE}" != "" ] 
 	then
 		# increment counter
