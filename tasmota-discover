@@ -1,39 +1,52 @@
 #!/bin/bash
 # ---------------------------------------------------
 #  Tasmota devices network discovery
-# 
+#
 # Revision history :
 #   15/04/2019, V1.0 - Creation by N. Bernaerts
 #   17/04/2019, V1.1 - Adjust timeout and retries
 #   18/04/2019, V1.2 - Add MQTT topic
 #   23/05/2020, V1.3 - Use /version page
 #   30/10/2020, V1.4 - Set retries to 2 for ESP32
+#   29/12/2020, v1.5 - Add --all parameter to list all network devices
 # ---------------------------------------------------
 
 #   Check tools availability
 command -v fping >/dev/null 2>&1 || { echo "[error] Please install fping"; exit 1; }
+command -v arp >/dev/null 2>&1 || { echo "[error] Please install arp"; exit 1; }
 command -v wget >/dev/null 2>&1 || { echo "[error] Please install wget"; exit 1; }
+
+# check --all
+[ "$1" = "--all" ] && LIST_ALL="ok"
 
 # generate temporary files and directory
 TMP_DIR=$(mktemp -t -d "tasmota-XXXXXXXX")
 TMP_DATA="${TMP_DIR}/data.txt"
+TMP_ARP="${TMP_DIR}/arp.txt"
 
 # get first adapter netmask
 NETMASK=$(ip addr | grep inet | grep brd | head -n 1 | xargs | cut -d' ' -f2)
 echo "Netmask is ${NETMASK}"
 
-# load array from fping
+# list all IP from LAN with fping
 ARR_IP=( $(fping --addr --generate "${NETMASK}" 2>/dev/null | grep "alive" | cut -d' ' -f1) )
 
+# list hostnames with arp
+arp -a > "${TMP_ARP}"
+
 # display number of IP
-NBR_IP="${#ARR_IP[@]}"
-echo "Found ${NBR_IP} IP addresses"
+NBR_TASMOTA=0
+NBR_DEVICE="${#ARR_IP[@]}"
+echo "Devices :"
 
 # loop thru IP addresses
 for IP in "${ARR_IP[@]}"
 do
 	# display current IP
-	echo -ne "${IP}\r"
+	#echo -ne "${IP}\r"
+
+	# get hostname from arp
+	IP_HOST=$(grep "(${IP})" "${TMP_ARP}" | cut -d' ' -f1)
 
 	# read page /version
 	wget --quiet --tries=2 --timeout=2 -O - "http://${IP}/info.json" | tr -d "\"{}" | tr "," "\n" > "${TMP_DATA}"
@@ -51,6 +64,9 @@ do
 	# if data are read, we are dealing with tasmota module
 	if [ "${TASMOTA_MODULE}" != "" ] 
 	then
+		# increment counter
+		NBR_TASMOTA=$((NBR_TASMOTA + 1))
+
 		# read data
 		TASMOTA_VERSION=$(grep "Program Version:" "${TMP_DATA}" | cut -d':' -f2)
 		TASMOTA_HOSTNAME=$(grep "Hostname" "${TMP_DATA}" | cut -d':' -f2)
@@ -60,12 +76,21 @@ do
 		EXTENSION_VERSION=$(grep "Extension version:" "${TMP_DATA}" | cut -d':' -f2)
 
 		# display
-		DISPLAY="${IP} [${TASMOTA_HOSTNAME}] ${TASMOTA_MODULE}, Tasmota ${TASMOTA_VERSION},"
+		DISPLAY=" ${IP} [${TASMOTA_HOSTNAME}] ${TASMOTA_MODULE}, Tasmota ${TASMOTA_VERSION},"
 		[ "${EXTENSION_TYPE}" != "" ] && DISPLAY="${DISPLAY} ${EXTENSION_TYPE} ${EXTENSION_VERSION},"
 		DISPLAY="${DISPLAY} Up ${TASMOTA_UPTIME}, MQTT ${TASMOTA_MQTT}"
 		echo "${DISPLAY}"
+
+	elif [ "${LIST_ALL}" = "ok" ]
+	then
+		# display
+		echo " ${IP} [${IP_HOST}]"
 	fi
 done
+
+echo "Found :"
+echo " * ${NBR_DEVICE} devices"
+echo " * ${NBR_TASMOTA} tasmota"
 
 # remove temporary directory
 rm -r "${TMP_DIR}"
