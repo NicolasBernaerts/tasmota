@@ -25,16 +25,23 @@ command -v nmblookup >/dev/null 2>&1 && IS_NMBLOOKUP="ok"
 TMP_DIR=$(mktemp -t -d "tasmota-XXXXXXXX")
 TMP_DATA="${TMP_DIR}/data.txt"
 TMP_ARP="${TMP_DIR}/arp.txt"
+TMP_IP="${TMP_DIR}/ip.txt"
 
 # get first adapter netmask
 NETMASK=$(ip addr | grep inet | grep brd | head -n 1 | xargs | cut -d' ' -f2)
 echo "Netmask is ${NETMASK}"
 
-# list all IP from LAN with fping
-ARR_IP=( $(fping --addr --retry=3 --alive --generate "${NETMASK}" 2>/dev/null | sort --numeric-sort) )
-
 # list hostnames with arp
 arp -a > "${TMP_ARP}"
+
+# list all IP from ARP
+cat "${TMP_ARP}" | cut -d'(' -f2 | cut -d')' -f1 >> "${TMP_IP}"
+
+# list all IP from fping
+fping --addr --retry=3 --alive --generate "${NETMASK}" 2>/dev/null >> "${TMP_IP}"
+
+# generate sorted IP adddress array
+ARR_IP=( $(cat "${TMP_IP}" | sort --numeric-sort | uniq) )
 
 # display number of IP
 NBR_TASMOTA=0
