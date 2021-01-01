@@ -32,6 +32,7 @@
                          Add randomisation to reconnexion
     04/11/2020 - v6.11 - Tasmota 9.0 compatibility
     11/11/2020 - v6.12 - Update to Offload v2.5
+                         Add /data.json for history data
 
   Settings are stored using weighting scale parameters :
     - Settings.weight_reference             = Fil pilote mode
@@ -437,7 +438,7 @@ void PilotwireSetMode (uint8_t new_mode)
   }
 
   // if within range, set mode
-  if (new_mode <= PILOTWIRE_OFFLOAD) Settings.weight_reference = (unsigned long) new_mode;
+  if (new_mode <= PILOTWIRE_OFFLOAD) Settings.weight_reference = new_mode;
 
   // update JSON status
   pilotwire_updated.json = true;
@@ -1575,10 +1576,10 @@ void PilotwireWebPageControl ()
     WSContentSend_P (PSTR (".lang {font-size:2vh;}\n"));
     WSContentSend_P (PSTR ("button {margin:0.25rem 0.5rem;padding:0.75rem 1rem;background:none;border:1px #666 solid;color:#fff;border-radius:8px;}\n"));
     WSContentSend_P (PSTR ("button.power {margin:0.75rem;padding:16px;border-radius:56px;}\n"));
-    WSContentSend_P (PSTR ("button.target {font-size:3vw;margin:0.25rem;padding:0.5rem 0.75rem;}\n"));
+    WSContentSend_P (PSTR ("button.target {font-size:4vw;margin:0.25rem;padding:0.5rem 0.75rem;}\n"));
     WSContentSend_P (PSTR ("span {margin:0.25rem 0.5rem;padding:0.5rem 1rem;}\n"));
-    WSContentSend_P (PSTR ("span.temp {font-size:4vh;color:yellow;}\n"));
-    WSContentSend_P (PSTR ("span.target {font-size:3vw;color:orange;border:1px orange solid;border-radius:8px;}\n"));
+    WSContentSend_P (PSTR ("span.temp {font-size:6vw;color:yellow;}\n"));
+    WSContentSend_P (PSTR ("span.target {font-size:6vw;color:orange;border:1px orange solid;border-radius:8px;}\n"));
     WSContentSend_P (PSTR ("img.power {height:64px;}\n"));
     WSContentSend_P (PSTR (".svg-container {position:relative;vertical-align:middle;overflow:hidden;width:100%%;max-width:%dpx;padding-bottom:65%%;}\n"), PILOTWIRE_GRAPH_WIDTH);
     WSContentSend_P (PSTR (".svg-content {display:inline-block;position:absolute;top:0;left:0;}\n"));
