@@ -28,6 +28,8 @@
     09/11/2020 - v6.0   - Handle ESP32 ethernet devices with board selection
     11/11/2020 - v6.1   - Add data.json page
     20/11/2020 - v6.2   - Correct checksum bug
+    29/12/2020 - v6.3   - Strengthen message error control
+    20/02/2021 - v6.4   - Add sub-totals (HCHP, HCHC, ...) to JSON
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -73,7 +75,7 @@
 #define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_TELEINFO                          // Add support for Teleinfo
 
-#define EXTENSION_VERSION "6.2"               // version
+#define EXTENSION_VERSION "6.4"               // version
 #define EXTENSION_NAME "Teleinfo"             // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 
