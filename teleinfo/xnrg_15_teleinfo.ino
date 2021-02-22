@@ -171,6 +171,7 @@ struct {
 struct {
   uint8_t part = TELEINFO_NONE;
   char    checksum;
+  char    separator;
   String  buffer;
   String  etiquette;
   String  donnee;
@@ -279,10 +280,10 @@ void TeleinfoSetMode (uint16_t new_mode)
  *               Functions
 \*********************************************/
 
-bool TeleinfoValidateChecksum (const char *pstr_etiquette, const char *pstr_donnee, const char tic_checksum) 
+bool TeleinfoValidateChecksum (const char *pstr_etiquette, const char tic_separator, const char *pstr_donnee, const char tic_checksum) 
 {
   bool    result = false;
-  uint8_t valid_checksum = 32;
+  uint8_t valid_checksum = 0;
 
   // check pointers 
   if ((pstr_etiquette != nullptr) && (pstr_donnee != nullptr))
@@ -290,10 +291,17 @@ bool TeleinfoValidateChecksum (const char *pstr_etiquette, const char *pstr_donn
     // if etiquette and donnee are defined and checksum is exactly one caracter
     if (strlen(pstr_etiquette) && strlen(pstr_donnee))
     {
-      // add every char of etiquette and donnee to checksum
-      while (*pstr_etiquette) valid_checksum += *pstr_etiquette++ ;
-      while(*pstr_donnee) valid_checksum += *pstr_donnee++ ;
-      valid_checksum = (valid_checksum & 63) + 32;
+      // add every char of etiquette
+      while (*pstr_etiquette) valid_checksum += *pstr_etiquette++;
+
+      // add separator
+      valid_checksum += tic_separator;
+
+      // add every char of donnee
+      while(*pstr_donnee) valid_checksum += *pstr_donnee++;
+
+      // keep 6 lower bits and add Ox20
+      valid_checksum = (valid_checksum & 0x3F) + 0x20;
       
       // compare given checksum and calculated one
       result = (valid_checksum == tic_checksum);
@@ -444,6 +452,7 @@ void TeleinfoEvery50ms ()
         teleinfo_line.buffer    = "";
         teleinfo_line.etiquette = "";
         teleinfo_line.donnee    = "";
+        teleinfo_line.separator = 0;
         teleinfo_line.checksum  = 0;
         break;
 
@@ -457,6 +466,7 @@ void TeleinfoEvery50ms ()
         {
           case TELEINFO_ETIQUETTE:
             teleinfo_line.etiquette = teleinfo_line.buffer;
+            teleinfo_line.separator = recv_serial;
             break;
           case TELEINFO_DONNEE:
             teleinfo_line.donnee = teleinfo_line.buffer;
@@ -494,7 +504,7 @@ void TeleinfoEvery50ms ()
         if (string_size <= LOGSZ) teleinfo_message.buffer += teleinfo_line.etiquette + " " + teleinfo_line.donnee + " " + String (teleinfo_line.checksum) + "\n";
 
         // validate checksum and numeric format
-        checksum_ok = TeleinfoValidateChecksum (teleinfo_line.etiquette.c_str (), teleinfo_line.donnee.c_str (), teleinfo_line.checksum);
+        checksum_ok = TeleinfoValidateChecksum (teleinfo_line.etiquette.c_str (), teleinfo_line.separator, teleinfo_line.donnee.c_str (), teleinfo_line.checksum);
         is_numeric  = TeleinfoIsValueNumeric (teleinfo_line.donnee.c_str ());
 
         // if checksum is ok, handle the line
