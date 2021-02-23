@@ -10,6 +10,7 @@
 #   30/10/2020, V1.4 - Set retries to 2 for ESP32
 #   29/12/2020, v1.5 - Add --all parameter to list all network devices
 #                      Update wget tries and timeout
+#   21/02/2021, v1.6 - Filter result according to --all parameter
 # ---------------------------------------------------
 
 #   Check tools availability
@@ -27,6 +28,9 @@ TMP_DATA="${TMP_DIR}/data.txt"
 TMP_ARP="${TMP_DIR}/arp.txt"
 TMP_IP="${TMP_DIR}/ip.txt"
 
+# display
+[ "${LIST_ALL}" = "ok" ] && DEVICE="all" || DEVICE="Tasmota" 
+
 # get first adapter netmask
 NETMASK=$(ip addr | grep inet | grep brd | head -n 1 | xargs | cut -d' ' -f2)
 echo "Netmask is ${NETMASK}"
@@ -38,7 +42,7 @@ arp -a > "${TMP_ARP}"
 cat "${TMP_ARP}" | cut -d'(' -f2 | cut -d')' -f1 >> "${TMP_IP}"
 
 # list all IP from fping
-fping --addr --retry=3 --alive --generate "${NETMASK}" 2>/dev/null >> "${TMP_IP}"
+fping --addr --retry=2 --alive --generate "${NETMASK}" 2>/dev/null >> "${TMP_IP}"
 
 # generate sorted IP adddress array
 ARR_IP=( $(cat "${TMP_IP}" | sort --numeric-sort | uniq) )
@@ -46,7 +50,7 @@ ARR_IP=( $(cat "${TMP_IP}" | sort --numeric-sort | uniq) )
 # display number of IP
 NBR_TASMOTA=0
 NBR_DEVICE="${#ARR_IP[@]}"
-echo "Devices :"
+echo "List of ${DEVICE} devices :"
 
 # loop thru IP addresses
 for DEVICE_IP in "${ARR_IP[@]}"
@@ -56,7 +60,7 @@ do
 	DEVICE_DESCRIPTION=""
 
 	# read info.json page
-	wget --quiet --tries=1 --timeout=4 -O - "http://${DEVICE_IP}/info.json" | tr -d "\"{}" | tr "," "\n" > "${TMP_DATA}"
+	wget --quiet --tries=1 --timeout=2 -O - "http://${DEVICE_IP}/info.json" | tr -d "\"{}" | tr "," "\n" > "${TMP_DATA}"
 
 	# detect tasmota module in info.json page
 	TASMOTA_MODULE=$(grep "Module:" "${TMP_DATA}" | cut -d':' -f2)
@@ -65,11 +69,11 @@ do
 	if [ "${TASMOTA_MODULE}" = "" ]
 	then
 		# retrieve tasmota module from home page
-		wget --quiet --tries=1 --timeout=4 -O "${TMP_DATA}" "http://${DEVICE_IP}/"
+		wget --quiet --tries=1 --timeout=2 -O "${TMP_DATA}" "http://${DEVICE_IP}/"
 		TASMOTA_MODULE=$(grep "Tasmota" "${TMP_DATA}" | tr '<' '\n' | grep "^h3" | cut -d'>' -f2 | sed "s| Module||g")
 
 		# read original information page
-		wget --quiet --tries=1 --timeout=4 -O - "http://${DEVICE_IP}/in" | sed "s|\}1|\n|g" | sed "s|\}2|\:|g" | tr '>' '\n' > "${TMP_DATA}"
+		wget --quiet --tries=1 --timeout=2 -O - "http://${DEVICE_IP}/in" | sed "s|\}1|\n|g" | sed "s|\}2|\:|g" | tr '>' '\n' > "${TMP_DATA}"
 	fi
 
 	# if tasmota module is recognised
@@ -94,20 +98,23 @@ do
 	elif [ "${LIST_ALL}" = "ok" ]
 	then
 		# get hostname from arp
-		DEVICE_HOSTNAME=$(grep "(${DEVICE_IP})" "${TMP_ARP}" | cut -d' ' -f1)
+		DEVICE_HOSTNAME=$(grep "(${DEVICE_IP})" "${TMP_ARP}" | head -n 1 | cut -d' ' -f1)
 
 		# if no hostname try nmblookup
 		[ "${DEVICE_HOSTNAME}" = "?" -a "${IS_NMBLOOKUP}" = "ok" ] && DEVICE_HOSTNAME=$(nmblookup -A ${DEVICE_IP} | grep "<00>" | grep -v "<GROUP>" | xargs | cut -d' ' -f1)
 	fi
 
 	# display
-	DEVICE_HOSTNAME=$(echo "${DEVICE_HOSTNAME}" | tr '[:upper:]' '[:lower:]')
-	echo " ${DEVICE_IP} [${DEVICE_HOSTNAME}] ${DEVICE_DESCRIPTION}"
+	if [ "${TASMOTA_MODULE}" != "" -o "${LIST_ALL}" = "ok" ]
+	then
+		DEVICE_HOSTNAME=$(echo "${DEVICE_HOSTNAME}" | tr '[:upper:]' '[:lower:]')
+		echo " ${DEVICE_IP} [${DEVICE_HOSTNAME}] ${DEVICE_DESCRIPTION}"
+	fi
 done
 
-echo "Found :"
-echo " * ${NBR_DEVICE} devices"
-echo " * ${NBR_TASMOTA} tasmota"
+# display totals
+[ "${LIST_ALL}" = "ok" ] && echo "${NBR_DEVICE} devices found, including ${NBR_TASMOTA} Tasmota devices" \
+                         || echo "${NBR_TASMOTA} Tasmota devices found"
 
 # remove temporary directory
 rm -r "${TMP_DIR}"
