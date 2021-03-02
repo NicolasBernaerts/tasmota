@@ -28,7 +28,7 @@
     11/11/2020 - v6.1   - Add data.json page
     20/11/2020 - v6.2   - Correct checksum bug
     29/12/2020 - v6.3   - Strengthen message error control
-    20/02/2021 - v6.4   - Add sub-totals (HCHP, HCHC, ...) to JSON
+    25/02/2021 - v7.0   - Rewrite to enhance compatibility with standart mode
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -53,8 +53,7 @@
  * Teleinfo historical
  * docs https://www.enedis.fr/sites/default/files/Enedis-NOI-CPT_54E.pdf
  * Teleinfo hardware will be enabled if 
- *     Hardware RX = [Teleinfo 1200] or [Teleinfo 9600]
- *     Hardware TX = [Teleinfo TX]
+ *     Hardware RX = [TinfoRX]
 \*********************************************************************************************/
 
 /*************************************************\
@@ -67,6 +66,9 @@
 
 // teleinfo constant
 #define TELEINFO_VOLTAGE             230        // default contract voltage is 200V
+#define TELEINFO_ITEM_MAX            48         // number of TIC items in the rolling array
+#define TELEINFO_STRING_MAX          28         // max length of etiquette or donnee
+#define TELEINFO_PHASE_MAX           3          // maximum number of phases
 
 // web published pages
 #define D_PAGE_TELEINFO_CONFIG       "teleinfo"
@@ -85,43 +87,28 @@
 #define TELEINFO_GRAPH_PERCENT_START 10     
 #define TELEINFO_GRAPH_PERCENT_STOP  90
 
-// JSON message
-#define TELEINFO_JSON_TIC            "TIC"
+// JSON TIC extensions
+#define TELEINFO_JSON_PERIOD         "PERIOD"
 #define TELEINFO_JSON_PHASE          "PHASE"
 #define TELEINFO_JSON_ADCO           "ADCO"
-#define TELEINFO_JSON_ISOUSC         "ISOUSC"
 #define TELEINFO_JSON_SSOUSC         "SSOUSC"
 #define TELEINFO_JSON_IINST          "IINST"
 #define TELEINFO_JSON_SINSTS         "SINSTS"
-#define TELEINFO_JSON_ADIR           "ADIR"
 
-#define TELEINFO_JSON_BASE           "BASE"
-#define TELEINFO_JSON_HCHC           "HCHC"
-#define TELEINFO_JSON_HCHP           "HCHP"
-#define TELEINFO_JSON_BBRHCJB        "BBRHCJB"
-#define TELEINFO_JSON_BBRHPJB        "BBRHPJB"
-#define TELEINFO_JSON_BBRHCJW        "BBRHCJW"
-#define TELEINFO_JSON_BBRHPJW        "BBRHPJW"
-#define TELEINFO_JSON_BBRHCJR        "BBRHCJR"
-#define TELEINFO_JSON_BBRHPJR        "BBRHPJR"
-#define TELEINFO_JSON_EJPHN          "EJPHN"
-#define TELEINFO_JSON_EJPHPM         "EJPHPM"
-
+// interface strings
+#define TELEINFO_TIC                 "TIC"
 #define D_TELEINFO_MODE              "Teleinfo"
 #define D_TELEINFO_CONFIG            "Configure Teleinfo"
 #define D_TELEINFO_BOARD             "Ethernet board"
 #define D_TELEINFO_GRAPH             "Graph"
-#define D_TELEINFO_MESSAGE           "Message"
 #define D_TELEINFO_REFERENCE         "Contract n°"
-#define D_TELEINFO_TIC               "TIC messages"
-#define D_TELEINFO_ERROR             "TIC errors"
+#define D_TELEINFO_MESSAGE           "Messages reçus"
+#define D_TELEINFO_CHECKSUM          "Erreurs checksum"
+#define D_TELEINFO_RESET             "Reset de trame"
 #define D_TELEINFO_DISABLED          "Désactivé"
 #define D_TELEINFO_SPEED_DEFAULT     "bauds"
 #define D_TELEINFO_SPEED_HISTO       "bauds (Historique)"
 #define D_TELEINFO_SPEED_STD         "bauds (Standard)"
-
-// others
-#define TELEINFO_PHASE_MAX           3      
 
 // form strings
 const char TELEINFO_INPUT_TEXT[] PROGMEM  = "<p><input type='radio' name='%s' value='%d' %s>%s</p>\n";
@@ -141,40 +128,35 @@ const char *const arr_week_day[] PROGMEM = { "Sun", "Mon", "Tue", "Wed", "Thu", 
 
 // TIC message parts
 enum TeleinfoMessagePart { TELEINFO_NONE, TELEINFO_ETIQUETTE, TELEINFO_DONNEE, TELEINFO_CHECKSUM };
+enum TeleinfoMessageChecksum { TELEINFO_NOCHECK, TELEINFO_CHECKONE, TELEINFO_CHECKTWO };
 
-// overload states
-enum TeleinfoGraphPeriod { TELEINFO_LIVE, TELEINFO_DAY, TELEINFO_WEEK, TELEINFO_MONTH, TELEINFO_YEAR, TELEINFO_PERIOD_MAX };
-const char *const arr_period_cmnd[] PROGMEM = { "live", "day", "week", "month", "year" };
-const char *const arr_period_label[] PROGMEM = { "Live", "Day", "Week", "Month", "Year" };
-const long arr_period_sample[] = { 5, 236, 1657, 7338, 86400 };       // number of seconds between samples
+// graph periods
+enum TeleinfoGraphPeriod { TELEINFO_LIVE, TELEINFO_DAY, TELEINFO_WEEK, TELEINFO_YEAR, TELEINFO_PERIOD_MAX };
+const char *const arr_period_cmnd[] PROGMEM = { "live", "day", "week", "year" };    // periods key
+const char *const arr_period_label[] PROGMEM = { "Live", "Day", "Week", "Year" };   // periods label
+const long arr_period_sample[] = { 5, 236, 1657, 86400 };                           // number of seconds between samples
 
 // teleinfo driver status
 bool teleinfo_enabled = false;
 
 // teleinfo data
 struct {
-  uint8_t phase  = 1;           // number of phases
-  long    isousc = 0;           // contract max current per phase
-  long    ssousc = 0;           // contract max power per phase
-  String  adco;
+  uint8_t checksum_type = TELEINFO_NOCHECK;     // type of checksum
+  uint8_t phase  = 1;                           // number of phases
+  long    isousc = 0;                           // contract max current per phase
+  long    ssousc = 0;                           // contract max power per phase
+  String  id;                                   // contract reference (adco or ads)
 } teleinfo_contract;
-
-// teleinfo message
-struct {
-  long   count = 0;             // number of received messages
-  long   error = 0;             // number of checksum errors
-  String buffer;
-  String content;
-} teleinfo_message;
 
 // teleinfo current line
 struct {
   uint8_t part = TELEINFO_NONE;
+  char    str_buffer[TELEINFO_STRING_MAX];
+  char    str_etiquette[TELEINFO_STRING_MAX];
+  char    separator1;
+  char    str_donnee[TELEINFO_STRING_MAX];
+  char    separator2;
   char    checksum;
-  char    separator;
-  String  buffer;
-  String  etiquette;
-  String  donnee;
 } teleinfo_line;
 
 // teleinfo update trigger
@@ -211,6 +193,29 @@ struct tic_phase {
   uint32_t last_diff;                     // last time a power difference was published
 }; 
 tic_phase teleinfo_phase[TELEINFO_PHASE_MAX];
+
+// TIC message array
+struct tic_line {
+  String etiquette;
+  String donnee;
+  char   checksum;
+};
+
+struct {
+  bool     complete = false;              // a message is complete and can be published
+  bool     overload = false;              // overload has been detected
+  long     nb_message = 0;                // number of received messages
+  long     nb_data    = 0;                // number of received data (lines)
+  long     nb_error   = 0;                // number of checksum errors
+  long     nb_reset   = 0;                // number of message reset
+  uint8_t  line_current   = 0;            // index of current received message line
+  uint8_t  line_first     = 0;            // index of first line of current complete message
+  uint8_t  line_last      = 0;            // index of last line of current complete message
+  uint8_t  line_nextfirst = 0;            // index of first line of next message
+  uint8_t  line_nextlast  = 0;            // index of last line of next message
+  uint8_t  line_max = 0;                  // max number of lines in a message
+  tic_line line[TELEINFO_ITEM_MAX];       // array of message lines
+} teleinfo_message;
 
 // graph
 struct tic_period {
@@ -280,9 +285,10 @@ void TeleinfoSetMode (uint16_t new_mode)
  *               Functions
 \*********************************************/
 
-bool TeleinfoValidateChecksum (const char *pstr_etiquette, const char tic_separator, const char *pstr_donnee, const char tic_checksum) 
+bool TeleinfoValidateChecksum (const char *pstr_etiquette, const char tic_separator1, const char *pstr_donnee, const char tic_separator2, const char tic_checksum) 
 {
   bool    result = false;
+  uint8_t test_checksum  = 0;
   uint8_t valid_checksum = 0;
 
   // check pointers 
@@ -291,37 +297,45 @@ bool TeleinfoValidateChecksum (const char *pstr_etiquette, const char tic_separa
     // if etiquette and donnee are defined and checksum is exactly one caracter
     if (strlen(pstr_etiquette) && strlen(pstr_donnee))
     {
-      // add every char of etiquette
-      while (*pstr_etiquette) valid_checksum += *pstr_etiquette++;
+      // add every char of etiquette, first separator and donnee
+      while (*pstr_etiquette) test_checksum += *pstr_etiquette++;
+      test_checksum += tic_separator1;
+      while(*pstr_donnee) test_checksum += *pstr_donnee++;
 
-      // add separator
-      valid_checksum += tic_separator;
+      switch (teleinfo_contract.checksum_type)
+      {
+      // checksum calculation not defined, let's try to define it
+      case TELEINFO_NOCHECK:
+        // test one separator only
+        valid_checksum = (test_checksum & 0x3F) + 0x20;
+        if (valid_checksum == tic_checksum) teleinfo_contract.checksum_type = TELEINFO_CHECKONE;
 
-      // add every char of donnee
-      while(*pstr_donnee) valid_checksum += *pstr_donnee++;
+        // else, try two separators
+        else
+        {
+          // add second separator to checksum and test it
+          test_checksum += tic_separator2;
+          valid_checksum = (test_checksum & 0x3F) + 0x20;
+          if (valid_checksum == tic_checksum) teleinfo_contract.checksum_type = TELEINFO_CHECKTWO;
+        }
+        break;
+          
+      // checksum calculated on first separator only, nothing to do
+      case TELEINFO_CHECKONE:
+        break;
 
-      // keep 6 lower bits and add Ox20
-      valid_checksum = (valid_checksum & 0x3F) + 0x20;
-      
-      // compare given checksum and calculated one
+      // checksum calculated on two separators, add second one
+      case TELEINFO_CHECKTWO:
+        // add second separator
+        test_checksum += tic_separator2;
+        break;
+      }
+
+      // keep 6 lower bits and add Ox20 and compare to given checksum
+      valid_checksum = (test_checksum & 0x3F) + 0x20;
       result = (valid_checksum == tic_checksum);
-      if (!result) teleinfo_message.error++;
+      if (!result) teleinfo_message.nb_error++;
     }
-  }
-
-  return result;
-}
-
-bool TeleinfoIsValueNumeric (const char *pstr_value) 
-{
-  bool result = false;
-
-  // check pointer 
-  if (pstr_value != nullptr)
-  {
-    // check that all are digits
-    result = true;
-    while(*pstr_value) if (isDigit(*pstr_value++) == false) result = false;
   }
 
   return result;
@@ -384,8 +398,6 @@ void TeleinfoGraphInit ()
     // default values
     teleinfo_phase[phase].iinst     = 0;
     teleinfo_phase[phase].papp      = 0;
-    teleinfo_phase[phase].adir      = 0;
-    teleinfo_phase[phase].adir_set  = false;
     teleinfo_phase[phase].last_papp = 0;
     teleinfo_phase[phase].last_diff = UINT32_MAX;
   }
@@ -411,12 +423,13 @@ void TeleinfoGraphInit ()
 
 void TeleinfoEvery50ms ()
 {
-  bool     checksum_ok, is_numeric;
-  uint8_t  recv_serial, phase;
+  bool     checksum;
+  uint8_t  recv_serial, index, phase;
   uint32_t teleinfo_delta, teleinfo_newtotal;
   int      string_size;
   long     current_inst, current_total;
   float    power_apparent;
+//  String   str_text;
 
   // loop as long as serial port buffer is not empty and timeout not reached
 #ifdef ESP8266
@@ -437,23 +450,33 @@ void TeleinfoEvery50ms ()
       // 0x02 : Beginning of message 
       // ---------------------------
       case 2:
-        // reset teleinformation message
-        teleinfo_message.buffer = "";
+        // save first line index of next message
+        teleinfo_message.line_nextfirst = teleinfo_message.line_current;
+        break;
+          
+      // ---------------------------
+      // 0x04 : Reset of message 
+      // ---------------------------
+      case 4:
+        // increment reset counter
+        teleinfo_message.nb_reset++;
 
-        // reset adir overload flags
-        for (phase = 0; phase < teleinfo_contract.phase; phase++) teleinfo_phase[phase].adir_set = false;
+        // set line index after end of previous complete message
+        teleinfo_message.line_current = teleinfo_message.line_last + 1;
+        teleinfo_message.line_current = teleinfo_message.line_current % TELEINFO_ITEM_MAX;
         break;
           
       // ------------------------
       // 0x0A : Beginning of line
       // ------------------------
       case 10:
-        teleinfo_line.part = TELEINFO_ETIQUETTE;
-        teleinfo_line.buffer    = "";
-        teleinfo_line.etiquette = "";
-        teleinfo_line.donnee    = "";
-        teleinfo_line.separator = 0;
-        teleinfo_line.checksum  = 0;
+        strcpy (teleinfo_line.str_buffer, "");
+        strcpy (teleinfo_line.str_etiquette, "");
+        strcpy (teleinfo_line.str_donnee, "");
+        teleinfo_line.separator1 = 0;
+        teleinfo_line.separator2 = 0;
+        teleinfo_line.checksum   = 0;
+        teleinfo_line.part       = TELEINFO_ETIQUETTE;
         break;
 
       // ---------------------------
@@ -465,19 +488,20 @@ void TeleinfoEvery50ms ()
         switch (teleinfo_line.part)
         {
           case TELEINFO_ETIQUETTE:
-            teleinfo_line.etiquette = teleinfo_line.buffer;
-            teleinfo_line.separator = recv_serial;
+            strcpy (teleinfo_line.str_etiquette, teleinfo_line.str_buffer);
+            teleinfo_line.separator1 = recv_serial;
             break;
           case TELEINFO_DONNEE:
-            teleinfo_line.donnee = teleinfo_line.buffer;
+            strcpy (teleinfo_line.str_donnee, teleinfo_line.str_buffer);
+            teleinfo_line.separator2 = recv_serial;
             break;
           case TELEINFO_CHECKSUM:
-            teleinfo_line.checksum = teleinfo_line.buffer[0];
+            teleinfo_line.checksum = teleinfo_line.str_buffer[0];
         }
 
         // prepare next part of line
         teleinfo_line.part ++;
-        teleinfo_line.buffer = "";
+        strcpy (teleinfo_line.str_buffer, "");
         break;
         
       // ------------------
@@ -485,77 +509,59 @@ void TeleinfoEvery50ms ()
       // ------------------
       case 13:
         // retrieve checksum
-        if (teleinfo_line.part == TELEINFO_CHECKSUM)
-        {
-          string_size = teleinfo_line.buffer.length ();
-          if (string_size > 0) teleinfo_line.checksum = teleinfo_line.buffer[0];
-        }
+        if (teleinfo_line.part == TELEINFO_CHECKSUM) teleinfo_line.checksum = teleinfo_line.str_buffer[0];
 
-        // reset line part
+        // increment counter and reset line part
+        teleinfo_message.nb_data++;
         teleinfo_line.part = TELEINFO_NONE;
 
-        // calculate size of complete message with current line
-        string_size  = teleinfo_message.buffer.length ();
-        string_size += teleinfo_line.etiquette.length ();
-        string_size += teleinfo_line.donnee.length ();
-        string_size += 4;
-
-        // if size permits, add last line received to tic message
-        if (string_size <= LOGSZ) teleinfo_message.buffer += teleinfo_line.etiquette + " " + teleinfo_line.donnee + " " + String (teleinfo_line.checksum) + "\n";
-
-        // validate checksum and numeric format
-        checksum_ok = TeleinfoValidateChecksum (teleinfo_line.etiquette.c_str (), teleinfo_line.separator, teleinfo_line.donnee.c_str (), teleinfo_line.checksum);
-        is_numeric  = TeleinfoIsValueNumeric (teleinfo_line.donnee.c_str ());
-
         // if checksum is ok, handle the line
-        if (checksum_ok && is_numeric)
+        checksum = TeleinfoValidateChecksum (teleinfo_line.str_etiquette, teleinfo_line.separator1, teleinfo_line.str_donnee, teleinfo_line.separator2, teleinfo_line.checksum);
+        if (checksum == false) teleinfo_message.nb_error++;
+        else
         {
           // detect 3 phase counter
-          if (teleinfo_line.etiquette == "IINST3") teleinfo_contract.phase = 3;
+          if (strcmp (teleinfo_line.str_etiquette, "IINST3") == 0) teleinfo_contract.phase = 3;
 
-          // handle etiquettes
-          if (teleinfo_line.etiquette == "ADCO") teleinfo_contract.adco = teleinfo_line.donnee;
-          else if (teleinfo_line.etiquette == "IINST")  teleinfo_phase[0].iinst = teleinfo_line.donnee.toInt ();
-          else if (teleinfo_line.etiquette == "IINST1") teleinfo_phase[0].iinst = teleinfo_line.donnee.toInt ();
-          else if (teleinfo_line.etiquette == "IINST2") teleinfo_phase[1].iinst = teleinfo_line.donnee.toInt ();
-          else if (teleinfo_line.etiquette == "IINST3") teleinfo_phase[2].iinst = teleinfo_line.donnee.toInt ();
-          else if (teleinfo_line.etiquette == "ADPS")
-          {
-            teleinfo_phase[0].adir_set = true;
-            teleinfo_phase[0].adir = teleinfo_line.donnee.toInt ();
-          }
-          else if (teleinfo_line.etiquette == "ADIR1")
-          {
-            teleinfo_phase[0].adir_set = true;
-            teleinfo_phase[0].adir = teleinfo_line.donnee.toInt ();
-          }
-          else if (teleinfo_line.etiquette == "ADIR2")
-          {
-            teleinfo_phase[1].adir_set = true;
-            teleinfo_phase[1].adir = teleinfo_line.donnee.toInt ();
-          } 
-          else if (teleinfo_line.etiquette == "ADIR3")
-          {
-            teleinfo_phase[2].adir_set = true;
-            teleinfo_phase[2].adir = teleinfo_line.donnee.toInt ();
-          }
-          else if (teleinfo_line.etiquette == "ISOUSC")
-          {
-            teleinfo_contract.isousc = teleinfo_line.donnee.toInt ();
-            if (teleinfo_contract.isousc > 0) teleinfo_contract.ssousc = teleinfo_contract.isousc * 200;
-          }
-          else if (teleinfo_line.etiquette == "PAPP")    teleinfo_counter.papp    = teleinfo_line.donnee.toInt ();
-          else if (teleinfo_line.etiquette == "BASE")    teleinfo_counter.base    = teleinfo_line.donnee.toInt ();
-          else if (teleinfo_line.etiquette == "HCHC")    teleinfo_counter.hchc    = teleinfo_line.donnee.toInt ();
-          else if (teleinfo_line.etiquette == "HCHP")    teleinfo_counter.hchp    = teleinfo_line.donnee.toInt ();
-          else if (teleinfo_line.etiquette == "BBRHCJB") teleinfo_counter.bbrhcjb = teleinfo_line.donnee.toInt ();
-          else if (teleinfo_line.etiquette == "BBRHPJB") teleinfo_counter.bbrhpjb = teleinfo_line.donnee.toInt ();
-          else if (teleinfo_line.etiquette == "BBRHCJW") teleinfo_counter.bbrhcjw = teleinfo_line.donnee.toInt ();
-          else if (teleinfo_line.etiquette == "BBRHPJW") teleinfo_counter.bbrhpjw = teleinfo_line.donnee.toInt ();
-          else if (teleinfo_line.etiquette == "BBRHCJR") teleinfo_counter.bbrhcjr = teleinfo_line.donnee.toInt ();
-          else if (teleinfo_line.etiquette == "BBRHPJR") teleinfo_counter.bbrhpjr = teleinfo_line.donnee.toInt ();
-          else if (teleinfo_line.etiquette == "EJPHN")   teleinfo_counter.ejphn   = teleinfo_line.donnee.toInt ();
-          else if (teleinfo_line.etiquette == "EJPHPM")  teleinfo_counter.ejphpm  = teleinfo_line.donnee.toInt ();
+          // handle specific etiquettes
+          if (strcmp (teleinfo_line.str_etiquette, "ADCO")         == 0) teleinfo_contract.id     = teleinfo_line.str_donnee;
+          else if (strcmp (teleinfo_line.str_etiquette, "ADS")     == 0) teleinfo_contract.id     = teleinfo_line.str_donnee;
+          else if (strcmp (teleinfo_line.str_etiquette, "IINST")   == 0) teleinfo_phase[0].iinst  = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "IINST1")  == 0) teleinfo_phase[0].iinst  = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "IINST2")  == 0) teleinfo_phase[1].iinst  = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "IINST3")  == 0) teleinfo_phase[2].iinst  = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "ISOUSC")  == 0) teleinfo_contract.isousc = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "PS")      == 0) teleinfo_contract.ssousc = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "PAPP")    == 0) teleinfo_counter.papp    = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "BASE")    == 0) teleinfo_counter.base    = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "HCHC")    == 0) teleinfo_counter.hchc    = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "HCHP")    == 0) teleinfo_counter.hchp    = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "EJPHN")   == 0) teleinfo_counter.ejphn   = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "EJPHPM")  == 0) teleinfo_counter.ejphpm  = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "BBRHCJB") == 0) teleinfo_counter.bbrhcjb = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "BBRHPJB") == 0) teleinfo_counter.bbrhpjb = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "BBRHCJW") == 0) teleinfo_counter.bbrhcjw = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "BBRHPJW") == 0) teleinfo_counter.bbrhpjw = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "BBRHCJR") == 0) teleinfo_counter.bbrhcjr = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "BBRHPJR") == 0) teleinfo_counter.bbrhpjr = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "ADPS")    == 0) teleinfo_message.overload = true;
+          else if (strcmp (teleinfo_line.str_etiquette, "ADIR1")   == 0) teleinfo_message.overload = true;
+          else if (strcmp (teleinfo_line.str_etiquette, "ADIR2")   == 0) teleinfo_message.overload = true;
+          else if (strcmp (teleinfo_line.str_etiquette, "ADIR3")   == 0) teleinfo_message.overload = true;
+
+          // add new message line
+          index = teleinfo_message.line_current;
+          teleinfo_message.line_nextlast = index;
+          teleinfo_message.line[index].etiquette = teleinfo_line.str_etiquette;
+          teleinfo_message.line[index].donnee    = teleinfo_line.str_donnee;
+          teleinfo_message.line[index].checksum  = teleinfo_line.checksum;
+
+          // increase index for next line
+          teleinfo_message.line_current++;
+          teleinfo_message.line_current = teleinfo_message.line_current % TELEINFO_ITEM_MAX;
+
+          // if complete message is available and array is full, drop previous complete message
+          if ((teleinfo_message.complete == true) && (teleinfo_message.line_current == teleinfo_message.line_first)) teleinfo_message.complete = false;
         }
         break;
 
@@ -563,6 +569,14 @@ void TeleinfoEvery50ms ()
       // Ox03 : End of message
       // ---------------------
       case 3:
+        // if defined, defined maximum power per phase
+        if (teleinfo_contract.isousc > 0) teleinfo_contract.ssousc = teleinfo_contract.isousc * 200;
+
+        // save first and last line of complete message
+        teleinfo_message.line_first = teleinfo_message.line_nextfirst;
+        teleinfo_message.line_last  = teleinfo_message.line_nextlast;
+        teleinfo_message.complete   = true;
+
         // if needed, declare 3 phases
         if (Energy.phase_count != teleinfo_contract.phase) Energy.phase_count = teleinfo_contract.phase;
 
@@ -573,9 +587,6 @@ void TeleinfoEvery50ms ()
         // loop to update current and power
         for (phase = 0; phase < teleinfo_contract.phase; phase++)
         {
-          // if adir not set, reset to 0
-          if (!teleinfo_phase[phase].adir_set) teleinfo_phase[phase].adir = 0;
-
           // calculate phase apparent power
           if (current_total == 0) teleinfo_phase[phase].papp = teleinfo_counter.papp / teleinfo_contract.phase;
           else teleinfo_phase[phase].papp = (teleinfo_counter.papp * teleinfo_phase[phase].iinst) / current_total;
@@ -603,24 +614,16 @@ void TeleinfoEvery50ms ()
         teleinfo_json.papp_delta = teleinfo_contract.ssousc / 100;
         if (abs (teleinfo_json.papp_last - teleinfo_counter.papp) > teleinfo_json.papp_delta) teleinfo_json.updated = true;
 
-        // message update : if ADIR is above 100%
-        for (phase = 0; phase < teleinfo_contract.phase; phase++) if (teleinfo_phase[phase].adir >= 100) teleinfo_json.updated = true;
-
         // increment message counter
-        teleinfo_message.count++;
-
-        // update teleinfo raw message
-        teleinfo_message.content  = "COUNTER " + String (teleinfo_message.count) + "\n";
-        teleinfo_message.content += teleinfo_message.buffer;
-        teleinfo_message.buffer  = "";
+        teleinfo_message.nb_message++;
         break;
 
       // if caracter is anything else printable, add it to current message part
       default:
          if ((teleinfo_line.part > TELEINFO_NONE) && isprint (recv_serial))
          {
-           string_size = teleinfo_line.buffer.length ();
-           if (string_size < CMDSZ) teleinfo_line.buffer += (char) recv_serial;
+           string_size = strlen (teleinfo_line.str_buffer) + 1;
+           if (string_size < TELEINFO_STRING_MAX) strncat (teleinfo_line.str_buffer, (char*) &recv_serial, 1);
          }
         break;
     }
@@ -679,12 +682,12 @@ void TeleinfoUpdateGraphData (uint8_t graph_period)
 }
 
 // Show JSON status (for MQTT)
-//  "TIC":{ "PHASE":3,"ADCO":"1234567890","ISOUSC":30,"SSOUSC":6000,"SINSTS":2567,"SINSTS1":1243,"IINST1":14.7,"ADIR1":0,"SINSTS2":290,"IINST2":4.4,"ADIR2":0,"SINSTS3":6500,"IINST3":33,"ADIR3":110 }
+//  "TIC":{ "ADCO":"1234567890","ISOUSC":30,"SSOUSC":6000,"SINSTS":2567,"SINSTS1":1243,"IINST1":14.7,"ADIR1":0,"SINSTS2":290,"IINST2":4.4,"ADIR2":0,"SINSTS3":6500,"IINST3":33,"ADIR3":110, "PHASE":3 }
 void TeleinfoShowJSON (bool append)
 {
-  uint8_t phase;
-  long    power_percent;
-  String  str_json, str_phase;
+  bool    finished = false;
+  uint8_t index;
+  String  str_json;
 
   // reset update flag and update published apparent power
   teleinfo_json.updated   = false;
@@ -694,45 +697,48 @@ void TeleinfoShowJSON (bool append)
   if (append == false) str_json = "\"" + String (D_JSON_TIME) + "\":\"" + GetDateAndTime(DT_LOCAL) + "\",";
 
   // start TIC section
-  str_json += "\"" + String (TELEINFO_JSON_TIC) + "\":{";
+  str_json += "\"" + String (TELEINFO_TIC) + "\":{";
 
-  // if in append mode, add contract data
-  if (append == true)
+  // if TIC messsage is complete
+  if (teleinfo_message.complete == true)
   {
-    str_json += "\"" + String (TELEINFO_JSON_PHASE) + "\":" + String (teleinfo_contract.phase);
-    str_json += ",\"" + String (TELEINFO_JSON_ADCO) + "\":\"" + teleinfo_contract.adco + "\"";
-    str_json += ",\"" + String (TELEINFO_JSON_ISOUSC) + "\":" + String (teleinfo_contract.isousc);
-    str_json += ",";
-  }
- 
-  // add instant values
-  str_json += "\"" + String (TELEINFO_JSON_SSOUSC) + "\":" + String (teleinfo_contract.ssousc);
-  str_json += ",\"" + String (TELEINFO_JSON_SINSTS) + "\":" + String (teleinfo_counter.papp);
-  for (phase = 0; phase < teleinfo_contract.phase; phase++)
-  {
-    // calculate adir (percentage)
-    if (teleinfo_contract.ssousc > teleinfo_phase[phase].papp) power_percent = teleinfo_phase[phase].papp * 100 / teleinfo_contract.ssousc;
-    else power_percent = 100;
+    // --------------------
+    // TIC received message
+    // --------------------
 
-    // add to JSON
-    str_phase = String (phase + 1);
-    str_json += ",\"" + String (TELEINFO_JSON_SINSTS) + str_phase + "\":" + String (teleinfo_phase[phase].papp);
-    str_json += ",\"" + String (TELEINFO_JSON_IINST)  + str_phase + "\":" + String (teleinfo_phase[phase].iinst);
-    str_json += ",\"" + String (TELEINFO_JSON_ADIR)   + str_phase + "\":" + String (power_percent);
-  }
+    // loop thru TIC message lines
+    index = teleinfo_message.line_first;
+    while (finished == false)
+    {
+      // add current line
+      if (index != teleinfo_message.line_first) str_json += ",";
+      str_json += "\"" + teleinfo_message.line[index].etiquette + "\":\"" + teleinfo_message.line[index].donnee + "\"";
 
-  // if needed, add Teleinfo sub-totals
-  if (teleinfo_counter.base    != 0) str_json += ",\"" + String (TELEINFO_JSON_BASE)    + "\":" + String (teleinfo_counter.base);
-  if (teleinfo_counter.hchc    != 0) str_json += ",\"" + String (TELEINFO_JSON_HCHC)    + "\":" + String (teleinfo_counter.hchc);
-  if (teleinfo_counter.hchp    != 0) str_json += ",\"" + String (TELEINFO_JSON_HCHP)    + "\":" + String (teleinfo_counter.hchp);
-  if (teleinfo_counter.bbrhcjb != 0) str_json += ",\"" + String (TELEINFO_JSON_BBRHCJB) + "\":" + String (teleinfo_counter.bbrhcjb);
-  if (teleinfo_counter.bbrhpjb != 0) str_json += ",\"" + String (TELEINFO_JSON_BBRHPJB) + "\":" + String (teleinfo_counter.bbrhpjb);
-  if (teleinfo_counter.bbrhcjw != 0) str_json += ",\"" + String (TELEINFO_JSON_BBRHCJW) + "\":" + String (teleinfo_counter.bbrhcjw);
-  if (teleinfo_counter.bbrhpjw != 0) str_json += ",\"" + String (TELEINFO_JSON_BBRHPJW) + "\":" + String (teleinfo_counter.bbrhpjw);
-  if (teleinfo_counter.bbrhcjr != 0) str_json += ",\"" + String (TELEINFO_JSON_BBRHCJR) + "\":" + String (teleinfo_counter.bbrhcjr);
-  if (teleinfo_counter.bbrhpjr != 0) str_json += ",\"" + String (TELEINFO_JSON_BBRHPJR) + "\":" + String (teleinfo_counter.bbrhpjr);
-  if (teleinfo_counter.ejphn   != 0) str_json += ",\"" + String (TELEINFO_JSON_EJPHN)   + "\":" + String (teleinfo_counter.ejphn);
-  if (teleinfo_counter.ejphpm  != 0) str_json += ",\"" + String (TELEINFO_JSON_EJPHPM)  + "\":" + String (teleinfo_counter.ejphpm);
+      // check for last message line
+      finished = (index == teleinfo_message.line_last);
+
+      // increment to next line
+      index++;
+      index = index % TELEINFO_ITEM_MAX;
+    }
+
+    // --------------
+    // TIC extensions
+    // --------------
+
+    // PHASE : number of phases 
+    str_json += ",\"" + String (TELEINFO_JSON_PHASE) + "\":" + String (teleinfo_contract.phase);
+
+    // SSOUSC : power per phase
+    str_json += ",\"" + String (TELEINFO_JSON_SSOUSC) + "\":\"" + String (teleinfo_contract.ssousc) + "\"";
+
+    // SINSTS1 : if only one phase, phase instant power 
+    if (teleinfo_contract.phase == 1)
+    {
+      str_json += ",\"" + String (TELEINFO_JSON_IINST) + "1\":\"" + String (teleinfo_phase[0].iinst) + "\"";
+      str_json += ",\"" + String (TELEINFO_JSON_SINSTS) + "1\":\"" + String (teleinfo_phase[0].papp) + "\"";
+    }
+  }
 
   // end of TIC section
   str_json += "}";
@@ -742,7 +748,7 @@ void TeleinfoShowJSON (bool append)
   else Response_P (PSTR("{%s}"), str_json.c_str ());
 
   // publish it if not in append mode
-  if (!append) MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
+  if ((!append) && (teleinfo_message.complete == true)) MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
 }
 
 /*********************************************\
@@ -753,66 +759,6 @@ void TeleinfoShowJSON (bool append)
 
 // display offload icons
 void TeleinfoWebIconTic () { Webserver->send_P (200, PSTR ("image/png"), teleinfo_icon_tic_png, teleinfo_icon_tic_len); }
-
-// get tic raw message
-void TeleinfoWebTicUpdate () { Webserver->send_P (200, PSTR ("text/plain"), teleinfo_message.content.c_str (), teleinfo_message.content.length ()); }
-
-// get status update
-void TeleinfoWebGraphUpdate ()
-{
-  uint8_t  graph_period = TELEINFO_LIVE;
-  int      index;
-  long     power_diff;
-  float    power_read;
-  uint32_t time_now;
-  String   str_text;
-
-  // timestamp
-  time_now = millis ();
-
-  // check graph period to be displayed
-  for (index = 0; index < TELEINFO_PERIOD_MAX; index++) if (Webserver->hasArg(arr_period_cmnd[index])) graph_period = index;
-
-  // chech for graph update
-  str_text = teleinfo_graph[graph_period].updated;
-
-  // check power and power difference for each phase
-  for (index = 0; index < teleinfo_contract.phase; index++)
-  {
-    // calculate power difference
-    power_diff = teleinfo_phase[index].papp - teleinfo_phase[index].last_papp;
-
-    // if power has changed
-    str_text += ";";
-    if (power_diff != 0)
-    {
-      teleinfo_phase[index].last_papp = teleinfo_phase[index].papp;
-      str_text += teleinfo_phase[index].papp;
-    }
-
-    // if more than 100 VA power difference
-    str_text += ";";
-    if (abs (power_diff) >= 100)
-    {
-      if (power_diff < 0) str_text += "- " + String (abs (power_diff));
-      else str_text += "+ " + String (power_diff);
-      teleinfo_phase[index].last_diff = millis ();
-    }
-
-    // else if diff has been published 10 sec
-    else if ((teleinfo_phase[index].last_diff != UINT32_MAX) && (time_now - teleinfo_phase[index].last_diff > 10000))
-    {
-      str_text += "---";
-      teleinfo_phase[index].last_diff = UINT32_MAX;
-    }
-  }
-
-  // send result
-  Webserver->send_P (200, PSTR ("text/plain"), str_text.c_str (), str_text.length ());
-
-  // reset update flags
-  teleinfo_graph[graph_period].updated = 0;
-}
 
 // append Teleinfo graph button to main page
 void TeleinfoWebMainButton ()
@@ -834,11 +780,23 @@ void TeleinfoWebButton ()
 // append Teleinfo state to main page
 bool TeleinfoWebSensor ()
 {
+  float  error_percent;
+  String str_percent;
+
   // display last TIC data received
-  WSContentSend_PD (PSTR("{s}%s{m}%d{e}"), D_TELEINFO_TIC, teleinfo_message.count);
+  WSContentSend_PD (PSTR("{s}%s{m}%d{e}"), D_TELEINFO_MESSAGE, teleinfo_message.nb_message);
 
   // display TIC checksum errors
-  WSContentSend_PD (PSTR("{s}%s{m}%d{e}"), D_TELEINFO_ERROR, teleinfo_message.error);
+  if ((teleinfo_message.nb_data > 0) && ( teleinfo_message.nb_error > 0 ))
+  {
+    error_percent = teleinfo_message.nb_error * 100;
+    error_percent = error_percent / teleinfo_message.nb_data;
+    str_percent = String (error_percent);
+    WSContentSend_PD (PSTR("{s}%s{m}%d (%s%%){e}"), D_TELEINFO_CHECKSUM, teleinfo_message.nb_error, str_percent.c_str ());
+  }
+
+  // display TIC reset
+  if (teleinfo_message.nb_reset > 0) WSContentSend_PD (PSTR("{s}%s{m}%d{e}"), D_TELEINFO_RESET, teleinfo_message.nb_reset);
 }
 
 // Teleinfo web page
@@ -913,10 +871,10 @@ void TeleinfoWebPageData ()
 
   // start of data page
   WSContentBegin(200, CT_HTML);
-  WSContentSend_P (PSTR("{\"period\":\"%s\""), arr_period_label[graph_period]);
-  WSContentSend_P (PSTR(",\"adco\":%s"), teleinfo_contract.adco.c_str ());
-  WSContentSend_P (PSTR(",\"ssousc\":%d"), teleinfo_contract.ssousc);
-  WSContentSend_P (PSTR(",\"phase\":%d"), teleinfo_contract.phase);
+  WSContentSend_P (PSTR("{\"%s\":\"%s\""), TELEINFO_JSON_PERIOD, arr_period_label[graph_period]);
+  WSContentSend_P (PSTR(",\"%s\":\"%s\""), TELEINFO_JSON_ADCO,   teleinfo_contract.id.c_str ());
+  WSContentSend_P (PSTR(",\"%s\":%d"),     TELEINFO_JSON_SSOUSC, teleinfo_contract.ssousc);
+  WSContentSend_P (PSTR(",\"%s\":%d"),     TELEINFO_JSON_PHASE,  teleinfo_contract.phase);
 
   // loop thru phasis
   for (phase = 0; phase < teleinfo_contract.phase; phase++)
@@ -950,13 +908,11 @@ void TeleinfoWebPageData ()
 // TIC information page
 void TeleinfoWebPageTic ()
 {
-  int index     = 0;
-  int pos_eol   = 0;
-  int pos_space = 0;
-  String str_text, str_line, str_header, str_data, str_checksum;
+  bool    finished = false;
+  uint8_t index, num_line;
 
   // beginning of form without authentification
-  WSContentStart_P (D_TELEINFO_TIC, false);
+  WSContentStart_P (D_TELEINFO_MESSAGE, false);
   WSContentSend_P (PSTR ("</script>\n"));
 
   // page data refresh script
@@ -1003,54 +959,72 @@ void TeleinfoWebPageTic ()
   WSContentSend_P (PSTR ("<div><img height=92 src='tic.png'></div>\n"));
 
   // display counter
-  WSContentSend_P (PSTR ("<div><span id='count'>%d</span></div>\n"), teleinfo_message.count);
+  WSContentSend_P (PSTR ("<div><span id='count'>%d</span></div>\n"), teleinfo_message.nb_message);
 
   // display table with header
   WSContentSend_P (PSTR ("<div><table>\n"));
   WSContentSend_P (PSTR ("<tr><th>Etiquette</th><th>Valeur</th><th>Checksum</th></tr>\n"));
 
-  // display TIC message
-  str_text = teleinfo_message.content;
-  while (pos_eol != -1)
+  // if TIC messsage is complete, display table
+  num_line = 1;
+  if (teleinfo_message.complete == true)
   {
-    // reset strings
-    str_header   = "";
-    str_data     = "";
-    str_checksum = "";
-    
-    // extract current line
-    pos_eol = str_text.indexOf ('\n');
-    if (pos_eol != -1)
+    // loop thru TIC message lines
+    index = teleinfo_message.line_first;
+    while (finished == false)
     {
-      str_line = str_text.substring (0, pos_eol);
-      str_text = str_text.substring (pos_eol + 1);
-    }
-    else str_line = str_text;
+      // send current line
+      WSContentSend_P (PSTR ("<tr><td id='h%d'>%s</td><td id='d%d'>%s</td><td id='c%d'>%c</td></tr>\n"), num_line, teleinfo_message.line[index].etiquette.c_str (), num_line, teleinfo_message.line[index].donnee.c_str (), num_line, teleinfo_message.line[index].checksum);
 
-    // extract data from line
-    pos_space = str_line.indexOf (' ');
-    if (pos_space != -1)
-    {
-      str_header = str_line.substring (0, pos_space);
-      str_line   = str_line.substring (pos_space + 1);
-      pos_space  = str_line.indexOf (' ');
-    }
-    if (pos_space != -1)
-    {
-      str_data     = str_line.substring (0, pos_space);
-      str_checksum = str_line.substring (pos_space + 1);
-    }
+      // check for last message line
+      finished = (index == teleinfo_message.line_last);
 
-    // display line
-    if ((index > 0) && (str_header.length () > 0)) WSContentSend_P (PSTR ("<tr><td id='h%d'>%s</td><td id='d%d'>%s</td><td id='c%d'>%s</td></tr>\n"), index, str_header.c_str (), index, str_data.c_str (), index, str_checksum.c_str ());
-
-    index++;
+      // increment to next line
+      num_line++;
+      index++;
+      index = index % TELEINFO_ITEM_MAX;
+    }
   }
 
   // end of table and end of page
   WSContentSend_P (PSTR ("</table></div>\n"));
   WSContentSend_P (PSTR ("<div>\n"));
   WSContentStop ();
+}
+
+// TIC raw message data
+void TeleinfoWebTicUpdate ()
+{
+  bool    finished = false;
+  uint8_t index;
+
+  // start of data page
+  WSContentBegin(200, CT_PLAIN);
+
+  // if TIC messsage is complete
+  if (teleinfo_message.complete == true)
+  {
+    // send line number
+    WSContentSend_P ("COUNTER %d\n", teleinfo_message.nb_message);
+
+    // loop thru TIC message lines
+    index = teleinfo_message.line_first;
+    while (finished == false)
+    {
+      // send current line
+      WSContentSend_P (PSTR ("%s %s %c\n"), teleinfo_message.line[index].etiquette.c_str (), teleinfo_message.line[index].donnee.c_str (), teleinfo_message.line[index].checksum);
+
+      // check for last message line
+      finished = (index == teleinfo_message.line_last);
+
+      // increment to next line
+      index++;
+      index = index % TELEINFO_ITEM_MAX;
+    }
+  }
+
+  // end of data page
+  WSContentEnd();
 }
 
 // Apparent power graph frame
@@ -1113,6 +1087,63 @@ void TeleinfoWebGraphFrame ()
   WSContentEnd();
 }
 
+// get status update
+void TeleinfoWebGraphUpdate ()
+{
+  uint8_t  graph_period = TELEINFO_LIVE;
+  int      index;
+  long     power_diff;
+//  float    power_read;
+  uint32_t time_now;
+  String   str_text;
+
+  // timestamp
+  time_now = millis ();
+
+  // check graph period to be displayed
+  for (index = 0; index < TELEINFO_PERIOD_MAX; index++) if (Webserver->hasArg(arr_period_cmnd[index])) graph_period = index;
+
+  // chech for graph update
+  str_text = teleinfo_graph[graph_period].updated;
+
+  // check power and power difference for each phase
+  for (index = 0; index < teleinfo_contract.phase; index++)
+  {
+    // calculate power difference
+    power_diff = teleinfo_phase[index].papp - teleinfo_phase[index].last_papp;
+
+    // if power has changed
+    str_text += ";";
+    if (power_diff != 0)
+    {
+      teleinfo_phase[index].last_papp = teleinfo_phase[index].papp;
+      str_text += teleinfo_phase[index].papp;
+    }
+
+    // if more than 100 VA power difference
+    str_text += ";";
+    if (abs (power_diff) >= 100)
+    {
+      if (power_diff < 0) str_text += "- " + String (abs (power_diff));
+      else str_text += "+ " + String (power_diff);
+      teleinfo_phase[index].last_diff = millis ();
+    }
+
+    // else if diff has been published 10 sec
+    else if ((teleinfo_phase[index].last_diff != UINT32_MAX) && (time_now - teleinfo_phase[index].last_diff > 10000))
+    {
+      str_text += "---";
+      teleinfo_phase[index].last_diff = UINT32_MAX;
+    }
+  }
+
+  // send result
+  Webserver->send_P (200, PSTR ("text/plain"), str_text.c_str (), str_text.length ());
+
+  // reset update flags
+  teleinfo_graph[graph_period].updated = 0;
+}
+
 // Apparent power graph curve
 void TeleinfoWebGraphData ()
 {
@@ -1125,7 +1156,7 @@ void TeleinfoWebGraphData ()
   uint16_t power_papp;
   TIME_T   current_dst;
   uint32_t current_time;
-  String   str_text;
+//  String   str_text;
 
   // check graph period to be displayed
   for (index = 0; index < TELEINFO_PERIOD_MAX; index++) if (Webserver->hasArg(arr_period_cmnd[index])) graph_period = index;
@@ -1253,29 +1284,6 @@ void TeleinfoWebGraphData ()
       }
       break;
 
-    case TELEINFO_MONTH:
-      // calculate horizontal shift
-      unit_width  = graph_width / 6;
-      shift_unit  = current_dst.day_of_month % 5;
-      shift_width = unit_width - (unit_width * shift_unit / 5) - (unit_width * current_dst.hour / 120);
-
-      // calculate first time displayed by substracting (5 * 5j + shift en j) to current time
-      current_time -= (5 * 432000) + (shift_unit * 86400); 
-
-      // display 5 days separation lines with day number
-      for (index = 0; index < 6; index++)
-      {
-        // convert back to date and increase time of 5 days
-        BreakTime (current_time, current_dst);
-        current_time += 432000;
-
-        // display separation line and day of month
-        graph_x = graph_left + shift_width + (index * unit_width);
-        WSContentSend_P (PSTR ("<line class='time' x1='%d' y1='%d%%' x2='%d' y2='%d%%' />\n"), graph_x, 49, graph_x, 51);
-        WSContentSend_P (PSTR ("<text class='time' x='%d' y='%d%%'>%02d</text>\n"), graph_x - 10, 55, current_dst.day_of_month);
-      }
-      break;
-      
     case TELEINFO_YEAR:
       // calculate horizontal shift
       unit_width = graph_width / 12;
