@@ -28,7 +28,7 @@
     11/11/2020 - v6.1   - Add data.json page
     20/11/2020 - v6.2   - Correct checksum bug
     29/12/2020 - v6.3   - Strengthen message error control
-    25/02/2021 - v7.0   - Rewrite to enhance compatibility with standart mode
+    25/02/2021 - v7.0   - Enhance compatibility with standart mode
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -101,11 +101,11 @@
 #define D_TELEINFO_CONFIG            "Configure Teleinfo"
 #define D_TELEINFO_BOARD             "Ethernet board"
 #define D_TELEINFO_GRAPH             "Graph"
-#define D_TELEINFO_REFERENCE         "Contract n°"
-#define D_TELEINFO_MESSAGE           "Messages reçus"
-#define D_TELEINFO_CHECKSUM          "Erreurs checksum"
-#define D_TELEINFO_RESET             "Reset de trame"
-#define D_TELEINFO_DISABLED          "Désactivé"
+#define D_TELEINFO_PERIOD            "Period"
+#define D_TELEINFO_MESSAGE           "Received messages"
+#define D_TELEINFO_CHECKSUM          "Checksum errors"
+#define D_TELEINFO_RESET             "Message reset"
+#define D_TELEINFO_DISABLED          "Disabled"
 #define D_TELEINFO_SPEED_DEFAULT     "bauds"
 #define D_TELEINFO_SPEED_HISTO       "bauds (Historique)"
 #define D_TELEINFO_SPEED_STD         "bauds (Standard)"
@@ -119,12 +119,19 @@ const char TELEINFO_FIELD_START[] PROGMEM = "<p><fieldset><legend><b>&nbsp;%s&nb
 const char TELEINFO_FIELD_STOP[] PROGMEM  = "</fieldset></p><br>\n";
 const char TELEINFO_HTML_POWER[] PROGMEM  = "<text class='power' x='%d%%' y='%d%%'>%d</text>\n";
 const char TELEINFO_HTML_DASH[] PROGMEM   = "<line class='dash' x1='%d%%' y1='%d%%' x2='%d%%' y2='%d%%' />\n";
+const char TELEINFO_HTML_BAR[] PROGMEM    = "<tr><div style='margin:4px 0px;padding:0px;background-color:#eee;border-radius:6px;'><div style='color:#666;padding:1px;text-align:center;border-radius:6px;background-color:#%s;width:%s%%;'>%s%%</div></div></tr>";
 
 // graph colors
-const char *const arr_color_phase[] PROGMEM = { "ph1", "ph2", "ph3" };
+const char *const arr_phase_id[] PROGMEM    = { "ph1", "ph2", "ph3" };
+const char *const arr_phase_color[] PROGMEM = { "ff0000", "ffa500", "a52a2a" };
 
 // week days name
 const char *const arr_week_day[] PROGMEM = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+
+// tarif option
+enum TeleinfoTarif { TIC_TARIF_TH, TIC_TARIF_HC, TIC_TARIF_HP, TIC_TARIF_HN, TIC_TARIF_PM, TIC_TARIF_CB, TIC_TARIF_CW, TIC_TARIF_CR, TIC_TARIF_PB, TIC_TARIF_PW, TIC_TARIF_PR, TIC_TARIF_MAX };
+const char kTeleinfoTarif[] PROGMEM = "TH..|HC..|HP..|HN..|PM..|HCJB|HCJW|HCJR|HPJB|HPJW|HPJR";
+const char kTeleinfoTarifName[] PROGMEM = "Toutes les Heures|Heures Creuses|Heures Pleines|Heures Normales|Pointe de Pointe Mobile|Heures Creuses Jours Bleus|Heures Creuses Jours Blancs|Heures Creuses Jours Rouges|Heures Pleines Jours Bleus|Heures Pleines Jours Blancs|Heures Pleines Jours Rouges";
 
 // TIC message parts
 enum TeleinfoMessagePart { TELEINFO_NONE, TELEINFO_ETIQUETTE, TELEINFO_DONNEE, TELEINFO_CHECKSUM };
@@ -146,6 +153,7 @@ struct {
   long    isousc = 0;                           // contract max current per phase
   long    ssousc = 0;                           // contract max power per phase
   String  id;                                   // contract reference (adco or ads)
+  String  period;                               // current tarif period
 } teleinfo_contract;
 
 // teleinfo current line
@@ -429,7 +437,6 @@ void TeleinfoEvery50ms ()
   int      string_size;
   long     current_inst, current_total;
   float    power_apparent;
-//  String   str_text;
 
   // loop as long as serial port buffer is not empty and timeout not reached
 #ifdef ESP8266
@@ -526,6 +533,7 @@ void TeleinfoEvery50ms ()
           // handle specific etiquettes
           if (strcmp (teleinfo_line.str_etiquette, "ADCO")         == 0) teleinfo_contract.id     = teleinfo_line.str_donnee;
           else if (strcmp (teleinfo_line.str_etiquette, "ADS")     == 0) teleinfo_contract.id     = teleinfo_line.str_donnee;
+          else if (strcmp (teleinfo_line.str_etiquette, "PTEC")    == 0) teleinfo_contract.period = teleinfo_line.str_donnee;
           else if (strcmp (teleinfo_line.str_etiquette, "IINST")   == 0) teleinfo_phase[0].iinst  = atol (teleinfo_line.str_donnee);
           else if (strcmp (teleinfo_line.str_etiquette, "IINST1")  == 0) teleinfo_phase[0].iinst  = atol (teleinfo_line.str_donnee);
           else if (strcmp (teleinfo_line.str_etiquette, "IINST2")  == 0) teleinfo_phase[1].iinst  = atol (teleinfo_line.str_donnee);
@@ -780,8 +788,27 @@ void TeleinfoWebButton ()
 // append Teleinfo state to main page
 bool TeleinfoWebSensor ()
 {
-  float  error_percent;
-  String str_percent;
+  uint8_t phase, period;
+  float   percentage;
+  char    str_period[32];
+  String  str_percent;
+
+  // display phase graph bar
+  if (teleinfo_contract.isousc > 0) for (phase = 0; phase < teleinfo_contract.phase; phase++)
+  {
+    // calculate phase percentage
+    percentage  = 100 * teleinfo_phase[phase].iinst;
+    percentage  = percentage / teleinfo_contract.isousc;
+    str_percent = String (percentage, 0);
+
+    // display graph bar
+    WSContentSend_PD (TELEINFO_HTML_BAR, arr_phase_color[phase], str_percent.c_str (), str_percent.c_str ());
+  }
+
+  // display TIC tarif period
+  period = GetCommandCode (str_period, sizeof(str_period), teleinfo_contract.period.c_str (), kTeleinfoTarif);
+  GetTextIndexed(str_period, sizeof(str_period), period, kTeleinfoTarifName);
+  WSContentSend_PD (PSTR("{s}%s{m}%s{e}"), D_TELEINFO_PERIOD, str_period);
 
   // display last TIC data received
   WSContentSend_PD (PSTR("{s}%s{m}%d{e}"), D_TELEINFO_MESSAGE, teleinfo_message.nb_message);
@@ -789,9 +816,9 @@ bool TeleinfoWebSensor ()
   // display TIC checksum errors
   if ((teleinfo_message.nb_data > 0) && ( teleinfo_message.nb_error > 0 ))
   {
-    error_percent = teleinfo_message.nb_error * 100;
-    error_percent = error_percent / teleinfo_message.nb_data;
-    str_percent = String (error_percent);
+    percentage = teleinfo_message.nb_error * 100;
+    percentage = percentage / teleinfo_message.nb_data;
+    str_percent   = String (percentage);
     WSContentSend_PD (PSTR("{s}%s{m}%d (%s%%){e}"), D_TELEINFO_CHECKSUM, teleinfo_message.nb_error, str_percent.c_str ());
   }
 
@@ -883,7 +910,7 @@ void TeleinfoWebPageData ()
     first_value = true;
 
     // loop for the apparent power array
-    WSContentSend_P (PSTR(",\"%s\":["), arr_color_phase[phase]);
+    WSContentSend_P (PSTR(",\"%s\":["), arr_phase_id[phase]);
     for (index = 0; index < TELEINFO_GRAPH_SAMPLE; index++)
     {
       // get target power array position and add value if defined
@@ -1093,7 +1120,6 @@ void TeleinfoWebGraphUpdate ()
   uint8_t  graph_period = TELEINFO_LIVE;
   int      index;
   long     power_diff;
-//  float    power_read;
   uint32_t time_now;
   String   str_text;
 
@@ -1156,7 +1182,6 @@ void TeleinfoWebGraphData ()
   uint16_t power_papp;
   TIME_T   current_dst;
   uint32_t current_time;
-//  String   str_text;
 
   // check graph period to be displayed
   for (index = 0; index < TELEINFO_PERIOD_MAX; index++) if (Webserver->hasArg(arr_period_cmnd[index])) graph_period = index;
@@ -1173,9 +1198,9 @@ void TeleinfoWebGraphData ()
   // SVG style 
   WSContentSend_P (PSTR ("<style type='text/css'>\n"));
   WSContentSend_P (PSTR ("polyline {fill:none;stroke-width:2;}\n"));
-  WSContentSend_P (PSTR ("polyline.ph1 {stroke:yellow;}\n"));
+  WSContentSend_P (PSTR ("polyline.ph1 {stroke:red;}\n"));
   WSContentSend_P (PSTR ("polyline.ph2 {stroke:orange;}\n"));
-  WSContentSend_P (PSTR ("polyline.ph3 {stroke:red;}\n"));
+  WSContentSend_P (PSTR ("polyline.ph3 {stroke:brown;}\n"));
   WSContentSend_P (PSTR ("line.time {stroke:white;stroke-width:1;}\n"));
   WSContentSend_P (PSTR ("text.time {font-size:16px;fill:grey;}\n"));
   WSContentSend_P (PSTR ("</style>\n"));
@@ -1188,7 +1213,7 @@ void TeleinfoWebGraphData ()
   if (teleinfo_graph[graph_period].pmax > 0) for (phase = 0; phase < teleinfo_contract.phase; phase++)
   {
     // loop for the apparent power graph
-    WSContentSend_P (PSTR ("<polyline class='%s' points='"), arr_color_phase[phase]);
+    WSContentSend_P (PSTR ("<polyline class='%s' points='"), arr_phase_id[phase]);
     for (index = 0; index < TELEINFO_GRAPH_SAMPLE; index++)
     {
       // get target power value
@@ -1358,12 +1383,12 @@ void TeleinfoWebPageGraph ()
   WSContentSend_P (PSTR ("div.papp {display:inline-block;width:auto;padding:0.25rem 0.75rem;margin:0.5rem;border-radius:8px;}\n"));
   WSContentSend_P (PSTR ("div.papp span.power {font-size:4vw;}\n"));
   WSContentSend_P (PSTR ("div.papp span.diff {font-size:2vw;font-style:italic;}\n"));
-  WSContentSend_P (PSTR ("div.ph1 {color:yellow;border:1px yellow solid;}\n"));
-  WSContentSend_P (PSTR ("div.ph1 span {color:yellow;}\n"));
+  WSContentSend_P (PSTR ("div.ph1 {color:red;border:1px red solid;}\n"));
+  WSContentSend_P (PSTR ("div.ph1 span {color:red;}\n"));
   WSContentSend_P (PSTR ("div.ph2 {color:orange;border:1px orange solid;}\n"));
   WSContentSend_P (PSTR ("div.ph2 span {color:orange;}\n"));
-  WSContentSend_P (PSTR ("div.ph3 {color:red;border:1px red solid;}\n"));
-  WSContentSend_P (PSTR ("div.ph3 span {color:red;}\n"));
+  WSContentSend_P (PSTR ("div.ph3 {color:brown;border:1px brown solid;}\n"));
+  WSContentSend_P (PSTR ("div.ph3 span {color:brown;}\n"));
   WSContentSend_P (PSTR (".button {font-size:2vw;padding:0.5rem 1rem;border:1px #666 solid;background:none;color:#fff;border-radius:8px;}\n"));
   WSContentSend_P (PSTR (".active {background:#666;}\n"));
   WSContentSend_P (PSTR (".svg-container {position:relative;vertical-align:middle;overflow:hidden;width:100%%;max-width:%dpx;padding-bottom:65%%;}\n"), TELEINFO_GRAPH_WIDTH);
@@ -1383,7 +1408,7 @@ void TeleinfoWebPageGraph ()
 
   // display values
   WSContentSend_P (PSTR ("<div>\n"));
-  for (index = 0; index < teleinfo_contract.phase; index++) WSContentSend_P (PSTR ("<div class='papp %s'><span class='power' id='%s'>%s VA</span><br><span class='diff' id='d%s'>---</span></div>\n"), arr_color_phase[index], arr_color_phase[index], String (Energy.apparent_power[index], 0).c_str (), arr_color_phase[index]);
+  for (index = 0; index < teleinfo_contract.phase; index++) WSContentSend_P (PSTR ("<div class='papp %s'><span class='power' id='%s'>%s VA</span><br><span class='diff' id='d%s'>---</span></div>\n"), arr_phase_id[index], arr_phase_id[index], String (Energy.apparent_power[index], 0).c_str (), arr_phase_id[index]);
   WSContentSend_P (PSTR ("</div>\n"));
 
   // display tabs

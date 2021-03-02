@@ -30,7 +30,7 @@
     20/11/2020 - v6.2   - Correct checksum bug
     29/12/2020 - v6.3   - Strengthen message error control
     20/02/2021 - v6.4   - Add sub-totals (HCHP, HCHC, ...) to JSON
-    25/02/2021 - v7.0   - Rewrite to enhance compatibility with standart mode
+    25/02/2021 - v7.0   - Enhance compatibility with standart mode
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
