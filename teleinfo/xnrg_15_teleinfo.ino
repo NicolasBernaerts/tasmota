@@ -29,6 +29,7 @@
     20/11/2020 - v6.2   - Correct checksum bug
     29/12/2020 - v6.3   - Strengthen message error control
     25/02/2021 - v7.0   - Enhance compatibility with standart mode
+    01/03/2021 - v7.0.1 - Add power status bar
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -119,19 +120,20 @@ const char TELEINFO_FIELD_START[] PROGMEM = "<p><fieldset><legend><b>&nbsp;%s&nb
 const char TELEINFO_FIELD_STOP[] PROGMEM  = "</fieldset></p><br>\n";
 const char TELEINFO_HTML_POWER[] PROGMEM  = "<text class='power' x='%d%%' y='%d%%'>%d</text>\n";
 const char TELEINFO_HTML_DASH[] PROGMEM   = "<line class='dash' x1='%d%%' y1='%d%%' x2='%d%%' y2='%d%%' />\n";
-const char TELEINFO_HTML_BAR[] PROGMEM    = "<tr><div style='margin:4px 0px;padding:0px;background-color:#eee;border-radius:6px;'><div style='color:#666;padding:1px;text-align:center;border-radius:6px;background-color:#%s;width:%s%%;'>%s%%</div></div></tr>";
+const char TELEINFO_HTML_BAR[] PROGMEM    = "<tr><div style='margin:4px 0px;padding:0px;background-color:#ddd;border-radius:6px;'><div style='color:#444;padding:0px;text-align:center;border-radius:6px;background-color:#%s;width:%s%%;'>%s%%</div></div></tr>";
 
 // graph colors
 const char *const arr_phase_id[] PROGMEM    = { "ph1", "ph2", "ph3" };
-const char *const arr_phase_color[] PROGMEM = { "ff0000", "ffa500", "a52a2a" };
+const char *const arr_phase_color[] PROGMEM = { "ff8c00", "32cd32", "9932cc" };
 
 // week days name
 const char *const arr_week_day[] PROGMEM = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
 
-// tarif option
+// mode and tarif
+enum TeleinfoMode { TELEINFO_HISTORIC, TELEINFO_STANDARD };
 enum TeleinfoTarif { TIC_TARIF_TH, TIC_TARIF_HC, TIC_TARIF_HP, TIC_TARIF_HN, TIC_TARIF_PM, TIC_TARIF_CB, TIC_TARIF_CW, TIC_TARIF_CR, TIC_TARIF_PB, TIC_TARIF_PW, TIC_TARIF_PR, TIC_TARIF_MAX };
 const char kTeleinfoTarif[] PROGMEM = "TH..|HC..|HP..|HN..|PM..|HCJB|HCJW|HCJR|HPJB|HPJW|HPJR";
-const char kTeleinfoTarifName[] PROGMEM = "Toutes les Heures|Heures Creuses|Heures Pleines|Heures Normales|Pointe de Pointe Mobile|Heures Creuses Jours Bleus|Heures Creuses Jours Blancs|Heures Creuses Jours Rouges|Heures Pleines Jours Bleus|Heures Pleines Jours Blancs|Heures Pleines Jours Rouges";
+const char kTeleinfoTarifName[] PROGMEM = "Toutes Heures|Heures Creuses|Heures Pleines|Heures Normales|Heures Pointe Mobile|Heures Creuses Bleus|Heures Creuses Blancs|Heures Creuses Rouges|Heures Pleines Bleus|Heures Pleines Blancs|Heures Pleines Rouges";
 
 // TIC message parts
 enum TeleinfoMessagePart { TELEINFO_NONE, TELEINFO_ETIQUETTE, TELEINFO_DONNEE, TELEINFO_CHECKSUM };
@@ -148,10 +150,11 @@ bool teleinfo_enabled = false;
 
 // teleinfo data
 struct {
-  uint8_t checksum_type = TELEINFO_NOCHECK;     // type of checksum
-  uint8_t phase  = 1;                           // number of phases
-  long    isousc = 0;                           // contract max current per phase
-  long    ssousc = 0;                           // contract max power per phase
+  uint8_t phase    = 1;                         // number of phases
+  uint8_t mode     = TELEINFO_HISTORIC;         // meter mode
+  uint8_t checksum = TELEINFO_NOCHECK;          // type of checksum
+  long    isousc   = 0;                         // contract max current per phase
+  long    ssousc   = 0;                         // contract max power per phase
   String  id;                                   // contract reference (adco or ads)
   String  period;                               // current tarif period
 } teleinfo_contract;
@@ -176,19 +179,14 @@ long papp_delta = 0;            // apparent power delta to publish
 
 // teleinfo power counters
 struct {
-  long papp    = 0;             // total apparent power
-  long base    = 0;
-  long total   = 0;
-  long hchc    = 0;
-  long hchp    = 0;
-  long bbrhcjb = 0;
-  long bbrhpjb = 0;
-  long bbrhcjw = 0;
-  long bbrhpjw = 0;
-  long bbrhcjr = 0;
-  long bbrhpjr = 0;
-  long ejphn   = 0;
-  long ejphpm  = 0;
+  long papp   = 0;             // total apparent power
+  long total  = 0;
+  long index1 = 0;
+  long index2 = 0;
+  long index3 = 0;
+  long index4 = 0;
+  long index5 = 0;
+  long index6 = 0;
 } teleinfo_counter;
 
 // data per phase
@@ -310,13 +308,13 @@ bool TeleinfoValidateChecksum (const char *pstr_etiquette, const char tic_separa
       test_checksum += tic_separator1;
       while(*pstr_donnee) test_checksum += *pstr_donnee++;
 
-      switch (teleinfo_contract.checksum_type)
+      switch (teleinfo_contract.checksum)
       {
       // checksum calculation not defined, let's try to define it
       case TELEINFO_NOCHECK:
         // test one separator only
         valid_checksum = (test_checksum & 0x3F) + 0x20;
-        if (valid_checksum == tic_checksum) teleinfo_contract.checksum_type = TELEINFO_CHECKONE;
+        if (valid_checksum == tic_checksum) teleinfo_contract.checksum = TELEINFO_CHECKONE;
 
         // else, try two separators
         else
@@ -324,7 +322,7 @@ bool TeleinfoValidateChecksum (const char *pstr_etiquette, const char tic_separa
           // add second separator to checksum and test it
           test_checksum += tic_separator2;
           valid_checksum = (test_checksum & 0x3F) + 0x20;
-          if (valid_checksum == tic_checksum) teleinfo_contract.checksum_type = TELEINFO_CHECKTWO;
+          if (valid_checksum == tic_checksum) teleinfo_contract.checksum = TELEINFO_CHECKTWO;
         }
         break;
           
@@ -530,28 +528,50 @@ void TeleinfoEvery50ms ()
           // detect 3 phase counter
           if (strcmp (teleinfo_line.str_etiquette, "IINST3") == 0) teleinfo_contract.phase = 3;
 
-          // handle specific etiquettes
-          if (strcmp (teleinfo_line.str_etiquette, "ADCO")         == 0) teleinfo_contract.id     = teleinfo_line.str_donnee;
-          else if (strcmp (teleinfo_line.str_etiquette, "ADS")     == 0) teleinfo_contract.id     = teleinfo_line.str_donnee;
-          else if (strcmp (teleinfo_line.str_etiquette, "PTEC")    == 0) teleinfo_contract.period = teleinfo_line.str_donnee;
-          else if (strcmp (teleinfo_line.str_etiquette, "IINST")   == 0) teleinfo_phase[0].iinst  = atol (teleinfo_line.str_donnee);
-          else if (strcmp (teleinfo_line.str_etiquette, "IINST1")  == 0) teleinfo_phase[0].iinst  = atol (teleinfo_line.str_donnee);
-          else if (strcmp (teleinfo_line.str_etiquette, "IINST2")  == 0) teleinfo_phase[1].iinst  = atol (teleinfo_line.str_donnee);
-          else if (strcmp (teleinfo_line.str_etiquette, "IINST3")  == 0) teleinfo_phase[2].iinst  = atol (teleinfo_line.str_donnee);
-          else if (strcmp (teleinfo_line.str_etiquette, "ISOUSC")  == 0) teleinfo_contract.isousc = atol (teleinfo_line.str_donnee);
-          else if (strcmp (teleinfo_line.str_etiquette, "PS")      == 0) teleinfo_contract.ssousc = atol (teleinfo_line.str_donnee);
-          else if (strcmp (teleinfo_line.str_etiquette, "PAPP")    == 0) teleinfo_counter.papp    = atol (teleinfo_line.str_donnee);
-          else if (strcmp (teleinfo_line.str_etiquette, "BASE")    == 0) teleinfo_counter.base    = atol (teleinfo_line.str_donnee);
-          else if (strcmp (teleinfo_line.str_etiquette, "HCHC")    == 0) teleinfo_counter.hchc    = atol (teleinfo_line.str_donnee);
-          else if (strcmp (teleinfo_line.str_etiquette, "HCHP")    == 0) teleinfo_counter.hchp    = atol (teleinfo_line.str_donnee);
-          else if (strcmp (teleinfo_line.str_etiquette, "EJPHN")   == 0) teleinfo_counter.ejphn   = atol (teleinfo_line.str_donnee);
-          else if (strcmp (teleinfo_line.str_etiquette, "EJPHPM")  == 0) teleinfo_counter.ejphpm  = atol (teleinfo_line.str_donnee);
-          else if (strcmp (teleinfo_line.str_etiquette, "BBRHCJB") == 0) teleinfo_counter.bbrhcjb = atol (teleinfo_line.str_donnee);
-          else if (strcmp (teleinfo_line.str_etiquette, "BBRHPJB") == 0) teleinfo_counter.bbrhpjb = atol (teleinfo_line.str_donnee);
-          else if (strcmp (teleinfo_line.str_etiquette, "BBRHCJW") == 0) teleinfo_counter.bbrhcjw = atol (teleinfo_line.str_donnee);
-          else if (strcmp (teleinfo_line.str_etiquette, "BBRHPJW") == 0) teleinfo_counter.bbrhpjw = atol (teleinfo_line.str_donnee);
-          else if (strcmp (teleinfo_line.str_etiquette, "BBRHCJR") == 0) teleinfo_counter.bbrhcjr = atol (teleinfo_line.str_donnee);
-          else if (strcmp (teleinfo_line.str_etiquette, "BBRHPJR") == 0) teleinfo_counter.bbrhpjr = atol (teleinfo_line.str_donnee);
+          // contract identifier
+          if (strcmp (teleinfo_line.str_etiquette, "ADCO") == 0) { teleinfo_contract.mode = TELEINFO_HISTORIC; teleinfo_contract.id = teleinfo_line.str_donnee; }
+          else if (strcmp (teleinfo_line.str_etiquette, "ADSC") == 0) { teleinfo_contract.mode = TELEINFO_STANDARD; teleinfo_contract.id = teleinfo_line.str_donnee; }
+
+          // period name
+          else if (strcmp (teleinfo_line.str_etiquette, "PTEC")  == 0) teleinfo_contract.period = teleinfo_line.str_donnee;
+          else if (strcmp (teleinfo_line.str_etiquette, "LTARF") == 0) teleinfo_contract.period = teleinfo_line.str_donnee;
+
+          // instant current
+          else if (strcmp (teleinfo_line.str_etiquette, "EAIT")   == 0) teleinfo_phase[0].iinst  = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "IINST")  == 0) teleinfo_phase[0].iinst  = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "IINST1") == 0) teleinfo_phase[0].iinst  = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "IINST2") == 0) teleinfo_phase[1].iinst  = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "IINST3") == 0) teleinfo_phase[2].iinst  = atol (teleinfo_line.str_donnee);
+
+          // contract max current or power
+          else if (strcmp (teleinfo_line.str_etiquette, "ISOUSC") == 0) teleinfo_contract.isousc = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "PS")     == 0) teleinfo_contract.ssousc = atol (teleinfo_line.str_donnee);
+
+          // instant power
+          else if (strcmp (teleinfo_line.str_etiquette, "PAPP")   == 0) teleinfo_counter.papp = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "SINSTS") == 0) teleinfo_counter.papp = atol (teleinfo_line.str_donnee);
+
+          // option base or standard
+          else if (strcmp (teleinfo_line.str_etiquette, "BASE") == 0) teleinfo_counter.index1 = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "EAST") == 0) teleinfo_counter.index1 = atol (teleinfo_line.str_donnee);
+
+          // option heures creuses
+          else if (strcmp (teleinfo_line.str_etiquette, "HCHC") == 0) teleinfo_counter.index1 = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "HCHP") == 0) teleinfo_counter.index2 = atol (teleinfo_line.str_donnee);
+
+          // option EJP
+          else if (strcmp (teleinfo_line.str_etiquette, "EJPHN")  == 0) teleinfo_counter.index1 = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "EJPHPM") == 0) teleinfo_counter.index2 = atol (teleinfo_line.str_donnee);
+
+          // option tempo
+          else if (strcmp (teleinfo_line.str_etiquette, "BBRHCJB") == 0) teleinfo_counter.index1 = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "BBRHPJB") == 0) teleinfo_counter.index2 = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "BBRHCJW") == 0) teleinfo_counter.index3 = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "BBRHPJW") == 0) teleinfo_counter.index4 = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "BBRHCJR") == 0) teleinfo_counter.index5 = atol (teleinfo_line.str_donnee);
+          else if (strcmp (teleinfo_line.str_etiquette, "BBRHPJR") == 0) teleinfo_counter.index6 = atol (teleinfo_line.str_donnee);
+
+          // overload flags
           else if (strcmp (teleinfo_line.str_etiquette, "ADPS")    == 0) teleinfo_message.overload = true;
           else if (strcmp (teleinfo_line.str_etiquette, "ADIR1")   == 0) teleinfo_message.overload = true;
           else if (strcmp (teleinfo_line.str_etiquette, "ADIR2")   == 0) teleinfo_message.overload = true;
@@ -607,9 +627,7 @@ void TeleinfoEvery50ms ()
         } 
 
         // update total energy counter
-        teleinfo_newtotal = teleinfo_counter.base + teleinfo_counter.hchc + teleinfo_counter.hchp;
-        teleinfo_newtotal += teleinfo_counter.bbrhcjb + teleinfo_counter.bbrhpjb + teleinfo_counter.bbrhcjw + teleinfo_counter.bbrhpjw + teleinfo_counter.bbrhcjr + teleinfo_counter.bbrhpjr;
-        teleinfo_newtotal += teleinfo_counter.ejphn + teleinfo_counter.ejphpm;
+        teleinfo_newtotal = teleinfo_counter.index1 + teleinfo_counter.index2 + teleinfo_counter.index3 + teleinfo_counter.index4 + teleinfo_counter.index5 + teleinfo_counter.index6 ;
         teleinfo_delta = teleinfo_newtotal - teleinfo_counter.total;
         teleinfo_counter.total = teleinfo_newtotal;
         Energy.kWhtoday += (unsigned long)(teleinfo_delta * 100);
@@ -794,11 +812,11 @@ bool TeleinfoWebSensor ()
   String  str_percent;
 
   // display phase graph bar
-  if (teleinfo_contract.isousc > 0) for (phase = 0; phase < teleinfo_contract.phase; phase++)
+  if (teleinfo_contract.ssousc > 0) for (phase = 0; phase < teleinfo_contract.phase; phase++)
   {
     // calculate phase percentage
-    percentage  = 100 * teleinfo_phase[phase].iinst;
-    percentage  = percentage / teleinfo_contract.isousc;
+    percentage  = 100 * teleinfo_phase[phase].papp;
+    percentage  = percentage / teleinfo_contract.ssousc;
     str_percent = String (percentage, 0);
 
     // display graph bar
@@ -1198,9 +1216,9 @@ void TeleinfoWebGraphData ()
   // SVG style 
   WSContentSend_P (PSTR ("<style type='text/css'>\n"));
   WSContentSend_P (PSTR ("polyline {fill:none;stroke-width:2;}\n"));
-  WSContentSend_P (PSTR ("polyline.ph1 {stroke:red;}\n"));
-  WSContentSend_P (PSTR ("polyline.ph2 {stroke:orange;}\n"));
-  WSContentSend_P (PSTR ("polyline.ph3 {stroke:brown;}\n"));
+  WSContentSend_P (PSTR ("polyline.ph1 {stroke:orange;}\n"));
+  WSContentSend_P (PSTR ("polyline.ph2 {stroke:lime;}\n"));
+  WSContentSend_P (PSTR ("polyline.ph3 {stroke:magenta;}\n"));
   WSContentSend_P (PSTR ("line.time {stroke:white;stroke-width:1;}\n"));
   WSContentSend_P (PSTR ("text.time {font-size:16px;fill:grey;}\n"));
   WSContentSend_P (PSTR ("</style>\n"));
@@ -1383,12 +1401,12 @@ void TeleinfoWebPageGraph ()
   WSContentSend_P (PSTR ("div.papp {display:inline-block;width:auto;padding:0.25rem 0.75rem;margin:0.5rem;border-radius:8px;}\n"));
   WSContentSend_P (PSTR ("div.papp span.power {font-size:4vw;}\n"));
   WSContentSend_P (PSTR ("div.papp span.diff {font-size:2vw;font-style:italic;}\n"));
-  WSContentSend_P (PSTR ("div.ph1 {color:red;border:1px red solid;}\n"));
-  WSContentSend_P (PSTR ("div.ph1 span {color:red;}\n"));
-  WSContentSend_P (PSTR ("div.ph2 {color:orange;border:1px orange solid;}\n"));
-  WSContentSend_P (PSTR ("div.ph2 span {color:orange;}\n"));
-  WSContentSend_P (PSTR ("div.ph3 {color:brown;border:1px brown solid;}\n"));
-  WSContentSend_P (PSTR ("div.ph3 span {color:brown;}\n"));
+  WSContentSend_P (PSTR ("div.ph1 {color:orange;border:1px orange solid;}\n"));
+  WSContentSend_P (PSTR ("div.ph1 span {color:orange;}\n"));
+  WSContentSend_P (PSTR ("div.ph2 {color:lime;border:1px lime solid;}\n"));
+  WSContentSend_P (PSTR ("div.ph2 span {color:lime;}\n"));
+  WSContentSend_P (PSTR ("div.ph3 {color:magenta;border:1px magenta solid;}\n"));
+  WSContentSend_P (PSTR ("div.ph3 span {color:magenta;}\n"));
   WSContentSend_P (PSTR (".button {font-size:2vw;padding:0.5rem 1rem;border:1px #666 solid;background:none;color:#fff;border-radius:8px;}\n"));
   WSContentSend_P (PSTR (".active {background:#666;}\n"));
   WSContentSend_P (PSTR (".svg-container {position:relative;vertical-align:middle;overflow:hidden;width:100%%;max-width:%dpx;padding-bottom:65%%;}\n"), TELEINFO_GRAPH_WIDTH);
