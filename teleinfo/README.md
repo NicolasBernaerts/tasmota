@@ -8,16 +8,20 @@ Please note that it is a completly different implementation than the one publish
 
 Since **v6.0** onward, it is compatible with **ESP8266** and **ESP32** chipsets.
 
-It provides Teleinfo data thru MQTT to allow easy offloading of electrical appliances or heaters.
-Teleinfo data have been slightly adapted to handle easily mono-phase and tri-phase meters.
-Data provided are :
+It provides thru MQTT :
+  * tasmota energy data
+  * all Teleinfo data
+Some Teleinfo data are also added to handle easily mono-phase and tri-phase meters (**PHASE**, **SSOUSC**, **IINST1**, **SINSTS1**, ...).
+It allows easy offloading of electrical appliances or heaters.
+
+Data provided are for example :
   * **PHASE** (number of phases)
-  * **ADCO** (contract number)
+  * **ADCO**, **ADCS** (contract number)
   * **ISOUSC** (max contract current per phase) 
   * **SSOUSC** (max contract power per phase)
   * **IINST1**, **IINST2**, **IINST3** (instant current per phase)
   * **SINSTS1**, **SINSTS2**, **SINSTS3** (instant apparent power per phase)
-  * **ADIR1**, **ADIR2**, **ADIR3** (% of instant power according to the contract, >100 means overload)
+  * **ADIR1**, **ADIR2**, **ADIR3** (overload message)
   
 These meters are :
   * Classical electronic meter (white)
