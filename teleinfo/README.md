@@ -46,8 +46,8 @@ For example, you can use :
   * Olimex ESP32-POE : **GPIO02** port
 
 Finaly, in **Configure Teleinfo** you need to select your Teleinfo adapter baud rate :
-  * **Teleinfo 1200** (original white meter or green Linky)
-  * **Teleinfo 9600**
+  * **1200** (original white meter or green Linky in historic mode)
+  * **9600** (green Linky in standard mode)
 
 If you are using an **ESP32** device, you can use its Ethernet port after selecting the proper board on the **Configure ESP32** menu.
 
