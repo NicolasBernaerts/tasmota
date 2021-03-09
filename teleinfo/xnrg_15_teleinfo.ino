@@ -31,7 +31,7 @@
     25/02/2021 - v7.0   - Enhance compatibility with standart mode
     01/03/2021 - v7.0.1 - Add power status bar
     05/03/2021 - v7.1   - Correct bug on hardware energy counter
-    08/03/2021 - v7.2   - Handle voltge and checksum for horodatage
+    08/03/2021 - v7.2   - Handle voltage and checksum for horodatage
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -92,7 +92,6 @@
 #define TELEINFO_GRAPH_PERCENT_STOP  90
 
 // JSON TIC extensions
-#define TELEINFO_TIC                 "TIC"
 #define TELEINFO_JSON_PERIOD         "PERIOD"
 #define TELEINFO_JSON_PHASE          "PHASE"
 #define TELEINFO_JSON_ADCO           "ADCO"
@@ -102,14 +101,15 @@
 
 // interface strings
 #define D_TELEINFO                   "Teleinfo"
+#define D_TELEINFO_TIC               "TIC"
 #define D_TELEINFO_CONFIG            "Configure Teleinfo"
 #define D_TELEINFO_BOARD             "Ethernet board"
 #define D_TELEINFO_GRAPH             "Graph"
 #define D_TELEINFO_VOLTAGE           "Voltage"
 #define D_TELEINFO_MODE              "Mode"
 #define D_TELEINFO_PERIOD            "Period"
-#define D_TELEINFO_MESSAGE           "Received messages"
-#define D_TELEINFO_CHECKSUM          "Checksum errors"
+#define D_TELEINFO_MESSAGE           "Message"
+#define D_TELEINFO_CHECKSUM          "Checksum error"
 #define D_TELEINFO_RESET             "Message reset"
 #define D_TELEINFO_DISABLED          "Disabled"
 #define D_TELEINFO_SPEED_DEFAULT     "bauds"
@@ -127,33 +127,41 @@ const char TELEINFO_HTML_POWER[] PROGMEM  = "<text class='power' x='%d%%' y='%d%
 const char TELEINFO_HTML_DASH[] PROGMEM   = "<line class='dash' x1='%d%%' y1='%d%%' x2='%d%%' y2='%d%%' />\n";
 const char TELEINFO_HTML_BAR[] PROGMEM    = "<tr><div style='margin:4px;padding:0px;background-color:#ddd;border-radius:4px;'><div style='font-size:14px;padding:0px;text-align:center;border:1px solid #bbb;border-radius:4px;color:#444;background-color:%s;width:%s%%;'>%s%%</div></div></tr>";
 
-// graph colors
-const char *const arr_phase_id[] PROGMEM  = { "ph0", "ph1", "ph2" };
-const char *const arr_phase_color_html[] PROGMEM = { "#FFA500", "#FF6347", "#D2691E" };       // orange tomato chocolate
+// TIC - message parts
+enum TeleinfoMessagePart { TIC_PART_ETIQUETTE, TIC_PART_DONNEE, TIC_PART_HORODATE, TIC_PART_CHECKSUM, TIC_PART_MAX };
+enum TeleinfoMessageChecksum { TIC_CHECKSUM_UNDEFINED, TIC_CHECKSUM_MODE1, TIC_CHECKSUM_MODE2 };
 
-// week days name
-const char *const arr_week_day[] PROGMEM = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+// TIC - specific etiquettes
+enum TeleinfoEtiquette { TIC_NONE, TIC_ADCO, TIC_ADSC, TIC_PTEC, TIC_LTARF, TIC_EAIT, TIC_IINST, TIC_IINST1, TIC_IINST2, TIC_IINST3, TIC_ISOUSC, TIC_PS, TIC_PAPP, TIC_SINSTS, TIC_BASE, TIC_EAST, TIC_HCHC, TIC_HCHP, TIC_EJPHN, TIC_EJPHPM, TIC_BBRHCJB, TIC_BBRHPJB, TIC_BBRHCJW, TIC_BBRHPJW, TIC_BBRHCJR, TIC_BBRHPJR, TIC_ADPS, TIC_ADIR1, TIC_ADIR2, TIC_ADIR3, TIC_URMS1, TIC_URMS2, TIC_URMS3, TIC_MAX };
+const char kTeleinfoEtiquetteName[] PROGMEM = "|ADCO|ADSC|PTEC|LTARF|EAIT|IINST|IINST1|IINST2|IINST3|ISOUSC|PS|PAPP|SINSTS|BASE|EAST|HCHC|HCHP|EJPHN|EJPHPM|BBRHCJB|BBRHPJB|BBRHCJW|BBRHPJW|BBRHCJR|BBRHPJR|ADPS|ADIR1|ADIR2|ADIR3|URMS1|URMS2|URMS3";
 
-// specific etiquette
-enum TeleinfoEtiquette { TIC_NONE, TIC_ADCO, TIC_ADSC, TIC_PTEC, TIC_LTARF, TIC_EAIT, TIC_IINST, TIC_IINST1, TIC_IINST2, TIC_IINST3, TIC_ISOUSC, TIC_PS, TIC_PAPP, TIC_SINSTS, TIC_BASE, TIC_EAST, TIC_HCHC, TIC_HCHP, TIC_EJPHN, TIC_EJPHPM, TIC_BBRHCJB, TIC_BBRHPJB, TIC_BBRHCJW, TIC_BBRHPJW, TIC_BBRHCJR, TIC_BBRHPJR, TIC_ADPS, TIC_ADIR1, TIC_ADIR2, TIC_ADIR3, TIC_UMOY1, TIC_MAX };
-const char kTeleinfoEtiquetteName[] PROGMEM = "|ADCO|ADSC|PTEC|LTARF|EAIT|IINST|IINST1|IINST2|IINST3|ISOUSC|PS|PAPP|SINSTS|BASE|EAST|HCHC|HCHP|EJPHN|EJPHPM|BBRHCJB|BBRHPJB|BBRHCJW|BBRHPJW|BBRHCJR|BBRHPJR|ADPS|ADIR1|ADIR2|ADIR3|UMOY1";
-
-// mode and tarif
+// TIC - modes
 enum TeleinfoMode { TIC_MODE_UNDEFINED, TIC_MODE_HISTORIC, TIC_MODE_STANDARD };
 const char kTeleinfoModeName[] PROGMEM = "|Historique|Standard";
+
+// TIC - tarifs
 enum TeleinfoTarif { TIC_TARIF_TH, TIC_TARIF_HC, TIC_TARIF_HP, TIC_TARIF_HN, TIC_TARIF_PM, TIC_TARIF_CB, TIC_TARIF_CW, TIC_TARIF_CR, TIC_TARIF_PB, TIC_TARIF_PW, TIC_TARIF_PR, TIC_TARIF_MAX };
 const char kTeleinfoPeriod[] PROGMEM = "TH..|HC..|HP..|HN..|PM..|HCJB|HCJW|HCJR|HPJB|HPJW|HPJR";
 const char kTeleinfoPeriodName[] PROGMEM = "Toutes Heures|Heures Creuses|Heures Pleines|Heures Normales|Heures Pointe Mobile|Heures Creuses Bleus|Heures Creuses Blancs|Heures Creuses Rouges|Heures Pleines Bleus|Heures Pleines Blancs|Heures Pleines Rouges";
 
-// TIC message parts
-enum TeleinfoMessagePart { TIC_PART_ETIQUETTE, TIC_PART_DONNEE, TIC_PART_HORODATE, TIC_PART_CHECKSUM, TIC_PART_MAX };
-enum TeleinfoMessageChecksum { TIC_CHECKSUM_UNDEFINED, TIC_CHECKSUM_MODE1, TIC_CHECKSUM_MODE2 };
-
-// graph periods
-enum TeleinfoGraphPeriod { TELEINFO_LIVE, TELEINFO_DAY, TELEINFO_WEEK, TELEINFO_YEAR, TELEINFO_PERIOD_MAX };
-const char *const arr_period_cmnd[] PROGMEM = { "live", "day", "week", "year" };    // period keys
-const char *const arr_period_label[] PROGMEM = { "Live", "Day", "Week", "Year" };   // period labels
+// graph - periods
+enum TeleinfoGraphPeriod { TELEINFO_LIVE, TELEINFO_DAY, TELEINFO_WEEK, TELEINFO_YEAR, TELEINFO_PERIOD_MAX };        // available graph periods
+const char kTeleinfoGraphPeriod[] PROGMEM = "Live|Day|Week|Year";                                                   // period labels
+const char *const arr_period_cmnd[] PROGMEM = { "live", "day", "week", "year" };                                    // period keys
 const long arr_period_sample[] = { 5, 236, 1657, 86400 };                           // number of seconds between samples
+
+// graph - phase colors
+const char TELEINFO_PHASE_ID0[] PROGMEM = "ph0";
+const char TELEINFO_PHASE_ID1[] PROGMEM = "ph1";
+const char TELEINFO_PHASE_ID2[] PROGMEM = "ph2";
+const char TELEINFO_PHASE_COLOR0[] PROGMEM = "#FFA500";         // orange
+const char TELEINFO_PHASE_COLOR1[] PROGMEM = "#FF6347";         // tomato
+const char TELEINFO_PHASE_COLOR2[] PROGMEM = "#D2691E";         // chocolate
+const char *const arr_phase_id[]    PROGMEM = { TELEINFO_PHASE_ID0, TELEINFO_PHASE_ID1, TELEINFO_PHASE_ID2 };
+const char *const arr_phase_color[] PROGMEM = { TELEINFO_PHASE_COLOR0, TELEINFO_PHASE_COLOR1, TELEINFO_PHASE_COLOR2 };
+
+// graph - week days name
+const char *const arr_week_day[] PROGMEM = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
 
 // teleinfo driver status
 bool teleinfo_enabled = false;
@@ -245,6 +253,8 @@ HardwareSerial *teleinfo_serial = nullptr;
 
 /****************************************\
  *               Icons
+ * 
+ *      xxd -i -c 256 icon.png
 \****************************************/
 
 // icon : teleinfo
@@ -570,7 +580,9 @@ void TeleinfoEvery50ms ()
             case TIC_BBRHCJR: teleinfo_counter.index5 = atol (teleinfo_line.str_part[idx_donnee]); break;
             case TIC_BBRHPJR: teleinfo_counter.index6 = atol (teleinfo_line.str_part[idx_donnee]); break;
             // option voltage
-            case TIC_UMOY1: teleinfo_phase[0].voltage = atol (teleinfo_line.str_part[idx_donnee]); break;
+            case TIC_URMS1: teleinfo_phase[0].voltage = atol (teleinfo_line.str_part[idx_donnee]); break;
+            case TIC_URMS2: teleinfo_phase[1].voltage = atol (teleinfo_line.str_part[idx_donnee]); break;
+            case TIC_URMS3: teleinfo_phase[2].voltage = atol (teleinfo_line.str_part[idx_donnee]); break;
             // overload flags
             case TIC_ADPS:
             case TIC_ADIR1:
@@ -718,7 +730,7 @@ void TeleinfoShowJSON (bool append)
   if (append == false) str_json = "\"" + String (D_JSON_TIME) + "\":\"" + GetDateAndTime(DT_LOCAL) + "\",";
 
   // start TIC section
-  str_json += "\"" + String (TELEINFO_TIC) + "\":{";
+  str_json += "\"" + String (D_TELEINFO_TIC) + "\":{";
 
   // if TIC messsage is complete
   if (teleinfo_message.complete == true)
@@ -785,7 +797,7 @@ void TeleinfoWebIconTic () { Webserver->send_P (200, PSTR ("image/png"), teleinf
 void TeleinfoWebMainButton ()
 {
   // Teleinfo message page button
-  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), D_PAGE_TELEINFO_TIC, D_TELEINFO_MESSAGE);
+  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s %s</button></form></p>\n"), D_PAGE_TELEINFO_TIC, D_TELEINFO_TIC, D_TELEINFO_MESSAGE);
 
   // Teleinfo graph page button
   WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), D_PAGE_TELEINFO_GRAPH, D_TELEINFO_GRAPH);
@@ -804,6 +816,7 @@ bool TeleinfoWebSensor ()
   uint8_t phase, period;
   float   percentage;
   char    str_text[32];
+  String  str_voltage;
   String  str_percent;
 
   // display phase graph bar
@@ -815,11 +828,17 @@ bool TeleinfoWebSensor ()
     str_percent = String (percentage, 0);
 
     // display graph bar
-    WSContentSend_PD (TELEINFO_HTML_BAR, arr_phase_color_html[phase], str_percent.c_str (), str_percent.c_str ());
+    WSContentSend_PD (TELEINFO_HTML_BAR, arr_phase_color[phase], str_percent.c_str (), str_percent.c_str ());
   }
 
   // if defined, display voltage
-  if (teleinfo_phase[0].voltage > 0) WSContentSend_PD (PSTR("{s}%s{m}%d V{e}"), D_TELEINFO_VOLTAGE, teleinfo_phase[0].voltage);
+  for (phase = 0; phase < teleinfo_contract.phase; phase++)
+    if (teleinfo_phase[phase].voltage > 0) 
+    {
+      if (phase > 0) str_voltage += " / ";
+      str_voltage += String (teleinfo_phase[phase].voltage);
+    }
+  if (str_voltage.length () > 0) WSContentSend_PD (PSTR("{s}%s{m}%s V{e}"), D_TELEINFO_VOLTAGE, str_voltage.c_str ());
 
   // display TIC mode
   GetTextIndexed(str_text, sizeof(str_text), teleinfo_contract.mode, kTeleinfoModeName);
@@ -835,7 +854,7 @@ bool TeleinfoWebSensor ()
   WSContentSend_PD (PSTR("{s}%s{m}%s{e}"), D_TELEINFO_PERIOD, str_text);
 
   // display last TIC data received
-  WSContentSend_PD (PSTR("{s}%s{m}%d{e}"), D_TELEINFO_MESSAGE, teleinfo_message.nb_message);
+  WSContentSend_PD (PSTR("{s}%s %s{m}%d{e}"), D_TELEINFO_TIC, D_TELEINFO_MESSAGE, teleinfo_message.nb_message);
 
   // display TIC checksum errors
   if ((teleinfo_message.nb_data > 0) && ( teleinfo_message.nb_error > 0 ))
@@ -915,14 +934,16 @@ void TeleinfoWebPageData ()
   bool     first_value;
   uint8_t  phase;
   uint16_t index, index_array, value;
-  int      graph_period = TELEINFO_LIVE;  
+  int      graph_period = TELEINFO_LIVE;
+  char     str_period[8]; 
 
   // check graph period to be displayed
   for (index = 0; index < TELEINFO_PERIOD_MAX; index++) if (Webserver->hasArg(arr_period_cmnd[index])) graph_period = index;
+  GetTextIndexed(str_period, sizeof(str_period), graph_period, kTeleinfoGraphPeriod);
 
   // start of data page
   WSContentBegin(200, CT_HTML);
-  WSContentSend_P (PSTR("{\"%s\":\"%s\""), TELEINFO_JSON_PERIOD, arr_period_label[graph_period]);
+  WSContentSend_P (PSTR("{\"%s\":\"%s\""), TELEINFO_JSON_PERIOD, str_period);
   WSContentSend_P (PSTR(",\"%s\":\"%s\""), TELEINFO_JSON_ADCO,   teleinfo_contract.id.c_str ());
   WSContentSend_P (PSTR(",\"%s\":%d"),     TELEINFO_JSON_SSOUSC, teleinfo_contract.ssousc);
   WSContentSend_P (PSTR(",\"%s\":%d"),     TELEINFO_JSON_PHASE,  teleinfo_contract.phase);
@@ -963,7 +984,7 @@ void TeleinfoWebPageTic ()
   uint8_t index, num_line;
 
   // beginning of form without authentification
-  WSContentStart_P (D_TELEINFO_MESSAGE, false);
+  WSContentStart_P (D_TELEINFO_TIC " " D_TELEINFO_MESSAGE, false);
   WSContentSend_P (PSTR ("</script>\n"));
 
   // page data refresh script
@@ -1222,7 +1243,7 @@ void TeleinfoWebGraphData ()
   // SVG style 
   WSContentSend_P (PSTR ("<style type='text/css'>\n"));
   WSContentSend_P (PSTR ("polyline {fill:none;stroke-width:2;}\n"));
-  for (index = 0; index < teleinfo_contract.phase; index++) WSContentSend_P (PSTR ("polyline.ph%d {stroke:%s;}\n"), index, arr_phase_color_html[index]);
+  for (index = 0; index < teleinfo_contract.phase; index++) WSContentSend_P (PSTR ("polyline.ph%d {stroke:%s;}\n"), index, arr_phase_color[index]);
   WSContentSend_P (PSTR ("line.time {stroke:white;stroke-width:1;}\n"));
   WSContentSend_P (PSTR ("text.time {font-size:16px;fill:grey;}\n"));
   WSContentSend_P (PSTR ("</style>\n"));
@@ -1368,6 +1389,7 @@ void TeleinfoWebPageGraph ()
 {
   uint8_t graph_period = TELEINFO_LIVE;  
   int     index, idx_param;
+  char    str_period[8], str_tab[8];
   String  str_text;
 
   // check graph period to be displayed
@@ -1409,8 +1431,8 @@ void TeleinfoWebPageGraph ()
   WSContentSend_P (PSTR ("div.papp span.diff {font-size:2vw;font-style:italic;}\n"));
   for (index = 0; index < teleinfo_contract.phase; index++)
   {
-    WSContentSend_P (PSTR ("div.ph%d {color:%s;border:1px %s solid;}\n"), index, arr_phase_color_html[index], arr_phase_color_html[index]);
-    WSContentSend_P (PSTR ("div.ph%d span {color:%s;}\n"), index, arr_phase_color_html[index]);
+    WSContentSend_P (PSTR ("div.ph%d {color:%s;border:1px %s solid;}\n"), index, arr_phase_color[index], arr_phase_color[index]);
+    WSContentSend_P (PSTR ("div.ph%d span {color:%s;}\n"), index, arr_phase_color[index]);
   }
   WSContentSend_P (PSTR (".button {font-size:2vw;padding:0.5rem 1rem;border:1px #666 solid;background:none;color:#fff;border-radius:8px;}\n"));
   WSContentSend_P (PSTR (".active {background:#666;}\n"));
@@ -1442,10 +1464,12 @@ void TeleinfoWebPageGraph ()
   WSContentSend_P (PSTR ("<div>\n"));
   for (index = 0; index < TELEINFO_PERIOD_MAX; index++)
   {
-    // if tab is the current graph period, display button
-    str_text = "";
-    if (graph_period == index) str_text = "active";
-    WSContentSend_P (PSTR ("<button name='%s' class='button %s'>%s</button>\n"), arr_period_cmnd[index], str_text.c_str (), arr_period_label[index]);
+    // get active tab and period label
+    if (graph_period == index) strcpy (str_tab, "active"); else strcpy (str_tab, "");
+    GetTextIndexed(str_period, sizeof(str_period), index, kTeleinfoGraphPeriod);
+
+    // display tab
+    WSContentSend_P (PSTR ("<button name='%s' class='button %s'>%s</button>\n"), arr_period_cmnd[index], str_tab, str_period);
   }
   WSContentSend_P (PSTR ("</div>\n"));
 
