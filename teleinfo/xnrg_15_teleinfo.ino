@@ -31,6 +31,7 @@
     25/02/2021 - v7.0   - Enhance compatibility with standart mode
     01/03/2021 - v7.0.1 - Add power status bar
     05/03/2021 - v7.1   - Correct bug on hardware energy counter
+    08/03/2021 - v7.2   - Handle voltge and checksum for horodatage
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -91,6 +92,7 @@
 #define TELEINFO_GRAPH_PERCENT_STOP  90
 
 // JSON TIC extensions
+#define TELEINFO_TIC                 "TIC"
 #define TELEINFO_JSON_PERIOD         "PERIOD"
 #define TELEINFO_JSON_PHASE          "PHASE"
 #define TELEINFO_JSON_ADCO           "ADCO"
@@ -99,11 +101,11 @@
 #define TELEINFO_JSON_SINSTS         "SINSTS"
 
 // interface strings
-#define TELEINFO_TIC                 "TIC"
 #define D_TELEINFO                   "Teleinfo"
 #define D_TELEINFO_CONFIG            "Configure Teleinfo"
 #define D_TELEINFO_BOARD             "Ethernet board"
 #define D_TELEINFO_GRAPH             "Graph"
+#define D_TELEINFO_VOLTAGE           "Voltage"
 #define D_TELEINFO_MODE              "Mode"
 #define D_TELEINFO_PERIOD            "Period"
 #define D_TELEINFO_MESSAGE           "Received messages"
@@ -133,19 +135,19 @@ const char *const arr_phase_color_html[] PROGMEM = { "#FFA500", "#FF6347", "#D26
 const char *const arr_week_day[] PROGMEM = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
 
 // specific etiquette
-enum TeleinfoEtiquette { TIC_NONE, TIC_ADCO, TIC_ADSC, TIC_PTEC, TIC_LTARF, TIC_EAIT, TIC_IINST, TIC_IINST1, TIC_IINST2, TIC_IINST3, TIC_ISOUSC, TIC_PS, TIC_PAPP, TIC_SINSTS, TIC_BASE, TIC_EAST, TIC_HCHC, TIC_HCHP, TIC_EJPHN, TIC_EJPHPM, TIC_BBRHCJB, TIC_BBRHPJB, TIC_BBRHCJW, TIC_BBRHPJW, TIC_BBRHCJR, TIC_BBRHPJR, TIC_ADPS, TIC_ADIR1, TIC_ADIR2, TIC_ADIR3, TIC_MAX };
-const char kTeleinfoEtiquetteName[] PROGMEM = "|ADCO|ADSC|PTEC|LTARF|EAIT|IINST|IINST1|IINST2|IINST3|ISOUSC|PS|PAPP|SINSTS|BASE|EAST|HCHC|HCHP|EJPHN|EJPHPM|BBRHCJB|BBRHPJB|BBRHCJW|BBRHPJW|BBRHCJR|BBRHPJR|ADPS|ADIR1|ADIR2|ADIR3";
+enum TeleinfoEtiquette { TIC_NONE, TIC_ADCO, TIC_ADSC, TIC_PTEC, TIC_LTARF, TIC_EAIT, TIC_IINST, TIC_IINST1, TIC_IINST2, TIC_IINST3, TIC_ISOUSC, TIC_PS, TIC_PAPP, TIC_SINSTS, TIC_BASE, TIC_EAST, TIC_HCHC, TIC_HCHP, TIC_EJPHN, TIC_EJPHPM, TIC_BBRHCJB, TIC_BBRHPJB, TIC_BBRHCJW, TIC_BBRHPJW, TIC_BBRHCJR, TIC_BBRHPJR, TIC_ADPS, TIC_ADIR1, TIC_ADIR2, TIC_ADIR3, TIC_UMOY1, TIC_MAX };
+const char kTeleinfoEtiquetteName[] PROGMEM = "|ADCO|ADSC|PTEC|LTARF|EAIT|IINST|IINST1|IINST2|IINST3|ISOUSC|PS|PAPP|SINSTS|BASE|EAST|HCHC|HCHP|EJPHN|EJPHPM|BBRHCJB|BBRHPJB|BBRHCJW|BBRHPJW|BBRHCJR|BBRHPJR|ADPS|ADIR1|ADIR2|ADIR3|UMOY1";
 
 // mode and tarif
-enum TeleinfoMode { TELEINFO_NOMODE, TELEINFO_HISTORIC, TELEINFO_STANDARD };
+enum TeleinfoMode { TIC_MODE_UNDEFINED, TIC_MODE_HISTORIC, TIC_MODE_STANDARD };
 const char kTeleinfoModeName[] PROGMEM = "|Historique|Standard";
 enum TeleinfoTarif { TIC_TARIF_TH, TIC_TARIF_HC, TIC_TARIF_HP, TIC_TARIF_HN, TIC_TARIF_PM, TIC_TARIF_CB, TIC_TARIF_CW, TIC_TARIF_CR, TIC_TARIF_PB, TIC_TARIF_PW, TIC_TARIF_PR, TIC_TARIF_MAX };
 const char kTeleinfoPeriod[] PROGMEM = "TH..|HC..|HP..|HN..|PM..|HCJB|HCJW|HCJR|HPJB|HPJW|HPJR";
 const char kTeleinfoPeriodName[] PROGMEM = "Toutes Heures|Heures Creuses|Heures Pleines|Heures Normales|Heures Pointe Mobile|Heures Creuses Bleus|Heures Creuses Blancs|Heures Creuses Rouges|Heures Pleines Bleus|Heures Pleines Blancs|Heures Pleines Rouges";
 
 // TIC message parts
-enum TeleinfoMessagePart { TELEINFO_NONE, TELEINFO_ETIQUETTE, TELEINFO_DONNEE, TELEINFO_CHECKSUM };
-enum TeleinfoMessageChecksum { TELEINFO_NOCHECK, TELEINFO_CHECKONE, TELEINFO_CHECKTWO };
+enum TeleinfoMessagePart { TIC_PART_ETIQUETTE, TIC_PART_DONNEE, TIC_PART_HORODATE, TIC_PART_CHECKSUM, TIC_PART_MAX };
+enum TeleinfoMessageChecksum { TIC_CHECKSUM_UNDEFINED, TIC_CHECKSUM_MODE1, TIC_CHECKSUM_MODE2 };
 
 // graph periods
 enum TeleinfoGraphPeriod { TELEINFO_LIVE, TELEINFO_DAY, TELEINFO_WEEK, TELEINFO_YEAR, TELEINFO_PERIOD_MAX };
@@ -159,8 +161,8 @@ bool teleinfo_enabled = false;
 // teleinfo data
 struct {
   uint8_t phase    = 1;                         // number of phases
-  uint8_t mode     = TELEINFO_NOMODE;           // meter mode
-  uint8_t checksum = TELEINFO_NOCHECK;          // type of checksum
+  uint8_t mode     = TIC_MODE_UNDEFINED;        // meter mode
+  uint8_t checksum = TIC_CHECKSUM_UNDEFINED;    // type of checksum
   long    isousc   = 0;                         // contract max current per phase
   long    ssousc   = 0;                         // contract max power per phase
   String  id;                                   // contract reference (adco or ads)
@@ -169,13 +171,9 @@ struct {
 
 // teleinfo current line
 struct {
-  uint8_t part = TELEINFO_NONE;
-  char    str_buffer[TELEINFO_STRING_MAX];
-  char    str_etiquette[TELEINFO_STRING_MAX];
-  char    separator1;
-  char    str_donnee[TELEINFO_STRING_MAX];
-  char    separator2;
-  char    checksum;
+  uint8_t part = TIC_PART_MAX;
+  char    str_part[TIC_PART_MAX][TELEINFO_STRING_MAX];
+  char    separator[TIC_PART_MAX];
 } teleinfo_line;
 
 // teleinfo update trigger
@@ -198,10 +196,9 @@ struct {
 
 // data per phase
 struct tic_phase {
-  bool adir_set;               // adir set in the message
+  long voltage;                // voltage
   long iinst;                  // instant current
   long papp;                   // instant apparent power
-  long adir;                   // percentage of contract power overconsumption
   long last_papp;              // last published apparent power
   uint32_t last_diff;          // last time a power difference was published
 }; 
@@ -298,58 +295,64 @@ void TeleinfoSetMode (uint16_t new_mode)
  *               Functions
 \*********************************************/
 
-bool TeleinfoValidateChecksum (const char *pstr_etiquette, const char tic_separator1, const char *pstr_donnee, const char tic_separator2, const char tic_checksum) 
+bool TeleinfoControlChecksum () 
 {
   bool    result = false;
-  uint8_t test_checksum  = 0;
-  uint8_t valid_checksum = 0;
+  uint8_t index;
+  uint8_t current_checksum = 0;
+  uint8_t control_checksum = 0;
+  uint8_t line_checksum    = 0;
+  char*   pstr_text;
 
-  // check pointers 
-  if ((pstr_etiquette != nullptr) && (pstr_donnee != nullptr))
+  // get line checksum (first caracter of last message part)
+  line_checksum = teleinfo_line.str_part[teleinfo_line.part][0];
+
+  // loop to calculate checksum of line parts
+  for (index = 0; index < teleinfo_line.part; index ++)
   {
-    // if etiquette and donnee are defined and checksum is exactly one caracter
-    if (strlen(pstr_etiquette) && strlen(pstr_donnee))
-    {
-      // add every char of etiquette, first separator and donnee
-      while (*pstr_etiquette) test_checksum += *pstr_etiquette++;
-      test_checksum += tic_separator1;
-      while(*pstr_donnee) test_checksum += *pstr_donnee++;
-
-      switch (teleinfo_contract.checksum)
-      {
-      // checksum calculation not defined, let's try to define it
-      case TELEINFO_NOCHECK:
-        // test one separator only
-        valid_checksum = (test_checksum & 0x3F) + 0x20;
-        if (valid_checksum == tic_checksum) teleinfo_contract.checksum = TELEINFO_CHECKONE;
-
-        // else, try two separators
-        else
-        {
-          // add second separator to checksum and test it
-          test_checksum += tic_separator2;
-          valid_checksum = (test_checksum & 0x3F) + 0x20;
-          if (valid_checksum == tic_checksum) teleinfo_contract.checksum = TELEINFO_CHECKTWO;
-        }
-        break;
-          
-      // checksum calculated on first separator only, nothing to do
-      case TELEINFO_CHECKONE:
-        break;
-
-      // checksum calculated on two separators, add second one
-      case TELEINFO_CHECKTWO:
-        // add second separator
-        test_checksum += tic_separator2;
-        break;
-      }
-
-      // keep 6 lower bits and add Ox20 and compare to given checksum
-      valid_checksum = (test_checksum & 0x3F) + 0x20;
-      result = (valid_checksum == tic_checksum);
-      if (!result) teleinfo_message.nb_error++;
-    }
+    // loop thru current line part
+    pstr_text = teleinfo_line.str_part[index];
+    while (*pstr_text) current_checksum += *pstr_text++;
   }
+
+  // loop to add separator to checksum (except last one)
+  for (index = 0; index < teleinfo_line.part - 2; index ++) current_checksum += teleinfo_line.separator[index];
+
+  // calculate according to calculation formula
+  switch (teleinfo_contract.checksum)
+  {
+    // checksum calculation not defined, let's try to define it
+    case TIC_CHECKSUM_UNDEFINED:
+      // test checksum
+      control_checksum = (current_checksum & 0x3F) + 0x20;
+      if (control_checksum == line_checksum) teleinfo_contract.checksum = TIC_CHECKSUM_MODE1;
+
+      // else, if not valid
+      else
+      {
+        // add second separator to checksum
+        current_checksum += teleinfo_line.separator[teleinfo_line.part - 1];
+
+        // test checksum
+        control_checksum = (current_checksum & 0x3F) + 0x20;
+        if (control_checksum == line_checksum) teleinfo_contract.checksum = TIC_CHECKSUM_MODE2;
+      }
+      break;
+          
+    // checksum calculated without last separator, nothing to do
+    case TIC_CHECKSUM_MODE1:
+      break;
+
+    // if checksum calculated with last separators, add it
+    case TIC_CHECKSUM_MODE2:
+      current_checksum += teleinfo_line.separator[teleinfo_line.part - 1];
+      break;
+  }
+
+  // keep 6 lower bits and add Ox20 and compare to given checksum
+  control_checksum = (current_checksum & 0x3F) + 0x20;
+  result = (control_checksum == line_checksum);
+  if (!result) teleinfo_message.nb_error++;
 
   return result;
 }
@@ -415,6 +418,7 @@ void TeleinfoGraphInit ()
     Energy.voltage[index] = TELEINFO_VOLTAGE;
 
     // default values
+    teleinfo_phase[phase].voltage   = 0;
     teleinfo_phase[phase].iinst     = 0;
     teleinfo_phase[phase].papp      = 0;
     teleinfo_phase[phase].last_papp = 0;
@@ -444,6 +448,7 @@ void TeleinfoEvery50ms ()
 {
   bool     checksum;
   uint8_t  recv_serial, index, phase;
+  uint8_t  idx_donnee, idx_checksum;
   uint32_t energy_total;
   long     current_total;
   float    power_apparent;
@@ -489,13 +494,12 @@ void TeleinfoEvery50ms ()
       // 0x0A : Beginning of line
       // ------------------------
       case 10:
-        strcpy (teleinfo_line.str_buffer,    "");
-        strcpy (teleinfo_line.str_etiquette, "");
-        strcpy (teleinfo_line.str_donnee,    "");
-        teleinfo_line.separator1 = 0;
-        teleinfo_line.separator2 = 0;
-        teleinfo_line.checksum   = 0;
-        teleinfo_line.part       = TELEINFO_ETIQUETTE;
+        teleinfo_line.part = TIC_PART_ETIQUETTE;
+         for (index = 0; index < TIC_PART_MAX; index ++)
+        {
+          strcpy (teleinfo_line.str_part[index], "");
+          teleinfo_line.separator[index] = 0;
+        }
         break;
 
       // ---------------------------
@@ -503,80 +507,70 @@ void TeleinfoEvery50ms ()
       // ---------------------------
       case 9:
       case ' ':
-        // update current line part
-        switch (teleinfo_line.part)
+        if (teleinfo_line.part < TIC_PART_MAX)
         {
-          case TELEINFO_ETIQUETTE:
-            strcpy (teleinfo_line.str_etiquette, teleinfo_line.str_buffer);
-            teleinfo_line.separator1 = recv_serial;
-            break;
-          case TELEINFO_DONNEE:
-            strcpy (teleinfo_line.str_donnee, teleinfo_line.str_buffer);
-            teleinfo_line.separator2 = recv_serial;
-            break;
-          case TELEINFO_CHECKSUM:
-            teleinfo_line.checksum = teleinfo_line.str_buffer[0];
+          teleinfo_line.separator[teleinfo_line.part] = recv_serial;
+          teleinfo_line.part ++;
         }
 
-        // prepare next part of line
-        teleinfo_line.part ++;
-        strcpy (teleinfo_line.str_buffer, "");
         break;
         
       // ------------------
       // 0x0D : End of line
       // ------------------
       case 13:
-        // retrieve checksum
-        if (teleinfo_line.part == TELEINFO_CHECKSUM) teleinfo_line.checksum = teleinfo_line.str_buffer[0];
-
         // increment counter and reset line part
         teleinfo_message.nb_data++;
-        teleinfo_line.part = TELEINFO_NONE;
+
+        // get data and checksum index
+        idx_donnee   = teleinfo_line.part - 1;
+        idx_checksum = teleinfo_line.part;
 
         // if checksum is ok, handle the line
-        checksum = TeleinfoValidateChecksum (teleinfo_line.str_etiquette, teleinfo_line.separator1, teleinfo_line.str_donnee, teleinfo_line.separator2, teleinfo_line.checksum);
+        checksum = TeleinfoControlChecksum ();
         if (checksum == false) teleinfo_message.nb_error++;
         else
         {
           // handle specific etiquette index
-          index = GetCommandCode (str_text, sizeof(str_text), teleinfo_line.str_etiquette, kTeleinfoEtiquetteName);
+          index = GetCommandCode (str_text, sizeof(str_text), teleinfo_line.str_part[0], kTeleinfoEtiquetteName);
           switch (index)
           {
             // contract reference
-            case TIC_ADCO: teleinfo_contract.id = teleinfo_line.str_donnee; teleinfo_contract.mode = TELEINFO_HISTORIC; break;
-            case TIC_ADSC: teleinfo_contract.id = teleinfo_line.str_donnee; teleinfo_contract.mode = TELEINFO_STANDARD; break;
+            case TIC_ADCO: teleinfo_contract.id = teleinfo_line.str_part[idx_donnee]; teleinfo_contract.mode = TIC_MODE_HISTORIC; break;
+            case TIC_ADSC: teleinfo_contract.id = teleinfo_line.str_part[idx_donnee]; teleinfo_contract.mode = TIC_MODE_STANDARD; break;
             // period name
             case TIC_PTEC:
-            case TIC_LTARF: teleinfo_contract.period = teleinfo_line.str_donnee; break;
+            case TIC_LTARF: teleinfo_contract.period = teleinfo_line.str_part[idx_donnee]; break;
             // instant current (also used to set triphase)
             case TIC_EAIT:
             case TIC_IINST:
-            case TIC_IINST1: teleinfo_phase[0].iinst = atol (teleinfo_line.str_donnee); break;
-            case TIC_IINST2: teleinfo_phase[1].iinst = atol (teleinfo_line.str_donnee); break;
-            case TIC_IINST3: teleinfo_phase[2].iinst = atol (teleinfo_line.str_donnee); teleinfo_contract.phase = 3; break;
+            case TIC_IINST1: teleinfo_phase[0].iinst = atol (teleinfo_line.str_part[idx_donnee]); break;
+            case TIC_IINST2: teleinfo_phase[1].iinst = atol (teleinfo_line.str_part[idx_donnee]); break;
+            case TIC_IINST3: teleinfo_phase[2].iinst = atol (teleinfo_line.str_part[idx_donnee]); teleinfo_contract.phase = 3; break;
             // contract max current or power
-            case TIC_ISOUSC: teleinfo_contract.isousc = atol (teleinfo_line.str_donnee); break;
-            case TIC_PS:     teleinfo_contract.ssousc = atol (teleinfo_line.str_donnee); break;
+            case TIC_ISOUSC: teleinfo_contract.isousc = atol (teleinfo_line.str_part[idx_donnee]); break;
+            case TIC_PS:     teleinfo_contract.ssousc = atol (teleinfo_line.str_part[idx_donnee]); break;
             // instant power
             case TIC_PAPP:
-            case TIC_SINSTS: teleinfo_counter.papp = atol (teleinfo_line.str_donnee); break;
+            case TIC_SINSTS: teleinfo_counter.papp = atol (teleinfo_line.str_part[idx_donnee]); break;
             // option base or standard
             case TIC_BASE:
-            case TIC_EAST: teleinfo_counter.index1 = atol (teleinfo_line.str_donnee); break;
+            case TIC_EAST: teleinfo_counter.index1 = atol (teleinfo_line.str_part[idx_donnee]); break;
             // option heures creuses
-            case TIC_HCHC: teleinfo_counter.index1 = atol (teleinfo_line.str_donnee); break;
-            case TIC_HCHP: teleinfo_counter.index2 = atol (teleinfo_line.str_donnee); break;
+            case TIC_HCHC: teleinfo_counter.index1 = atol (teleinfo_line.str_part[idx_donnee]); break;
+            case TIC_HCHP: teleinfo_counter.index2 = atol (teleinfo_line.str_part[idx_donnee]); break;
             // option EJP
-            case TIC_EJPHN:  teleinfo_counter.index1 = atol (teleinfo_line.str_donnee); break;
-            case TIC_EJPHPM: teleinfo_counter.index2 = atol (teleinfo_line.str_donnee); break;
+            case TIC_EJPHN:  teleinfo_counter.index1 = atol (teleinfo_line.str_part[idx_donnee]); break;
+            case TIC_EJPHPM: teleinfo_counter.index2 = atol (teleinfo_line.str_part[idx_donnee]); break;
             // option tempo
-            case TIC_BBRHCJB: teleinfo_counter.index1 = atol (teleinfo_line.str_donnee); break;
-            case TIC_BBRHPJB: teleinfo_counter.index2 = atol (teleinfo_line.str_donnee); break;
-            case TIC_BBRHCJW: teleinfo_counter.index3 = atol (teleinfo_line.str_donnee); break;
-            case TIC_BBRHPJW: teleinfo_counter.index4 = atol (teleinfo_line.str_donnee); break;
-            case TIC_BBRHCJR: teleinfo_counter.index5 = atol (teleinfo_line.str_donnee); break;
-            case TIC_BBRHPJR: teleinfo_counter.index6 = atol (teleinfo_line.str_donnee); break;
+            case TIC_BBRHCJB: teleinfo_counter.index1 = atol (teleinfo_line.str_part[idx_donnee]); break;
+            case TIC_BBRHPJB: teleinfo_counter.index2 = atol (teleinfo_line.str_part[idx_donnee]); break;
+            case TIC_BBRHCJW: teleinfo_counter.index3 = atol (teleinfo_line.str_part[idx_donnee]); break;
+            case TIC_BBRHPJW: teleinfo_counter.index4 = atol (teleinfo_line.str_part[idx_donnee]); break;
+            case TIC_BBRHCJR: teleinfo_counter.index5 = atol (teleinfo_line.str_part[idx_donnee]); break;
+            case TIC_BBRHPJR: teleinfo_counter.index6 = atol (teleinfo_line.str_part[idx_donnee]); break;
+            // option voltage
+            case TIC_UMOY1: teleinfo_phase[0].voltage = atol (teleinfo_line.str_part[idx_donnee]); break;
             // overload flags
             case TIC_ADPS:
             case TIC_ADIR1:
@@ -587,9 +581,9 @@ void TeleinfoEvery50ms ()
           // add new message line
           index = teleinfo_message.line_current;
           teleinfo_message.line_nextlast = index;
-          teleinfo_message.line[index].etiquette = teleinfo_line.str_etiquette;
-          teleinfo_message.line[index].donnee    = teleinfo_line.str_donnee;
-          teleinfo_message.line[index].checksum  = teleinfo_line.checksum;
+          teleinfo_message.line[index].etiquette = teleinfo_line.str_part[0];
+          teleinfo_message.line[index].donnee    = teleinfo_line.str_part[idx_donnee];
+          teleinfo_message.line[index].checksum  = teleinfo_line.str_part[idx_checksum][0];
 
           // increase index for next line
           teleinfo_message.line_current++;
@@ -605,7 +599,7 @@ void TeleinfoEvery50ms ()
       // ---------------------
       case 3:
         // if defined, defined maximum power per phase
-        if (teleinfo_contract.isousc > 0) teleinfo_contract.ssousc = teleinfo_contract.isousc * 200;
+        if (teleinfo_contract.ssousc == 0) teleinfo_contract.ssousc = teleinfo_contract.isousc * 200;
 
         // save first and last line of complete message
         teleinfo_message.line_first = teleinfo_message.line_nextfirst;
@@ -650,8 +644,8 @@ void TeleinfoEvery50ms ()
 
       // if caracter is anything else printable, add it to current message part
       default:
-        if ((teleinfo_line.part > TELEINFO_NONE) && isprint (recv_serial) && (strlen (teleinfo_line.str_buffer) < sizeof (teleinfo_line.str_buffer)))
-          strncat (teleinfo_line.str_buffer, (char*) &recv_serial, 1);
+        if ((teleinfo_line.part < TIC_PART_MAX) && isprint (recv_serial))
+          if (strlen (teleinfo_line.str_part[teleinfo_line.part]) < TELEINFO_STRING_MAX - 1) strncat (teleinfo_line.str_part[teleinfo_line.part], (char*) &recv_serial, 1);
         break;
     }
   }
@@ -823,6 +817,9 @@ bool TeleinfoWebSensor ()
     // display graph bar
     WSContentSend_PD (TELEINFO_HTML_BAR, arr_phase_color_html[phase], str_percent.c_str (), str_percent.c_str ());
   }
+
+  // if defined, display voltage
+  if (teleinfo_phase[0].voltage > 0) WSContentSend_PD (PSTR("{s}%s{m}%d V{e}"), D_TELEINFO_VOLTAGE, teleinfo_phase[0].voltage);
 
   // display TIC mode
   GetTextIndexed(str_text, sizeof(str_text), teleinfo_contract.mode, kTeleinfoModeName);
