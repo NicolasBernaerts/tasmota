@@ -34,8 +34,8 @@ This firmware is based on Tasmota **v9.1** modified with :
   * standard energy MQTT message (IINST, SINSTS, ADIR, ...)
 
 You'll get one extra Web page on the device :
-  * **/graph** : live, daily, weekly, monthly or yearly graph
-  * **/tic** : real time display of received Teleinfo messages
+  * **/tic-graph** : live, daily, weekly or yearly graph
+  * **/tic-msg** : real time display of received Teleinfo messages
 
 Between your Energy meter and your Tasmota device, you'll need an adapter like this one :
 
@@ -61,14 +61,12 @@ Pre-compiled version is available under **tasmota.bin** and **tasmota32.bin**.
 
 MQTT result should look like that :
 
-    compteur/tele/STATE = {"Time":"2020-08-07T19:49:49","Uptime":"0T00:50:14","UptimeSec":3014,"Heap":26,"SleepMode":"Dynamic","Sleep":50,"LoadAvg":19,"MqttCount":1,"POWER":"OFF","Wifi":{"AP":1,"SSId":"bernaerts-xxxx","BSSId":"24:F5:A2:B8:AF:FB","Channel":7,"RSSI":100,"Signal":-34,"LinkCount":1,"Downtime":"0T00:00:08"}}
-    compteur/tele/SENSOR = {"Time":"2020-08-07T19:49:49","ENERGY":{"TotalStartTime":"2020-01-05T13:58:16","Total":5321.567,"Yesterday":42353.109,"Today":3775.768,"Period":376,"Power":[490,0,0],"Current":[2.130,0.000,0.000]},"TIC":{"PHASE":3,"ADCO":"2147483647","ISOUSC":30,"SSOUSC":6000,"SINSTS":490,"SINSTS1":490,"IINST1":2.1,"ADIR1":8,"SINSTS2":0,"IINST2":0.0,"ADIR2":0,"SINSTS3":0,"IINST3":0.0,"ADIR3":0},"Timezone":{"STD":{"Offset":60,"Month":10,"Week":0,"Day":1},"DST":{"Offset":120,"Month":3,"Week":0,"Day":1}}}
-    compteur/tele/SENSOR = {"TIC":{"SINSTS":480,"SINSTS1":740,"IINST1":3.2,"ADIR1":12,"SINSTS2":0,"IINST2":0.0,"ADIR2":0,"SINSTS3":0,"IINST3":0.0,"ADIR3":0}}
-    compteur/tele/SENSOR = {"TIC":{"SINSTS":480,"SINSTS1":160,"IINST1":0.7,"ADIR1":2,"SINSTS2":0,"IINST2":0.0,"ADIR2":0,"SINSTS3":320,"IINST3":1.4,"ADIR3":5}}
-    compteur/tele/SENSOR = {"TIC":{"SINSTS":480,"SINSTS1":480,"IINST1":2.1,"ADIR1":8,"SINSTS2":0,"IINST2":0.0,"ADIR2":0,"SINSTS3":0,"IINST3":0.0,"ADIR3":0}}
-    compteur/tele/SENSOR = {"TIC":{"SINSTS":480,"SINSTS1":160,"IINST1":0.7,"ADIR1":2,"SINSTS2":0,"IINST2":0.0,"ADIR2":0,"SINSTS3":320,"IINST3":1.4,"ADIR3":5}}
-    compteur/tele/SENSOR = {"TIC":{"SINSTS":470,"SINSTS1":470,"IINST1":2.0,"ADIR1":7,"SINSTS2":0,"IINST2":0.0,"ADIR2":0,"SINSTS3":0,"IINST3":0.0,"ADIR3":0}}
-
+    compteur/tele/STATE = {"Time":"2021-03-13T09:20:26","Uptime":"0T13:20:12","UptimeSec":48012,"Heap":17,"SleepMode":"Dynamic","Sleep":1,"LoadAvg":999,"MqttCount":1,"Wifi":{"AP":1,"SSId":"hello-nantes","BSSId":"30:23:03:xx:xx:xx","Channel":5,"RSSI":64,"Signal":-68,"LinkCount":1,"Downtime":"0T00:00:05"}}
+    compteur/tele/SENSOR = {"Time":"2021-03-13T09:20:26","ENERGY":{"TotalStartTime":"2021-03-13T09:20:26","Total":7970.903,"Yesterday":3.198,"Today":6.024,"Period":63,"Power":860,"Current":4.000},"TIC":{"ADCO":"061964xxxxxx","OPTARIF":"BASE","ISOUSC":"30","BASE":"007970903","PTEC":"TH..","IINST":"004","IMAX":"090","PAPP":"00860","HHPHC":"A","MOTDETAT":"000000","PHASE":1,"SSOUSC":"6000","IINST1":"4","SINSTS1":"860"},"IP":"192.168.xx.xx","MAC":"50:02:91:xx:xx:xx"}
+    compteur/tele/SENSOR = {"Time":"2021-03-13T09:20:30","TIC":{"ADCO":"061964xxxxxx","OPTARIF":"BASE","ISOUSC":"30","BASE":"007970903","PTEC":"TH..","IINST":"003","IMAX":"090","PAPP":"00780","HHPHC":"A","MOTDETAT":"000000","PHASE":1,"SSOUSC":"6000","IINST1":"3","SINSTS1":"780"}}
+    compteur/tele/SENSOR = {"Time":"2021-03-13T09:25:11","TIC":{"ADCO":"061964xxxxxx","OPTARIF":"BASE","ISOUSC":"30","BASE":"007970947","PTEC":"TH..","IINST":"004","IMAX":"090","PAPP":"00860","HHPHC":"A","MOTDETAT":"000000","PHASE":1,"SSOUSC":"6000","IINST1":"4","SINSTS1":"860"}}
+    compteur/tele/STATE = {"Time":"2021-03-13T09:25:26","Uptime":"0T13:25:12","UptimeSec":48312,"Heap":18,"SleepMode":"Dynamic","Sleep":1,"LoadAvg":999,"MqttCount":1,"Wifi":{"AP":1,"SSId":"hello-nantes","BSSId":"30:23:03:xx:xx:xx","Channel":5,"RSSI":64,"Signal":-68,"LinkCount":1,"Downtime":"0T00:00:05"}}
+    compteur/tele/SENSOR = {"Time":"2021-03-13T09:25:26","ENERGY":{"TotalStartTime":"2021-03-13T09:25:26","Total":7970.950,"Yesterday":3.198,"Today":6.071,"Period":47,"Power":860,"Current":4.000},"TIC":{"ADCO":"061964xxxxxx","OPTARIF":"BASE","ISOUSC":"30","BASE":"007970950","PTEC":"TH..","IINST":"004","IMAX":"090","PAPP":"00860","HHPHC":"A","MOTDETAT":"000000","PHASE":1,"SSOUSC":"6000","IINST1":"4","SINSTS1":"860"},"IP":"192.168.xx.xx","MAC":"50:02:91:xx:xx:xx"}
 
 Complete setup guide is available at http://www.bernaerts-nicolas.fr/iot/...
 
