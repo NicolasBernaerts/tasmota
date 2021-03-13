@@ -33,7 +33,8 @@
     25/02/2021 - v7.0   - Enhance compatibility with standart mode
     01/03/2021 - v7.0.1 - Add power status bar
     05/03/2021 - v7.1   - Correct bug on hardware energy counter
-    08/03/2021 - v7.2   - Handle voltge and checksum for horodatage
+    08/03/2021 - v7.2   - Handle voltage and checksum for horodatage
+    12/03/2021 - v7.3   - Use average / overload for graph
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -79,7 +80,7 @@
 #define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_TELEINFO                          // Add support for Teleinfo
 
-#define EXTENSION_VERSION "7.2"               // version
+#define EXTENSION_VERSION "7.3"               // version
 #define EXTENSION_NAME "Teleinfo"             // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 
