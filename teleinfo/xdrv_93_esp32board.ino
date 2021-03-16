@@ -4,6 +4,7 @@
   Copyright (C) 2020  Nicolas Bernaerts
 
     08/11/2020 - v1.0   - Creation
+    15/03/2021 - v1.1   - Detect model board in config page
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -28,21 +29,26 @@
 #define XDRV_93   93
 
 // web configuration page
-#define D_PAGE_BOARD_CONFIG       "board"
+#define D_PAGE_BOARD_CONFIG  "/board"
 
-#define D_CMND_BOARD              "board"
+#define D_CMND_BOARD         "board"
 
-#define D_BOARD                   "ESP32 board"
-#define D_BOARD_WIFI              "Wifi"
-#define D_BOARD_ETH               "Ethernet"
-#define D_BOARD_CONFIG            "Configure ESP32"
+#define D_BOARD              "ESP32 board"
+#define D_BOARD_WIFI         "Wifi"
+#define D_BOARD_ETH          "Ethernet"
+#define D_BOARD_CONFIG       "Configure ESP32"
+
+// JSON strings
+#define D_JSON_ESP32_ETH     "Eth"
+#define D_JSON_ESP32_MAC     "MAC"
+#define D_JSON_ESP32_IP      "IP"
 
 // form strings
 const char BOARD_FORM_START[] PROGMEM  = "<form method='get' action='%s'>\n";
 const char BOARD_FORM_STOP[] PROGMEM   = "</form>\n";
 const char BOARD_FIELD_START[] PROGMEM = "<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n";
 const char BOARD_FIELD_STOP[] PROGMEM  = "</fieldset></p><br>\n";
-const char BOARD_INPUT_TEXT[] PROGMEM  = "<p><input type='radio' name='%s' value='%d'>%s</p>\n";
+const char BOARD_INPUT_TEXT[] PROGMEM  = "<p><input type='radio' name='%s' value='%d' %s>%s</p>\n";
 
 
 // ESP32 referenced ethernet adapters
@@ -65,6 +71,22 @@ const uint8_t arr_eth_type[]   PROGMEM = { 0, ETH_PHY_LAN8720, ETH_PHY_LAN8720, 
 const uint8_t arr_eth_clock[]  PROGMEM = { 0, ETH_CLOCK_GPIO17_OUT, ETH_CLOCK_GPIO0_IN, ETH_CLOCK_GPIO0_IN };
 const uint8_t  arr_eth_addr[]  PROGMEM = { 0, 0, 0, 1 };
 
+
+// Show JSON status (for MQTT)
+void ESP32BoardShowJSON ()
+{
+  String str_json;
+
+  // append to MQTT message
+  str_json  = ",\"" + String (D_JSON_ESP32_ETH) + "\":{";
+  str_json += "\"" + String (D_JSON_ESP32_MAC) + "\":\"" + ETH.macAddress() + "\",";
+  str_json += "\"" + String (D_JSON_ESP32_IP) + "\":\"" + ETH.localIP().toString() + "\"";
+  str_json += "}";
+
+  // append JSON to MQTT message
+  ResponseAppend_P (PSTR("%s"), str_json.c_str ());
+}
+
 /*********************************************\
  *                   Web
 \*********************************************/
@@ -72,32 +94,32 @@ const uint8_t  arr_eth_addr[]  PROGMEM = { 0, 0, 0, 1 };
 #ifdef USE_WEBSERVER
 
 // append Teleinfo configuration button to configuration page
-void BoardWebConfigButton ()
+void ESP32BoardWebConfigButton ()
 {
   // heater and meter configuration button
   WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>"), D_PAGE_BOARD_CONFIG, D_BOARD_CONFIG);
 }
 
 // append board info to main page
-bool BoardWebSensor ()
+bool ESP32BoardWebSensor ()
 {
-  String str_ip, str_mac;
+  String str_ip;
 
   // display wifi IP address
   str_ip = WiFi.localIP().toString();
   WSContentSend_PD (PSTR("{s}%s{m}%s{e}"), D_BOARD_WIFI, str_ip.c_str ());
 
   // display Ethernet IP address
-  str_mac = ETH.macAddress();
   str_ip  = ETH.localIP().toString();
   if (str_mac.length () > 0) WSContentSend_PD (PSTR("{s}%s{m}%s{e}"), D_BOARD_ETH, str_ip.c_str ());
 }
 
 // board config page
-void BoardWebPageConfig ()
+void ESP32BoardWebPageConfig ()
 {
   uint16_t value;
   char     argument[LOGSZ];
+  String   str_board, str_active;
 
   // if access not allowed, close
   if (!HttpCheckPriviledgedAccess()) return;
@@ -105,7 +127,7 @@ void BoardWebPageConfig ()
   // get teleinfo mode according to ETH parameter
   if (Webserver->hasArg(D_CMND_BOARD))
   {
-    WebGetArg (D_CMND_BOARD, argument, LOGSZ);
+    WebGetArg (D_CMND_BOARD, argument, sizeof(argument));
     value = (uint16_t)atoi (argument);
 
     // if adapter is referenced
@@ -134,9 +156,16 @@ void BoardWebPageConfig ()
   WSContentSendStyle ();
   WSContentSend_P (BOARD_FORM_START, D_PAGE_BOARD_CONFIG);
 
+  // get board template name
+  str_board = SettingsText(SET_TEMPLATE_NAME);
+
   // board selection
   WSContentSend_P (BOARD_FIELD_START, D_BOARD);
-  for (value = 0; value < ETH_MAX; value ++) WSContentSend_P (BOARD_INPUT_TEXT, D_CMND_BOARD, value, arr_board_name[value]);
+  for (value = 0; value < ETH_MAX; value ++) 
+  {
+    if (str_board == arr_board_name[value]) str_active = "checked"; else str_active = "";
+    WSContentSend_P (BOARD_INPUT_TEXT, D_CMND_BOARD, value, str_active.c_str (), arr_board_name[value]);
+  }
   WSContentSend_P (BOARD_FIELD_STOP);
 
   // save button
@@ -162,16 +191,20 @@ bool Xdrv93 (uint8_t function)
   // swtich according to context
   switch (function) 
   {
+    case FUNC_JSON_APPEND:
+      ESP32BoardShowJSON ();
+      break;
+
 #ifdef USE_WEBSERVER
     case FUNC_WEB_ADD_HANDLER:
       // pages
-      Webserver->on ("/" D_PAGE_BOARD_CONFIG, BoardWebPageConfig);
+      Webserver->on (D_PAGE_BOARD_CONFIG, ESP32BoardWebPageConfig);
       break;
     case FUNC_WEB_ADD_BUTTON:
-      BoardWebConfigButton ();
+      ESP32BoardWebConfigButton ();
       break;
     case FUNC_WEB_SENSOR:
-     BoardWebSensor ();
+      ESP32BoardWebSensor ();
       break;
 #endif  // USE_WEBSERVER
   }

@@ -35,6 +35,7 @@
     05/03/2021 - v7.1   - Correct bug on hardware energy counter
     08/03/2021 - v7.2   - Handle voltage and checksum for horodatage
     12/03/2021 - v7.3   - Use average / overload for graph
+    15/03/2021 - v7.4   - Change graph period parameter
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -80,7 +81,7 @@
 #define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_TELEINFO                          // Add support for Teleinfo
 
-#define EXTENSION_VERSION "7.3"               // version
+#define EXTENSION_VERSION "7.4"               // version
 #define EXTENSION_NAME "Teleinfo"             // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 

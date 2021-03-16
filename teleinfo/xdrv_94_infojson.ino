@@ -27,8 +27,9 @@
 #define XDRV_94             94
 
 // JSON strings
-#define D_JSON_INFO_IP      "IP"
+#define D_JSON_INFO_WIFI    "Wifi"
 #define D_JSON_INFO_MAC     "MAC"
+#define D_JSON_INFO_IP      "IP"
 
 // web URL
 const char D_INFO_PAGE_JSON[] PROGMEM = "/info.json";
@@ -43,8 +44,10 @@ void InfoShowJSON ()
   String str_json;
 
   // append to MQTT message
-  str_json  = ",\"" + String (D_JSON_INFO_IP) + "\":\"" + WiFi.localIP().toString() + "\"";
-  str_json += ",\"" + String (D_JSON_INFO_MAC) + "\":\"" + WiFi.macAddress() + "\"";
+  str_json  = ",\"" + String (D_JSON_INFO_WIFI) + "\":{";
+  str_json += "\"" + String (D_JSON_INFO_MAC) + "\":\"" + WiFi.macAddress() + "\",";
+  str_json += "\"" + String (D_JSON_INFO_IP) + "\":\"" + WiFi.localIP().toString() + "\"";
+  str_json += "}";
 
   // append JSON to MQTT message
   ResponseAppend_P (PSTR("%s"), str_json.c_str ());
@@ -73,11 +76,11 @@ void InfoWebPageJson ()
   json_version += "\"" + String (D_FRIENDLY_NAME) + "\":\"" + SettingsText(SET_DEVICENAME) + "\",";
   json_version += "\"" + String (D_SSID) + "\":\"" + SettingsText(SET_STASSID1 + Settings.sta_active) + " (" + WifiGetRssiAsQuality(WiFi.RSSI()) + "%%)\",";
   json_version += "\"" + String (D_HOSTNAME) + "\":\"" + String (TasmotaGlobal.hostname) + "\",";
-  json_version += "\"" + String (D_IP_ADDRESS) + "\":\"" + WiFi.localIP().toString() + "\",";
-  json_version += "\"" + String (D_MAC_ADDRESS) + "\":\"" + WiFi.macAddress() + "\",";
   json_version += "\"" + String (D_MQTT_HOST) + "\":\"" + SettingsText(SET_MQTT_HOST) + "\",";
   json_version += "\"" + String (D_MQTT_PORT) + "\":\"" + Settings.mqtt_port + "\",";
-  json_version += "\"" + String (D_MQTT_FULL_TOPIC) + "\":\"" + GetTopic_P(stopic, CMND, TasmotaGlobal.mqtt_topic, "") + "\"";
+  json_version += "\"" + String (D_MQTT_FULL_TOPIC) + "\":\"" + GetTopic_P(stopic, CMND, TasmotaGlobal.mqtt_topic, "") + "\",";
+  json_version += "\"" + String (D_IP_ADDRESS) + "\":\"" + WiFi.localIP().toString() + "\",";
+  json_version += "\"" + String (D_MAC_ADDRESS) + "\":\"" + WiFi.macAddress() + "\"";
   json_version += "}";
 
   // publish public page
