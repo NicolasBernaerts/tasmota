@@ -102,6 +102,10 @@
 #define D_TELEINFO_TIC               "TIC"
 #define D_TELEINFO_MESSAGE           "Messages"
 #define D_TELEINFO_HEURES            "Heures"
+#define D_TELEINFO_ERROR             "Errors"
+#define D_TELEINFO_MODE              "Mode"
+#define D_TELEINFO_RESET             "Message reset"
+#define D_TELEINFO_PERIOD            "Period"
 
 // web URL
 const char D_TELEINFO_PAGE_CONFIG[]    PROGMEM = "/tic-cfg";
@@ -117,16 +121,12 @@ const char D_TELEINFO_PAGE_TIC_PNG[]   PROGMEM = "/tic.png";
 // web strings
 const char D_TELEINFO_GRAPH[]         PROGMEM = "Graph";
 const char D_TELEINFO_CONFIG[]        PROGMEM = "Configure Teleinfo";
-const char D_TELEINFO_RESET[]         PROGMEM = "Message reset";
-const char D_TELEINFO_ERROR[]         PROGMEM = "Errors";
 const char D_TELEINFO_CHECKSUM[]      PROGMEM = "Checksum";
 const char D_TELEINFO_DISABLED[]      PROGMEM = "Disabled";
 const char D_TELEINFO_SPEED_DEFAULT[] PROGMEM = "bauds";
 const char D_TELEINFO_SPEED_HISTO[]   PROGMEM = "bauds (Historique)";
 const char D_TELEINFO_SPEED_STD[]     PROGMEM = "bauds (Standard)";
 const char D_TELEINFO_VOLTAGE[]       PROGMEM = "Voltage";
-const char D_TELEINFO_MODE[]          PROGMEM = "Mode";
-const char D_TELEINFO_PERIOD[]        PROGMEM = "Period";
 
 // form strings
 const char TELEINFO_INPUT_TEXT[]  PROGMEM = "<p><input type='radio' name='%s' value='%d' %s>%s</p>\n";

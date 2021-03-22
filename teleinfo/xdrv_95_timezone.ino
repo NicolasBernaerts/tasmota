@@ -237,7 +237,7 @@ void TimezoneWebSensor ()
   // dislay local time
   current_time = LocalTime ();
   BreakTime (current_time, current_dst);
-  WSContentSend_PD (PSTR ("<div style='text-align:center;'>%02d:%02d:%02d</div>\n"), current_dst.hour, current_dst.minute, current_dst.second);
+  WSContentSend_PD (PSTR ("<tr><div style='text-align:center;'>%02d:%02d:%02d</div></tr>\n"), current_dst.hour, current_dst.minute, current_dst.second);
 }
 
 // Timezone configuration web page
