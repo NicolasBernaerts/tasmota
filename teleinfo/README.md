@@ -1,9 +1,17 @@
 Teleinfo Tasmota firmware for Linky energy meters
 =============
 
-This evolution of Tasmota firmware has been enhanced to handle France energy meters using **Teleinfo** protocol. These meters are widely known as **Linky**.
+This evolution of Tasmota firmware **v9.3.1** has been enhanced to handle France energy meters using **Teleinfo** protocol.
+These meters are widely known as **Linky**.
 
-This implementation handles single-phase (monophase) and three-phase (triphase). It provides some real time consumption graphs.
+This implementation handles :
+  * TIC **historique**
+  * TIC **standard**
+  * Single-phase (**monophase**)
+  * Three-phase (**triphase**)
+
+It also provides some real time consumption graphs.
+
 Please note that it is a completly different implementation than the one published early 2020 by Charles Hallard. 
 
 Since **v6.0** onward, it is compatible with **ESP8266** and **ESP32** chipsets.
@@ -27,7 +35,7 @@ These meters are :
   * Classical electronic meter (white)
   * Linky meter (green)
 
-This firmware is based on Tasmota **v9.1** modified with :
+This firmware is based on Tasmota modified with :
   * serial as 7 bits, parity Even, 1 stop bit
   * default speed as 1200 or 9600 bauds
   * interface to handle teleinfo messages
@@ -43,7 +51,9 @@ Between your Energy meter and your Tasmota device, you'll need an adapter like t
 
 With modern Linky meters, **4.7k** resistor should be replaced by a **1.5k** resistor.
 
-You need to connect your adapter output **Tx** to any available port of your Tasmota device. This port should be declared as **TInfo RX**.
+You need to connect your adapter output **Tx** to any available port of your Tasmota device.
+This port should be declared as **TInfo RX**.
+
 For example, you can use :
   * ESP8266 : **GPIO03 RXD** port
   * WT32-ETH01 : **GPIO36** port
@@ -53,7 +63,7 @@ Finaly, in **Configure Teleinfo** you need to select your Teleinfo adapter baud 
   * **1200** (original white meter or green Linky in historic mode)
   * **9600** (green Linky in standard mode)
 
-If you are using an **ESP32** device, you can use its Ethernet port after selecting the proper board on the **Configure ESP32** menu.
+If you are using an **ESP32** device, you can use its **Ethernet** port after selecting the proper board on the **Configure ESP32** menu.
 
 Teleinfo protocol is described in this document : https://www.enedis.fr/sites/default/files/Enedis-NOI-CPT_54E.pdf
 
