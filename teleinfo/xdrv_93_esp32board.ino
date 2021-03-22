@@ -51,26 +51,43 @@ const char BOARD_FIELD_STOP[] PROGMEM  = "</fieldset></p><br>\n";
 const char BOARD_INPUT_TEXT[] PROGMEM  = "<p><input type='radio' name='%s' value='%d' %s>%s</p>\n";
 
 
-// ESP32 referenced ethernet adapters
-enum TeleinfoEthAdapter { ETH_NONE, ETH_OLIMEX_ESP32_PoE, ETH_WESP32, ETH_WT32_ETH01, ETH_MAX };
-const char board_name0[] PROGMEM = "ESP32-Dev-Kit (no ethernet)";
-const char board_name1[] PROGMEM = "Olimex ESP32-PoE";
-const char board_name2[] PROGMEM = "wESP32";
-const char board_name3[] PROGMEM = "WT32-ETH01";
+// ESP32 ethernet - list
+enum ESP32BoardList { ETH_NONE, ETH_OLIMEX_ESP32_PoE, ETH_WESP32, ETH_WT32_ETH01, ETH_MAX };
+const char kESP32BoardName[] PROGMEM = "ESP32-Dev-Kit|Olimex ESP32-PoE|wESP32|WT32-ETH01";
 
-const char board_tmpl0[] PROGMEM = "{\"NAME\":\"ESP32-Dev-Kit\",\"GPIO\":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,0,1,1,1,0,0,0,0,1,1,1,1,1,0,0,1],\"FLAG\":0,\"BASE\":1}";
-const char board_tmpl1[] PROGMEM = "{\"NAME\":\"Olimex ESP32-PoE\",\"GPIO\":[1,1,1,1,1,1,0,0,5536,1,1,1,1,0,5600,0,0,0,0,5568,0,0,0,0,0,0,0,0,1,1,1,1,1,0,0,1],\"FLAG\":0,\"BASE\":1}";
-const char board_tmpl2[] PROGMEM = "{\"NAME\":\"wESP32\",\"GPIO\":[0,0,1,0,1,1,0,0,1,1,1,1,5568,5600,1,0,0,0,0,1,0,0,0,0,0,0,0,0,1,1,1,1,1,0,0,1],\"FLAG\":0,\"BASE\":1}";
-const char board_tmpl3[] PROGMEM = "{\"NAME\":\"WT32-ETH01\",\"GPIO\":[1,1,1,1,1,1,0,0,1,0,1,1,3840,576,5600,0,0,0,0,5568,0,0,0,0,0,0,0,0,1,1,0,1,1,0,0,1],\"FLAG\":0,\"BASE\":1}";
-
-const char* const arr_board_name[]  PROGMEM = { board_name0, board_name1, board_name2, board_name3 };
-const char* const arr_board_tmpl[]  PROGMEM = { board_tmpl0, board_tmpl1, board_tmpl2, board_tmpl3 };
-
+// ESP32 ethernet - specific parameters
 const uint8_t arr_eth_enable[] PROGMEM = { 0, 1, 1, 1 };
 const uint8_t arr_eth_type[]   PROGMEM = { 0, ETH_PHY_LAN8720, ETH_PHY_LAN8720, ETH_PHY_LAN8720 };
 const uint8_t arr_eth_clock[]  PROGMEM = { 0, ETH_CLOCK_GPIO17_OUT, ETH_CLOCK_GPIO0_IN, ETH_CLOCK_GPIO0_IN };
 const uint8_t  arr_eth_addr[]  PROGMEM = { 0, 0, 0, 1 };
 
+// ESP32 ethernet - templates
+const char board_tmpl0[] PROGMEM = "{\"NAME\":\"ESP32-Dev-Kit\",\"GPIO\":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,0,1,1,1,0,0,0,0,1,1,1,1,1,0,0,1],\"FLAG\":0,\"BASE\":1}";
+const char board_tmpl1[] PROGMEM = "{\"NAME\":\"Olimex ESP32-PoE\",\"GPIO\":[1,1,1,1,1,1,0,0,5536,1,1,1,1,0,5600,0,0,0,0,5568,0,0,0,0,0,0,0,0,1,1,1,1,1,0,0,1],\"FLAG\":0,\"BASE\":1}";
+const char board_tmpl2[] PROGMEM = "{\"NAME\":\"wESP32\",\"GPIO\":[0,0,1,0,1,1,0,0,1,1,1,1,5568,5600,1,0,0,0,0,1,0,0,0,0,0,0,0,0,1,1,1,1,1,0,0,1],\"FLAG\":0,\"BASE\":1}";
+const char board_tmpl3[] PROGMEM = "{\"NAME\":\"WT32-ETH01\",\"GPIO\":[1,1,1,1,1,1,0,0,1,0,1,1,3840,576,5600,0,0,0,0,5568,0,0,0,0,0,0,0,0,1,1,0,1,1,0,0,1],\"FLAG\":0,\"BASE\":1}";
+const char* const arr_board_tmpl[] PROGMEM = { board_tmpl0, board_tmpl1, board_tmpl2, board_tmpl3 };
+
+// init procedure
+void ESP32BoardInit ()
+{
+  int    index;
+  String str_board;
+  char   str_text[32];
+
+  // get board template name and index
+  str_board = SettingsText(SET_TEMPLATE_NAME);
+  index = GetCommandCode (str_text, sizeof(str_text), str_board.c_str (), kESP32BoardName);
+
+  // if template name is registered, set technical parameters
+  if (index >= 0)
+  {
+    Settings.flag4.network_ethernet = arr_eth_enable[index];
+    Settings.eth_address  = arr_eth_addr[index];
+    Settings.eth_type     = arr_eth_type[index];
+    Settings.eth_clk_mode = arr_eth_clock[index];
+  }
+}
 
 // Show JSON status (for MQTT)
 void ESP32BoardShowJSON ()
@@ -78,10 +95,21 @@ void ESP32BoardShowJSON ()
   String str_json;
 
   // append to MQTT message
-  str_json  = ",\"" + String (D_JSON_ESP32_ETH) + "\":{";
-  str_json += "\"" + String (D_JSON_ESP32_MAC) + "\":\"" + ETH.macAddress() + "\",";
-  str_json += "\"" + String (D_JSON_ESP32_IP) + "\":\"" + ETH.localIP().toString() + "\"";
-  str_json += "}";
+  str_json  = ",\"";
+  str_json += D_JSON_ESP32_ETH;
+  str_json += "\":{";
+
+  str_json += "\"";
+  str_json += D_JSON_ESP32_MAC;
+  str_json += "\":\"";
+  str_json += ETH.macAddress();
+  str_json += "\",";
+
+  str_json += "\"";
+  str_json += D_JSON_ESP32_IP;
+  str_json += "\":\"";
+  str_json += ETH.localIP().toString();
+  str_json += "\"}";
 
   // append JSON to MQTT message
   ResponseAppend_P (PSTR("%s"), str_json.c_str ());
@@ -101,25 +129,35 @@ void ESP32BoardWebConfigButton ()
 }
 
 // append board info to main page
-bool ESP32BoardWebSensor ()
+void ESP32BoardWebSensor ()
 {
-  String str_ip;
+  String str_header, str_data, str_mac;
 
   // display wifi IP address
-  str_ip = WiFi.localIP().toString();
-  WSContentSend_PD (PSTR("{s}%s{m}%s{e}"), D_BOARD_WIFI, str_ip.c_str ());
+  str_header = D_BOARD_WIFI;
+  str_data   = WiFi.localIP().toString();
 
   // display Ethernet IP address
-  str_ip  = ETH.localIP().toString();
-  if (str_mac.length () > 0) WSContentSend_PD (PSTR("{s}%s{m}%s{e}"), D_BOARD_ETH, str_ip.c_str ());
+  str_mac = ETH.macAddress ();
+  if (str_mac.length () > 0)
+  {
+    str_header += "<br>";
+    str_header += D_BOARD_ETH;
+    str_data += "<br>";
+    str_data += ETH.localIP().toString();
+  }
+
+  // affichage IP wifi et ethernet
+  WSContentSend_PD (PSTR("{s}%s{m}%s{e}"), str_header.c_str (), str_data.c_str ());
+
 }
 
 // board config page
 void ESP32BoardWebPageConfig ()
 {
-  uint16_t value;
-  char     argument[LOGSZ];
-  String   str_board, str_active;
+  int    index;
+  char   str_text[MAX_LOGSZ];
+  String str_board, str_active;
 
   // if access not allowed, close
   if (!HttpCheckPriviledgedAccess()) return;
@@ -127,24 +165,21 @@ void ESP32BoardWebPageConfig ()
   // get teleinfo mode according to ETH parameter
   if (Webserver->hasArg(D_CMND_BOARD))
   {
-    WebGetArg (D_CMND_BOARD, argument, sizeof(argument));
-    value = (uint16_t)atoi (argument);
+    WebGetArg (D_CMND_BOARD, str_text, sizeof(str_text));
+    index = atoi (str_text);
 
     // if adapter is referenced
-    if (value < ETH_MAX)
+    if (index < ETH_MAX)
     {
       // set technical parameters
-      Settings.flag4.network_ethernet = arr_eth_enable[value];
-      Settings.eth_address  = arr_eth_addr[value];
-      Settings.eth_type     = arr_eth_type[value];
-      Settings.eth_clk_mode = arr_eth_clock[value];
+      Settings.flag4.network_ethernet = arr_eth_enable[index];
+      Settings.eth_address  = arr_eth_addr[index];
+      Settings.eth_type     = arr_eth_type[index];
+      Settings.eth_clk_mode = arr_eth_clock[index];
 
       // apply template as default one
-      snprintf_P(argument, sizeof(argument), PSTR("%s %s %s; %s 0"), D_CMND_BACKLOG, D_CMND_TEMPLATE, arr_board_tmpl[value], D_CMND_MODULE);
-      ExecuteWebCommand(argument, SRC_WEBGUI);
-
-      // log and ask for reboot
-      AddLog_P2(LOG_LEVEL_INFO, PSTR("ETH: Change to %s"), arr_board_name[value]);
+      snprintf_P (str_text, sizeof(str_text), PSTR(D_CMND_BACKLOG " " D_CMND_TEMPLATE " %s; %s 0"), arr_board_tmpl[index], D_CMND_MODULE);
+      ExecuteWebCommand (str_text, SRC_WEBGUI);
 
       // if some data has been updated, ask for reboot
       WebRestart(1);
@@ -161,13 +196,14 @@ void ESP32BoardWebPageConfig ()
 
   // board selection
   WSContentSend_P (BOARD_FIELD_START, D_BOARD);
-  for (value = 0; value < ETH_MAX; value ++) 
+  for (index = 0; index < ETH_MAX; index ++) 
   {
-    if (str_board == arr_board_name[value]) str_active = "checked"; else str_active = "";
-    WSContentSend_P (BOARD_INPUT_TEXT, D_CMND_BOARD, value, str_active.c_str (), arr_board_name[value]);
+    GetTextIndexed(str_text, sizeof(str_text), index, kESP32BoardName);
+    if (str_board == str_text) str_active = "checked"; else str_active = "";
+    WSContentSend_P (BOARD_INPUT_TEXT, D_CMND_BOARD, index, str_active.c_str (), str_text);
   }
   WSContentSend_P (BOARD_FIELD_STOP);
-
+   
   // save button
   WSContentSend_P (PSTR ("<button name='save' type='submit' class='button bgrn'>%s</button>"), D_SAVE);
   WSContentSend_P (BOARD_FORM_STOP);
@@ -191,7 +227,10 @@ bool Xdrv93 (uint8_t function)
   // swtich according to context
   switch (function) 
   {
-    case FUNC_JSON_APPEND:
+    case FUNC_INIT:
+      ESP32BoardInit ();
+      break;
+   case FUNC_JSON_APPEND:
       ESP32BoardShowJSON ();
       break;
 

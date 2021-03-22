@@ -30,12 +30,13 @@
     20/11/2020 - v6.2   - Correct checksum bug
     29/12/2020 - v6.3   - Strengthen message error control
     20/02/2021 - v6.4   - Add sub-totals (HCHP, HCHC, ...) to JSON
-    25/02/2021 - v7.0   - Enhance compatibility with standart mode
+    25/02/2021 - v7.0   - Prepare compatibility with TIC standard
     01/03/2021 - v7.0.1 - Add power status bar
     05/03/2021 - v7.1   - Correct bug on hardware energy counter
     08/03/2021 - v7.2   - Handle voltage and checksum for horodatage
     12/03/2021 - v7.3   - Use average / overload for graph
     15/03/2021 - v7.4   - Change graph period parameter
+    21/03/2021 - v7.5   - Support for TIC Standard
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -75,13 +76,19 @@
  *    Pilotwire firmware configuration
 \********************************************/
 
+// ESP32 specific
 #define USE_ETHERNET                          // Add support for ESP32 Ethernet physical port
+#define CONFIG_IDF_TARGET_ESP32 1             // Needed since tasmota 9.3
+
+//#undef USE_UFILESYS
+//#undef USE_MI_ESP32                         // ESP32 bluetooth support
+//#undef USE_ADC                              // ESP32 ADC support
 
 #define USE_INFOJSON                          // Add support for Information JSON page
 #define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_TELEINFO                          // Add support for Teleinfo
 
-#define EXTENSION_VERSION "7.4"               // version
+#define EXTENSION_VERSION "7.5"               // version
 #define EXTENSION_NAME "Teleinfo"             // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 
@@ -101,26 +108,30 @@
 #undef FRIENDLY_NAME
 #define FRIENDLY_NAME      "Teleinfo"
 
-//#undef USE_ENERGY_SENSOR                    // Disable energy sensors
 #undef USE_ARDUINO_OTA                        // support for Arduino OTA
 #undef USE_WPS                                // support for WPS as initial wifi configuration tool
 #undef USE_SMARTCONFIG                        // support for Wifi SmartConfig as initial wifi configuration tool
 #undef USE_DOMOTICZ                           // Domoticz
+
+//#ifdef ESP32
 //#undef USE_HOME_ASSISTANT                     // Home Assistant
+//#endif  // ESP32
+
 #undef USE_MQTT_TLS                           // TLS support won't work as the MQTTHost is not set
 #undef USE_KNX                                // KNX IP Protocol Support
 //#undef USE_WEBSERVER                        // Webserver
+
 #undef USE_EMULATION_HUE                      // Hue Bridge emulation for Alexa (+14k code, +2k mem common)
 #undef USE_EMULATION_WEMO                     // Belkin WeMo emulation for Alexa (+6k code, +2k mem common)
 #undef USE_CUSTOM                             // Custom features
-//#undef USE_DISCOVERY                          // Discovery services for both MQTT and web server
+
+//#undef USE_DISCOVERY                        // Discovery services for both MQTT and web server
 //#undef WEBSERVER_ADVERTISE                  // Provide access to webserver by name <Hostname>.local/
-//#undef MQTT_HOST_DISCOVERY                    // Find MQTT host server (overrides MQTT_HOST if found)
-//#undef USE_TIMERS                           // support for up to 16 timers
-//#undef USE_TIMERS_WEB                       // support for timer webpage
-//#undef USE_SUNRISE                          // support for Sunrise and sunset tools
-//#undef SUNRISE_DAWN_ANGLE DAWN_NORMAL       // Select desired Dawn Angle from
-#undef USE_RULES                              // Disable support for rules
+//#undef MQTT_HOST_DISCOVERY                  // Find MQTT host server (overrides MQTT_HOST if found)
+
+#undef USE_TIMERS                             // support for up to 16 timers
+#undef USE_SUNRISE                            // support for Sunrise and sunset tools
+//#undef USE_RULES                            // Disable support for rules
 
 #undef ROTARY_V1                              // Add support for Rotary Encoder as used in MI Desk Lamp (+0k8 code)
 #undef USE_SONOFF_RF                          // Add support for Sonoff Rf Bridge (+3k2 code)
@@ -136,10 +147,15 @@
 #undef USE_DEEPSLEEP                          // Add support for deepsleep (+1k code)
 #undef USE_EXS_DIMMER                         // Add support for ES-Store WiFi Dimmer (+1k5 code)
 #undef USE_DEVICE_GROUPS                      // Add support for device groups (+5k5 code)
-#undef USE_DEVICE_GROUPS_SEND                 // Add support for the DevGroupSend command (+0k6 code)
-#undef USE_PWM_DIMMER                         // Add support for MJ-SD01/acenx/NTONPOWER PWM dimmers (+2k2 code, DGR=0k4)
+#undef USE_PWM_DIMMER
 #undef USE_PWM_DIMMER_REMOTE                  // Add support for remote switches to PWM Dimmer (requires USE_DEVICE_GROUPS) (+0k9 code)
 #undef USE_SONOFF_D1                          // Add support for Sonoff D1 Dimmer (+0k7 code)
+#undef USE_SHELLY_DIMMER
+
+//#ifdef ESP32
+//#undef USE_LIGHT
+//#endif  // ESP32
+
 #undef USE_WS2812                             // WS2812 Led string using library NeoPixelBus (+5k code, +1k mem, 232 iram) - Disable by //
 #undef USE_MY92X1                             // Add support for MY92X1 RGBCW led controller as used in Sonoff B1, Ailight and Lohas
 #undef USE_SM16716                            // Add support for SM16716 RGB LED controller (+0k7 code)
@@ -149,7 +165,10 @@
 #undef USE_LIGHT_PALETTE                      // Add support for color palette (+0k7 code)
 #undef USE_DGR_LIGHT_SEQUENCE                 // Add support for device group light sequencing (requires USE_DEVICE_GROUPS) (+0k2 code)
 
-#undef USE_COUNTER                            // Enable inputs as counter (+0k8 code)
+#undef USE_ADE7953
+#undef USE_BL0940
+
+//#undef USE_COUNTER                          // Enable inputs as counter (+0k8 code)
 #undef USE_DS18x20                            // Add support for DS18x20 sensors with id sort, single scan and read retry (+2k6 code)
 #undef USE_DHT                                // Disable internal DHT sensor
 
@@ -158,6 +177,7 @@
 
 #undef USE_SERIAL_BRIDGE                      // Disable support for software Serial Bridge (+0k8 code)
 
+//#undef USE_ENERGY_SENSOR                    // Disable energy sensors
 #undef USE_ENERGY_MARGIN_DETECTION            // Add support for Energy Margin detection (+1k6 code)
 #undef USE_ENERGY_POWER_LIMIT                 // Add additional support for Energy Power Limit detection (+1k2 code)
 #undef USE_PZEM004T                           // Add support for PZEM004T Energy monitor (+2k code)
@@ -166,10 +186,8 @@
 #undef USE_MCP39F501                          // Add support for MCP39F501 Energy monitor as used in Shelly 2 (+3k1 code)
 
 #undef USE_IR_REMOTE                          // Send IR remote commands using library IRremoteESP8266 and ArduinoJson (+4k3 code, 0k3 mem, 48 iram)
-#undef USE_IR_SEND_NEC                        // Support IRsend NEC protocol
-#undef USE_IR_SEND_RC5                        // Support IRsend Philips RC5 protocol
-#undef USE_IR_SEND_RC6                        // Support IRsend Philips RC6 protocol
-#undef USE_IR_RECEIVE                         // Support for IR receiver (+7k2 code, 264 iram)
-#undef USE_ZIGBEE_ZNP                         // Enable ZNP protocol, needed for CC2530 based devices
+
+#undef USE_ZIGBEE                             // Enable Zigbee protocol
+//#undef USE_ZIGBEE_ZNP                       // Enable ZNP protocol, needed for CC2530 based devices
 
 #endif  // _USER_CONFIG_OVERRIDE_H_

@@ -44,10 +44,18 @@ void InfoShowJSON ()
   String str_json;
 
   // append to MQTT message
-  str_json  = ",\"" + String (D_JSON_INFO_WIFI) + "\":{";
-  str_json += "\"" + String (D_JSON_INFO_MAC) + "\":\"" + WiFi.macAddress() + "\",";
-  str_json += "\"" + String (D_JSON_INFO_IP) + "\":\"" + WiFi.localIP().toString() + "\"";
-  str_json += "}";
+  str_json  = ",\"";
+  str_json += D_JSON_INFO_WIFI;
+  str_json += "\":{\"";
+  str_json += D_JSON_INFO_MAC;
+  str_json += "\":\"";
+  str_json += WiFi.macAddress();
+  str_json += "\",";
+  str_json += "\"";
+  str_json += D_JSON_INFO_IP;
+  str_json += "\":\"";
+  str_json += WiFi.localIP().toString();
+  str_json += "\"}";
 
   // append JSON to MQTT message
   ResponseAppend_P (PSTR("%s"), str_json.c_str ());
@@ -67,26 +75,90 @@ void InfoWebPageJson ()
 
   // generate version string
   json_version  = "{";
-  json_version += "\"Module\":\"" + ModuleName() + "\",";
-  json_version += "\"" + String (D_PROGRAM_VERSION) + "\":\"" + String (TasmotaGlobal.version) + "\",";
-  json_version += "\"Extension type\":\"" + String (EXTENSION_NAME) + "\",";
-  json_version += "\"Extension version\":\"" + String (EXTENSION_VERSION) + "\",";
-  json_version += "\"Extension author\":\"" + String (EXTENSION_AUTHOR) + "\",";
-  json_version += "\"" + String (D_UPTIME) + "\":\"" + GetUptime() + "\",";
-  json_version += "\"" + String (D_FRIENDLY_NAME) + "\":\"" + SettingsText(SET_DEVICENAME) + "\",";
-  json_version += "\"" + String (D_SSID) + "\":\"" + SettingsText(SET_STASSID1 + Settings.sta_active) + " (" + WifiGetRssiAsQuality(WiFi.RSSI()) + "%%)\",";
-  json_version += "\"" + String (D_HOSTNAME) + "\":\"" + String (TasmotaGlobal.hostname) + "\",";
-  json_version += "\"" + String (D_MQTT_HOST) + "\":\"" + SettingsText(SET_MQTT_HOST) + "\",";
-  json_version += "\"" + String (D_MQTT_PORT) + "\":\"" + Settings.mqtt_port + "\",";
-  json_version += "\"" + String (D_MQTT_FULL_TOPIC) + "\":\"" + GetTopic_P(stopic, CMND, TasmotaGlobal.mqtt_topic, "") + "\",";
-  json_version += "\"" + String (D_IP_ADDRESS) + "\":\"" + WiFi.localIP().toString() + "\",";
-  json_version += "\"" + String (D_MAC_ADDRESS) + "\":\"" + WiFi.macAddress() + "\"";
+  json_version += "\"Module\":\"";
+  json_version += ModuleName ();
+  json_version += "\",";
+
+  json_version += "\"";
+  json_version += D_PROGRAM_VERSION;
+  json_version += "\":\"";
+  json_version += TasmotaGlobal.version;
+  json_version += "\",";
+
+  json_version += "\"Extension type\":\"";
+  json_version += EXTENSION_NAME;
+  json_version += "\",";
+
+  json_version += "\"Extension version\":\"";
+  json_version += EXTENSION_VERSION;
+  json_version += "\",";
+
+  json_version += "\"Extension author\":\"";
+  json_version += EXTENSION_AUTHOR;
+  json_version += "\",";
+
+  json_version += "\"";
+  json_version += D_UPTIME;
+  json_version += "\":\"";
+  json_version += GetUptime ();
+  json_version += "\",";
+
+  json_version += "\"";
+  json_version += D_FRIENDLY_NAME;
+  json_version += "\":\"";
+  json_version += SettingsText (SET_DEVICENAME);
+  json_version += "\",";
+
+  json_version += "\"";
+  json_version += D_SSID;
+  json_version += "\":\"";
+  json_version += SettingsText (SET_STASSID1 + Settings.sta_active);
+  json_version += " (";
+  json_version += WifiGetRssiAsQuality (WiFi.RSSI ());
+  json_version += "%%)\",";
+
+  json_version += "\"";
+  json_version += D_HOSTNAME;
+  json_version += "\":\"";
+  json_version += TasmotaGlobal.hostname;
+  json_version += "\",";
+
+  json_version += "\"";
+  json_version += D_MQTT_HOST;
+  json_version += "\":\"";
+  json_version += SettingsText (SET_MQTT_HOST);
+  json_version += "\",";
+
+  json_version += "\"";
+  json_version += D_MQTT_PORT;
+  json_version += "\":\"";
+  json_version += Settings.mqtt_port;
+  json_version += "\",";
+
+  json_version += "\"";
+  json_version += D_MQTT_FULL_TOPIC;
+  json_version += "\":\"";
+  json_version += GetTopic_P (stopic, CMND, TasmotaGlobal.mqtt_topic, "");
+  json_version += "\",";
+
+  json_version += "\"";
+  json_version += D_IP_ADDRESS;
+  json_version += "\":\"";
+  json_version += WiFi.localIP ().toString ();
+  json_version += "\",";
+
+  json_version += "\"";
+  json_version += D_MAC_ADDRESS;
+  json_version += "\":\"";
+  json_version += WiFi.macAddress ();
+  json_version += "\"";
+
   json_version += "}";
 
   // publish public page
   WSContentBegin (200, CT_HTML);
   WSContentSend_P (json_version.c_str ());
-  WSContentEnd();
+  WSContentEnd ();
 }
 
 #endif  // USE_WEBSERVER

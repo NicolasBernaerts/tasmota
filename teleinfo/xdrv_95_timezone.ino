@@ -81,23 +81,75 @@ void TimezoneShowJSON (bool append)
   String  str_json;
 
   // Timezone section start -->  "Timezone":{
-  str_json = "\"" + String (D_JSON_TIMEZONE) + "\":{";
+  str_json = "\"";
+  str_json += D_JSON_TIMEZONE;
+  str_json += "\":{";
 
   // STD section -->  "STD":{"Offset":60,"Month":10,"Week":0,"Day":1}
-  str_json += "\"" + String (D_JSON_TIMEZONE_STD) + "\":{";
-  str_json += "\"" + String (D_JSON_TIMEZONE_OFFSET) + "\":" + String (Settings.toffset[0]) + ",";
-  str_json += "\"" + String (D_JSON_TIMEZONE_MONTH) + "\":" + String (Settings.tflag[0].month) + ",";
-  str_json += "\"" + String (D_JSON_TIMEZONE_WEEK) + "\":" + String (Settings.tflag[0].week) + ",";
-  str_json += "\"" + String (D_JSON_TIMEZONE_DAY) + "\":" + String (Settings.tflag[0].dow) + "}";
+  str_json += "\"";
+  str_json += D_JSON_TIMEZONE_STD;
+  str_json += "\":{";
+
+  // Offset
+  str_json += "\"";
+  str_json += D_JSON_TIMEZONE_OFFSET;
+  str_json += "\":";
+  str_json += Settings.toffset[0];
   str_json += ",";
 
+  // Month
+  str_json += "\"";
+  str_json += D_JSON_TIMEZONE_MONTH;
+  str_json += "\":";
+  str_json += Settings.tflag[0].month;
+  str_json += ",";
+
+  // Week
+  str_json += "\"";
+  str_json += D_JSON_TIMEZONE_WEEK;
+  str_json += "\":";
+  str_json += Settings.tflag[0].week;
+  str_json += ",";
+
+  // Day
+  str_json += "\"";
+  str_json += D_JSON_TIMEZONE_DAY;
+  str_json += "\":";
+  str_json += Settings.tflag[0].dow;
+  str_json += "},";
+
   // DST section -->  "DST":{"Offset":60,"Month":10,"Week":0,"Day":1}
-  str_json += "\"" + String (D_JSON_TIMEZONE_DST) + "\":{";
-  str_json += "\"" + String (D_JSON_TIMEZONE_OFFSET) + "\":" + String (Settings.toffset[1]) + ",";
-  str_json += "\"" + String (D_JSON_TIMEZONE_MONTH) + "\":" + String (Settings.tflag[1].month) + ",";
-  str_json += "\"" + String (D_JSON_TIMEZONE_WEEK) + "\":" + String (Settings.tflag[1].week) + ",";
-  str_json += "\"" + String (D_JSON_TIMEZONE_DAY) + "\":" + String (Settings.tflag[1].dow) + "}";
-  str_json += "}";
+  str_json += "\"";
+  str_json += D_JSON_TIMEZONE_DST;
+  str_json += "\":{";
+
+  // Offset
+  str_json += "\"";
+  str_json += D_JSON_TIMEZONE_OFFSET;
+  str_json += "\":";
+  str_json += Settings.toffset[1];
+  str_json += ",";
+
+  // Month
+  str_json += "\"";
+  str_json += D_JSON_TIMEZONE_MONTH;
+  str_json += "\":";
+  str_json += Settings.tflag[1].month;
+  str_json += ",";
+
+  // Week
+  str_json += "\"";
+  str_json += D_JSON_TIMEZONE_WEEK;
+  str_json += "\":";
+  str_json += Settings.tflag[1].week;
+  str_json += ",";
+
+  // Day
+  str_json += "\"";
+  str_json += D_JSON_TIMEZONE_DAY;
+  str_json += "\":";
+  str_json += Settings.tflag[1].dow;
+  str_json += "}}";
 
   // if append mode, add json string to MQTT message
   if (append) ResponseAppend_P (PSTR (",%s"), str_json.c_str ());
@@ -177,7 +229,7 @@ void TimezoneWebConfigButton ()
 }
 
 // append local time to main page
-bool TimezoneWebSensor ()
+void TimezoneWebSensor ()
 {
   TIME_T   current_dst;
   uint32_t current_time;
@@ -185,7 +237,7 @@ bool TimezoneWebSensor ()
   // dislay local time
   current_time = LocalTime ();
   BreakTime (current_time, current_dst);
-  WSContentSend_PD (PSTR ("{s}%s{m}%02d:%02d:%02d{e}"), D_TIMEZONE_TIME, current_dst.hour, current_dst.minute, current_dst.second);
+  WSContentSend_PD (PSTR ("<div style='text-align:center;'>%02d:%02d:%02d</div>\n"), current_dst.hour, current_dst.minute, current_dst.second);
 }
 
 // Timezone configuration web page
