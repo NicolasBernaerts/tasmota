@@ -4,11 +4,11 @@ Teleinfo Tasmota firmware for Linky energy meters
 This evolution of Tasmota firmware **v9.3.1** has been enhanced to handle France energy meters using **Teleinfo** protocol.
 These meters are widely known as **Linky**.
 
-This implementation handles :
-  * TIC **historique**
-  * TIC **standard**
-  * Single-phase (**monophase**)
-  * Three-phase (**triphase**)
+This implementation has been tested on :
+  * Single-phase (**monophase**) with TIC **historique**
+  * Single-phase (**monophase**) with TIC **standard**
+  * Three-phase (**triphase**) with TIC **historique**
+  * Three-phase (**triphase**) with TIC **standard**
 
 It also provides some real time consumption graphs.
 
@@ -19,21 +19,27 @@ Since **v6.0** onward, it is compatible with **ESP8266** and **ESP32** chipsets.
 It provides thru MQTT :
   * tasmota energy data
   * all Teleinfo data
-Some Teleinfo data are also added to handle easily mono-phase and tri-phase meters (**PHASE**, **SSOUSC**, **IINST1**, **SINSTS1**, ...).
-It allows easy offloading of electrical appliances or heaters.
+  * some simple Meter data (independent from TIC mode)
 
-Data provided are for example :
-  * **PHASE** (number of phases)
-  * **ADCO**, **ADCS** (contract number)
-  * **ISOUSC** (max contract current per phase) 
-  * **SSOUSC** (max contract power per phase)
-  * **IINST1**, **IINST2**, **IINST3** (instant current per phase)
-  * **SINSTS1**, **SINSTS2**, **SINSTS3** (instant apparent power per phase)
-  * **ADIR1**, **ADIR2**, **ADIR3** (overload message)
-  
+Teleinfo data are provided as is :
+  * **ADCO**, **ADCS** = contract number
+  * **ISOUSC** = max contract current per phase 
+  * **SSOUSC** = max contract power per phase
+  * **IINST**, **IINST1**, **IINST2**, **IINST3** = instant current per phase
+  * **SINSTS1**, **SINSTS2**, **SINSTS3** = instant apparent power per phase (seems to be a sum)
+  * **ADIR1**, **ADIR2**, **ADIR3** = overload message
+
 These meters are :
   * Classical electronic meter (white)
   * Linky meter (green)
+
+Meter data allows easy reading and offloading of electrical appliances or heaters :
+  * **PHASE** = number of phases
+  * **PREF** = contract maximum power per phase 
+  * **IREF** = contract maximum current per phase 
+  * **Px** = instant power on phase x 
+  * **Ix** = instant current on phase x 
+  * **Ux** = instant voltage on phase x 
 
 This firmware is based on Tasmota modified with :
   * serial as 7 bits, parity Even, 1 stop bit
