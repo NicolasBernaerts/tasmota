@@ -89,10 +89,16 @@
 
 // graph data
 #define TELEINFO_GRAPH_SAMPLE        300         // number of samples per period
-#define TELEINFO_GRAPH_WIDTH         600         // graph width
-#define TELEINFO_GRAPH_HEIGHT        400 
+#define TELEINFO_GRAPH_WIDTH         1200        // graph width
+#define TELEINFO_GRAPH_HEIGHT        800 
 #define TELEINFO_GRAPH_PERCENT_START 10     
 #define TELEINFO_GRAPH_PERCENT_STOP  90
+
+// specificity of ESP32 which has lots of RAM
+#ifdef ESP32
+#undef TELEINFO_GRAPH_SAMPLE
+#define TELEINFO_GRAPH_SAMPLE        1200        // number of samples per period
+#endif // ESP32
 
 // commands
 #define D_CMND_TELEINFO_MODE         "mode"
@@ -117,6 +123,7 @@
 #define D_TELEINFO                   "Teleinfo"
 #define D_TELEINFO_TIC               "TIC"
 #define D_TELEINFO_MESSAGE           "Messages"
+#define D_TELEINFO_CONTRACT          "Contract"
 #define D_TELEINFO_HEURES            "Heures"
 #define D_TELEINFO_ERROR             "Errors"
 #define D_TELEINFO_MODE              "Mode"
@@ -182,7 +189,7 @@ const char *const ARR_TELEINFO_CFG_LABEL[] PROGMEM = { TELEINFO_CFG_LABEL0, TELE
 // graph - periods
 enum TeleinfoGraphPeriod { TELEINFO_PERIOD_LIVE, TELEINFO_PERIOD_DAY, TELEINFO_PERIOD_WEEK, TELEINFO_PERIOD_YEAR, TELEINFO_PERIOD_MAX };      // available graph periods
 const char kTeleinfoGraphPeriod[] PROGMEM = "Live|Day|Week|Year";                                                                             // period labels
-const long ARR_TELEINFO_PERIOD_SAMPLE[] = { 6, 288, 2016, 105120 };                                                                           // number of seconds between samples
+const long ARR_TELEINFO_PERIOD_SAMPLE[] = { 1800/TELEINFO_GRAPH_SAMPLE, 86400/TELEINFO_GRAPH_SAMPLE, 604800/TELEINFO_GRAPH_SAMPLE, 31536000/TELEINFO_GRAPH_SAMPLE };                                                                           // number of seconds between samples
 
 // graph - display
 enum TeleinfoGraphDisplay { TELEINFO_DISPLAY_POWER, TELEINFO_DISPLAY_VOLTAGE, TELEINFO_DISPLAY_MAX };                                         // available graph displays
@@ -763,8 +770,8 @@ void TeleinfoEvery250ms ()
             index_start = index_stop + 1;
             index_stop  = teleinfo_line.str_text.indexOf (teleinfo_line.separator, index_start);
             index_last  = teleinfo_line.str_text.lastIndexOf (teleinfo_line.separator);
-            if (index_stop == index_last) str_donnee = teleinfo_line.str_text.substring (index_start, index_stop);
-            else str_donnee = teleinfo_line.str_text.substring (index_stop + 1, index_last);
+            if (index_stop != index_last) str_donnee = teleinfo_line.str_text.substring (index_stop + 1, index_last);
+            if ((index_stop == index_last) || (str_donnee.length () == 0)) str_donnee = teleinfo_line.str_text.substring (index_start, index_stop);
             str_donnee = TeleinfoCleanupDonnee (str_donnee.c_str ());
 
             // handle specific etiquette index
@@ -839,7 +846,6 @@ void TeleinfoEvery250ms ()
                 teleinfo_contract.ssousc = str_donnee.toInt ();
                 break;
               // contract maximum power
-                break;
               case TIC_PREF:
               case TIC_PCOUP:
                 teleinfo_contract.ssousc = 1000 * str_donnee.toInt () / teleinfo_contract.phase;
@@ -889,6 +895,7 @@ void TeleinfoEvery250ms ()
               case TIC_ADIR2:
               case TIC_ADIR3:
                 teleinfo_message.overload = true;
+                break;
             }
 
             // if maximum number of lines no reached
@@ -1200,7 +1207,7 @@ void TeleinfoWebSensor ()
   String str_header;
   String str_display;
 
-  // display phase graph bar
+  // phase graph bar
   if (teleinfo_contract.ssousc > 0)
     for (phase = 0; phase < teleinfo_contract.phase; phase++)
     {
@@ -1213,16 +1220,16 @@ void TeleinfoWebSensor ()
       WSContentSend_PD (TELEINFO_HTML_BAR, ARR_TELEINFO_PHASE_COLOR[phase], str_display.c_str (), str_display.c_str ());
     }
 
-  // get TIC mode
+  // Teleinfo mode
   GetTextIndexed (str_text, 32, teleinfo_contract.mode, kTeleinfoModeName);
   str_header  = D_TELEINFO_MODE;
   str_display = str_text;
   
-  // get TIC tarif period, with conversion if historic short version
-  str_header += "<br>";
-  str_header += D_TELEINFO_PERIOD;
+  // Teleinfo tarif period, with conversion if historic short version
+  str_header  += "<br>";
+  str_header  += D_TELEINFO_PERIOD;
   str_display += "<br>";
-  sizeString = teleinfo_contract.period.length ();
+  sizeString  = teleinfo_contract.period.length ();
   if (sizeString >= 5) str_display += teleinfo_contract.period;
   else if (sizeString > 0)
   {
@@ -1236,7 +1243,22 @@ void TeleinfoWebSensor ()
     str_display += str_text;
   }
 
-  // display TIC mode and period
+  // Teleinfo contract power
+  str_header  += "<br>";
+  str_header  += D_TELEINFO_CONTRACT;
+  str_display += "<br>";
+  if (teleinfo_contract.phase > 1)
+  {
+    str_display += teleinfo_contract.phase;
+    str_display += " x ";
+  }
+  if (teleinfo_contract.ssousc > 0)
+  {
+    str_display += (teleinfo_contract.ssousc / 1000);
+    str_display += "kW";
+  }
+
+  // display data
   WSContentSend_PD (PSTR ("{s}%s{m}%s{e}"), str_header.c_str (), str_display.c_str ());
 
   // get number of TIC messages received
@@ -1506,11 +1528,10 @@ void TeleinfoWebPageTic ()
   WSContentSend_P (PSTR ("div {width:100%%;margin:12px auto;padding:3px 0px;text-align:center;vertical-align:middle;}\n"));
   WSContentSend_P (PSTR ("div.title {font-size:2rem;font-weight:bold;}\n"));
   WSContentSend_P (PSTR ("span {font-size:1.5rem;padding:0.5rem 1rem;border-radius:1rem;background:#4d82bd;}\n"));
-  WSContentSend_P (PSTR ("table {width:100%%;max-width:400px;margin:auto;border:none;background:none;padding:0.5rem;color:#fff;border-collapse:collapse;}\n"));
-  WSContentSend_P (PSTR ("th,td {font-size:1.2rem;padding:0.2rem 0.1rem;border:1px #666 solid;}\n"));
+  WSContentSend_P (PSTR ("table {width:100%%;max-width:400px;margin:0px auto;border:none;background:none;color:#fff;border-collapse:collapse;}\n"));
+  WSContentSend_P (PSTR ("th,td {font-size:1rem;padding:0.2rem 0.1rem;border:1px #666 solid;}\n"));
   WSContentSend_P (PSTR ("th {font-style:bold;background:#555;}\n"));
-  WSContentSend_P (PSTR ("th.narrow {width:20%%;}\n"));
-  WSContentSend_P (PSTR ("th.wide {width:60%%;}\n"));
+  WSContentSend_P (PSTR ("th.value {width:60%%;}\n"));
   WSContentSend_P (PSTR ("</style>\n"));
 
   // page body
@@ -1526,7 +1547,7 @@ void TeleinfoWebPageTic ()
 
   // display table with header
   WSContentSend_P (PSTR ("<div><table>\n"));
-  WSContentSend_P (PSTR ("<tr><th class='narrow'>Etiquette</th><th class='wide'>Valeur</th><th class='narrow'>Checksum</th></tr>\n"));
+  WSContentSend_P (PSTR ("<tr><th>Etiquette</th><th class='value'>Valeur</th><th>Checksum</th></tr>\n"));
 
   // loop to display TIC messsage lines
   for (index = 0; index < teleinfo_message.line_max; index ++)
@@ -1624,14 +1645,14 @@ void TeleinfoWebGraphData ()
 
   // start of SVG graph
   WSContentBegin (200, CT_HTML);
-  WSContentSend_P (PSTR ("<svg viewBox='%d %d %d %d' preserveAspectRatio='xMinYMin meet'>\n"), 0, 0, TELEINFO_GRAPH_WIDTH, TELEINFO_GRAPH_HEIGHT);
+  WSContentSend_P (PSTR ("<svg viewBox='%d %d %d %d'>\n"), 0, 0, TELEINFO_GRAPH_WIDTH, TELEINFO_GRAPH_HEIGHT);
 
   // SVG style 
   WSContentSend_P (PSTR ("<style type='text/css'>\n"));
   WSContentSend_P (PSTR ("polyline {fill:none;stroke-width:2;}\n"));
   for (phase = 0; phase < teleinfo_contract.phase; phase++) WSContentSend_P (PSTR ("polyline.ph%d {stroke:%s;}\n"), phase, ARR_TELEINFO_PHASE_COLOR[phase]);
   WSContentSend_P (PSTR ("line.time {stroke:white;stroke-width:1;}\n"));
-  WSContentSend_P (PSTR ("text.time {font-size:16px;fill:grey;}\n"));
+  WSContentSend_P (PSTR ("text.time {font-size:1.5rem;fill:grey;}\n"));
   WSContentSend_P (PSTR ("</style>\n"));
 
   // -----------------
@@ -1727,7 +1748,7 @@ void TeleinfoWebGraphData ()
         // display separation line and time
         graph_x = graph_left + shift_width + (index * unit_width);
         WSContentSend_P (PSTR ("<line class='time' x1='%d' y1='%d%%' x2='%d' y2='%d%%' />\n"), graph_x, 49, graph_x, 51);
-        WSContentSend_P (PSTR ("<text class='time' x='%d' y='%d%%'>%02dh%02d</text>\n"), graph_x - 25, 55, current_dst.hour, current_dst.minute);
+        WSContentSend_P (PSTR ("<text class='time' x='%d' y='%d%%'>%02dh%02d</text>\n"), graph_x - 35, 55, current_dst.hour, current_dst.minute);
       }
       break;
 
@@ -1886,15 +1907,14 @@ void TeleinfoWebGraphFrame ()
 
   // start of SVG graph
   WSContentBegin (200, CT_HTML);
-  WSContentSend_P (PSTR ("<svg viewBox='%d %d %d %d' preserveAspectRatio='xMinYMin meet'>\n"), 0, 0, TELEINFO_GRAPH_WIDTH, TELEINFO_GRAPH_HEIGHT);
+  WSContentSend_P (PSTR ("<svg viewBox='%d %d %d %d'>\n"), 0, 0, TELEINFO_GRAPH_WIDTH, TELEINFO_GRAPH_HEIGHT);
 
   // SVG style 
   WSContentSend_P (PSTR ("<style type='text/css'>\n"));
   WSContentSend_P (PSTR ("rect {stroke:grey;fill:none;}\n"));
   WSContentSend_P (PSTR ("line.dash {stroke:grey;stroke-width:1;stroke-dasharray:8;}\n"));
   WSContentSend_P (PSTR ("line.time {stroke:white;stroke-width:1;}\n"));
-  WSContentSend_P (PSTR ("text.power {font-size:16px;stroke:white;fill:white;}\n"));
-  WSContentSend_P (PSTR ("text.time {font-size:16px;fill:white;}\n"));
+  WSContentSend_P (PSTR ("text.power {font-size:2rem;stroke:white;fill:white;}\n"));
   WSContentSend_P (PSTR ("</style>\n"));
 
   // graph frame
@@ -1907,7 +1927,7 @@ void TeleinfoWebGraphFrame ()
 
   // power units
   WSContentSend_P (PSTR ("<text class='power' x='%d%%' y='%d%%'>%s</text>\n"), TELEINFO_GRAPH_PERCENT_STOP + 2, 4, str_unit.c_str ());
-  WSContentSend_P (TELEINFO_HTML_POWER, 1, 4,  value_max);
+  WSContentSend_P (TELEINFO_HTML_POWER, 1, 3,  value_max);
   WSContentSend_P (TELEINFO_HTML_POWER, 1, 26, value_min + (value_max - value_min) * 3 / 4);
   WSContentSend_P (TELEINFO_HTML_POWER, 1, 51, value_min + (value_max - value_min) / 2);
   WSContentSend_P (TELEINFO_HTML_POWER, 1, 76, value_min + (value_max - value_min) / 4);
@@ -1987,13 +2007,13 @@ void TeleinfoWebPageGraph ()
   WSContentSend_P (PSTR (" httpUpd.open('GET','%s?%s=%d',true);\n"), D_TELEINFO_PAGE_GRAPH_UPD, D_CMND_TELEINFO_PERIOD, graph_period);
   WSContentSend_P (PSTR (" httpUpd.send();\n"));
   WSContentSend_P (PSTR ("}\n"));
-  WSContentSend_P (PSTR ("setInterval(function() {update();},1000);\n"));
+  WSContentSend_P (PSTR ("setInterval(function() {update();},5000);\n"));
   WSContentSend_P (PSTR ("</script>\n"));
 
   // page style
   WSContentSend_P (PSTR ("<style>\n"));
   WSContentSend_P (PSTR ("body {color:white;background-color:#252525;font-family:Arial, Helvetica, sans-serif;}\n"));
-  WSContentSend_P (PSTR ("div {width:100%%;margin:1rem auto;padding:0.1rem 0px;text-align:center;vertical-align:middle;}\n"));
+  WSContentSend_P (PSTR ("div {width:100%%;margin:0.5rem auto;padding:0.1rem 0px;text-align:center;vertical-align:middle;}\n"));
   WSContentSend_P (PSTR (".title {font-size:2rem;font-weight:bold;}\n"));
   WSContentSend_P (PSTR ("div.phase {display:inline-block;width:90px;padding:0.2rem;margin:0.2rem;border-radius:8px;}\n"));
   WSContentSend_P (PSTR ("div.phase span.power {font-size:1rem;font-weight:bold;}\n"));
@@ -2004,7 +2024,7 @@ void TeleinfoWebPageGraph ()
   WSContentSend_P (PSTR ("button.period {width:75px;}\n"));
   WSContentSend_P (PSTR ("button.data {width:100px;}\n"));
   WSContentSend_P (PSTR (".active {background:#666;}\n"));
-  WSContentSend_P (PSTR (".svg-container {position:relative;vertical-align:middle;overflow:hidden;width:100%%;max-width:%dpx;padding-bottom:%dpx;}\n"), TELEINFO_GRAPH_WIDTH, TELEINFO_GRAPH_HEIGHT + 5);
+  WSContentSend_P (PSTR (".svg-container {position:relative;vertical-align:middle;overflow:hidden;width:100%%;max-width:%dpx;padding-bottom:68vw;}\n"), TELEINFO_GRAPH_WIDTH);
   WSContentSend_P (PSTR (".svg-content {display:inline-block;position:absolute;top:0;left:0;}\n"));
   WSContentSend_P (PSTR ("</style>\n"));
 
@@ -2068,8 +2088,8 @@ void TeleinfoWebPageGraph ()
 
   // display graph base and data
   WSContentSend_P (PSTR ("<div class='svg-container'>\n"));
-  WSContentSend_P (PSTR ("<object class='svg-content' id='base' type='image/svg+xml' width='%d%%' height='%d%%' data='%s?period=%d&data=%d'></object>\n"), 100, 100, D_TELEINFO_PAGE_GRAPH_FRAME, graph_period, graph_display);
-  WSContentSend_P (PSTR ("<object class='svg-content' id='data' type='image/svg+xml' width='%d%%' height='%d%%' data='%s?period=%d&data=%d&phase=%s&ts=0'></object>\n"), 100, 100, D_TELEINFO_PAGE_GRAPH_DATA, graph_period, graph_display, str_phase.c_str ());
+  WSContentSend_P (PSTR ("<object class='svg-content' id='base' type='image/svg+xml' width='100%%' height='100%%' data='%s?period=%d&data=%d'></object>\n"), D_TELEINFO_PAGE_GRAPH_FRAME, graph_period, graph_display);
+  WSContentSend_P (PSTR ("<object class='svg-content' id='data' type='image/svg+xml' width='100%%' height='100%%' data='%s?period=%d&data=%d&phase=%s&ts=0'></object>\n"), D_TELEINFO_PAGE_GRAPH_DATA, graph_period, graph_display, str_phase.c_str ());
   WSContentSend_P (PSTR ("</div>\n"));
 
   // end of page
