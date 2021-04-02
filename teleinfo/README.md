@@ -61,9 +61,9 @@ You need to connect your adapter output **Tx** to any available port of your Tas
 This port should be declared as **TInfo RX**.
 
 For example, you can use :
-  * ESP8266 : **GPIO03 RXD** port
-  * WT32-ETH01 : **GPIO36** port
-  * Olimex ESP32-POE : **GPIO02** port
+  * ESP8266 : **GPIO3 (RXD)** port
+  * WT32-ETH01 : **GPIO5 (RXD)** port
+  * Olimex ESP32-POE : **GPIO2** port
 
 Finaly, in **Configure Teleinfo** you need to select your Teleinfo adapter baud rate :
   * **1200** (original white meter or green Linky in historic mode)
