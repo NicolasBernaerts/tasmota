@@ -94,12 +94,6 @@
 #define TELEINFO_GRAPH_PERCENT_START 10     
 #define TELEINFO_GRAPH_PERCENT_STOP  90
 
-// specificity of ESP32 which has lots of RAM
-#ifdef ESP32
-#undef TELEINFO_GRAPH_SAMPLE
-#define TELEINFO_GRAPH_SAMPLE        1200        // number of samples per period
-#endif // ESP32
-
 // commands
 #define D_CMND_TELEINFO_MODE         "mode"
 #define D_CMND_TELEINFO_ETH          "eth"
@@ -554,8 +548,8 @@ void TeleinfoInit ()
     ClaimSerial ();
 #else  // ESP32
     // start ESP32 serial port
-    teleinfo_serial = new HardwareSerial(2);
-    teleinfo_serial->begin(teleinfo_mode, SERIAL_7E1, Pin(GPIO_TELEINFO_RX), -1);
+    teleinfo_serial = new HardwareSerial (2);
+    teleinfo_serial->begin (teleinfo_mode, SERIAL_7E1, Pin(GPIO_TELEINFO_RX), -1);
 #endif // ESP286 & ESP32
 
     // log
@@ -623,7 +617,7 @@ void TeleinfoGraphInit ()
 }
 
 // function to handle received teleinfo data
-void TeleinfoEvery250ms ()
+void TeleinfoReceiveData ()
 {
   bool   first_total;
   bool   overload = false;
@@ -1221,7 +1215,7 @@ void TeleinfoWebSensor ()
     }
 
   // Teleinfo mode
-  GetTextIndexed (str_text, 32, teleinfo_contract.mode, kTeleinfoModeName);
+  GetTextIndexed (str_text, sizeof (str_text), teleinfo_contract.mode, kTeleinfoModeName);
   str_header  = D_TELEINFO_MODE;
   str_display = str_text;
   
@@ -1234,8 +1228,8 @@ void TeleinfoWebSensor ()
   else if (sizeString > 0)
   {
     // get period label
-    period = GetCommandCode (str_text, 32, teleinfo_contract.period.c_str (), kTeleinfoPeriod);
-    GetTextIndexed (str_text, 32, period, kTeleinfoPeriodName);
+    period = GetCommandCode (str_text, sizeof (str_text), teleinfo_contract.period.c_str (), kTeleinfoPeriod);
+    GetTextIndexed (str_text, sizeof (str_text), period, kTeleinfoPeriodName);
 
     // add period label
     str_display += D_TELEINFO_HEURES;
@@ -1255,7 +1249,7 @@ void TeleinfoWebSensor ()
   if (teleinfo_contract.ssousc > 0)
   {
     str_display += (teleinfo_contract.ssousc / 1000);
-    str_display += "kW";
+    str_display += " kW";
   }
 
   // display data
@@ -1405,7 +1399,7 @@ void TeleinfoWebJsonData ()
     graph_period = atoi (str_argument);
     if ((graph_period < 0) || (graph_period >= TELEINFO_PERIOD_MAX)) graph_period = TELEINFO_PERIOD_LIVE;
   }
-  GetTextIndexed (str_argument, 8, graph_period, kTeleinfoGraphPeriod);
+  GetTextIndexed (str_argument, sizeof (str_argument), graph_period, kTeleinfoGraphPeriod);
 
   // start of data page
   WSContentBegin (200, CT_HTML);
@@ -2013,17 +2007,22 @@ void TeleinfoWebPageGraph ()
   // page style
   WSContentSend_P (PSTR ("<style>\n"));
   WSContentSend_P (PSTR ("body {color:white;background-color:#252525;font-family:Arial, Helvetica, sans-serif;}\n"));
-  WSContentSend_P (PSTR ("div {width:100%%;margin:0.5rem auto;padding:0.1rem 0px;text-align:center;vertical-align:middle;}\n"));
+  WSContentSend_P (PSTR ("div {margin:0.5rem auto;padding:0.1rem 0px;text-align:center;vertical-align:middle;}\n"));
   WSContentSend_P (PSTR (".title {font-size:2rem;font-weight:bold;}\n"));
   WSContentSend_P (PSTR ("div.phase {display:inline-block;width:90px;padding:0.2rem;margin:0.2rem;border-radius:8px;}\n"));
   WSContentSend_P (PSTR ("div.phase span.power {font-size:1rem;font-weight:bold;}\n"));
   WSContentSend_P (PSTR ("div.phase span.volt {font-size:0.8rem;font-style:italic;}\n"));
   for (phase = 0; phase < teleinfo_contract.phase; phase++) WSContentSend_P (PSTR ("div.ph%d {color:%s;border:1px %s solid;}\n"), phase, ARR_TELEINFO_PHASE_COLOR[phase], ARR_TELEINFO_PHASE_COLOR[phase]);
   WSContentSend_P (PSTR ("div.disabled {color:#444;}\n"));
-  WSContentSend_P (PSTR ("button {font-size:1rem;padding:0.2rem 0.5rem;border:1px #666 solid;background:none;color:#fff;border-radius:8px;}\n"));
-  WSContentSend_P (PSTR ("button.period {width:75px;}\n"));
-  WSContentSend_P (PSTR ("button.data {width:100px;}\n"));
-  WSContentSend_P (PSTR (".active {background:#666;}\n"));
+  WSContentSend_P (PSTR ("div.choice {display:inline-block;font-size:1rem;padding:0px;margin:auto 10px;border:1px #666 solid;background:none;color:#fff;border-radius:6px;}\n"));
+  WSContentSend_P (PSTR ("div.choice a {color:white;}\n"));
+  WSContentSend_P (PSTR ("div.choice div {background:#666;}\n"));
+  WSContentSend_P (PSTR ("div.choice a div {background:none;}\n"));
+  WSContentSend_P (PSTR ("div.item {display:inline-block;padding:0.2rem auto;margin:1px;border:none;border-radius:4px;}\n"));
+  WSContentSend_P (PSTR ("div.choice a div.item:hover {background:#aaa;}\n"));
+  WSContentSend_P (PSTR ("div.period {width:75px;}\n"));
+  WSContentSend_P (PSTR ("div.data {width:100px;}\n"));
+  WSContentSend_P (PSTR ("div.size {width:40px;}\n"));
   WSContentSend_P (PSTR (".svg-container {position:relative;vertical-align:middle;overflow:hidden;width:100%%;max-width:%dpx;padding-bottom:68vw;}\n"), TELEINFO_GRAPH_WIDTH);
   WSContentSend_P (PSTR (".svg-content {display:inline-block;position:absolute;top:0;left:0;}\n"));
   WSContentSend_P (PSTR ("</style>\n"));
@@ -2059,30 +2058,38 @@ void TeleinfoWebPageGraph ()
 
   // period tabs
   WSContentSend_P (PSTR ("<div>\n"));
+  WSContentSend_P (PSTR ("<div class='choice'>\n"));
   for (index = 0; index < TELEINFO_PERIOD_MAX; index++)
   {
     // get period label
     GetTextIndexed (str_data, sizeof (str_data), index, kTeleinfoGraphPeriod);
 
     // set button according to active state
-    if (graph_period == index) WSContentSend_P (PSTR ("<button class='button period active'>%s</button>\n"), str_data);
-    else WSContentSend_P (PSTR ("<a href='%s?period=%d&data=%d&phase=%s'><button class='button period'>%s</button></a>\n"), D_TELEINFO_PAGE_GRAPH, index, graph_display, str_phase.c_str (), str_data);
+    if (graph_period != index) WSContentSend_P (PSTR ("<a href='%s?period=%d&data=%d&phase=%s'>"), D_TELEINFO_PAGE_GRAPH, index, graph_display, str_phase.c_str ());
+    WSContentSend_P (PSTR ("<div class='item period'>%s</div>"), str_data);
+    if (graph_period != index) WSContentSend_P (PSTR ("</a>"));
+    WSContentSend_P (PSTR ("\n"));
   }
+  WSContentSend_P (PSTR ("</div>\n"));
   WSContentSend_P (PSTR ("</div>\n"));
 
   // if voltage is available, display data selection tabs
   if (Energy.voltage_available)
   {
     WSContentSend_P (PSTR ("<div>\n"));
+    WSContentSend_P (PSTR ("<div class='choice'>\n"));
     for (index = 0; index < TELEINFO_DISPLAY_MAX; index++)
     {
       // get data display label
       GetTextIndexed (str_data, sizeof (str_data), index, kTeleinfoGraphDisplay);
 
       // display tab
-      if (graph_display == index) WSContentSend_P (PSTR ("<button class='button data active'>%s</button>\n"), str_data);
-      else WSContentSend_P (PSTR ("<a href='%s?period=%d&data=%d&phase=%s'><button class='button data'>%s</button></a>\n"), D_TELEINFO_PAGE_GRAPH, graph_period, index, str_phase.c_str (), str_data);
+      if (graph_display != index) WSContentSend_P (PSTR ("<a href='%s?period=%d&data=%d&phase=%s'>"), D_TELEINFO_PAGE_GRAPH, graph_period, index, str_phase.c_str ());
+      WSContentSend_P (PSTR ("<div class='item data'>%s</div>"), str_data);
+      if (graph_display != index) WSContentSend_P (PSTR ("</a>"));
+      WSContentSend_P (PSTR ("\n"));
    }
+    WSContentSend_P (PSTR ("</div>\n"));
     WSContentSend_P (PSTR ("</div>\n"));
   }
 
@@ -2129,8 +2136,8 @@ bool Xsns15 (uint8_t function)
     case FUNC_INIT:
       TeleinfoGraphInit ();
       break;
-    case FUNC_EVERY_250_MSECOND:
-      if (teleinfo_enabled && (TasmotaGlobal.uptime > 4)) TeleinfoEvery250ms ();
+    case FUNC_EVERY_100_MSECOND:
+      if (teleinfo_enabled && (TasmotaGlobal.uptime > 4)) TeleinfoReceiveData ();
       break;
     case FUNC_EVERY_SECOND:
       TeleinfoEverySecond ();

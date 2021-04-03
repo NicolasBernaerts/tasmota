@@ -92,7 +92,7 @@
 #define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_TELEINFO                          // Add support for Teleinfo
 
-#define EXTENSION_VERSION "7.6"               // version
+#define EXTENSION_VERSION "7.6e"               // version
 #define EXTENSION_NAME "Teleinfo"             // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 
@@ -117,7 +117,7 @@
 #undef USE_ARDUINO_OTA                        // support for Arduino OTA
 #undef USE_WPS                                // support for WPS as initial wifi configuration tool
 #undef USE_SMARTCONFIG                        // support for Wifi SmartConfig as initial wifi configuration tool
-#undef USE_DOMOTICZ                           // Domoticz
+//#undef USE_DOMOTICZ                           // Domoticz
 //#undef USE_HOME_ASSISTANT                     // Home Assistant
 
 #undef USE_MQTT_TLS                           // TLS support won't work as the MQTTHost is not set
