@@ -38,6 +38,7 @@
     15/03/2021 - v7.4   - Change graph period parameter
     21/03/2021 - v7.5   - Support for TIC Standard
     29/03/2021 - v7.6   - Add voltage graph
+    04/03/2021 - v7.7   - Change in serial port & graph height selection
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -82,7 +83,6 @@
 
 // ESP32 specific
 #define USE_ETHERNET                          // Add support for ESP32 Ethernet physical port
-#define CONFIG_IDF_TARGET_ESP32 1             // Needed since tasmota 9.3
 
 //#undef USE_UFILESYS
 //#undef USE_MI_ESP32                         // ESP32 bluetooth support
@@ -92,7 +92,7 @@
 #define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_TELEINFO                          // Add support for Teleinfo
 
-#define EXTENSION_VERSION "7.6e"               // version
+#define EXTENSION_VERSION "7.7"               // version
 #define EXTENSION_NAME "Teleinfo"             // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 

@@ -41,6 +41,7 @@
     15/03/2021 - v7.4   - Change graph period parameter
     21/03/2021 - v7.5   - Support for TIC Standard
     29/03/2021 - v7.6   - Add voltage graph
+    04/03/2021 - v7.7   - Change in serial port & graph height selection
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -90,7 +91,8 @@
 // graph data
 #define TELEINFO_GRAPH_SAMPLE        300         // number of samples per period
 #define TELEINFO_GRAPH_WIDTH         1200        // graph width
-#define TELEINFO_GRAPH_HEIGHT        800 
+#define TELEINFO_GRAPH_HEIGHT        800         // default graph height
+#define TELEINFO_GRAPH_STEP          200         // graph height mofification step
 #define TELEINFO_GRAPH_PERCENT_START 10     
 #define TELEINFO_GRAPH_PERCENT_STOP  90
 
@@ -100,6 +102,7 @@
 #define D_CMND_TELEINFO_PHASE        "phase"
 #define D_CMND_TELEINFO_PERIOD       "period"
 #define D_CMND_TELEINFO_DATA         "data"
+#define D_CMND_TELEINFO_HEIGHT       "height"
 #define D_CMND_TELEINFO_CFG_RATE     "rate"
 #define D_CMND_TELEINFO_CFG_TIC      "tic"
 #define D_CMND_TELEINFO_CFG_DATA     "data"
@@ -153,7 +156,7 @@ const char TELEINFO_FORM_START[]  PROGMEM = "<form method='get' action='%s'>\n";
 const char TELEINFO_FORM_STOP[]   PROGMEM = "</form>\n";
 const char TELEINFO_FIELD_START[] PROGMEM = "<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n";
 const char TELEINFO_FIELD_STOP[]  PROGMEM = "</fieldset></p><br>\n";
-const char TELEINFO_HTML_POWER[]  PROGMEM = "<text class='power' x='%d%%' y='%d%%'>%d</text>\n";
+const char TELEINFO_HTML_POWER[]  PROGMEM = "<text class='power' x='%d%%' y='%d%%'>%s</text>\n";
 const char TELEINFO_HTML_DASH[]   PROGMEM = "<line class='dash' x1='%d%%' y1='%d%%' x2='%d%%' y2='%d%%' />\n";
 const char TELEINFO_HTML_BAR[]    PROGMEM = "<tr><div style='margin:4px;padding:0px;background-color:#ddd;border-radius:4px;'><div style='font-size:0.75rem;font-weight:bold;padding:0px;text-align:center;border:1px solid #bbb;border-radius:4px;color:#444;background-color:%s;width:%s%%;'>%s%%</div></div></tr>\n";
 
@@ -165,7 +168,6 @@ const char kTeleinfoEtiquetteName[] PROGMEM = "|ADCO|ADSC|PTEC|NGTF|EAIT|IINST|I
 enum TeleinfoMode { TIC_MODE_UNDEFINED, TIC_MODE_HISTORIC, TIC_MODE_STANDARD };
 const char kTeleinfoModeName[] PROGMEM = "|Historique|Standard";
 const int ARR_TELEINFO_RATE[] = { 0, 1200, 2400, 4800, 9600, 19200 }; 
-//const int arr_tic_rate_mode[] = { TIC_MODE_UNDEFINED, TIC_MODE_HISTORIC, TIC_MODE_UNDEFINED, TIC_MODE_UNDEFINED, TIC_MODE_STANDARD, TIC_MODE_UNDEFINED };                                                                                     // number of seconds between samples
 
 // TIC - tarifs
 enum TeleinfoPeriod { TIC_HISTO_TH, TIC_HISTO_HC, TIC_HISTO_HP, TIC_HISTO_HN, TIC_HISTO_PM, TIC_HISTO_CB, TIC_HISTO_CW, TIC_HISTO_CR, TIC_HISTO_PB, TIC_HISTO_PW, TIC_HISTO_PR, TIC_HISTO_MAX, TIC_STD_P, TIC_STD_HPH, TIC_STD_HCH, TIC_STD_HPD, TIC_STD_HCD, TIC_STD_HPE, TIC_STD_HCE, TIC_STD_JA, TIC_STD_PM, TIC_STD_HH, TIC_STD_HD, TIC_STD_HM, TIC_STD_DSM, TIC_STD_SCM, TIC_STD_1, TIC_STD_2, TIC_STD_3, TIC_STD_4, TIC_STD_5 };
@@ -200,6 +202,13 @@ const char *const arr_week_day[] PROGMEM = { "Sun", "Mon", "Tue", "Wed", "Thu", 
 
 // teleinfo driver status
 bool teleinfo_enabled = false;
+
+// serial port
+#ifdef ESP8266
+TasmotaSerial *teleinfo_serial = nullptr;
+#else  // ESP32
+HardwareSerial *teleinfo_serial = nullptr;
+#endif // ESP286 & ESP32
 
 // teleinfo data
 struct {
@@ -266,25 +275,23 @@ struct tic_period {
   bool     updated;                                               // flag to ask for graph update
   int      index;                                                 // current array index per refresh period
   long     counter;                                               // counter in seconds of current refresh period
+
   // --- limit values for graph display ---
   uint16_t vmin;                                                  // graph minimum voltage
   uint16_t vmax;                                                  // graph maximum voltage
   uint16_t pmax;                                                  // graph maximum power
+
   // --- arrays for current refresh period (per phase) ---
   uint16_t volt_low[TELEINFO_PHASE_MAX];                          // peak low voltage during refresh period
   uint16_t volt_high[TELEINFO_PHASE_MAX];                         // peak high voltage during refresh period
   uint16_t papp_high[TELEINFO_PHASE_MAX];                         // peak apparent power during refresh period
   uint32_t papp_sum[TELEINFO_PHASE_MAX];                          // sum of apparent power during refresh period
+
   // --- arrays with all graph values ---
   uint8_t  arr_papp[TELEINFO_PHASE_MAX][TELEINFO_GRAPH_SAMPLE];   // array of apparent power graph values
   uint8_t  arr_volt[TELEINFO_PHASE_MAX][TELEINFO_GRAPH_SAMPLE];   // array min and max voltage delta
 }; 
 tic_period teleinfo_graph[TELEINFO_PERIOD_MAX];
-
-#ifdef ESP32
-// serial port
-HardwareSerial *teleinfo_serial = nullptr;
-#endif
 
 /****************************************\
  *               Icons
@@ -342,29 +349,29 @@ void TeleinfoSetPolicyData (int policy)
   Settings.weight_calibration = (ulong)policy;
 }
 
-// get teleinfo mode (baud rate)
-uint16_t TeleinfoGetMode ()
+// get teleinfo baud rate
+uint16_t TeleinfoGetBaudRate ()
 {
-  uint16_t actual_mode;
+  uint16_t actual_rate;
 
-  // read actual teleinfo mode
-  actual_mode = Settings.sbaudrate;
-  if (actual_mode > 19200) actual_mode = 0;
+  // read actual teleinfo baud rate
+  actual_rate = Settings.sbaudrate;
+  if (actual_rate > 19200) actual_rate = 0;
   
-  return actual_mode;
+  return actual_rate;
 }
 
-// set teleinfo mode (baud rate)
-void TeleinfoSetMode (uint16_t new_mode)
+// set teleinfo baud rate
+void TeleinfoSetBaudRate (uint16_t new_rate)
 {
   // if within range, set baud rate
-  if (new_mode <= 19200)
+  if (new_rate <= 19200)
   {
     // if mode has changed
-    if (Settings.sbaudrate != new_mode)
+    if (Settings.sbaudrate != new_rate)
     {
       // save mode
-      Settings.sbaudrate = new_mode;
+      Settings.sbaudrate = new_rate;
 
       // ask for restart
       TasmotaGlobal.restart_flag = 2;
@@ -479,7 +486,7 @@ char TeleinfoCalculateChecksum (const char* pstr_line)
     {
       // increase checksum error counter and log
       teleinfo_message.nb_error++;
-      AddLog (LOG_LEVEL_INFO, PSTR ("ERR: [%c] %s"), line_checksum, teleinfo_line.str_text.c_str ());
+      AddLog (LOG_LEVEL_INFO, PSTR ("ERR: %s [%c]"), teleinfo_line.str_text.c_str (), line_checksum);
 
       // reset checksum
       line_checksum = 0;
@@ -516,6 +523,29 @@ String TeleinfoCleanupDonnee (const char* pstr_string)
   return str_cleanup;
 }
 
+String TeleinfoGenerateUnitLabel (uint16_t unit_value) 
+{
+  int    nb_digit;
+  String str_unit, str_digit;
+
+  // generate raw conversion
+  str_unit = unit_value;
+  nb_digit = str_unit.length ();
+
+  // if value is more than 3 digits (beyond 999)
+  if (nb_digit > 3)
+  {
+    // convert 6120 to 6.1k
+    str_digit = str_unit.substring (nb_digit - 3, nb_digit - 2);
+    str_unit = str_unit.substring (0, nb_digit - 3);
+    str_unit += ".";
+    str_unit += str_digit;
+    str_unit += "k";
+  }
+
+  return str_unit;
+}
+
 void TeleinfoPreInit ()
 {
   // if PIN defined, set energy driver
@@ -532,28 +562,51 @@ void TeleinfoPreInit ()
 void TeleinfoInit ()
 {
   int      index;
-  uint16_t teleinfo_mode;
+  uint16_t baud_rate;
 
   // get teleinfo speed
-  teleinfo_mode = TeleinfoGetMode ();
+  baud_rate = TeleinfoGetBaudRate ();
 
   // if sensor has been pre initialised
-  teleinfo_enabled = ((TasmotaGlobal.energy_driver == XNRG_15) && (teleinfo_mode > 0));
+  teleinfo_enabled = ((TasmotaGlobal.energy_driver == XNRG_15) && (baud_rate > 0));
   if (teleinfo_enabled)
   {
+
 #ifdef ESP8266
-    // start ESP8266 serial port
-    Serial.flush ();
-    Serial.begin (teleinfo_mode, SERIAL_7E1);
-    ClaimSerial ();
+
+    // create serial port with buffer set to 256 (to handle 19200bps with 100ms loop)
+    teleinfo_serial = new TasmotaSerial (Pin (GPIO_TELEINFO_RX), -1, 2, 0, 256);
+
+    // if port has been created
+    if (teleinfo_serial->begin (baud_rate))
+    {
+      // check that it's connected to hardware GPIO
+      if (teleinfo_serial->hardwareSerial ())
+      {
+        // init hardware port
+        Serial.begin (baud_rate, SERIAL_7E1);
+        ClaimSerial ();
+
+        // log
+        AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Teleinfo ESP8266 hardware serial initialised"));
+      }
+    }
+
 #else  // ESP32
-    // start ESP32 serial port
+
+    // use UART2 (some board have USB on UART1)
     teleinfo_serial = new HardwareSerial (2);
-    teleinfo_serial->begin (teleinfo_mode, SERIAL_7E1, Pin(GPIO_TELEINFO_RX), -1);
-#endif // ESP286 & ESP32
+
+    // set buffer to 256 (to handle 19200bps with 100ms loop)
+    teleinfo_serial->setRxBufferSize (256); 
+
+    // init UART          
+    teleinfo_serial->begin (baud_rate, SERIAL_7E1, Pin(GPIO_TELEINFO_RX), -1);
 
     // log
-    AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Teleinfo Serial ready"));
+    AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Teleinfo ESP32 hardware serial initialised"));
+
+#endif // ESP286 & ESP32
 
     // init hardware energy counters
     Settings.flag3.hardware_energy_total = true;
@@ -629,19 +682,11 @@ void TeleinfoReceiveData ()
   String str_etiquette;
   String str_donnee;
 
-#ifdef ESP8266
-  // loop as long as serial port buffer is not almost empty
-  while (Serial.available() > TELEINFO_SERIAL_BUFFER) 
-  {
-    // read caracter
-    recv_serial = Serial.read ();
-#else  // ESP32
   // loop as long as serial port buffer is not almost empty
   while (teleinfo_serial->available() > TELEINFO_SERIAL_BUFFER) 
   {
     // read caracter
     recv_serial = teleinfo_serial->read(); 
-#endif // ESP286 & ESP32
 
     switch (recv_serial)
     {
@@ -769,7 +814,7 @@ void TeleinfoReceiveData ()
             str_donnee = TeleinfoCleanupDonnee (str_donnee.c_str ());
 
             // handle specific etiquette index
-            index = GetCommandCode (str_text, 16, str_etiquette.c_str (), kTeleinfoEtiquetteName);
+            index = GetCommandCode (str_text, sizeof (str_text), str_etiquette.c_str (), kTeleinfoEtiquetteName);
             switch (index)
             {
               // contract reference
@@ -1174,6 +1219,26 @@ void TeleinfoShowJSON (bool append, bool publish_tic, bool publish_data)
 // display offload icons
 void TeleinfoWebIconTic () { Webserver->send_P (200, PSTR ("image/png"), teleinfo_icon_tic_png, teleinfo_icon_tic_len); }
 
+// get specific argument as a value with min and max
+int TeleinfoWebGetArgValue (const char* pstr_argument, int value_default, int value_min, int value_max)
+{
+  int  arg_value = value_default;
+  char str_argument[8];
+
+  // check for argument
+  if (Webserver->hasArg (pstr_argument))
+  {
+    WebGetArg (pstr_argument, str_argument, sizeof (str_argument));
+    arg_value = atoi (str_argument);
+
+    // check for min and max value
+    if (arg_value < value_min) arg_value = value_min;
+    if (arg_value > value_max) arg_value = value_max;
+  }
+
+  return arg_value;
+}
+
 // append Teleinfo graph button to main page
 void TeleinfoWebMainButton ()
 {
@@ -1324,12 +1389,12 @@ void TeleinfoWebPageConfig ()
     // get current and new teleinfo rate
     WebGetArg (D_CMND_TELEINFO_CFG_RATE, str_argument, sizeof (str_argument));
     rate_baud = atoi (str_argument);
-    tic_baud = (int)TeleinfoGetMode ();
+    tic_baud = (int)TeleinfoGetBaudRate ();
 
     // if different, update and restart
     if (tic_baud != rate_baud)
     {
-      TeleinfoSetMode ((uint16_t) atoi (str_argument));
+      TeleinfoSetBaudRate ((uint16_t) atoi (str_argument));
       WebRestart (1);
     }
   }
@@ -1340,7 +1405,7 @@ void TeleinfoWebPageConfig ()
   WSContentSend_P (TELEINFO_FORM_START, D_TELEINFO_PAGE_CONFIG);
 
   // speed selection form
-  tic_baud = (int)TeleinfoGetMode ();
+  tic_baud = (int)TeleinfoGetBaudRate ();
   WSContentSend_P (TELEINFO_FIELD_START, TELEINFO_TITLE_RATE);
   for (index = 0; index < 6; index++)
   {
@@ -1385,11 +1450,11 @@ void TeleinfoWebPageConfig ()
 // JSON data page
 void TeleinfoWebJsonData ()
 {
-  bool     first_value;
-  int      index, phase,index_array;
-  int      graph_period = TELEINFO_PERIOD_LIVE;
-  long     power, voltage;
-  char     str_argument[8];
+  bool first_value;
+  int  index, phase,index_array;
+  int  graph_period = TELEINFO_PERIOD_LIVE;
+  long power, voltage;
+  char str_argument[8];
 
   // check graph period to be displayed
   if (Webserver->hasArg (D_CMND_TELEINFO_PERIOD))
@@ -1412,8 +1477,6 @@ void TeleinfoWebJsonData ()
   // loop thru phasis
   for (phase = 0; phase < teleinfo_contract.phase; phase++)
   {
-    // current phase section
-
     // loop for the apparent power array
     WSContentSend_P (PSTR (",\"P%d\":["), phase + 1);
     for (index = 0; index < TELEINFO_GRAPH_SAMPLE; index++)
@@ -1556,10 +1619,10 @@ void TeleinfoWebPageTic ()
 // get status update
 void TeleinfoWebGraphUpdate ()
 {
-  int      graph_period = TELEINFO_PERIOD_LIVE;
-  int      index;
-  String   str_text;
-  char     str_argument[4];
+  int    graph_period = TELEINFO_PERIOD_LIVE;
+  int    index;
+  char   str_argument[4];
+  String str_text;
 
   // check graph period to be displayed
   if (Webserver->hasArg (D_CMND_TELEINFO_PERIOD))
@@ -1595,42 +1658,28 @@ void TeleinfoWebGraphUpdate ()
 void TeleinfoWebGraphData ()
 {
   bool     graph_valid, phase_display;
-  int      graph_period  = TELEINFO_PERIOD_LIVE;  
-  int      graph_display = TELEINFO_DISPLAY_POWER;  
   int      index, phase, index_array;
+  int      graph_period, graph_display, graph_height;  
   long     graph_left, graph_right, graph_width;  
   long     unit_width, shift_unit, shift_width;  
   long     graph_value, graph_delta, graph_x, graph_y;  
   TIME_T   current_dst;
   uint32_t current_time;
+  float    font_size;
   char     str_data[8];
   String   str_phase;
 
-  // check graph period to be displayed
-  if (Webserver->hasArg (D_CMND_TELEINFO_PERIOD))
-  {
-    // set graph period
-    WebGetArg (D_CMND_TELEINFO_PERIOD, str_data, sizeof (str_data));
-    graph_period = atoi (str_data);
-    if ((graph_period < 0) || (graph_period >= TELEINFO_PERIOD_MAX)) graph_period = TELEINFO_PERIOD_LIVE;
-  }
+  // get numerical argument values
+  graph_period  = TeleinfoWebGetArgValue (D_CMND_TELEINFO_PERIOD, TELEINFO_PERIOD_LIVE,   0,   TELEINFO_PERIOD_MAX - 1);
+  graph_display = TeleinfoWebGetArgValue (D_CMND_TELEINFO_DATA,   TELEINFO_DISPLAY_POWER, 0,   TELEINFO_DISPLAY_MAX - 1);
+  graph_height  = TeleinfoWebGetArgValue (D_CMND_TELEINFO_HEIGHT, TELEINFO_GRAPH_HEIGHT,  100, INT_MAX);
 
-  // check graph data to be displayed
-  if (Webserver->hasArg (D_CMND_TELEINFO_DATA))
-  {
-    // set graph period
-    WebGetArg (D_CMND_TELEINFO_DATA, str_data, sizeof (str_data));
-    graph_display = atoi (str_data);
-    if ((graph_display < 0) || (graph_display >= TELEINFO_DISPLAY_MAX)) graph_display = TELEINFO_DISPLAY_POWER;
-  }
+  // set font size
+  font_size = (float)graph_height / TELEINFO_GRAPH_HEIGHT * 1.5;
 
   // check phase display argument
-  if (Webserver->hasArg (D_CMND_TELEINFO_PHASE))
-  {
-    // set graph period
-    WebGetArg (D_CMND_TELEINFO_PHASE, str_data, sizeof (str_data));
-    str_phase = str_data;
-  }
+  if (Webserver->hasArg (D_CMND_TELEINFO_PHASE)) { WebGetArg (D_CMND_TELEINFO_PHASE, str_data, sizeof (str_data)); str_phase = str_data; }
+  for (phase = str_phase.length (); phase < teleinfo_contract.phase; phase++) str_phase += "1";
 
   // boundaries of SVG graph
   graph_left  = TELEINFO_GRAPH_PERCENT_START * TELEINFO_GRAPH_WIDTH / 100;
@@ -1639,14 +1688,14 @@ void TeleinfoWebGraphData ()
 
   // start of SVG graph
   WSContentBegin (200, CT_HTML);
-  WSContentSend_P (PSTR ("<svg viewBox='%d %d %d %d'>\n"), 0, 0, TELEINFO_GRAPH_WIDTH, TELEINFO_GRAPH_HEIGHT);
+  WSContentSend_P (PSTR ("<svg viewBox='%d %d %d %d'>\n"), 0, 0, TELEINFO_GRAPH_WIDTH, graph_height);
 
   // SVG style 
   WSContentSend_P (PSTR ("<style type='text/css'>\n"));
   WSContentSend_P (PSTR ("polyline {fill:none;stroke-width:2;}\n"));
   for (phase = 0; phase < teleinfo_contract.phase; phase++) WSContentSend_P (PSTR ("polyline.ph%d {stroke:%s;}\n"), phase, ARR_TELEINFO_PHASE_COLOR[phase]);
   WSContentSend_P (PSTR ("line.time {stroke:white;stroke-width:1;}\n"));
-  WSContentSend_P (PSTR ("text.time {font-size:1.5rem;fill:grey;}\n"));
+  WSContentSend_P (PSTR ("text.time {font-size:%srem;fill:grey;}\n"), String (font_size, 1).c_str ());
   WSContentSend_P (PSTR ("</style>\n"));
 
   // -----------------
@@ -1675,7 +1724,7 @@ void TeleinfoWebGraphData ()
             // if power is defined, calculate graph y position
             graph_value = (long)TeleinfoGetGraphPower (graph_period, phase, index_array);
             graph_valid = ((graph_value != UINT16_MAX) && (teleinfo_graph[graph_period].pmax != 0));
-            if (graph_valid) graph_y = TELEINFO_GRAPH_HEIGHT - (graph_value * TELEINFO_GRAPH_HEIGHT / teleinfo_graph[graph_period].pmax);
+            if (graph_valid) graph_y = graph_height - (graph_value * graph_height / teleinfo_graph[graph_period].pmax);
             break;
 
           case TELEINFO_DISPLAY_VOLTAGE:
@@ -1689,7 +1738,7 @@ void TeleinfoWebGraphData ()
               graph_value = graph_value - teleinfo_graph[graph_period].vmin;
 
               // calculate graph y position
-              graph_y = TELEINFO_GRAPH_HEIGHT - (graph_value * TELEINFO_GRAPH_HEIGHT / graph_delta);
+              graph_y = graph_height - (graph_value * graph_height / graph_delta);
             }
             break;
           
@@ -1821,30 +1870,20 @@ void TeleinfoWebGraphData ()
 // Graph frame
 void TeleinfoWebGraphFrame ()
 {
-  int      graph_period  = TELEINFO_PERIOD_LIVE;  
-  int      graph_display = TELEINFO_DISPLAY_POWER;
-  int      index, phase, graph_left, graph_right, graph_width;
+  int      index, phase;
+  int      graph_period, graph_display, graph_height;  
+  int      graph_left, graph_right, graph_width;
   uint16_t value, value_min, value_max;
-  char     str_data[4];
+  float    font_size, unit, unit_min, unit_max;
   String   str_unit;
 
-  // check graph period to be displayed
-  if (Webserver->hasArg (D_CMND_TELEINFO_PERIOD))
-  {
-    // set graph period
-    WebGetArg (D_CMND_TELEINFO_PERIOD, str_data, sizeof (str_data));
-    graph_period = atoi (str_data);
-    if ((graph_period < 0) || (graph_period >= TELEINFO_PERIOD_MAX)) graph_period = TELEINFO_PERIOD_LIVE;
-  }
- 
-  // check graph data to be displayed
-  if (Webserver->hasArg (D_CMND_TELEINFO_DATA))
-  {
-    // set graph period
-    WebGetArg (D_CMND_TELEINFO_DATA, str_data, sizeof (str_data));
-    graph_display = atoi (str_data);
-    if ((graph_display < 0) || (graph_display >= TELEINFO_DISPLAY_MAX)) graph_display = TELEINFO_DISPLAY_POWER;
-  }
+  // get numerical argument values
+  graph_period  = TeleinfoWebGetArgValue (D_CMND_TELEINFO_PERIOD, TELEINFO_PERIOD_LIVE,   0,   TELEINFO_PERIOD_MAX - 1);
+  graph_display = TeleinfoWebGetArgValue (D_CMND_TELEINFO_DATA,   TELEINFO_DISPLAY_POWER, 0,   TELEINFO_DISPLAY_MAX - 1);
+  graph_height  = TeleinfoWebGetArgValue (D_CMND_TELEINFO_HEIGHT, TELEINFO_GRAPH_HEIGHT,  100, INT_MAX);
+
+  // set font size
+  font_size = (float)graph_height / TELEINFO_GRAPH_HEIGHT * 2;
 
   // set scale according to displayed data
   switch (graph_display) 
@@ -1901,14 +1940,14 @@ void TeleinfoWebGraphFrame ()
 
   // start of SVG graph
   WSContentBegin (200, CT_HTML);
-  WSContentSend_P (PSTR ("<svg viewBox='%d %d %d %d'>\n"), 0, 0, TELEINFO_GRAPH_WIDTH, TELEINFO_GRAPH_HEIGHT);
+  WSContentSend_P (PSTR ("<svg viewBox='%d %d %d %d'>\n"), 0, 0, TELEINFO_GRAPH_WIDTH, graph_height);
 
   // SVG style 
   WSContentSend_P (PSTR ("<style type='text/css'>\n"));
   WSContentSend_P (PSTR ("rect {stroke:grey;fill:none;}\n"));
   WSContentSend_P (PSTR ("line.dash {stroke:grey;stroke-width:1;stroke-dasharray:8;}\n"));
   WSContentSend_P (PSTR ("line.time {stroke:white;stroke-width:1;}\n"));
-  WSContentSend_P (PSTR ("text.power {font-size:2rem;stroke:white;fill:white;}\n"));
+  WSContentSend_P (PSTR ("text.power {font-size:%srem;stroke:white;fill:white;}\n"), String (font_size, 1).c_str ());
   WSContentSend_P (PSTR ("</style>\n"));
 
   // graph frame
@@ -1919,13 +1958,13 @@ void TeleinfoWebGraphFrame ()
   WSContentSend_P (TELEINFO_HTML_DASH, TELEINFO_GRAPH_PERCENT_START, 50, TELEINFO_GRAPH_PERCENT_STOP, 50);
   WSContentSend_P (TELEINFO_HTML_DASH, TELEINFO_GRAPH_PERCENT_START, 75, TELEINFO_GRAPH_PERCENT_STOP, 75);
 
-  // power units
+  // units graduation
   WSContentSend_P (PSTR ("<text class='power' x='%d%%' y='%d%%'>%s</text>\n"), TELEINFO_GRAPH_PERCENT_STOP + 2, 4, str_unit.c_str ());
-  WSContentSend_P (TELEINFO_HTML_POWER, 1, 3,  value_max);
-  WSContentSend_P (TELEINFO_HTML_POWER, 1, 26, value_min + (value_max - value_min) * 3 / 4);
-  WSContentSend_P (TELEINFO_HTML_POWER, 1, 51, value_min + (value_max - value_min) / 2);
-  WSContentSend_P (TELEINFO_HTML_POWER, 1, 76, value_min + (value_max - value_min) / 4);
-  WSContentSend_P (TELEINFO_HTML_POWER, 1, 99, value_min);
+  WSContentSend_P (TELEINFO_HTML_POWER, 1, 3,  TeleinfoGenerateUnitLabel (value_max).c_str ());
+  WSContentSend_P (TELEINFO_HTML_POWER, 1, 26, TeleinfoGenerateUnitLabel (value_min + (value_max - value_min) * 3 / 4).c_str ());
+  WSContentSend_P (TELEINFO_HTML_POWER, 1, 51, TeleinfoGenerateUnitLabel (value_min + (value_max - value_min) / 2).c_str ());
+  WSContentSend_P (TELEINFO_HTML_POWER, 1, 76, TeleinfoGenerateUnitLabel (value_min + (value_max - value_min) / 4).c_str ());
+  WSContentSend_P (TELEINFO_HTML_POWER, 1, 99, TeleinfoGenerateUnitLabel (value_min).c_str ());
 
   // end of SVG graph
   WSContentSend_P (PSTR ("</svg>\n"));
@@ -1935,39 +1974,22 @@ void TeleinfoWebGraphFrame ()
 // Graph public page
 void TeleinfoWebPageGraph ()
 {
-  bool    phase_display;
-  int     graph_period  = TELEINFO_PERIOD_LIVE;  
-  int     graph_display = TELEINFO_DISPLAY_POWER;  
-  int     index, phase;
-  char    str_data[16];
-  String  str_phase, str_text;
+  bool   phase_display;
+  int    index, phase;
+  int    graph_period, graph_display, graph_height, graph_bottom;  
+  char   str_data[8];
+  String str_phase, str_text;
 
+  // get numerical argument values
+  graph_period  = TeleinfoWebGetArgValue (D_CMND_TELEINFO_PERIOD, TELEINFO_PERIOD_LIVE,   0,   TELEINFO_PERIOD_MAX - 1);
+  graph_display = TeleinfoWebGetArgValue (D_CMND_TELEINFO_DATA,   TELEINFO_DISPLAY_POWER, 0,   TELEINFO_DISPLAY_MAX - 1);
+  graph_height  = TeleinfoWebGetArgValue (D_CMND_TELEINFO_HEIGHT, TELEINFO_GRAPH_HEIGHT,  100, INT_MAX);
 
-  // check graph period to be displayed
-  if (Webserver->hasArg (D_CMND_TELEINFO_PERIOD))
-  {
-    // set graph period
-    WebGetArg (D_CMND_TELEINFO_PERIOD, str_data, sizeof (str_data));
-    graph_period = atoi (str_data);
-    if ((graph_period < 0) || (graph_period >= TELEINFO_PERIOD_MAX)) graph_period = TELEINFO_PERIOD_LIVE;
-  }
- 
-  // check graph data to be displayed
-  if (Webserver->hasArg (D_CMND_TELEINFO_DATA))
-  {
-    // set graph period
-    WebGetArg (D_CMND_TELEINFO_DATA, str_data, sizeof (str_data));
-    graph_display = atoi (str_data);
-    if ((graph_display < 0) || (graph_display >= TELEINFO_DISPLAY_MAX)) graph_display = TELEINFO_DISPLAY_POWER;
-  }
+  // calculate graph bottom padding
+  graph_bottom = 68 * graph_height / TELEINFO_GRAPH_HEIGHT;
 
   // check phase display argument
-  if (Webserver->hasArg (D_CMND_TELEINFO_PHASE))
-  {
-    // set graph period
-    WebGetArg (D_CMND_TELEINFO_PHASE, str_data, sizeof (str_data));
-    str_phase = str_data;
-  }
+  if (Webserver->hasArg (D_CMND_TELEINFO_PHASE)) { WebGetArg (D_CMND_TELEINFO_PHASE, str_data, sizeof (str_data)); str_phase = str_data; }
   for (phase = str_phase.length (); phase < teleinfo_contract.phase; phase++) str_phase += "1";
 
   // beginning of form without authentification
@@ -1987,7 +2009,7 @@ void TeleinfoWebPageGraph ()
   WSContentSend_P (PSTR ("   if (arr_param[0]==1)\n"));
   WSContentSend_P (PSTR ("   {\n"));
   WSContentSend_P (PSTR ("    str_random=Math.floor(Math.random()*100000);\n"));
-  WSContentSend_P (PSTR ("    document.getElementById('data').data='%s?period=%d&data=%d&phase=%s&rnd='+str_random;\n"), D_TELEINFO_PAGE_GRAPH_DATA, graph_period, graph_display, str_phase.c_str ());
+  WSContentSend_P (PSTR ("    document.getElementById('data').data='%s?period=%d&data=%d&height=%d&phase=%s&rnd='+str_random;\n"), D_TELEINFO_PAGE_GRAPH_DATA, graph_period, graph_display, graph_height, str_phase.c_str ());
   WSContentSend_P (PSTR ("   }\n"));
   WSContentSend_P (PSTR ("   num_param=arr_param.length;\n"));
   WSContentSend_P (PSTR ("   for (i=1;i<num_param;i++)\n"));
@@ -2023,7 +2045,7 @@ void TeleinfoWebPageGraph ()
   WSContentSend_P (PSTR ("div.period {width:75px;}\n"));
   WSContentSend_P (PSTR ("div.data {width:100px;}\n"));
   WSContentSend_P (PSTR ("div.size {width:40px;}\n"));
-  WSContentSend_P (PSTR (".svg-container {position:relative;vertical-align:middle;overflow:hidden;width:100%%;max-width:%dpx;padding-bottom:68vw;}\n"), TELEINFO_GRAPH_WIDTH);
+  WSContentSend_P (PSTR (".svg-container {position:relative;vertical-align:middle;overflow:hidden;width:100%%;max-width:%dpx;padding-bottom:%dvw;}\n"), TELEINFO_GRAPH_WIDTH, graph_bottom);
   WSContentSend_P (PSTR (".svg-content {display:inline-block;position:absolute;top:0;left:0;}\n"));
   WSContentSend_P (PSTR ("</style>\n"));
 
@@ -2045,7 +2067,7 @@ void TeleinfoWebPageGraph ()
     str_text = str_phase;
     phase_display = (str_text.charAt (phase) != '0');
     if (phase_display) str_text.setCharAt (phase, '0'); else str_text.setCharAt (phase, '1');
-    WSContentSend_P (PSTR ("<a href='%s?period=%d&data=%d&phase=%s'>"), D_TELEINFO_PAGE_GRAPH, graph_period, graph_display, str_text.c_str ());
+    WSContentSend_P (PSTR ("<a href='%s?period=%d&data=%d&height=%d&phase=%s'>"), D_TELEINFO_PAGE_GRAPH, graph_period, graph_display, graph_height, str_text.c_str ());
 
     // display phase data
     if (phase_display) str_text = ""; else str_text = "disabled";
@@ -2065,7 +2087,7 @@ void TeleinfoWebPageGraph ()
     GetTextIndexed (str_data, sizeof (str_data), index, kTeleinfoGraphPeriod);
 
     // set button according to active state
-    if (graph_period != index) WSContentSend_P (PSTR ("<a href='%s?period=%d&data=%d&phase=%s'>"), D_TELEINFO_PAGE_GRAPH, index, graph_display, str_phase.c_str ());
+    if (graph_period != index) WSContentSend_P (PSTR ("<a href='%s?period=%d&data=%d&height=%d&phase=%s'>"), D_TELEINFO_PAGE_GRAPH, index, graph_display, graph_height, str_phase.c_str ());
     WSContentSend_P (PSTR ("<div class='item period'>%s</div>"), str_data);
     if (graph_period != index) WSContentSend_P (PSTR ("</a>"));
     WSContentSend_P (PSTR ("\n"));
@@ -2073,10 +2095,12 @@ void TeleinfoWebPageGraph ()
   WSContentSend_P (PSTR ("</div>\n"));
   WSContentSend_P (PSTR ("</div>\n"));
 
+  // start second line of parameters
+  WSContentSend_P (PSTR ("<div>\n"));
+
   // if voltage is available, display data selection tabs
   if (Energy.voltage_available)
   {
-    WSContentSend_P (PSTR ("<div>\n"));
     WSContentSend_P (PSTR ("<div class='choice'>\n"));
     for (index = 0; index < TELEINFO_DISPLAY_MAX; index++)
     {
@@ -2084,19 +2108,29 @@ void TeleinfoWebPageGraph ()
       GetTextIndexed (str_data, sizeof (str_data), index, kTeleinfoGraphDisplay);
 
       // display tab
-      if (graph_display != index) WSContentSend_P (PSTR ("<a href='%s?period=%d&data=%d&phase=%s'>"), D_TELEINFO_PAGE_GRAPH, graph_period, index, str_phase.c_str ());
+      if (graph_display != index) WSContentSend_P (PSTR ("<a href='%s?period=%d&data=%d&height=%d&phase=%s'>"), D_TELEINFO_PAGE_GRAPH, graph_period, index, graph_height, str_phase.c_str ());
       WSContentSend_P (PSTR ("<div class='item data'>%s</div>"), str_data);
       if (graph_display != index) WSContentSend_P (PSTR ("</a>"));
       WSContentSend_P (PSTR ("\n"));
    }
     WSContentSend_P (PSTR ("</div>\n"));
-    WSContentSend_P (PSTR ("</div>\n"));
   }
+
+  // display graph height selection tabs
+  WSContentSend_P (PSTR ("<div class='choice'>\n"));
+  index = graph_height - TELEINFO_GRAPH_STEP;
+  WSContentSend_P (PSTR ("<a href='%s?period=%d&data=%d&height=%d&phase=%s'><div class='item size'>-</div></a>"), D_TELEINFO_PAGE_GRAPH, graph_period, graph_display, index, str_phase.c_str ());
+  index = graph_height + TELEINFO_GRAPH_STEP;
+  WSContentSend_P (PSTR ("<a href='%s?period=%d&data=%d&height=%d&phase=%s'><div class='item size'>+</div></a>"), D_TELEINFO_PAGE_GRAPH, graph_period, graph_display, index, str_phase.c_str ());
+  WSContentSend_P (PSTR ("</div>\n"));
+
+  // start second line of parameters
+  WSContentSend_P (PSTR ("</div>\n"));
 
   // display graph base and data
   WSContentSend_P (PSTR ("<div class='svg-container'>\n"));
-  WSContentSend_P (PSTR ("<object class='svg-content' id='base' type='image/svg+xml' width='100%%' height='100%%' data='%s?period=%d&data=%d'></object>\n"), D_TELEINFO_PAGE_GRAPH_FRAME, graph_period, graph_display);
-  WSContentSend_P (PSTR ("<object class='svg-content' id='data' type='image/svg+xml' width='100%%' height='100%%' data='%s?period=%d&data=%d&phase=%s&ts=0'></object>\n"), D_TELEINFO_PAGE_GRAPH_DATA, graph_period, graph_display, str_phase.c_str ());
+  WSContentSend_P (PSTR ("<object class='svg-content' id='base' type='image/svg+xml' width='100%%' height='100%%' data='%s?period=%d&data=%d&height=%d'></object>\n"), D_TELEINFO_PAGE_GRAPH_FRAME, graph_period, graph_display, graph_height);
+  WSContentSend_P (PSTR ("<object class='svg-content' id='data' type='image/svg+xml' width='100%%' height='100%%' data='%s?period=%d&data=%d&height=%d&phase=%s&ts=0'></object>\n"), D_TELEINFO_PAGE_GRAPH_DATA, graph_period, graph_display, graph_height, str_phase.c_str ());
   WSContentSend_P (PSTR ("</div>\n"));
 
   // end of page
