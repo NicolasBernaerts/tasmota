@@ -20,12 +20,12 @@ It has been tested succesfully with few days stability on a **HW-149** board, ba
 
 Here is an example of working interface board for **ESP-01** :
 
-![ESP01 interface](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/icse/tasmota-icse-diagram.png)
+![ESP01 interface](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/serialrelay/screen/tasmota-icse-diagram.png)
 
 On this diagram, power supply comes fully from the micro-USB port of the ICSE01xA board. \
 You just need a 5V / 1A USB charger for the complete setup.
 
 Here is an example of PCB board that just fits and works :
 
-![ESP01 board](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/icse/tasmota-icse-pcb.png)
+![ESP01 board](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/serialrelay/screen/tasmota-icse-pcb.png)
 
