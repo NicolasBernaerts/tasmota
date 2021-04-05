@@ -42,3 +42,7 @@ Here is an example of PCB board that implements this diagram.
 
 ![ESP01 board](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/serialrelay/screen/tasmota-icse-pcb.png)
 
+**Screenshots**
+
+![Main screen](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/serialrelay/screen/tasmota-serialrelay-main.png) ![Board selection](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/serialrelay/screen/tasmota-serialrelay-boardselect.png)
+
