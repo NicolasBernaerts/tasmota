@@ -7,6 +7,7 @@ This firmware is a modified version of **Tasmota 9.3.1** wich handle 2 majors fa
 ![ICSE013A](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/serialrelay/screen/serialrelay-icse013a.png) ![ICSE012A](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/serialrelay/screen/serialrelay-icse012a.png) ![ICSE014A](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/serialrelay/screen/serialrelay-icse014a.png)
 
   * **LC Technology boards**
+
 ![LC Tech x1](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/serialrelay/screen/serialrelay-lctech-x1.png) ![LC Tech x2](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/serialrelay/screen/serialrelay-lctech-x2.png) ![LC Tech x4](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/serialrelay/screen/serialrelay-lctech-x4.png) 
 
 As ICSE01xA board works on 5V input, if you plan to use it with a Sonoff Basic (or similar), you'll need an interface board to adjust **Rx** and **Tx** from 5V (ICSE) to 3.3V (Sonoff) levels.
