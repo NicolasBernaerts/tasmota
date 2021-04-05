@@ -1,10 +1,12 @@
-Tasmota modified for ICSE014A, ICSE013A and ICSE012A
+Tasmota modified for Serial Relay Boards
 =============
 
-This firmware is a modified version of **Tasmota 9.1.0** wich handle **ICSE01xA** based serial relay boards :
-  * ICSE012A : 4 relays
-  * ICSE013A : 2 relays
-  * ICSE014A : 8 relays
+This firmware is a modified version of **Tasmota 9.3.1** wich handle 2 majors families of serial relay boards :
+  * **ICSE boards**
+![ICSE013A](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/serialrelay/screen/serialrelay-icse013a.png)
+
+  * **LC Technology boards**
+
 
 As ICSE01xA board works on 5V input, if you plan to use it with a Sonoff Basic (or similar), you'll need an interface board to adjust **Rx** and **Tx** from 5V (ICSE) to 3.3V (Sonoff) levels.
 
