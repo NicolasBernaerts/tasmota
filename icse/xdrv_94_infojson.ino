@@ -4,8 +4,7 @@
   Copyright (C) 2020  Nicolas Bernaerts
     22/05/2020 - v1.0 - Creation 
     12/09/2020 - v1.1 - Correction of PSTR bug 
-    19/09/2020 - v1.2 - Add Wifi MAC address
-    09/11/2020 - v1.3 - Add ESP32 Ethernet IP and MAC 
+    19/09/2020 - v1.2 - Add MAC address to JSON 
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -27,12 +26,13 @@
 
 #define XDRV_94             94
 
-#define D_PAGE_INFO_JSON    "info.json"
-
+// JSON strings
 #define D_JSON_INFO_WIFI    "Wifi"
-#define D_JSON_INFO_ETH     "Eth"
-#define D_JSON_INFO_IP      "IP"
 #define D_JSON_INFO_MAC     "MAC"
+#define D_JSON_INFO_IP      "IP"
+
+// web URL
+const char D_INFO_PAGE_JSON[] PROGMEM = "/info.json";
 
 /**************************************************\
  *                  Functions
@@ -44,12 +44,18 @@ void InfoShowJSON ()
   String str_json;
 
   // append to MQTT message
-  str_json += ",\"" + String (D_JSON_INFO_WIFI) + " " + String (D_JSON_INFO_IP)  + "\":\"" + WiFi.localIP().toString() + "\"";
-  str_json += ",\"" + String (D_JSON_INFO_WIFI) + " " + String (D_JSON_INFO_MAC) + "\":\"" + WiFi.macAddress() + "\"";
-#ifdef ESP32
-  str_json += ",\"" + String (D_JSON_INFO_ETH)  + " " + String (D_JSON_INFO_IP)  + "\":\"" + ETH.localIP().toString() + "\"";
-  str_json += ",\"" + String (D_JSON_INFO_ETH)  + " " + String (D_JSON_INFO_MAC) + "\":\"" + ETH.macAddress() + "\"";
-#endif
+  str_json  = ",\"";
+  str_json += D_JSON_INFO_WIFI;
+  str_json += "\":{\"";
+  str_json += D_JSON_INFO_MAC;
+  str_json += "\":\"";
+  str_json += WiFi.macAddress();
+  str_json += "\",";
+  str_json += "\"";
+  str_json += D_JSON_INFO_IP;
+  str_json += "\":\"";
+  str_json += WiFi.localIP().toString();
+  str_json += "\"}";
 
   // append JSON to MQTT message
   ResponseAppend_P (PSTR("%s"), str_json.c_str ());
@@ -69,30 +75,90 @@ void InfoWebPageJson ()
 
   // generate version string
   json_version  = "{";
-  json_version += "\"Module\":\"" + ModuleName() + "\",";
-  json_version += "\"" + String (D_PROGRAM_VERSION) + "\":\"" + String (TasmotaGlobal.version) + "\",";
-  json_version += "\"Extension type\":\"" + String (EXTENSION_NAME) + "\",";
-  json_version += "\"Extension version\":\"" + String (EXTENSION_VERSION) + "\",";
-  json_version += "\"Extension author\":\"" + String (EXTENSION_AUTHOR) + "\",";
-  json_version += "\"" + String (D_UPTIME) + "\":\"" + GetUptime() + "\",";
-  json_version += "\"" + String (D_FRIENDLY_NAME) + "\":\"" + SettingsText(SET_DEVICENAME) + "\",";
-  json_version += "\"" + String (D_SSID) + "\":\"" + SettingsText(SET_STASSID1 + Settings.sta_active) + " (" + WifiGetRssiAsQuality(WiFi.RSSI()) + "%%)\",";
-  json_version += "\"" + String (D_HOSTNAME) + "\":\"" + String (TasmotaGlobal.hostname) + "\",";
-  json_version += "\"" + String (D_JSON_INFO_WIFI) + " " + String (D_JSON_INFO_IP)  + "\":\"" + WiFi.localIP().toString() + "\",";
-  json_version += "\"" + String (D_JSON_INFO_WIFI) + " " + String (D_JSON_INFO_MAC) + "\":\"" + WiFi.macAddress() + "\",";
-#ifdef ESP32
-  json_version += "\"" + String (D_JSON_INFO_ETH) + " " + String (D_JSON_INFO_IP)  + "\":\"" + ETH.localIP().toString() + "\",";
-  json_version += "\"" + String (D_JSON_INFO_ETH) + " " + String (D_JSON_INFO_MAC) + "\":\"" + ETH.macAddress() + "\",";
-#endif
-  json_version += "\"" + String (D_MQTT_HOST) + "\":\"" + SettingsText(SET_MQTT_HOST) + "\",";
-  json_version += "\"" + String (D_MQTT_PORT) + "\":\"" + Settings.mqtt_port + "\",";
-  json_version += "\"" + String (D_MQTT_FULL_TOPIC) + "\":\"" + GetTopic_P(stopic, CMND, TasmotaGlobal.mqtt_topic, "") + "\"";
+  json_version += "\"Module\":\"";
+  json_version += ModuleName ();
+  json_version += "\",";
+
+  json_version += "\"";
+  json_version += D_PROGRAM_VERSION;
+  json_version += "\":\"";
+  json_version += TasmotaGlobal.version;
+  json_version += "\",";
+
+  json_version += "\"Extension type\":\"";
+  json_version += EXTENSION_NAME;
+  json_version += "\",";
+
+  json_version += "\"Extension version\":\"";
+  json_version += EXTENSION_VERSION;
+  json_version += "\",";
+
+  json_version += "\"Extension author\":\"";
+  json_version += EXTENSION_AUTHOR;
+  json_version += "\",";
+
+  json_version += "\"";
+  json_version += D_UPTIME;
+  json_version += "\":\"";
+  json_version += GetUptime ();
+  json_version += "\",";
+
+  json_version += "\"";
+  json_version += D_FRIENDLY_NAME;
+  json_version += "\":\"";
+  json_version += SettingsText (SET_DEVICENAME);
+  json_version += "\",";
+
+  json_version += "\"";
+  json_version += D_SSID;
+  json_version += "\":\"";
+  json_version += SettingsText (SET_STASSID1 + Settings.sta_active);
+  json_version += " (";
+  json_version += WifiGetRssiAsQuality (WiFi.RSSI ());
+  json_version += "%%)\",";
+
+  json_version += "\"";
+  json_version += D_HOSTNAME;
+  json_version += "\":\"";
+  json_version += TasmotaGlobal.hostname;
+  json_version += "\",";
+
+  json_version += "\"";
+  json_version += D_MQTT_HOST;
+  json_version += "\":\"";
+  json_version += SettingsText (SET_MQTT_HOST);
+  json_version += "\",";
+
+  json_version += "\"";
+  json_version += D_MQTT_PORT;
+  json_version += "\":\"";
+  json_version += Settings.mqtt_port;
+  json_version += "\",";
+
+  json_version += "\"";
+  json_version += D_MQTT_FULL_TOPIC;
+  json_version += "\":\"";
+  json_version += GetTopic_P (stopic, CMND, TasmotaGlobal.mqtt_topic, "");
+  json_version += "\",";
+
+  json_version += "\"";
+  json_version += D_IP_ADDRESS;
+  json_version += "\":\"";
+  json_version += WiFi.localIP ().toString ();
+  json_version += "\",";
+
+  json_version += "\"";
+  json_version += D_MAC_ADDRESS;
+  json_version += "\":\"";
+  json_version += WiFi.macAddress ();
+  json_version += "\"";
+
   json_version += "}";
 
   // publish public page
-  WSContentBegin(200, CT_HTML);
+  WSContentBegin (200, CT_HTML);
   WSContentSend_P (json_version.c_str ());
-  WSContentEnd();
+  WSContentEnd ();
 }
 
 #endif  // USE_WEBSERVER
@@ -114,7 +180,7 @@ bool Xdrv94 (uint8_t function)
 
 #ifdef USE_WEBSERVER
     case FUNC_WEB_ADD_HANDLER:
-      Webserver->on ("/" D_PAGE_INFO_JSON, InfoWebPageJson);
+      Webserver->on (FPSTR (D_INFO_PAGE_JSON), InfoWebPageJson);
       break;
 #endif  // USE_WEBSERVER
   }

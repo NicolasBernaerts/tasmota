@@ -4,6 +4,7 @@
   Copyright (C) 2020  Theo Arends, Nicolas Bernaerts
 
     21/11/2020 - v1.0 - Creation
+    05/04/2021 - v2.0 - Rewrite to add LC Technology boards
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -45,10 +46,10 @@
 
 #define USE_INFOJSON                          // Add support for Information JSON page
 #define USE_TIMEZONE                          // Add support for Timezone management
-#define USE_ICSE                              // Add support for serial relay board ICSE012A, ICSE013A, ICSE014A
+#define USE_SERIALRELAY                       // Add support for serial relay boards (ICSE012A, ICSE013A, ICSE014A & LC Technology 1, 2 and 4 relays)
 
-#define EXTENSION_VERSION "1.0"               // version
-#define EXTENSION_NAME "ICSE"                 // name
+#define EXTENSION_VERSION "2.0"               // version
+#define EXTENSION_NAME "Serial Relay Board"   // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 
 // MQTT default
@@ -65,7 +66,7 @@
 #undef MQTT_FULLTOPIC
 #define MQTT_FULLTOPIC     "%topic%/%prefix%/"
 #undef FRIENDLY_NAME
-#define FRIENDLY_NAME      "ISCE01xA"
+#define FRIENDLY_NAME      "Serial Relays Board"
 
 #undef SERIAL_LOG_LEVEL
 #define SERIAL_LOG_LEVEL LOG_LEVEL_NONE       // disable SerialLog
@@ -74,8 +75,8 @@
 #undef USE_ARDUINO_OTA                        // support for Arduino OTA
 #undef USE_WPS                                // support for WPS as initial wifi configuration tool
 #undef USE_SMARTCONFIG                        // support for Wifi SmartConfig as initial wifi configuration tool
-#undef USE_DOMOTICZ                           // Domoticz
-#undef USE_HOME_ASSISTANT                     // Home Assistant
+//#undef USE_DOMOTICZ                           // Domoticz
+//#undef USE_HOME_ASSISTANT                     // Home Assistant
 #undef USE_MQTT_TLS                           // TLS support won't work as the MQTTHost is not set
 #undef USE_KNX                                // KNX IP Protocol Support
 //#undef USE_WEBSERVER                        // Webserver
