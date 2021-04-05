@@ -20,7 +20,7 @@ Firmware is configured to use the Normally Open (NO) input. When relay is ON, co
 
 These serial relay boards are quite cheap, but not hyper reactive. So, you should expect few seconds to fully initialise the board.
 
-It has been tested succesfully on a **HW-034** (ICSE012A), **HW-149** (ICSE014A), **LC Tech x2** aand **LC Tech x4** boards.
+It has been tested succesfully on a **HW-034** (ICSE012A), **HW-149** (ICSE014A), **LC Tech x2** and **LC Tech x4** boards.
 
 **ICSE01xA specificities**
 
