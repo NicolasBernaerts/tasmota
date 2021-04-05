@@ -2,11 +2,12 @@ Tasmota modified for Serial Relay Boards
 =============
 
 This firmware is a modified version of **Tasmota 9.3.1** wich handle 2 majors families of serial relay boards :
-  * **ICSE01xA boards**
+
+### ICSE01xA boards
 
 ![ICSE013A](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/serialrelay/screen/serialrelay-icse013a.png) ![ICSE012A](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/serialrelay/screen/serialrelay-icse012a.png) ![ICSE014A](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/serialrelay/screen/serialrelay-icse014a.png)
 
-  * **LC Technology boards**
+ ### LC Technology boards
 
 ![LC Tech x1](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/serialrelay/screen/serialrelay-lctech-x1.png) ![LC Tech x2](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/serialrelay/screen/serialrelay-lctech-x2.png) ![LC Tech x4](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/serialrelay/screen/serialrelay-lctech-x4.png) 
 
@@ -22,7 +23,7 @@ These serial relay boards are quite cheap, but not hyper reactive. So, you shoul
 
 It has been tested succesfully on a **HW-034** (ICSE012A), **HW-149** (ICSE014A), **LC Tech x2** and **LC Tech x4** boards.
 
-**LC Technology specificities**
+## LC Technology specificities
 
 LC Technology boards work according to 2 different modes :
   * Mode 1 : a blue LED is ON
@@ -32,7 +33,7 @@ This tasmota firmware handles both modes. But if you are in Mode 1, it will take
 
 You switch from Mode 2 to Mode 1 anytime by pressing **S1**. To switch from Mode 1 to Mode 2, you need to press **S1** button while switching on the board. 
 
-**ICSE01xA specificities**
+## ICSE01xA specificities
 
 As ICSE01xA board works on 5V input, if you plan to use it with a Sonoff Basic or any ESP8266 board, you'll need an interface board to adjust **Rx** and **Tx** from 5V to 3.3V levels. Here is an example of working interface board using an **ESP-01**. Power supply is directly provided by the ICSE01xA board thru the micro-USB port. You just need a 5V / 1A USB charger.
 
@@ -42,7 +43,7 @@ Here is an example of PCB board that implements this diagram.
 
 ![ESP01 board](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/serialrelay/screen/tasmota-icse-pcb.png)
 
-**Screenshots**
+## Screenshots
 
 ![Main screen](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/serialrelay/screen/tasmota-serialrelay-main.png) ![Board selection](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/serialrelay/screen/tasmota-serialrelay-boardselect.png)
 
