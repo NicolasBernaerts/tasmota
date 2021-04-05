@@ -3,7 +3,8 @@ Tasmota modified for Serial Relay Boards
 
 This firmware is a modified version of **Tasmota 9.3.1** wich handle 2 majors families of serial relay boards :
   * **ICSE boards**
-![ICSE013A](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/serialrelay/screen/serialrelay-icse013a.png)
+
+![ICSE013A](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/serialrelay/screen/serialrelay-icse013a.png) ![ICSE012A](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/serialrelay/screen/serialrelay-icse012a.png) ![ICSE014A](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/serialrelay/screen/serialrelay-icse014a.png)
 
   * **LC Technology boards**
 
