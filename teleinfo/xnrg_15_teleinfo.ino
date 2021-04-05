@@ -41,7 +41,8 @@
     15/03/2021 - v7.4   - Change graph period parameter
     21/03/2021 - v7.5   - Support for TIC Standard
     29/03/2021 - v7.6   - Add voltage graph
-    04/03/2021 - v7.7   - Change in serial port & graph height selection
+    04/04/2021 - v7.7   - Change in serial port & graph height selection
+    06/04/2021 - v7.7.1 - Handle number of indexes according to contract
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -85,6 +86,7 @@
 #define TELEINFO_LINE_MAX            71         // maximum number of lines in a TIC message (71 lines)
 #define TELEINFO_STRING_MAX          30         // max length of etiquette or donnee (28 char)
 #define TELEINFO_PHASE_MAX           3          // maximum number of phases
+#define TELEINFO_INDEX_MAX           10         // maximum number of total power counters
 #define TELEINFO_SERIAL_BUFFER       4          // teleinfo serial buffer
 #define TELEINFO_STORE_PERIOD        1800       // store energy totals every 30mn
 
@@ -161,8 +163,8 @@ const char TELEINFO_HTML_DASH[]   PROGMEM = "<line class='dash' x1='%d%%' y1='%d
 const char TELEINFO_HTML_BAR[]    PROGMEM = "<tr><div style='margin:4px;padding:0px;background-color:#ddd;border-radius:4px;'><div style='font-size:0.75rem;font-weight:bold;padding:0px;text-align:center;border:1px solid #bbb;border-radius:4px;color:#444;background-color:%s;width:%s%%;'>%s%%</div></div></tr>\n";
 
 // TIC - specific etiquettes
-enum TeleinfoEtiquette { TIC_NONE, TIC_ADCO, TIC_ADSC, TIC_PTEC, TIC_NGTF, TIC_EAIT, TIC_IINST, TIC_IINST1, TIC_IINST2, TIC_IINST3, TIC_ISOUSC, TIC_PS, TIC_PAPP, TIC_SINSTS, TIC_BASE, TIC_EAST, TIC_HCHC, TIC_HCHP, TIC_EJPHN, TIC_EJPHPM, TIC_BBRHCJB, TIC_BBRHPJB, TIC_BBRHCJW, TIC_BBRHPJW, TIC_BBRHCJR, TIC_BBRHPJR, TIC_ADPS, TIC_ADIR1, TIC_ADIR2, TIC_ADIR3, TIC_URMS1, TIC_URMS2, TIC_URMS3, TIC_UMOY1, TIC_UMOY2, TIC_UMOY3, TIC_IRMS1, TIC_IRMS2, TIC_IRMS3, TIC_SINSTS1, TIC_SINSTS2, TIC_SINSTS3, TIC_PTCOUR, TIC_PREF, TIC_PCOUP, TIC_MAX };
-const char kTeleinfoEtiquetteName[] PROGMEM = "|ADCO|ADSC|PTEC|NGTF|EAIT|IINST|IINST1|IINST2|IINST3|ISOUSC|PS|PAPP|SINSTS|BASE|EAST|HCHC|HCHP|EJPHN|EJPHPM|BBRHCJB|BBRHPJB|BBRHCJW|BBRHPJW|BBRHCJR|BBRHPJR|ADPS|ADIR1|ADIR2|ADIR3|URMS1|URMS2|URMS3|UMOY1|UMOY2|UMOY3|IRMS1|IRMS2|IRMS3|SINSTS1|SINSTS2|SINSTS3|PTCOUR|PREF|PCOUP";
+enum TeleinfoEtiquette { TIC_NONE, TIC_ADCO, TIC_ADSC, TIC_PTEC, TIC_NGTF, TIC_EAIT, TIC_IINST, TIC_IINST1, TIC_IINST2, TIC_IINST3, TIC_ISOUSC, TIC_PS, TIC_PAPP, TIC_SINSTS, TIC_BASE, TIC_EAST, TIC_HCHC, TIC_HCHP, TIC_EJPHN, TIC_EJPHPM, TIC_BBRHCJB, TIC_BBRHPJB, TIC_BBRHCJW, TIC_BBRHPJW, TIC_BBRHCJR, TIC_BBRHPJR, TIC_ADPS, TIC_ADIR1, TIC_ADIR2, TIC_ADIR3, TIC_URMS1, TIC_URMS2, TIC_URMS3, TIC_UMOY1, TIC_UMOY2, TIC_UMOY3, TIC_IRMS1, TIC_IRMS2, TIC_IRMS3, TIC_SINSTS1, TIC_SINSTS2, TIC_SINSTS3, TIC_PTCOUR, TIC_PREF, TIC_PCOUP, TIC_LTARF, TIC_EASF01, TIC_EASF02, TIC_EASF03, TIC_EASF04, TIC_EASF05, TIC_EASF06, TIC_EASF07, TIC_EASF08, TIC_EASF09, TIC_EASF10, TIC_MAX };
+const char kTeleinfoEtiquetteName[] PROGMEM = "|ADCO|ADSC|PTEC|NGTF|EAIT|IINST|IINST1|IINST2|IINST3|ISOUSC|PS|PAPP|SINSTS|BASE|EAST|HCHC|HCHP|EJPHN|EJPHPM|BBRHCJB|BBRHPJB|BBRHCJW|BBRHPJW|BBRHCJR|BBRHPJR|ADPS|ADIR1|ADIR2|ADIR3|URMS1|URMS2|URMS3|UMOY1|UMOY2|UMOY3|IRMS1|IRMS2|IRMS3|SINSTS1|SINSTS2|SINSTS3|PTCOUR|PREF|PCOUP|LTARF|EASF01|EASF02|EASF03|EASF04|EASF05|EASF06|EASF07|EASF08|EASF09|EASF10";
 
 // TIC - modes and rates
 enum TeleinfoMode { TIC_MODE_UNDEFINED, TIC_MODE_HISTORIC, TIC_MODE_STANDARD };
@@ -170,9 +172,10 @@ const char kTeleinfoModeName[] PROGMEM = "|Historique|Standard";
 const int ARR_TELEINFO_RATE[] = { 0, 1200, 2400, 4800, 9600, 19200 }; 
 
 // TIC - tarifs
-enum TeleinfoPeriod { TIC_HISTO_TH, TIC_HISTO_HC, TIC_HISTO_HP, TIC_HISTO_HN, TIC_HISTO_PM, TIC_HISTO_CB, TIC_HISTO_CW, TIC_HISTO_CR, TIC_HISTO_PB, TIC_HISTO_PW, TIC_HISTO_PR, TIC_HISTO_MAX, TIC_STD_P, TIC_STD_HPH, TIC_STD_HCH, TIC_STD_HPD, TIC_STD_HCD, TIC_STD_HPE, TIC_STD_HCE, TIC_STD_JA, TIC_STD_PM, TIC_STD_HH, TIC_STD_HD, TIC_STD_HM, TIC_STD_DSM, TIC_STD_SCM, TIC_STD_1, TIC_STD_2, TIC_STD_3, TIC_STD_4, TIC_STD_5 };
-const char kTeleinfoPeriod[] PROGMEM = "TH..|HC..|HP..|HN..|PM..|HCJB|HCJW|HCJR|HPJB|HPJW|HPJR|P|HPH|HCH|HPD|HCD|HPE|HCE|JA|PM|HH|HD|HM|DSM|SCM|1|2|3|4|5|BASE";
-const char kTeleinfoPeriodName[] PROGMEM = "Toutes|Creuses|Pleines|Normales|Pointe Mobile|Creuses Bleus|Creuses Blancs|Creuses Rouges|Pleines Bleus|Pleines Blancs|Pleines Rouges|Pointe|Pleines Hiver|Creuses Hiver|Pleines Demi-saison|Creuses Demi-saison|Pleines Ete|Creuses Ete|Juillet-Aout|Pointe Mobile|Hiver|Demi-saison|Hiver Mobile|Demi-saison Mobile|Saison Creuse Mobile|Pointe|Pleines Hiver|Creuses Hiver|Pleines Ete|Creuses Ete|Base";
+enum TeleinfoPeriod { TIC_HISTO_TH, TIC_HISTO_HC, TIC_HISTO_HP, TIC_HISTO_HN, TIC_HISTO_PM, TIC_HISTO_CB, TIC_HISTO_CW, TIC_HISTO_CR, TIC_HISTO_PB, TIC_HISTO_PW, TIC_HISTO_PR, TIC_STD_P, TIC_STD_HPH, TIC_STD_HCH, TIC_STD_HPD, TIC_STD_HCD, TIC_STD_HPE, TIC_STD_HCE, TIC_STD_JA, TIC_STD_PM, TIC_STD_HH, TIC_STD_HD, TIC_STD_HM, TIC_STD_DSM, TIC_STD_SCM, TIC_STD_1, TIC_STD_2, TIC_STD_3, TIC_STD_4, TIC_STD_5, TIC_STD_BASE, TIC_STD_HP, TIC_STD_HC };
+const char kTeleinfoPeriod[] PROGMEM = "TH..|HC..|HP..|HN..|PM..|HCJB|HCJW|HCJR|HPJB|HPJW|HPJR|P|HPH|HCH|HPD|HCD|HPE|HCE|JA|PM|HH|HD|HM|DSM|SCM|1|2|3|4|5|BASE|HEURES PLEINES|HEURES CREUSES";
+const char kTeleinfoPeriodName[] PROGMEM = "Toutes|Creuses|Pleines|Normales|Pointe Mobile|Creuses Bleus|Creuses Blancs|Creuses Rouges|Pleines Bleus|Pleines Blancs|Pleines Rouges|Pointe|Pleines Hiver|Creuses Hiver|Pleines Demi-saison|Creuses Demi-saison|Pleines Ete|Creuses Ete|Juillet-Aout|Pointe Mobile|Hiver|Demi-saison|Hiver Mobile|Demi-saison Mobile|Saison Creuse Mobile|Pointe|Pleines Hiver|Creuses Hiver|Pleines Ete|Creuses Ete|Base|Pleines|Creuses";
+const int ARR_TELEINFO_PERIOD_INDEX[] { 1, 2, 2, 2, 2, 6, 6, 6, 6, 6, 6, 8, 8, 8, 8, 8, 8, 8, 8, 6, 6, 6, 6, 6, 6, 5, 5, 5, 5, 5, 1, 2, 2 };
 
 // TIC - data diffusion policy
 enum TeleinfoConfigDiffusion { TELEINFO_POLICY_NEVER, TELEINFO_POLICY_MESSAGE, TELEINFO_POLICY_PERCENT, TELEINFO_POLICY_TELEMETRY, TELEINFO_POLICY_MAX };
@@ -229,24 +232,20 @@ struct {
 
 // teleinfo power counters
 struct {
-  long store  = 0;             // number of second since last energy totals storage
-  long papp   = 0;             // total apparent power
-  long total  = 0;             // total of all indexes
-  long index1 = 0;             // index of different tarif periods
-  long index2 = 0;
-  long index3 = 0;
-  long index4 = 0;
-  long index5 = 0;
-  long index6 = 0;
+  long store    = 0;                          // number of second since last energy totals storage
+  long papp     = 0;                          // total apparent power
+  long total    = 0;                          // total of all indexes for current contract
+  int  nb_index = TELEINFO_INDEX_MAX;         // number of indexes in current contract      
+  long index[TELEINFO_INDEX_MAX];             // array of indexes of different tarif periods
 } teleinfo_counter;
 
 // data per phase
 struct tic_phase {
-  bool voltage_set = false;    // voltage set in current message
-  long voltage;                // voltage
-  long iinst;                  // instant current
-  long papp;                   // instant apparent power
-  long papp_last;              // last published apparent power
+  bool voltage_set = false;           // voltage set in current message
+  long voltage;                       // voltage
+  long iinst;                         // instant current
+  long papp;                          // instant apparent power
+  long papp_last;                     // last published apparent power
 }; 
 tic_phase teleinfo_phase[TELEINFO_PHASE_MAX];
 
@@ -618,6 +617,9 @@ void TeleinfoInit ()
     Energy.voltage_available = false;
     Energy.current_available = false;
 
+    // init all total indexes
+    for (index = 0; index < TELEINFO_INDEX_MAX; index ++) teleinfo_counter.index[index] = 0;
+
     // disable all message lines
     for (index = 0; index < TELEINFO_LINE_MAX; index ++) teleinfo_message.line[index].checksum = 0;
   }
@@ -755,9 +757,15 @@ void TeleinfoReceiveData ()
           }
         } 
 
+        // determine number of indexes according to contract
+        index = GetCommandCode (str_text, sizeof (str_text), teleinfo_contract.period.c_str (), kTeleinfoPeriod);
+        if (index == -1) teleinfo_counter.nb_index = TELEINFO_INDEX_MAX;
+        else teleinfo_counter.nb_index = ARR_TELEINFO_PERIOD_INDEX[index];
+
         // update total energy counter and store energy totals if first reading
         first_total = (teleinfo_counter.total == 0);
-        teleinfo_counter.total = teleinfo_counter.index1 + teleinfo_counter.index2 + teleinfo_counter.index3 + teleinfo_counter.index4 + teleinfo_counter.index5 + teleinfo_counter.index6;
+        teleinfo_counter.total = 0;
+        for (index = 0; index < teleinfo_counter.nb_index; index ++) teleinfo_counter.total += teleinfo_counter.index[index];
         if (first_total && (teleinfo_counter.total > 0)) EnergyUpdateTotal((float) teleinfo_counter.total, false);
  
         // declare received message
@@ -830,7 +838,7 @@ void TeleinfoReceiveData ()
                 break;
               // period name
               case TIC_PTEC:
-              case TIC_NGTF:
+              case TIC_LTARF:
               case TIC_PTCOUR:
                 teleinfo_contract.period = str_donnee;
                 break;
@@ -890,43 +898,47 @@ void TeleinfoReceiveData ()
                 teleinfo_contract.ssousc = 1000 * str_donnee.toInt () / teleinfo_contract.phase;
                 teleinfo_contract.isousc = teleinfo_contract.ssousc / TELEINFO_VOLTAGE_REF;
                 break;
-              // option base or standard
+              // index suivant type de contrat
               case TIC_BASE:
-              case TIC_EAST:
-                teleinfo_counter.index1 = str_donnee.toInt ();
-                break;
-              // option heures creuses
               case TIC_HCHC:
-                teleinfo_counter.index1 = str_donnee.toInt ();
+              case TIC_EJPHN:
+              case TIC_BBRHCJB:
+              case TIC_EASF01:
+                teleinfo_counter.index[0] = str_donnee.toInt ();
                 break;
               case TIC_HCHP:
-                teleinfo_counter.index2 = str_donnee.toInt ();
-                break;
-              // option EJP
-              case TIC_EJPHN:
-                teleinfo_counter.index1 = str_donnee.toInt ();
-                break;
               case TIC_EJPHPM:
-                teleinfo_counter.index2 = str_donnee.toInt ();
-                break;
-              // option tempo
-              case TIC_BBRHCJB:
-                teleinfo_counter.index1 = str_donnee.toInt ();
-                break;
               case TIC_BBRHPJB:
-                teleinfo_counter.index2 = str_donnee.toInt ();
+              case TIC_EASF02:
+                teleinfo_counter.index[1] = str_donnee.toInt ();
                 break;
               case TIC_BBRHCJW:
-                teleinfo_counter.index3 = str_donnee.toInt ();
+              case TIC_EASF03:
+                teleinfo_counter.index[2] = str_donnee.toInt ();
                 break;
               case TIC_BBRHPJW:
-                teleinfo_counter.index4 = str_donnee.toInt ();
+              case TIC_EASF04:
+                teleinfo_counter.index[3] = str_donnee.toInt ();
                 break;
               case TIC_BBRHCJR:
-                teleinfo_counter.index5 = str_donnee.toInt ();
+              case TIC_EASF05:
+                teleinfo_counter.index[4] = str_donnee.toInt ();
                 break;
               case TIC_BBRHPJR:
-                teleinfo_counter.index6 = str_donnee.toInt ();
+              case TIC_EASF06:
+                teleinfo_counter.index[5] = str_donnee.toInt ();
+                break;
+              case TIC_EASF07:
+                teleinfo_counter.index[6] = str_donnee.toInt ();
+                break;
+              case TIC_EASF08:
+                teleinfo_counter.index[7] = str_donnee.toInt ();
+                break;
+              case TIC_EASF09:
+                teleinfo_counter.index[8] = str_donnee.toInt ();
+                break;
+              case TIC_EASF10:
+                teleinfo_counter.index[9] = str_donnee.toInt ();
                 break;
               // overload flags
               case TIC_ADPS:
@@ -1246,7 +1258,7 @@ void TeleinfoWebMainButton ()
   WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s %s</button></form></p>\n"), D_TELEINFO_PAGE_TIC, D_TELEINFO_TIC, D_TELEINFO_MESSAGE);
 
   // Teleinfo graph page button
-  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), D_TELEINFO_PAGE_GRAPH, D_TELEINFO_GRAPH);
+  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s %s</button></form></p>\n"), D_TELEINFO_PAGE_GRAPH, D_TELEINFO_TIC, D_TELEINFO_GRAPH);
 }
 
 // append Teleinfo configuration button to configuration page
