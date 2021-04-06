@@ -73,7 +73,7 @@ If you are using an **ESP32** device, you can use its **Ethernet** port after se
 
 Teleinfo protocol is described in this document : https://www.enedis.fr/sites/default/files/Enedis-NOI-CPT_54E.pdf
 
-Pre-compiled version is available under **tasmota.bin** and **tasmota32.bin**.
+Pre-compiled version is available under **tasmota.bin.gz** and **tasmota32.bin**.
 
 MQTT result should look like that :
 
