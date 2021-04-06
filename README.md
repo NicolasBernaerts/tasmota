@@ -2,7 +2,7 @@ Tasmota Extensions
 ==================
 
 Some Tasmota firmware extensions :
-  * **icse** : handle ICSE01xA based serial relay boards
+  * **serialrelay** : handle ICSE01xA and LC Tech serial relay boards
   * **intercom** : manage building gate opening upon flat intercom rings
   * **motion** : handle motion detectors and push buttons in parallel to light circuit
   * **offload** : pilot device with power offloading according to power meter publishing thru MQTT
