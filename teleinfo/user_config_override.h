@@ -115,6 +115,10 @@
 #undef MQTT_MAX_PACKET_SIZE
 #define MQTT_MAX_PACKET_SIZE   2200
 
+// disable serial log
+#undef SERIAL_LOG_LEVEL 
+#define SERIAL_LOG_LEVEL   LOG_LEVEL_NONE
+
 #undef USE_ARDUINO_OTA                        // support for Arduino OTA
 #undef USE_WPS                                // support for WPS as initial wifi configuration tool
 #undef USE_SMARTCONFIG                        // support for Wifi SmartConfig as initial wifi configuration tool
@@ -134,7 +138,9 @@
 //#undef MQTT_HOST_DISCOVERY                  // Find MQTT host server (overrides MQTT_HOST if found)
 
 #undef USE_TIMERS                             // support for up to 16 timers
+#undef USE_TIMERS_WEB                         // support for timer webpage
 #undef USE_SUNRISE                            // support for Sunrise and sunset tools
+#undef SUNRISE_DAWN_ANGLE                     // Select desired Dawn Angle from
 //#undef USE_RULES                            // Disable support for rules
 
 #undef ROTARY_V1                              // Add support for Rotary Encoder as used in MI Desk Lamp (+0k8 code)
@@ -151,6 +157,7 @@
 #undef USE_DEEPSLEEP                          // Add support for deepsleep (+1k code)
 #undef USE_EXS_DIMMER                         // Add support for ES-Store WiFi Dimmer (+1k5 code)
 #undef USE_DEVICE_GROUPS                      // Add support for device groups (+5k5 code)
+#undef USE_DEVICE_GROUPS_SEND                 // Add support for the DevGroupSend command (+0k6 code)
 #undef USE_PWM_DIMMER
 #undef USE_PWM_DIMMER_REMOTE                  // Add support for remote switches to PWM Dimmer (requires USE_DEVICE_GROUPS) (+0k9 code)
 #undef USE_SONOFF_D1                          // Add support for Sonoff D1 Dimmer (+0k7 code)
@@ -189,6 +196,6 @@
 #undef USE_IR_REMOTE                          // Send IR remote commands using library IRremoteESP8266 and ArduinoJson (+4k3 code, 0k3 mem, 48 iram)
 
 #undef USE_ZIGBEE                             // Enable Zigbee protocol
-//#undef USE_ZIGBEE_ZNP                       // Enable ZNP protocol, needed for CC2530 based devices
+#undef USE_ZIGBEE_ZNP                       // Enable ZNP protocol, needed for CC2530 based devices
 
 #endif  // _USER_CONFIG_OVERRIDE_H_
