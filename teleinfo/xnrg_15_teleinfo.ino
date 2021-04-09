@@ -241,7 +241,6 @@ struct {
 
 // data per phase
 struct tic_phase {
-  bool voltage_set = false;           // voltage set in current message
   long voltage;                       // voltage
   long iinst;                         // instant current
   long papp;                          // instant apparent power
@@ -336,8 +335,7 @@ int TeleinfoGetPolicyData ()
 
   // read actual teleinfo mode
   policy = (int)Settings.weight_calibration;
-  if (policy < 0) policy = TELEINFO_POLICY_TELEMETRY;
-  if (policy >= TELEINFO_POLICY_MAX) policy = TELEINFO_POLICY_TELEMETRY;
+  if ((policy < 0) || (policy >= TELEINFO_POLICY_MAX)) policy = TELEINFO_POLICY_TELEMETRY;
   
   return policy;
 }
@@ -345,6 +343,7 @@ int TeleinfoGetPolicyData ()
 // set Meter data publication policy
 void TeleinfoSetPolicyData (int policy)
 {
+  if ((policy < 0) || (policy >= TELEINFO_POLICY_MAX)) policy = TELEINFO_POLICY_TELEMETRY;
   Settings.weight_calibration = (ulong)policy;
 }
 
@@ -378,13 +377,31 @@ void TeleinfoSetBaudRate (uint16_t new_rate)
   }
 }
 
+// validate graph access data
+bool TeleinfoValidateGraphAccess (int period, int phase, int index)
+{
+  bool validation = true;
+
+  // check that values are within range
+  validation &= ((period >= 0) && (period < TELEINFO_PERIOD_MAX));
+  validation &= ((phase >= 0)  && (phase < TELEINFO_PHASE_MAX));
+  validation &= ((index >= 0)  && (index < TELEINFO_GRAPH_SAMPLE));
+
+  return validation;
+}
+
 // set graph power value
 void TeleinfoSaveGraphPower (int period, int phase, int index)
 {
+  bool     data_valid, power_valid;
   uint32_t graph_value;
 
-  // if contract power is defined
-  if (teleinfo_contract.ssousc != 0)
+  // check power value
+  power_valid = (teleinfo_contract.ssousc > 0);
+
+  // if all provided data are valid, update graph data
+  data_valid = TeleinfoValidateGraphAccess (period, phase, index);
+  if (data_valid && power_valid)
   {
     // if overload has been detected during period, use overload value, else use average value
     if (teleinfo_graph[period].papp_high[phase] > teleinfo_contract.ssousc) graph_value = (uint32_t)teleinfo_graph[period].papp_high[phase];
@@ -395,22 +412,32 @@ void TeleinfoSaveGraphPower (int period, int phase, int index)
     teleinfo_graph[period].arr_papp[phase][index] = (uint8_t)graph_value;
   }
 
-  // reset period data
-  teleinfo_graph[period].papp_high[phase] = 0;
-  teleinfo_graph[period].papp_sum[phase]  = 0;
+  // if period and phase are valid, reset them
+  if (data_valid)
+  {
+    // reset period data
+    teleinfo_graph[period].papp_high[phase] = 0;
+    teleinfo_graph[period].papp_sum[phase]  = 0;
+  }
 }
 
 // get graph power value
 uint16_t TeleinfoGetGraphPower (int period, int phase, int index)
 {
+  bool     data_valid;
   uint32_t graph_value = UINT16_MAX;
 
-  // if value is defined
-  if (teleinfo_graph[period].arr_papp[phase][index] != UINT8_MAX)
+  // if all provided data are valid, get graph data
+  data_valid = TeleinfoValidateGraphAccess (period, phase, index);
+  if (data_valid)
   {
-    // calculate percentage of power according to contract
-    graph_value = (uint32_t)teleinfo_graph[period].arr_papp[phase][index];
-    graph_value = graph_value * teleinfo_contract.ssousc / TELEINFO_VOLTAGE_REF;
+    // if value is defined
+    if (teleinfo_graph[period].arr_papp[phase][index] != UINT8_MAX)
+    {
+      // calculate percentage of power according to contract
+      graph_value = (uint32_t)teleinfo_graph[period].arr_papp[phase][index];
+      graph_value = graph_value * teleinfo_contract.ssousc / TELEINFO_VOLTAGE_REF;
+    }
   }
 
   return (uint16_t)graph_value;
@@ -419,37 +446,49 @@ uint16_t TeleinfoGetGraphPower (int period, int phase, int index)
 // set graph voltage value
 void TeleinfoSaveGraphVoltage (int period, int phase, int index)
 {
+  bool     data_valid;
   uint16_t voltage;
 
-  // if maximum voltage is above maximum acceptable value, store it
-  if (teleinfo_graph[period].volt_high[phase] > TELEINFO_VOLTAGE_HIGH) voltage = teleinfo_graph[period].volt_high[phase];
+  // if all provided data are valid, get graph data
+  data_valid = TeleinfoValidateGraphAccess (period, phase, index);
+  if (data_valid)
+  {
+    // if maximum voltage is above maximum acceptable value, store it
+    if (teleinfo_graph[period].volt_high[phase] > TELEINFO_VOLTAGE_HIGH) voltage = teleinfo_graph[period].volt_high[phase];
 
-  // else, if minimum voltage is below acceptable value, store it
-  else if (teleinfo_graph[period].volt_low[phase] < TELEINFO_VOLTAGE_LOW) voltage = teleinfo_graph[period].volt_low[phase];
+    // else, if minimum voltage is below acceptable value, store it
+    else if (teleinfo_graph[period].volt_low[phase] < TELEINFO_VOLTAGE_LOW) voltage = teleinfo_graph[period].volt_low[phase];
 
-  // else, store average value between min and max
-  else voltage = (teleinfo_graph[period].volt_high[phase] + teleinfo_graph[period].volt_low[phase]) / 2;
+    // else, store average value between min and max
+    else voltage = (teleinfo_graph[period].volt_high[phase] + teleinfo_graph[period].volt_low[phase]) / 2;
 
-  // calculate value to be stored
-  if (voltage > TELEINFO_VOLTAGE) voltage = voltage + 128 - TELEINFO_VOLTAGE;
-  else if (voltage < TELEINFO_VOLTAGE) voltage = 128 + voltage - TELEINFO_VOLTAGE;
-  else voltage = 128;
+    // calculate value to be stored
+    if (voltage > TELEINFO_VOLTAGE) voltage = voltage + 128 - TELEINFO_VOLTAGE;
+    else if (voltage < TELEINFO_VOLTAGE) voltage = 128 + voltage - TELEINFO_VOLTAGE;
+    else voltage = 128;
 
-  // store value
-  teleinfo_graph[period].arr_volt[phase][index] = (uint8_t)voltage;
+    // store value
+    teleinfo_graph[period].arr_volt[phase][index] = (uint8_t)voltage;
 
-  // reset period data
-  teleinfo_graph[period].volt_low[phase]  = UINT16_MAX;
-  teleinfo_graph[period].volt_high[phase] = UINT16_MAX;
+    // reset period data
+    teleinfo_graph[period].volt_low[phase]  = UINT16_MAX;
+    teleinfo_graph[period].volt_high[phase] = UINT16_MAX;
+  }
 }
 
 // get graph voltage value
 uint16_t TeleinfoGetGraphVoltage (int period, int phase, int index)
 {
+  bool     data_valid;
   uint16_t voltage = UINT16_MAX;
 
-  // if voltage has been stored
-  if (teleinfo_graph[period].arr_volt[phase][index] != UINT8_MAX) voltage = TELEINFO_VOLTAGE - 128 + teleinfo_graph[period].arr_volt[phase][index];
+  // if all provided data are valid, get graph data
+  data_valid = TeleinfoValidateGraphAccess (period, phase, index);
+  if (data_valid)
+  {
+    // if voltage has been stored
+    if (teleinfo_graph[period].arr_volt[phase][index] != UINT8_MAX) voltage = TELEINFO_VOLTAGE - 128 + teleinfo_graph[period].arr_volt[phase][index];
+  }
 
   return voltage;
 }
@@ -536,7 +575,7 @@ String TeleinfoGenerateUnitLabel (uint16_t unit_value)
   {
     // convert 6120 to 6.1k
     str_digit = str_unit.substring (nb_digit - 3, nb_digit - 2);
-    str_unit = str_unit.substring (0, nb_digit - 3);
+    str_unit  = str_unit.substring (0, nb_digit - 3);
     str_unit += ".";
     str_unit += str_digit;
     str_unit += "k";
@@ -548,7 +587,7 @@ String TeleinfoGenerateUnitLabel (uint16_t unit_value)
 void TeleinfoPreInit ()
 {
   // if PIN defined, set energy driver
-  if (!TasmotaGlobal.energy_driver && PinUsed(GPIO_TELEINFO_RX))
+  if (!TasmotaGlobal.energy_driver && PinUsed (GPIO_TELEINFO_RX))
   {
     // energy driver is teleinfo meter
     TasmotaGlobal.energy_driver = XNRG_15;
@@ -574,7 +613,7 @@ void TeleinfoInit ()
 #ifdef ESP8266
 
     // create serial port with buffer set to 256 (to handle 19200bps with 100ms loop)
-    teleinfo_serial = new TasmotaSerial (Pin (GPIO_TELEINFO_RX), -1, 2, 0, 256);
+    teleinfo_serial = new TasmotaSerial (Pin (GPIO_TELEINFO_RX), -1, 1, 0, 256);
 
     // if port has been created
     if (teleinfo_serial->begin (baud_rate))
@@ -636,7 +675,7 @@ void TeleinfoGraphInit ()
   for (phase = 0; phase < TELEINFO_PHASE_MAX; phase++)
   {
     // default energy voltage
-    Energy.voltage[index] = TELEINFO_VOLTAGE;
+    Energy.voltage[phase] = TELEINFO_VOLTAGE;
 
     // default values
     teleinfo_phase[phase].voltage   = TELEINFO_VOLTAGE;
@@ -698,9 +737,6 @@ void TeleinfoReceiveData ()
       case 2:
         // reset current message line index
         teleinfo_message.line_index = 0;
-
-        // reset voltage flags
-        for (phase = 0; phase < teleinfo_contract.phase; phase++) teleinfo_phase[phase].voltage_set = false;
         break;
           
       // ---------------------
@@ -731,7 +767,8 @@ void TeleinfoReceiveData ()
 
         // loop to calculate total current
         current_total = 0;
-        for (phase = 0; phase < teleinfo_contract.phase; phase++) current_total += teleinfo_phase[phase].iinst;
+        for (phase = 0; phase < teleinfo_contract.phase; phase++)
+          current_total += teleinfo_phase[phase].iinst;
 
         // loop to update current and power
         for (phase = 0; phase < teleinfo_contract.phase; phase++)
@@ -757,17 +794,19 @@ void TeleinfoReceiveData ()
           }
         } 
 
-        // determine number of indexes according to contract
-        index = GetCommandCode (str_text, sizeof (str_text), teleinfo_contract.period.c_str (), kTeleinfoPeriod);
-        if (index == -1) teleinfo_counter.nb_index = TELEINFO_INDEX_MAX;
-        else teleinfo_counter.nb_index = ARR_TELEINFO_PERIOD_INDEX[index];
+        // if not already done, determine number of indexes according to contract
+        if (teleinfo_counter.nb_index == TELEINFO_INDEX_MAX)
+        {
+          index = GetCommandCode (str_text, sizeof (str_text), teleinfo_contract.period.c_str (), kTeleinfoPeriod);
+          if ((index >= 0) && (index < TELEINFO_INDEX_MAX)) teleinfo_counter.nb_index = ARR_TELEINFO_PERIOD_INDEX[index];
+        }
 
         // update total energy counter and store energy totals if first reading
         first_total = (teleinfo_counter.total == 0);
         teleinfo_counter.total = 0;
         for (index = 0; index < teleinfo_counter.nb_index; index ++) teleinfo_counter.total += teleinfo_counter.index[index];
         if (first_total && (teleinfo_counter.total > 0)) EnergyUpdateTotal((float) teleinfo_counter.total, false);
- 
+
         // declare received message
         teleinfo_message.received = true;
         break;
@@ -866,7 +905,6 @@ void TeleinfoReceiveData ()
               // voltage
               case TIC_URMS1:
                 teleinfo_phase[0].voltage = str_donnee.toInt ();
-                teleinfo_phase[0].voltage_set = true;
                 Energy.voltage_available = true;
                 break;
               case TIC_URMS2:
@@ -874,16 +912,6 @@ void TeleinfoReceiveData ()
                 break;
               case TIC_URMS3:
                 teleinfo_phase[2].voltage = str_donnee.toInt ();
-                break;
-              case TIC_UMOY1:
-                if (teleinfo_phase[0].voltage_set == false) teleinfo_phase[0].voltage = str_donnee.toInt ();
-                Energy.voltage_available = true;
-                break;
-              case TIC_UMOY2:
-                if (teleinfo_phase[1].voltage_set == false) teleinfo_phase[1].voltage = str_donnee.toInt ();
-                break;
-              case TIC_UMOY3:
-                if (teleinfo_phase[2].voltage_set == false) teleinfo_phase[2].voltage = str_donnee.toInt ();
                 break;
               // contract max current or power
               case TIC_ISOUSC:
@@ -1073,23 +1101,27 @@ void TeleinfoUpdateGraphData (uint8_t period)
 {
   int index, phase;
 
-  // set indexed graph values with current values
-  index = teleinfo_graph[period].index;
-  for (phase = 0; phase < teleinfo_contract.phase; phase++)
+  // if period is within the range
+  if (period < TELEINFO_PERIOD_MAX)
   {
-    // save power values for graph usage
-    TeleinfoSaveGraphPower (period, phase, index);
+    // set indexed graph values with current values
+    index = teleinfo_graph[period].index;
+    for (phase = 0; phase < teleinfo_contract.phase; phase++)
+    {
+      // save power values for graph usage
+      TeleinfoSaveGraphPower (period, phase, index);
 
-    // save voltage values for graph usage
-    TeleinfoSaveGraphVoltage (period, phase, index);
+      // save voltage values for graph usage
+      TeleinfoSaveGraphVoltage (period, phase, index);
+    }
+
+    // increase data index in the graph
+    teleinfo_graph[period].index++;
+    teleinfo_graph[period].index = teleinfo_graph[period].index % TELEINFO_GRAPH_SAMPLE;
+
+    // set update flag
+    teleinfo_graph[period].updated = true;
   }
-
-  // increase data index in the graph
-  teleinfo_graph[period].index++;
-  teleinfo_graph[period].index = teleinfo_graph[period].index % TELEINFO_GRAPH_SAMPLE;
-
-  // set update flag
-  teleinfo_graph[period].updated = true;
 }
 
 // Generate JSON with TIC informations
@@ -1128,7 +1160,7 @@ String TeleinfoGenerateTicJSON ()
 String TeleinfoGenerateMeterJSON ()
 {
   int    index, phase;
-  String str_json;
+  String str_value, str_json;
 
   // start Data section
   str_json  = "\"";
@@ -1153,28 +1185,34 @@ String TeleinfoGenerateMeterJSON ()
   str_json += "\":";
   str_json += teleinfo_contract.isousc;
 
-  // loop to update current and power
+  // loop to update voltage, current and power
   for (phase = 0; phase < teleinfo_contract.phase; phase++)
   {
     index = phase + 1;
 
     // U
+    str_value = String (Energy.voltage[phase], 0);
+    str_value.trim ();
     str_json += ",\"U";
     str_json += index;
     str_json += "\":";
-    str_json += String (Energy.voltage[phase], 0);
+    str_json += str_value;
 
     // I
+    str_value = String (Energy.current[phase], 1);
+    str_value.trim ();
     str_json += ",\"I";
     str_json += index;
     str_json += "\":";
-    str_json += String (Energy.current[phase], 1);
+    str_json += str_value;
 
     // I
+    str_value = String (Energy.apparent_power[phase], 0);
+    str_value.trim ();
     str_json += ",\"P";
     str_json += index;
     str_json += "\":";
-    str_json += String (Energy.apparent_power[phase], 0);
+    str_json += str_value;
   } 
 
   // end of Meter section
@@ -1242,11 +1280,11 @@ int TeleinfoWebGetArgValue (const char* pstr_argument, int value_default, int va
   {
     WebGetArg (pstr_argument, str_argument, sizeof (str_argument));
     arg_value = atoi (str_argument);
-
-    // check for min and max value
-    if (arg_value < value_min) arg_value = value_min;
-    if (arg_value > value_max) arg_value = value_max;
   }
+
+  // check for min and max value
+  if (arg_value < value_min) arg_value = value_min;
+  if (arg_value > value_max) arg_value = value_max;
 
   return arg_value;
 }
@@ -1283,30 +1321,31 @@ void TeleinfoWebSensor ()
     for (phase = 0; phase < teleinfo_contract.phase; phase++)
     {
       // calculate phase percentage
-      percentage  = 100 * teleinfo_phase[phase].papp;
-      percentage  = percentage / teleinfo_contract.ssousc;
+      percentage  = (float)teleinfo_phase[phase].papp * 100 / (float)teleinfo_contract.ssousc;
       str_display = String (percentage, 0);
+      str_display.trim ();
 
       // display graph bar
       WSContentSend_PD (TELEINFO_HTML_BAR, ARR_TELEINFO_PHASE_COLOR[phase], str_display.c_str (), str_display.c_str ());
     }
 
-  // Teleinfo mode
-  GetTextIndexed (str_text, sizeof (str_text), teleinfo_contract.mode, kTeleinfoModeName);
-  str_header  = D_TELEINFO_MODE;
-  str_display = str_text;
-  
   // Teleinfo tarif period, with conversion if historic short version
+  str_header   = D_TELEINFO_MODE;
   str_header  += "<br>";
   str_header  += D_TELEINFO_PERIOD;
+  GetTextIndexed (str_text, sizeof (str_text), teleinfo_contract.mode, kTeleinfoModeName);
+  str_display  = str_text;
   str_display += "<br>";
+
+  // convert period name if it is a short historic version
   sizeString  = teleinfo_contract.period.length ();
   if (sizeString >= 5) str_display += teleinfo_contract.period;
   else if (sizeString > 0)
   {
     // get period label
+    strcpy (str_text, "");
     period = GetCommandCode (str_text, sizeof (str_text), teleinfo_contract.period.c_str (), kTeleinfoPeriod);
-    GetTextIndexed (str_text, sizeof (str_text), period, kTeleinfoPeriodName);
+    if (period != -1) GetTextIndexed (str_text, sizeof (str_text), period, kTeleinfoPeriodName);
 
     // add period label
     str_display += D_TELEINFO_HEURES;
@@ -1340,8 +1379,8 @@ void TeleinfoWebSensor ()
   if ((teleinfo_message.nb_data > 0) && ( teleinfo_message.nb_error > 0 ))
   {
     // calculate error percentage
-    percentage = teleinfo_message.nb_error * 100;
-    percentage = percentage / teleinfo_message.nb_data;
+    if (teleinfo_message.nb_data == 0) percentage = 0;
+    else percentage = (float)teleinfo_message.nb_error * 100 / teleinfo_message.nb_data;
 
     // append data
     str_header += "<br>";
@@ -1349,7 +1388,7 @@ void TeleinfoWebSensor ()
     str_display += "<br>";
     str_display += teleinfo_message.nb_error;
     str_display += " <small>(";
-    str_display += String (percentage);
+    str_display += String (percentage, 2);
     str_display += "%)</small>";
   }
 
@@ -1466,7 +1505,7 @@ void TeleinfoWebJsonData ()
   int  index, phase,index_array;
   int  graph_period = TELEINFO_PERIOD_LIVE;
   long power, voltage;
-  char str_argument[8];
+  char str_argument[16];
 
   // check graph period to be displayed
   if (Webserver->hasArg (D_CMND_TELEINFO_PERIOD))
@@ -1539,7 +1578,8 @@ void TeleinfoWebTicUpdate ()
   WSContentSend_P ("COUNTER|%d\n", teleinfo_message.nb_message);
 
   // loop thru TIC message lines to publish if defined
-  for (index = 0; index < teleinfo_message.line_max; index ++) WSContentSend_P (PSTR ("%s|%s|%s\n"), teleinfo_message.line[index].etiquette.c_str (), teleinfo_message.line[index].donnee.c_str (), String (teleinfo_message.line[index].checksum).c_str ());
+  for (index = 0; index < teleinfo_message.line_max; index ++)
+    WSContentSend_P (PSTR ("%s|%s|%c\n"), teleinfo_message.line[index].etiquette.c_str (), teleinfo_message.line[index].donnee.c_str (), teleinfo_message.line[index].checksum);
 
   // end of data page
   WSContentEnd ();
@@ -1632,8 +1672,8 @@ void TeleinfoWebPageTic ()
 void TeleinfoWebGraphUpdate ()
 {
   int    graph_period = TELEINFO_PERIOD_LIVE;
-  int    index;
-  char   str_argument[4];
+  int    index, phase;
+  char   str_argument[16];
   String str_text;
 
   // check graph period to be displayed
@@ -1650,12 +1690,12 @@ void TeleinfoWebGraphUpdate ()
   str_text += "\n";
 
   // check power and power difference for each phase
-  for (index = 0; index < teleinfo_contract.phase; index++)
+  for (phase = 0; phase < teleinfo_contract.phase; phase++)
   {
     // publish apparent power and voltage
-    str_text += teleinfo_phase[index].papp;
+    str_text += teleinfo_phase[phase].papp;
     str_text += ";";
-    str_text += teleinfo_phase[index].voltage;
+    str_text += teleinfo_phase[phase].voltage;
     str_text += "\n";    
   }
 
@@ -1678,7 +1718,7 @@ void TeleinfoWebGraphData ()
   TIME_T   current_dst;
   uint32_t current_time;
   float    font_size;
-  char     str_data[8];
+  char     str_data[16];
   String   str_phase;
 
   // get numerical argument values
@@ -1690,7 +1730,11 @@ void TeleinfoWebGraphData ()
   font_size = (float)graph_height / TELEINFO_GRAPH_HEIGHT * 1.5;
 
   // check phase display argument
-  if (Webserver->hasArg (D_CMND_TELEINFO_PHASE)) { WebGetArg (D_CMND_TELEINFO_PHASE, str_data, sizeof (str_data)); str_phase = str_data; }
+  if (Webserver->hasArg (D_CMND_TELEINFO_PHASE))
+  {
+    WebGetArg (D_CMND_TELEINFO_PHASE, str_data, sizeof (str_data));
+    str_phase = str_data;
+  }
   for (phase = str_phase.length (); phase < teleinfo_contract.phase; phase++) str_phase += "1";
 
   // boundaries of SVG graph
@@ -1745,12 +1789,13 @@ void TeleinfoWebGraphData ()
             graph_valid = (graph_value != UINT16_MAX);
             if (graph_valid)
             {
-              // calclate graph value as delta from min & max range
+              // calculate graph value as delta from min & max range
               graph_delta = teleinfo_graph[graph_period].vmax - teleinfo_graph[graph_period].vmin;
               graph_value = graph_value - teleinfo_graph[graph_period].vmin;
 
               // calculate graph y position
-              graph_y = graph_height - (graph_value * graph_height / graph_delta);
+              graph_y = graph_height;
+              if (graph_delta != 0) graph_y -= (graph_value * graph_height / graph_delta);
             }
             break;
           
@@ -1791,7 +1836,8 @@ void TeleinfoWebGraphData ()
       shift_width = unit_width - (unit_width * shift_unit / 5) - (unit_width * current_dst.second / 300);
 
       // calculate first time displayed by substracting (5 * 5mn + shift) to current time
-      current_time -= 1500 + (shift_unit * 60); 
+      current_time -= 1500;
+      current_time -= (shift_unit * 60); 
 
       // display 5 mn separation lines with time
       for (index = 0; index < 6; index++)
@@ -1814,7 +1860,8 @@ void TeleinfoWebGraphData ()
       shift_width = unit_width - (unit_width * shift_unit / 4) - (unit_width * current_dst.minute / 240);
 
       // calculate first time displayed by substracting (5 * 4h + shift) to current time
-      current_time -= 72000 + (shift_unit * 3600); 
+      current_time -= 72000;
+      current_time -= (shift_unit * 3600); 
 
       // display 4 hours separation lines with hour
       for (index = 0; index < 6; index++)
@@ -1903,8 +1950,8 @@ void TeleinfoWebGraphFrame ()
     case TELEINFO_DISPLAY_POWER:
       // init power range
       str_unit = "W";
-      teleinfo_graph[graph_period].pmax = 1000;
-      if (teleinfo_contract.ssousc > 0) teleinfo_graph[graph_period].pmax = (uint16_t)teleinfo_contract.ssousc;
+      if (teleinfo_contract.ssousc > 1000) teleinfo_graph[graph_period].pmax = (uint16_t)teleinfo_contract.ssousc;
+      else teleinfo_graph[graph_period].pmax = 1000;
 
       // loop thru phasis and graph records to calculate max power
       for (phase = 0; phase < teleinfo_contract.phase; phase++)
@@ -1989,7 +2036,7 @@ void TeleinfoWebPageGraph ()
   bool   phase_display;
   int    index, phase;
   int    graph_period, graph_display, graph_height, graph_bottom;  
-  char   str_data[8];
+  char   str_data[16];
   String str_phase, str_text;
 
   // get numerical argument values
@@ -2001,7 +2048,11 @@ void TeleinfoWebPageGraph ()
   graph_bottom = 68 * graph_height / TELEINFO_GRAPH_HEIGHT;
 
   // check phase display argument
-  if (Webserver->hasArg (D_CMND_TELEINFO_PHASE)) { WebGetArg (D_CMND_TELEINFO_PHASE, str_data, sizeof (str_data)); str_phase = str_data; }
+  if (Webserver->hasArg (D_CMND_TELEINFO_PHASE))
+  {
+    WebGetArg (D_CMND_TELEINFO_PHASE, str_data, sizeof (str_data)); 
+    str_phase = str_data; 
+  }
   for (phase = str_phase.length (); phase < teleinfo_contract.phase; phase++) str_phase += "1";
 
   // beginning of form without authentification
@@ -2046,7 +2097,8 @@ void TeleinfoWebPageGraph ()
   WSContentSend_P (PSTR ("div.phase {display:inline-block;width:90px;padding:0.2rem;margin:0.2rem;border-radius:8px;}\n"));
   WSContentSend_P (PSTR ("div.phase span.power {font-size:1rem;font-weight:bold;}\n"));
   WSContentSend_P (PSTR ("div.phase span.volt {font-size:0.8rem;font-style:italic;}\n"));
-  for (phase = 0; phase < teleinfo_contract.phase; phase++) WSContentSend_P (PSTR ("div.ph%d {color:%s;border:1px %s solid;}\n"), phase, ARR_TELEINFO_PHASE_COLOR[phase], ARR_TELEINFO_PHASE_COLOR[phase]);
+  for (phase = 0; phase < teleinfo_contract.phase; phase++)
+    WSContentSend_P (PSTR ("div.ph%d {color:%s;border:1px %s solid;}\n"), phase, ARR_TELEINFO_PHASE_COLOR[phase], ARR_TELEINFO_PHASE_COLOR[phase]);
   WSContentSend_P (PSTR ("div.disabled {color:#444;}\n"));
   WSContentSend_P (PSTR ("div.choice {display:inline-block;font-size:1rem;padding:0px;margin:auto 10px;border:1px #666 solid;background:none;color:#fff;border-radius:6px;}\n"));
   WSContentSend_P (PSTR ("div.choice a {color:white;}\n"));
@@ -2075,7 +2127,7 @@ void TeleinfoWebPageGraph ()
   WSContentSend_P (PSTR ("<div>\n"));
   for (phase = 0; phase < teleinfo_contract.phase; phase++)
   {
-    // display phase switch link
+    // display phase inverted link
     str_text = str_phase;
     phase_display = (str_text.charAt (phase) != '0');
     if (phase_display) str_text.setCharAt (phase, '0'); else str_text.setCharAt (phase, '1');
@@ -2117,6 +2169,7 @@ void TeleinfoWebPageGraph ()
     for (index = 0; index < TELEINFO_DISPLAY_MAX; index++)
     {
       // get data display label
+      strcpy (str_data, "");
       GetTextIndexed (str_data, sizeof (str_data), index, kTeleinfoGraphDisplay);
 
       // display tab
