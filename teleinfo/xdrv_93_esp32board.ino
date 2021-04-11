@@ -3,8 +3,9 @@
   
   Copyright (C) 2020  Nicolas Bernaerts
 
-    08/11/2020 - v1.0   - Creation
-    15/03/2021 - v1.1   - Detect model board in config page
+    08/11/2020 - v1.0 - Creation
+    15/03/2021 - v1.1 - Detect model board in config page
+    10/04/2021 - v1.2 - Remove use of String to avoid heap fragmentation 
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -71,13 +72,13 @@ const char* const arr_board_tmpl[] PROGMEM = { board_tmpl0, board_tmpl1, board_t
 // init procedure
 void ESP32BoardInit ()
 {
-  int    index;
-  String str_board;
-  char   str_text[32];
+  int  index;
+  char str_board[32];
+  char str_text[32];
 
   // get board template name and index
-  str_board = SettingsText(SET_TEMPLATE_NAME);
-  index = GetCommandCode (str_text, sizeof(str_text), str_board.c_str (), kESP32BoardName);
+  strcpy (str_board, SettingsText(SET_TEMPLATE_NAME));
+  index = GetCommandCode (str_text, sizeof(str_text), str_board, kESP32BoardName);
 
   // if template name is registered, set technical parameters
   if (index >= 0)
@@ -92,27 +93,10 @@ void ESP32BoardInit ()
 // Show JSON status (for MQTT)
 void ESP32BoardShowJSON ()
 {
-  String str_json;
-
   // append to MQTT message
-  str_json  = ",\"";
-  str_json += D_JSON_ESP32_ETH;
-  str_json += "\":{";
-
-  str_json += "\"";
-  str_json += D_JSON_ESP32_MAC;
-  str_json += "\":\"";
-  str_json += ETH.macAddress();
-  str_json += "\",";
-
-  str_json += "\"";
-  str_json += D_JSON_ESP32_IP;
-  str_json += "\":\"";
-  str_json += ETH.localIP().toString();
-  str_json += "\"}";
-
-  // append JSON to MQTT message
-  ResponseAppend_P (PSTR("%s"), str_json.c_str ());
+  ResponseAppend_P (PSTR (",\"%s\":{"), D_JSON_ESP32_ETH);
+  ResponseAppend_P (PSTR ("\"%s\":\"%s\","), D_JSON_ESP32_ETH, ETH.macAddress().c_str ());
+  ResponseAppend_P (PSTR ("\"%s\":\"%s\"}"), D_JSON_ESP32_IP,  ETH.localIP().toString().c_str ());
 }
 
 /*********************************************\
@@ -131,33 +115,39 @@ void ESP32BoardWebConfigButton ()
 // append board info to main page
 void ESP32BoardWebSensor ()
 {
-  String str_header, str_data, str_mac;
+  int  index;
+  char str_header[2][16];
+  char str_data[2][16];
+  char str_lf[8];
+
+  // init
+  for (index = 0; index < 2; index ++) str_header[index][0] = 0;
+  for (index = 0; index < 2; index ++) str_data[index][0] = 0;
+  str_lf[0] = 0;
 
   // display wifi IP address
-  str_header = D_BOARD_WIFI;
-  str_data   = WiFi.localIP().toString();
+  strcpy (str_header[0], D_BOARD_WIFI);
+  strcpy (str_data[0], WiFi.localIP().toString().c_str ());
 
   // display Ethernet IP address
-  str_mac = ETH.macAddress ();
-  if (str_mac.length () > 0)
+  if (ETH.macAddress ().length () > 0)
   {
-    str_header += "<br>";
-    str_header += D_BOARD_ETH;
-    str_data += "<br>";
-    str_data += ETH.localIP().toString();
+    strcpy (str_lf, "<br>");
+    strcpy (str_header[1], D_BOARD_ETH);
+    strcpy (str_data[1], ETH.localIP().toString().c_str ());
   }
 
   // affichage IP wifi et ethernet
-  WSContentSend_PD (PSTR("{s}%s{m}%s{e}"), str_header.c_str (), str_data.c_str ());
-
+  WSContentSend_PD (PSTR("{s}%s%s%s{m}%s%s%s{e}"), str_header[0], str_lf, str_header[1], str_data[0], str_lf, str_data[1]);
 }
 
 // board config page
 void ESP32BoardWebPageConfig ()
 {
-  int    index;
-  char   str_text[MAX_LOGSZ];
-  String str_board, str_active;
+  int  index;
+  char str_text[MAX_LOGSZ];
+  char str_board[32];
+  char str_active[16];
 
   // if access not allowed, close
   if (!HttpCheckPriviledgedAccess()) return;
@@ -192,15 +182,15 @@ void ESP32BoardWebPageConfig ()
   WSContentSend_P (BOARD_FORM_START, D_PAGE_BOARD_CONFIG);
 
   // get board template name
-  str_board = SettingsText(SET_TEMPLATE_NAME);
+  strcpy (str_board, SettingsText(SET_TEMPLATE_NAME));
 
   // board selection
   WSContentSend_P (BOARD_FIELD_START, D_BOARD);
   for (index = 0; index < ETH_MAX; index ++) 
   {
     GetTextIndexed(str_text, sizeof(str_text), index, kESP32BoardName);
-    if (str_board == str_text) str_active = "checked"; else str_active = "";
-    WSContentSend_P (BOARD_INPUT_TEXT, D_CMND_BOARD, index, str_active.c_str (), str_text);
+    if (strcmp (str_board, str_text) == 0) strcpy (str_active, "checked"); else str_active[0] = 0;
+    WSContentSend_P (BOARD_INPUT_TEXT, D_CMND_BOARD, index, str_active, str_text);
   }
   WSContentSend_P (BOARD_FIELD_STOP);
    

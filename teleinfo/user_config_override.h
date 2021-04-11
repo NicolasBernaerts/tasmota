@@ -40,6 +40,7 @@
     29/03/2021 - v7.6   - Add voltage graph
     04/04/2021 - v7.7   - Change in serial port & graph height selection
     06/04/2021 - v7.7.1 - Handle number of indexes according to contract
+    10/04/2021 - v7.7.2 - Remove use of String to avoid heap fragmentation 
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -93,7 +94,7 @@
 #define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_TELEINFO                          // Add support for Teleinfo
 
-#define EXTENSION_VERSION "7.7.1"             // version
+#define EXTENSION_VERSION "7.7.2"             // version
 #define EXTENSION_NAME "Teleinfo"             // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 
