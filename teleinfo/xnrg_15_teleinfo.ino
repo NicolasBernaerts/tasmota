@@ -787,7 +787,7 @@ void TeleinfoInit ()
     Settings.energy_kWhtotal    = 0;
 
     // set default energy parameters
-    Energy.voltage_available = false;
+    Energy.voltage_available = true;
     Energy.current_available = true;
     for (index = 0; index < TELEINFO_PHASE_MAX; index++)
     {
@@ -2329,14 +2329,11 @@ void TeleinfoWebPageGraph ()
   WSContentSend_P (PSTR ("<div class='choice'>\n"));
   for (index = 0; index < TELEINFO_DISPLAY_MAX; index++)
   {
-    if (Energy.voltage_available || (index != TELEINFO_DISPLAY_VOLTAGE))
-    {
-      GetTextIndexed (str_data, sizeof (str_data), index, kTeleinfoGraphDisplay);
-      if (graph_display != index) WSContentSend_P (PSTR ("<a href='%s?period=%d&data=%d&height=%d&phase=%s'>"), D_TELEINFO_PAGE_GRAPH, graph_period, index, graph_height, str_phase);
-      WSContentSend_P (PSTR ("<div class='item data'>%s</div>"), str_data);
-      if (graph_display != index) WSContentSend_P (PSTR ("</a>"));
-      WSContentSend_P (PSTR ("\n"));
-    }
+    GetTextIndexed (str_data, sizeof (str_data), index, kTeleinfoGraphDisplay);
+    if (graph_display != index) WSContentSend_P (PSTR ("<a href='%s?period=%d&data=%d&height=%d&phase=%s'>"), D_TELEINFO_PAGE_GRAPH, graph_period, index, graph_height, str_phase);
+    WSContentSend_P (PSTR ("<div class='item data'>%s</div>"), str_data);
+    if (graph_display != index) WSContentSend_P (PSTR ("</a>"));
+    WSContentSend_P (PSTR ("\n"));
   }
   WSContentSend_P (PSTR ("</div>\n"));
 
