@@ -40,10 +40,11 @@ Meter data allows easy reading and offloading of electrical appliances or heater
   * **PHASE** = number of phases
   * **PREF** = contract maximum power per phase 
   * **IREF** = contract maximum current per phase 
-  * **Ix** = instant current on phase x 
-  * **Ux** = instant voltage on phase x 
-  * **Px** = instant apparent power on phase x 
-  * **Wx** = instant active power on phase x 
+  * **Ix** = current on phase x 
+  * **Ux** = voltage on phase x 
+  * **Px** = apparent power on phase x 
+  * **Wx** = active power on phase x 
+  * **Cx** = power factor on phase x 
 
 This firmware is based on Tasmota modified with :
   * serial as 7 bits, parity Even, 1 stop bit
