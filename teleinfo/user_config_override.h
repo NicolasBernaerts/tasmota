@@ -41,6 +41,7 @@
     04/04/2021 - v7.7   - Change in serial port & graph height selection
     06/04/2021 - v7.7.1 - Handle number of indexes according to contract
     10/04/2021 - v7.7.2 - Remove use of String to avoid heap fragmentation 
+    14/04/2021 - v7.8   - Calculate Cos phi and Active power (W) 
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -86,15 +87,11 @@
 // ESP32 specific
 #define USE_ETHERNET                          // Add support for ESP32 Ethernet physical port
 
-//#undef USE_UFILESYS
-//#undef USE_MI_ESP32                         // ESP32 bluetooth support
-//#undef USE_ADC                              // ESP32 ADC support
-
 #define USE_INFOJSON                          // Add support for Information JSON page
 #define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_TELEINFO                          // Add support for Teleinfo
 
-#define EXTENSION_VERSION "7.7.2"             // version
+#define EXTENSION_VERSION "7.8"               // version
 #define EXTENSION_NAME "Teleinfo"             // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 

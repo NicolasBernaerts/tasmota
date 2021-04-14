@@ -31,25 +31,16 @@
 // constants
 #define TIMEZONE_JSON_MAX         112
 
-// JSON sttrings
-#define D_JSON_TIMEZONE        "Timezone"
-#define D_JSON_TIMEZONE_STD    "STD"
-#define D_JSON_TIMEZONE_DST    "DST"
-#define D_JSON_TIMEZONE_OFFSET "Offset"
-#define D_JSON_TIMEZONE_MONTH  "Month"
-#define D_JSON_TIMEZONE_WEEK   "Week"
-#define D_JSON_TIMEZONE_DAY    "Day"
-
 // commands
-#define D_CMND_TIMEZONE_NTP    "ntp"
-#define D_CMND_TIMEZONE_STDO   "stdo"
-#define D_CMND_TIMEZONE_STDM   "stdm"
-#define D_CMND_TIMEZONE_STDW   "stdw"
-#define D_CMND_TIMEZONE_STDD   "stdd"
-#define D_CMND_TIMEZONE_DSTO   "dsto"
-#define D_CMND_TIMEZONE_DSTM   "dstm"
-#define D_CMND_TIMEZONE_DSTW   "dstw"
-#define D_CMND_TIMEZONE_DSTD   "dstd"
+#define D_CMND_TIMEZONE_NTP       "ntp"
+#define D_CMND_TIMEZONE_STDO      "stdo"
+#define D_CMND_TIMEZONE_STDM      "stdm"
+#define D_CMND_TIMEZONE_STDW      "stdw"
+#define D_CMND_TIMEZONE_STDD      "stdd"
+#define D_CMND_TIMEZONE_DSTO      "dsto"
+#define D_CMND_TIMEZONE_DSTM      "dstm"
+#define D_CMND_TIMEZONE_DSTW      "dstw"
+#define D_CMND_TIMEZONE_DSTD      "dstd"
 
 // web URL
 const char D_TIMEZONE_PAGE_CONFIG[] PROGMEM = "/tz";
