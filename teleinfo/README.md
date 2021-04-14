@@ -22,7 +22,7 @@ It provides thru MQTT :
   * some simple Meter data (independent from TIC mode)
 
 Since **v7.8** onward, it calculates Power Factor (Cos φ) from Teleinfo totals (W) and Instant Power (VA).
-So, you now get Active Power in addition to Apparent Power.
+It is evaluated everytime total power increases of 10W. So, you now get Active Power in addition to Apparent Power.
 
 Teleinfo data are provided as is :
   * **ADCO**, **ADCS** = contract number
