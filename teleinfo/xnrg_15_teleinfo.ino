@@ -165,6 +165,7 @@ const char D_TELEINFO_PAGE_TIC_PNG[]     PROGMEM = "/tic.png";
 // web strings
 const char D_TELEINFO_CONFIG[]   PROGMEM = "Configure Teleinfo";
 const char TELEINFO_DISABLED[]   PROGMEM = "Disabled";
+const char TELEINFO_APPARENT[]   PROGMEM = "Apparent";
 const char TELEINFO_COSPHI[]     PROGMEM = "Cos φ";
 const char TELEINFO_TITLE_RATE[] PROGMEM = "TIC Rate";
 const char TELEINFO_TITLE_TIC[]  PROGMEM = "Send Teleinfo data";
@@ -267,10 +268,11 @@ struct {
 
 // data per phase
 struct tic_phase {
-  long  voltage;                            // voltage
-  long  iinst;                              // instant current
+  long  voltage;                            // instant voltage
+  long  current;                            // instant current
   long  sinsts;                             // instant apparent power (may be a sum)
   long  papp;                               // instant apparent power
+  long  pact;                               // instant active power
   long  papp_last;                          // last published apparent power
   float cos_phi;                            // cos phi
 }; 
@@ -786,7 +788,7 @@ void TeleinfoInit ()
 
     // set default energy parameters
     Energy.voltage_available = false;
-    Energy.current_available = false;
+    Energy.current_available = true;
     for (index = 0; index < TELEINFO_PHASE_MAX; index++)
     {
       // ernergy counter
@@ -822,7 +824,7 @@ void TeleinfoGraphInit ()
   {
     // default values
     teleinfo_phase[phase].voltage   = TELEINFO_VOLTAGE;
-    teleinfo_phase[phase].iinst     = 0;
+    teleinfo_phase[phase].current   = 0;
     teleinfo_phase[phase].papp      = 0;
     teleinfo_phase[phase].papp_last = 0;
   }
@@ -858,13 +860,14 @@ void TeleinfoGraphInit ()
 // function to handle received teleinfo data
 void TeleinfoReceiveData ()
 {
-  bool overload = false;
-  char recv_serial, checksum;
-  int  index, phase, max_size;
-  long current_total, power_total, counter_total;
-  char str_etiquette[TELEINFO_STRING_ETIQUETTE_MAX];
-  char str_donnee[TELEINFO_STRING_LINE_MAX];
-  char str_result[TELEINFO_STRING_LINE_MAX];
+  bool  overload = false;
+  char  recv_serial, checksum;
+  int   index, phase, max_size;
+  long  current_total, power_total, counter_total;
+  float active_power;
+  char  str_etiquette[TELEINFO_STRING_ETIQUETTE_MAX];
+  char  str_donnee[TELEINFO_STRING_LINE_MAX];
+  char  str_result[TELEINFO_STRING_LINE_MAX];
 
   while (teleinfo_serial->available() > TELEINFO_SERIAL_BUFFER) 
   {
@@ -912,7 +915,7 @@ void TeleinfoReceiveData ()
         power_total = 0;
         for (phase = 0; phase < teleinfo_contract.phase; phase++)
         {
-          current_total += teleinfo_phase[phase].iinst;
+          current_total += teleinfo_phase[phase].current;
           power_total += teleinfo_phase[phase].sinsts;
         }
 
@@ -922,13 +925,17 @@ void TeleinfoReceiveData ()
           // calculate phase apparent power
           if (teleinfo_counter.papp == power_total) teleinfo_phase[phase].papp = teleinfo_phase[phase].sinsts;
           else if (current_total == 0) teleinfo_phase[phase].papp = teleinfo_counter.papp / teleinfo_contract.phase;
-          else teleinfo_phase[phase].papp = (teleinfo_counter.papp * teleinfo_phase[phase].iinst) / current_total;
+          else teleinfo_phase[phase].papp = (teleinfo_counter.papp * teleinfo_phase[phase].current) / current_total;
+
+          // calculate active power
+          active_power = (float)teleinfo_phase[phase].papp * teleinfo_phase[phase].cos_phi;
+          teleinfo_phase[phase].pact = (uint16_t)active_power; 
 
           // update phase active power and instant current
           Energy.voltage[phase]        = (float)teleinfo_phase[phase].voltage;
-          Energy.current[phase]        = (float)teleinfo_phase[phase].iinst;
           Energy.apparent_power[phase] = (float)teleinfo_phase[phase].papp;
-          Energy.active_power[phase]   = Energy.apparent_power[phase] * teleinfo_phase[phase].cos_phi;
+          Energy.current[phase]        = Energy.apparent_power[phase] / Energy.voltage[phase];
+          Energy.active_power[phase]   = active_power;
 
           // detect power overload
           if (teleinfo_phase[phase].papp > teleinfo_contract.ssousc) teleinfo_message.overload = true;
@@ -1033,15 +1040,15 @@ void TeleinfoReceiveData ()
               case TIC_IINST:
               case TIC_IRMS1:
               case TIC_IINST1:
-                teleinfo_phase[0].iinst = atoi (str_donnee);
+                teleinfo_phase[0].current = atoi (str_donnee);
                 break;
               case TIC_IRMS2:
               case TIC_IINST2:
-                teleinfo_phase[1].iinst = atoi (str_donnee);
+                teleinfo_phase[1].current = atoi (str_donnee);
                 break;
               case TIC_IRMS3:
               case TIC_IINST3:
-                teleinfo_phase[2].iinst = atoi (str_donnee); 
+                teleinfo_phase[2].current = atoi (str_donnee); 
                 teleinfo_contract.phase = 3; 
                 break;
               // instant power
@@ -1315,35 +1322,34 @@ void TeleinfoGenerateTicJSON ()
 //  "METER":{ "PHASE":3,"PREF":6000,"IREF":30,"U1":233,"I1":10,"P1":2020,"U2":231,"I2":5,"P1":990,"U3":230,"I3":2,"P3":410}
 void TeleinfoGenerateMeterJSON ()
 {
-  int  phase, value;
+  int   phase, value;
+  float current;
   char str_text[TELEINFO_STRING_VALUE_MAX];
 
   // start METER section
   ResponseAppend_P (PSTR (",\"%s\":{"), TELEINFO_JSON_METER);
-
-  // PHASE
   ResponseAppend_P (PSTR ("\"%s\":%d"), TELEINFO_JSON_PHASE, teleinfo_contract.phase);
-
-  // PREF
   ResponseAppend_P (PSTR (",\"%s\":%d"), TELEINFO_JSON_PREF, teleinfo_contract.ssousc);
-
-  // IREF
   ResponseAppend_P (PSTR (",\"%s\":%d"), TELEINFO_JSON_IREF, teleinfo_contract.isousc);
 
   // loop to update voltage, current and power
   for (phase = 0; phase < teleinfo_contract.phase; phase++)
   {
-    // U
-    value = (int)Energy.voltage[phase];
-    ResponseAppend_P (PSTR (",\"U%d\":%d"), phase + 1, value);
+    value = phase + 1;
+
+    // U, Papp and Pact
+    ResponseAppend_P (PSTR (",\"U%d\":%d"), value, teleinfo_phase[phase].voltage);
+    ResponseAppend_P (PSTR (",\"P%d\":%d"), value, teleinfo_phase[phase].papp);
+    ResponseAppend_P (PSTR (",\"W%d\":%d"), value, teleinfo_phase[phase].pact);
 
     // I
-    value = (int)Energy.current[phase];
-    ResponseAppend_P (PSTR (",\"I%d\":%d"), phase + 1, value);
+    current = teleinfo_phase[phase].papp / teleinfo_phase[phase].voltage;
+    ext_snprintf_P (str_text, sizeof(str_text), PSTR ("%1_f"), &current);
+    ResponseAppend_P (PSTR (",\"I%d\":%s"), value, str_text);
 
-    // P
-    value = (int)Energy.apparent_power[phase];
-    ResponseAppend_P (PSTR (",\"P%d\":%d"), phase + 1, value);
+    // cos phi
+    ext_snprintf_P (str_text, sizeof(str_text), PSTR ("%2_f"), &teleinfo_phase[phase].cos_phi);
+    ResponseAppend_P (PSTR (",\"C%d\":%s"), value, str_text);
   } 
 
   // end of Meter section
@@ -1438,15 +1444,27 @@ void TeleinfoWebSensor ()
       WSContentSend_PD (TELEINFO_HTML_BAR, ARR_TELEINFO_PHASE_COLOR[phase], str_text, str_text);
     }
 
+/*
+  // display apparent power
+  strcpy (str_display[0], "");
+  for (phase = 0; phase < teleinfo_contract.phase; phase++)
+  {
+    itoa (teleinfo_phase[phase].papp, str_text, 10);
+    if (strlen (str_display[0]) > 0) strcat (str_display[0], " / ");
+    strcat (str_display[0], str_text);
+  }
+  WSContentSend_PD (PSTR ("{s}%s{m}%s VA{e}"), TELEINFO_APPARENT, str_display[0]);
+
   // display cos phi
   strcpy (str_display[0], "");
   for (phase = 0; phase < teleinfo_contract.phase; phase++)
   {
-    ext_snprintf_P (str_text, sizeof(str_text), PSTR ("%2_f"), &teleinfo_phase[0].cos_phi);
-    if (strlen (str_display[0]) != 0) strcat (str_display[0], " / ");
+    ext_snprintf_P (str_text, sizeof(str_text), PSTR ("%2_f"), &teleinfo_phase[phase].cos_phi);
+    if (strlen (str_display[0]) > 0) strcat (str_display[0], " / ");
     strcat (str_display[0], str_text);
   }
   WSContentSend_PD (PSTR ("{s}%s{m}%s{e}"), TELEINFO_COSPHI, str_display[0]);
+*/
 
   // init strings
   for (index = 0; index < 2; index ++) strcpy (str_lf[index], "");
