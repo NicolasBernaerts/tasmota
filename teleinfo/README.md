@@ -21,7 +21,7 @@ It provides thru MQTT :
   * all Teleinfo data
   * some simple Meter data (independent from TIC mode)
 
-Since **v7.8** onward, it calculates Cos Phi factor from Teleinfo totals (W) and Instant Power (VA).
+Since **v7.8** onward, it calculates Power Factor (Cos φ) from Teleinfo totals (W) and Instant Power (VA).
 So, you now get Active Power in addition to Apparent Power.
 
 Teleinfo data are provided as is :
