@@ -21,6 +21,8 @@ It provides thru MQTT :
   * all Teleinfo data
   * some simple Meter data (independent from TIC mode)
 
+If your linky in in historic mode, it doesn't provide instant voltage. Voltage is then forced to 230V.
+
 Since **v7.8** onward, it calculates Power Factor (Cos φ) from Teleinfo totals (W) and Instant Power (VA).
 It is evaluated everytime total power increases of 10W. So, you now get Active Power in addition to Apparent Power.
 
