@@ -243,7 +243,7 @@ void TimezoneWebSensor ()
 // Timezone configuration web page
 void TimezoneWebPageConfigure ()
 {
-  char argument[8];
+  char argument[32];
 
   // if access not allowed, close
   if (!HttpCheckPriviledgedAccess()) return;
