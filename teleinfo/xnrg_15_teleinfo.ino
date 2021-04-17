@@ -268,6 +268,7 @@ struct {
 
 // data per phase
 struct tic_phase {
+  bool  volt_set;                           // voltage set in current message
   long  voltage;                            // instant voltage
   long  current;                            // instant current
   long  sinsts;                             // instant apparent power (may be a sum)
@@ -747,7 +748,7 @@ void TeleinfoInit ()
 #ifdef ESP8266
 
     // create serial port with buffer set to 256 (to handle 19200bps with 100ms loop)
-    teleinfo_serial = new TasmotaSerial (Pin (GPIO_TELEINFO_RX), -1, 1, 1, 256);
+    teleinfo_serial = new TasmotaSerial (Pin (GPIO_TELEINFO_RX), -1, 2, 1, 256);
 
     // if port has been created
     if (teleinfo_serial->begin (baud_rate))
@@ -882,6 +883,9 @@ void TeleinfoReceiveData ()
       case 2:
         // reset current message line index
         teleinfo_message.line_index = 0;
+
+        // reset voltage flags
+        for (phase = 0; phase < teleinfo_contract.phase; phase++) teleinfo_phase[phase].volt_set = false;
         break;
           
       // ---------------------
@@ -907,7 +911,7 @@ void TeleinfoReceiveData ()
         // if defined, defined maximum power per phase
         if ((teleinfo_contract.ssousc == 0) && (teleinfo_contract.isousc != 0)) teleinfo_contract.ssousc = teleinfo_contract.isousc * TELEINFO_VOLTAGE_REF;
 
-        // if needed, declare number of phases
+        // if needed, declare voltage and number of phases
         if (Energy.phase_count != teleinfo_contract.phase) Energy.phase_count = teleinfo_contract.phase;
 
         // loop to calculate total current and power
@@ -923,7 +927,7 @@ void TeleinfoReceiveData ()
         for (phase = 0; phase < teleinfo_contract.phase; phase++)
         {
           // calculate phase apparent power
-          if (teleinfo_counter.papp == power_total) teleinfo_phase[phase].papp = teleinfo_phase[phase].sinsts;
+          if (abs (teleinfo_counter.papp - power_total) < 10) teleinfo_phase[phase].papp = teleinfo_phase[phase].sinsts;
           else if (current_total == 0) teleinfo_phase[phase].papp = teleinfo_counter.papp / teleinfo_contract.phase;
           else teleinfo_phase[phase].papp = (teleinfo_counter.papp * teleinfo_phase[phase].current) / current_total;
 
@@ -1064,17 +1068,31 @@ void TeleinfoReceiveData ()
                 break;
               case TIC_SINSTS3:
                 teleinfo_phase[2].sinsts = atoi (str_donnee);
+                teleinfo_contract.phase = 3; 
                 break;
               // voltage
               case TIC_URMS1:
-                teleinfo_phase[0].voltage = atoi (str_donnee);
-                Energy.voltage_available = true;
+                teleinfo_phase[0].voltage  = atoi (str_donnee);
+                teleinfo_phase[0].volt_set = true;
+                break;
+              case TIC_UMOY1:
+                if (!teleinfo_phase[0].volt_set) teleinfo_phase[0].voltage = atoi (str_donnee);
                 break;
               case TIC_URMS2:
                 teleinfo_phase[1].voltage = atoi (str_donnee);
+                teleinfo_phase[1].volt_set = true;
+                break;
+              case TIC_UMOY2:
+                if (!teleinfo_phase[1].volt_set) teleinfo_phase[1].voltage = atoi (str_donnee);
                 break;
               case TIC_URMS3:
                 teleinfo_phase[2].voltage = atoi (str_donnee);
+                teleinfo_phase[2].volt_set = true;
+                teleinfo_contract.phase = 3; 
+                break;
+              case TIC_UMOY3:
+                if (!teleinfo_phase[2].volt_set) teleinfo_phase[2].voltage = atoi (str_donnee);
+                teleinfo_contract.phase = 3; 
                 break;
               // contract max current or power
               case TIC_ISOUSC:
