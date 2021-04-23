@@ -76,7 +76,7 @@ const char serialrelay_tmpl8[] PROGMEM = "{\"NAME\":\"LC Tech. x4\",\"GPIO\":[21
 const char* const arr_serialrelay_tmpl[] PROGMEM = { serialrelay_tmpl0, serialrelay_tmpl1, serialrelay_tmpl2, serialrelay_tmpl3, serialrelay_tmpl4, serialrelay_tmpl5, serialrelay_tmpl6, serialrelay_tmpl7, serialrelay_tmpl8 };
 
 enum SerialRelayBoards { SERIALRELAY_ICSE013A, SERIALRELAY_ICSE012A, SERIALRELAY_ICSE014A, SERIALRELAY_LC1_OLD, SERIALRELAY_LC1, SERIALRELAY_LC2_OLD, SERIALRELAY_LC2, SERIALRELAY_LC4_OLD, SERIALRELAY_LC4, SERIALRELAY_BOARD_MAX };
-const char kSerialRelayBoard[] PROGMEM = "ICSE-013A 2 relays|ICSE-012A 4 relays (HW-034)|ICSE-014A 8 relays|LC Tech. Relay x1 (old)|LC Tech. Relay x1 v1.2+|LC Tech. Relay x2 (old)|LC Tech. Relay x2|LC Tech. Relay x4 (old)|LC Tech. Relay x4|Unknown board";
+const char kSerialRelayBoard[] PROGMEM = "ICSE-013A 2 relays|ICSE-012A 4 relays (HW-034)|ICSE-014A 8 relays (HW-149)|LC Tech. Relay x1 (old)|LC Tech. Relay x1 v1.2+|LC Tech. Relay x2 (old)|LC Tech. Relay x2|LC Tech. Relay x4 (old)|LC Tech. Relay x4|Unknown board";
 const int  arr_serialrelay_device[]    = { 2,    4,    8,    1,    1,      2,    2,      4,    4,      0};                      // number of relays
 const int  arr_serialrelay_baud[]      = { 9600, 9600, 9600, 9600, 115200, 9600, 115200, 9600, 115200, 9600};                   // board serial speed
 const int  arr_serialrelay_delay[]     = { 250,  250,  250,  400,  400,    400,  400,    400,  400,    500};                    // delay between commands (in ms)
@@ -314,10 +314,21 @@ void SerialRelayInit ()
     Serial.begin (serialrelay_board.baud_rate, SERIAL_8N1);
     ClaimSerial ();
 
+    // force GPIO2 as output and set it LOW to enable Tx
+    pinMode (2, OUTPUT);
+    digitalWrite (2, LOW);
+
     // next step is initilisation
     serialrelay_board.status = SERIALRELAY_STATUS_INIT;
     AddLog (LOG_LEVEL_INFO, PSTR ("SRB: Step %d"), serialrelay_board.status);
   }
+}
+
+void SerialRelayBeforeRestart ()
+{
+  // set back GPIO2 to input PIN before reboot (to avoid Tx junk)
+  digitalWrite (2, HIGH);
+  pinMode (2, INPUT);
 }
 
 void SerialRelayBoardInitialise ()
@@ -557,7 +568,7 @@ bool Xdrv96 (uint8_t function)
   // swtich according to context
   switch (function) 
   {
-    case FUNC_INIT:
+    case FUNC_PRE_INIT:
       SerialRelayInit ();
       break;
     case FUNC_EVERY_100_MSECOND:
@@ -565,6 +576,9 @@ bool Xdrv96 (uint8_t function)
       break;
     case FUNC_JSON_APPEND:
       SerialRelayAppendJSON ();
+      break;
+    case FUNC_SAVE_BEFORE_RESTART:
+      SerialRelayBeforeRestart ();
       break;
 #ifdef USE_WEBSERVER
     case FUNC_WEB_SENSOR:

@@ -44,12 +44,12 @@
  *    Pilotwire firmware configuration
 \********************************************/
 
-#define USE_INFOJSON                          // Add support for Information JSON page
+#define USE_IPADDRESS                         // Add fixed IP configuration page
 #define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_SERIALRELAY                       // Add support for serial relay boards (ICSE012A, ICSE013A, ICSE014A & LC Technology 1, 2 and 4 relays)
 
 #define EXTENSION_VERSION "2.0"               // version
-#define EXTENSION_NAME "Serial Relay Board"   // name
+#define EXTENSION_NAME "Serial Relay"         // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 
 // MQTT default

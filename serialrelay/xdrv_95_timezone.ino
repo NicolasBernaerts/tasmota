@@ -5,6 +5,8 @@
     04/04/2020 - v1.0 - Creation 
     19/05/2020 - v1.1 - Add configuration for first NTP server 
     22/07/2020 - v1.2 - Memory optimisation 
+    10/04/2021 - v1.3 - Remove use of String to avoid heap fragmentation 
+    22/04/2021 - v1.4 - Switch to a full Drv (without Sns) 
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -25,27 +27,20 @@
 #ifdef USE_TIMEZONE
 
 #define XDRV_95                   95
-#define XSNS_95                   95
 
-// JSON sttrings
-#define D_JSON_TIMEZONE        "Timezone"
-#define D_JSON_TIMEZONE_STD    "STD"
-#define D_JSON_TIMEZONE_DST    "DST"
-#define D_JSON_TIMEZONE_OFFSET "Offset"
-#define D_JSON_TIMEZONE_MONTH  "Month"
-#define D_JSON_TIMEZONE_WEEK   "Week"
-#define D_JSON_TIMEZONE_DAY    "Day"
+// constants
+#define TIMEZONE_JSON_MAX         112
 
 // commands
-#define D_CMND_TIMEZONE_NTP    "ntp"
-#define D_CMND_TIMEZONE_STDO   "stdo"
-#define D_CMND_TIMEZONE_STDM   "stdm"
-#define D_CMND_TIMEZONE_STDW   "stdw"
-#define D_CMND_TIMEZONE_STDD   "stdd"
-#define D_CMND_TIMEZONE_DSTO   "dsto"
-#define D_CMND_TIMEZONE_DSTM   "dstm"
-#define D_CMND_TIMEZONE_DSTW   "dstw"
-#define D_CMND_TIMEZONE_DSTD   "dstd"
+#define D_CMND_TIMEZONE_NTP       "ntp"
+#define D_CMND_TIMEZONE_STDO      "stdo"
+#define D_CMND_TIMEZONE_STDM      "stdm"
+#define D_CMND_TIMEZONE_STDW      "stdw"
+#define D_CMND_TIMEZONE_STDD      "stdd"
+#define D_CMND_TIMEZONE_DSTO      "dsto"
+#define D_CMND_TIMEZONE_DSTM      "dstm"
+#define D_CMND_TIMEZONE_DSTW      "dstw"
+#define D_CMND_TIMEZONE_DSTD      "dstd"
 
 // web URL
 const char D_TIMEZONE_PAGE_CONFIG[] PROGMEM = "/tz";
@@ -61,6 +56,7 @@ const char D_TIMEZONE_OFFSET[] PROGMEM = "Offset to GMT (mn)";
 const char D_TIMEZONE_MONTH[]  PROGMEM = "Month (1:jan ... 12:dec)";
 const char D_TIMEZONE_WEEK[]   PROGMEM = "Week (0:last ... 4:fourth)";
 const char D_TIMEZONE_DAY[]    PROGMEM = "Day of week (1:sun ... 7:sat)";
+const char D_TIMEZONE_JSON[]   PROGMEM = "\"Timezone\":{\"STD\":{\"Offset\":%d,\"Month\":%d,\"Week\":%d,\"Day\":%d},\"DST\":{\"Offset\":%d,\"Month\":%d,\"Week\":%d,\"Day\":%d}}";
 
 // offloading commands
 enum TimezoneCommands { CMND_TIMEZONE_NTP, CMND_TIMEZONE_STDO, CMND_TIMEZONE_STDM, CMND_TIMEZONE_STDW, CMND_TIMEZONE_STDD, CMND_TIMEZONE_DSTO, CMND_TIMEZONE_DSTM, CMND_TIMEZONE_DSTW, CMND_TIMEZONE_DSTD };
@@ -75,85 +71,18 @@ const char TZ_FIELD_INPUT[]    PROGMEM = "<p>%s<span style='float:right;font-siz
  *                  Functions
 \**************************************************/
 
+
 // Show JSON status (for MQTT)
 void TimezoneShowJSON (bool append)
 {
-  String  str_json;
+  char str_json[TIMEZONE_JSON_MAX];
 
-  // Timezone section start -->  "Timezone":{
-  str_json = "\"";
-  str_json += D_JSON_TIMEZONE;
-  str_json += "\":{";
-
-  // STD section -->  "STD":{"Offset":60,"Month":10,"Week":0,"Day":1}
-  str_json += "\"";
-  str_json += D_JSON_TIMEZONE_STD;
-  str_json += "\":{";
-
-  // Offset
-  str_json += "\"";
-  str_json += D_JSON_TIMEZONE_OFFSET;
-  str_json += "\":";
-  str_json += Settings.toffset[0];
-  str_json += ",";
-
-  // Month
-  str_json += "\"";
-  str_json += D_JSON_TIMEZONE_MONTH;
-  str_json += "\":";
-  str_json += Settings.tflag[0].month;
-  str_json += ",";
-
-  // Week
-  str_json += "\"";
-  str_json += D_JSON_TIMEZONE_WEEK;
-  str_json += "\":";
-  str_json += Settings.tflag[0].week;
-  str_json += ",";
-
-  // Day
-  str_json += "\"";
-  str_json += D_JSON_TIMEZONE_DAY;
-  str_json += "\":";
-  str_json += Settings.tflag[0].dow;
-  str_json += "},";
-
-  // DST section -->  "DST":{"Offset":60,"Month":10,"Week":0,"Day":1}
-  str_json += "\"";
-  str_json += D_JSON_TIMEZONE_DST;
-  str_json += "\":{";
-
-  // Offset
-  str_json += "\"";
-  str_json += D_JSON_TIMEZONE_OFFSET;
-  str_json += "\":";
-  str_json += Settings.toffset[1];
-  str_json += ",";
-
-  // Month
-  str_json += "\"";
-  str_json += D_JSON_TIMEZONE_MONTH;
-  str_json += "\":";
-  str_json += Settings.tflag[1].month;
-  str_json += ",";
-
-  // Week
-  str_json += "\"";
-  str_json += D_JSON_TIMEZONE_WEEK;
-  str_json += "\":";
-  str_json += Settings.tflag[1].week;
-  str_json += ",";
-
-  // Day
-  str_json += "\"";
-  str_json += D_JSON_TIMEZONE_DAY;
-  str_json += "\":";
-  str_json += Settings.tflag[1].dow;
-  str_json += "}}";
+  // generate string
+  sprintf (str_json, D_TIMEZONE_JSON, Settings.toffset[0], Settings.tflag[0].month, Settings.tflag[0].week, Settings.tflag[0].dow, Settings.toffset[1], Settings.tflag[1].month, Settings.tflag[1].week, Settings.tflag[1].dow);
 
   // if append mode, add json string to MQTT message
-  if (append) ResponseAppend_P (PSTR (",%s"), str_json.c_str ());
-  else Response_P (PSTR ("{%s}"), str_json.c_str ());
+  if (append) ResponseAppend_P (PSTR (",%s"), str_json);
+  else Response_P (PSTR ("{%s}"), str_json);
   
   // publish it if not in append mode
   if (!append) MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
@@ -347,21 +276,6 @@ bool Xdrv95 (uint8_t function)
       break;
     case FUNC_COMMAND:
       result = TimezoneMqttCommand ();
-      break;
-  }
-  
-  return result;
-}
-
-bool Xsns95 (uint8_t function)
-{
-  bool result = false;
-
-  // main callback switch
-  switch (function)
-  { 
-    case FUNC_JSON_APPEND:
-      //TimezoneShowJSON (true);
       break;
 
 #ifdef USE_WEBSERVER
