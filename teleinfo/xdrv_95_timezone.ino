@@ -6,6 +6,7 @@
     19/05/2020 - v1.1 - Add configuration for first NTP server 
     22/07/2020 - v1.2 - Memory optimisation 
     10/04/2021 - v1.3 - Remove use of String to avoid heap fragmentation 
+    22/04/2021 - v1.4 - Switch to a full Drv (without Sns) 
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -26,7 +27,6 @@
 #ifdef USE_TIMEZONE
 
 #define XDRV_95                   95
-#define XSNS_95                   95
 
 // constants
 #define TIMEZONE_JSON_MAX         112
@@ -70,6 +70,7 @@ const char TZ_FIELD_INPUT[]    PROGMEM = "<p>%s<span style='float:right;font-siz
 /**************************************************\
  *                  Functions
 \**************************************************/
+
 
 // Show JSON status (for MQTT)
 void TimezoneShowJSON (bool append)
@@ -275,21 +276,6 @@ bool Xdrv95 (uint8_t function)
       break;
     case FUNC_COMMAND:
       result = TimezoneMqttCommand ();
-      break;
-  }
-  
-  return result;
-}
-
-bool Xsns95 (uint8_t function)
-{
-  bool result = false;
-
-  // main callback switch
-  switch (function)
-  { 
-    case FUNC_JSON_APPEND:
-      //TimezoneShowJSON (true);
       break;
 
 #ifdef USE_WEBSERVER

@@ -45,6 +45,7 @@
     06/04/2021 - v7.7.1 - Handle number of indexes according to contract
     10/04/2021 - v7.7.2 - Remove use of String to avoid heap fragmentation 
     14/04/2021 - v7.8   - Calculate Cos phi and Active power (W)
+    21/04/2021 - v8.0   - Fixed IP configuration and change in Cos phi calculation
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -78,7 +79,7 @@
 
 // declare teleinfo energy driver and sensor
 #define XNRG_15   15
-#define XSNS_15   15
+#define XSNS_99   99
 
 // teleinfo constant
 #define TELEINFO_VOLTAGE             230        // default voltage provided
@@ -260,10 +261,10 @@ struct {
 
 // cos phi data
 struct {
-  uint32_t start_time     = 0;                // timestamp of measurement start (ms)
-  uint32_t update_time    = 0;                // timestamp of last measurement update (ms)
-  uint32_t start_power_wh = 0;                // total counter at start of measurement (Wh)
-  uint32_t counter_va[TELEINFO_PHASE_MAX];    // counter for apparent power since start of measurement (VA)
+  uint32_t start_time  = 0;                   // timestamp of measurement start (ms)
+  uint32_t update_time = 0;                   // timestamp of last measurement update (ms)
+  uint32_t start_total = 0;                   // total counter at start of measurement (Wh)
+  float    delta_va[TELEINFO_PHASE_MAX];      // counter for apparent power since start of measurement (VA)
 } teleinfo_cosphi; 
 
 // data per phase
@@ -670,55 +671,65 @@ void TeleinfoCleanupString (char* pstr_string, char* pstr_result, int max_size)
 void TeleinfoUpdateCosPhi ()
 {
   int      phase;
-  long     global_delta_w, phase_delta_w;
-  uint32_t time_now, time_delta;
-  float    global_delta_va = 0;
-  float    cox_max = 1;
-  float    phase_delta_va[TELEINFO_PHASE_MAX];
+  uint32_t time_now;
+  long     difference_w;
+  float    global_va, global_w;
+  float    phase_w;
+  float    delta_va, cos_phi;
+  float    time_delta;
+  float    phase_va[TELEINFO_PHASE_MAX];
 
   // timestamp
   time_now = millis ();
 
   // first initialisation
-  if (teleinfo_cosphi.start_time == 0) teleinfo_cosphi.start_time = time_now;
+  if (teleinfo_cosphi.start_time  == 0) teleinfo_cosphi.start_time  = time_now;
   if (teleinfo_cosphi.update_time == 0) teleinfo_cosphi.update_time = time_now;
-  if (teleinfo_cosphi.start_power_wh == 0) teleinfo_cosphi.start_power_wh = teleinfo_counter.total;
+  if (teleinfo_cosphi.start_total == 0) teleinfo_cosphi.start_total = teleinfo_counter.total;
 
-  // calculate time difference since last measurement
-  time_delta = time_now - teleinfo_cosphi.update_time;
+  // calculate time difference since last measurement (in sec.)
+  time_delta = (float)(time_now - teleinfo_cosphi.update_time) / 1000;
   teleinfo_cosphi.update_time = time_now;
 
   // update data since last measurement
   for (phase = 0; phase < teleinfo_contract.phase; phase++)
   {
-    teleinfo_cosphi.counter_va[phase] += (time_delta * teleinfo_phase[phase].papp);
+    delta_va = (float)teleinfo_phase[phase].papp * time_delta / 3600;
+    teleinfo_cosphi.delta_va[phase] += delta_va;
   }
 
   // if total power difference has execeeded 10Wn update cos phi
-  global_delta_w = teleinfo_counter.total - teleinfo_cosphi.start_power_wh;
-  if (global_delta_w >= 10)
+  difference_w = teleinfo_counter.total - teleinfo_cosphi.start_total;
+  if (difference_w >= 10)
   {
-    // calculate time difference since start time
-    time_delta = time_now - teleinfo_cosphi.start_time;
+    // calculate time difference since start time (in sec.)
+    time_delta = (float)(time_now - teleinfo_cosphi.start_time) / 1000;
 
     // loop thru phase to calculate apparent power
+    global_va = 0;
     for (phase = 0; phase < teleinfo_contract.phase; phase++)
     {
-      phase_delta_va[phase] = (float)teleinfo_cosphi.counter_va[phase] / 3600000;
-      global_delta_va += phase_delta_va[phase];
-      teleinfo_cosphi.counter_va[phase] = 0;
+      // calculate phase apparent power in VA during period
+      phase_va[phase] = teleinfo_cosphi.delta_va[phase] / time_delta * 3600;
+      global_va += phase_va[phase];
+
+      // reset cos phi phase couter
+      teleinfo_cosphi.delta_va[phase] = 0;
     }
 
-    // loop thru phase to calculate cos phi
-    for (phase = 0; phase < teleinfo_contract.phase; phase++)
-    {
-      phase_delta_w = phase_delta_va[phase] * global_delta_w / global_delta_va;
-      teleinfo_phase[phase].cos_phi = min (phase_delta_w / phase_delta_va[phase], cox_max);
-    }
+    // calculate global active power on the period
+    global_w = (float)difference_w / time_delta * 3600;
+
+    // calculate cos phi (similar for all phases as active power is published globally)
+    if (global_va > 0) cos_phi = min (global_w / global_va, (float)1);
+    else cos_phi = 1;
+
+    // loop thru phase to update cos phi
+    for (phase = 0; phase < teleinfo_contract.phase; phase++) teleinfo_phase[phase].cos_phi = cos_phi;
 
     // reset measurement data
-    teleinfo_cosphi.start_time = time_now;
-    teleinfo_cosphi.start_power_wh = teleinfo_counter.total;    
+    teleinfo_cosphi.start_time  = time_now;
+    teleinfo_cosphi.start_total = teleinfo_counter.total;    
   } 
 }
 
@@ -799,6 +810,7 @@ void TeleinfoInit ()
 
       // cos phi values
       teleinfo_phase[index].cos_phi = 1;
+      teleinfo_cosphi.delta_va[index] = 0;
     }
 
     // init strings
@@ -1462,28 +1474,6 @@ void TeleinfoWebSensor ()
       WSContentSend_PD (TELEINFO_HTML_BAR, ARR_TELEINFO_PHASE_COLOR[phase], str_text, str_text);
     }
 
-/*
-  // display apparent power
-  strcpy (str_display[0], "");
-  for (phase = 0; phase < teleinfo_contract.phase; phase++)
-  {
-    itoa (teleinfo_phase[phase].papp, str_text, 10);
-    if (strlen (str_display[0]) > 0) strcat (str_display[0], " / ");
-    strcat (str_display[0], str_text);
-  }
-  WSContentSend_PD (PSTR ("{s}%s{m}%s VA{e}"), TELEINFO_APPARENT, str_display[0]);
-
-  // display cos phi
-  strcpy (str_display[0], "");
-  for (phase = 0; phase < teleinfo_contract.phase; phase++)
-  {
-    ext_snprintf_P (str_text, sizeof(str_text), PSTR ("%2_f"), &teleinfo_phase[phase].cos_phi);
-    if (strlen (str_display[0]) > 0) strcat (str_display[0], " / ");
-    strcat (str_display[0], str_text);
-  }
-  WSContentSend_PD (PSTR ("{s}%s{m}%s{e}"), TELEINFO_COSPHI, str_display[0]);
-*/
-
   // init strings
   for (index = 0; index < 2; index ++) strcpy (str_lf[index], "");
   for (index = 0; index < 3; index ++) strcpy (str_header[index], "");
@@ -1506,7 +1496,7 @@ void TeleinfoWebSensor ()
   strcpy (str_lf[1], "<br>");
   strcpy (str_header[2], D_TELEINFO_CONTRACT);
   if (teleinfo_contract.phase > 1) sprintf (str_text, "%d x ", teleinfo_contract.phase);
-  if (teleinfo_contract.ssousc > 0) sprintf (str_display[2], "%s%d kW", str_text, teleinfo_contract.ssousc / 1000);
+  if (teleinfo_contract.ssousc > 0) sprintf (str_display[2], "%s%d kVA", str_text, teleinfo_contract.ssousc / 1000);
 
   // display data
   WSContentSend_PD (PSTR ("{s}%s%s%s%s%s{m}%s%s%s%s%s{e}"), str_header[0], str_lf[0], str_header[1], str_lf[1], str_header[2], str_display[0], str_lf[0], str_display[1], str_lf[1], str_display[2]);
@@ -1768,7 +1758,7 @@ void TeleinfoWebPageTic ()
   WSContentSend_P (PSTR (" httpUpd.open('GET','%s',true);\n"), D_TELEINFO_PAGE_TIC_UPD);
   WSContentSend_P (PSTR (" httpUpd.send();\n"));
   WSContentSend_P (PSTR ("}\n"));
-  WSContentSend_P (PSTR ("setInterval(function() {update();},2000);\n"));
+  WSContentSend_P (PSTR ("setInterval(function() {update();},1000);\n"));
   WSContentSend_P (PSTR ("</script>\n"));
 
   // page style
@@ -2401,7 +2391,7 @@ bool Xnrg15 (uint8_t function)
 }
 
 // teleinfo sensor
-bool Xsns15 (uint8_t function)
+bool Xsns99 (uint8_t function)
 {
   bool publish_tic, publish_data;
 
@@ -2426,6 +2416,7 @@ bool Xsns15 (uint8_t function)
         TeleinfoShowJSON (true, publish_tic, publish_data);
       }
       break;
+
 #ifdef USE_WEBSERVER
     case FUNC_WEB_ADD_HANDLER:
       // pages
@@ -2455,6 +2446,7 @@ bool Xsns15 (uint8_t function)
       TeleinfoWebSensor ();
       break;
 #endif  // USE_WEBSERVER
+
   }
   return false;
 }

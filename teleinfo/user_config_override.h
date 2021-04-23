@@ -42,6 +42,7 @@
     06/04/2021 - v7.7.1 - Handle number of indexes according to contract
     10/04/2021 - v7.7.2 - Remove use of String to avoid heap fragmentation 
     14/04/2021 - v7.8   - Calculate Cos phi and Active power (W) 
+    21/04/2021 - v8.0   - Fixed IP configuration and change in Cos phi calculation
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -84,15 +85,17 @@
 // meter simulation
 //#define SIMULATION
 
-// ESP32 specific
-#define USE_ETHERNET                          // Add support for ESP32 Ethernet physical port
-
-#define USE_INFOJSON                          // Add support for Information JSON page
+// complementary modules
+#define USE_IPADDRESS                         // Add fixed IP configuration page
 #define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_TELEINFO                          // Add support for Teleinfo
 
-#define EXTENSION_VERSION "7.8"               // version
+// ESP32 specific
+#define USE_ETHERNET                          // Add support for ESP32 Ethernet physical port
+
+// extension
 #define EXTENSION_NAME "Teleinfo"             // name
+#define EXTENSION_VERSION "8.0"               // version
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 
 // MQTT default
@@ -160,6 +163,7 @@
 #undef USE_PWM_DIMMER_REMOTE                  // Add support for remote switches to PWM Dimmer (requires USE_DEVICE_GROUPS) (+0k9 code)
 #undef USE_SONOFF_D1                          // Add support for Sonoff D1 Dimmer (+0k7 code)
 #undef USE_SHELLY_DIMMER
+#undef USE_MHZ19                              // Add support for MH-Z19 - CO2 sensor
 
 //#undef USE_LIGHT
 #undef USE_WS2812                             // WS2812 Led string using library NeoPixelBus (+5k code, +1k mem, 232 iram) - Disable by //
