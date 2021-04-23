@@ -1,7 +1,7 @@
 Teleinfo Tasmota firmware for Linky energy meters
 =============
 
-This evolution of Tasmota firmware **v9.3.1** has been enhanced to handle France energy meters using **Teleinfo** protocol.
+This evolution of Tasmota firmware **v9.4.0** has been enhanced to handle France energy meters using **Teleinfo** protocol.
 These meters are widely known as **Linky**.
 
 This implementation has been tested on :
