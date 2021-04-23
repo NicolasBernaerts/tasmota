@@ -1,7 +1,7 @@
 Tasmota modified for Serial Relay Boards
 =============
 
-This firmware is a modified version of **Tasmota 9.3.1** wich handle 2 majors families of serial relay boards :
+This firmware is a modified version of **Tasmota 9.4.0** wich handle 2 majors families of serial relay boards :
 
 ### ICSE01xA boards
 
