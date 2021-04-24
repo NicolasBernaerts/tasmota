@@ -11,6 +11,7 @@
 #   29/12/2020, v1.5 - Add --all parameter to list all network devices
 #                      Update wget tries and timeout
 #   21/02/2021, v1.6 - Filter result according to --all parameter
+#   23/04/2021, v1.7 - Update with new info.json format
 # ---------------------------------------------------
 
 #   Check tools availability
@@ -59,36 +60,30 @@ do
 	DEVICE_HOSTNAME=""
 	DEVICE_DESCRIPTION=""
 
-	# read info.json page
-	wget --quiet --tries=1 --timeout=2 -O - "http://${DEVICE_IP}/info.json" | tr -d "\"{}" | tr "," "\n" > "${TMP_DATA}"
-
-	# detect tasmota module in info.json page
-	TASMOTA_MODULE=$(grep "Module:" "${TMP_DATA}" | cut -d':' -f2)
-
-	# if not available, read original tasmota information page (doesn't work if password set)
-	if [ "${TASMOTA_MODULE}" = "" ]
-	then
-		# retrieve tasmota module from home page
-		wget --quiet --tries=1 --timeout=2 -O "${TMP_DATA}" "http://${DEVICE_IP}/"
-		TASMOTA_MODULE=$(grep "Tasmota" "${TMP_DATA}" | tr '<' '\n' | grep "^h3" | cut -d'>' -f2 | sed "s| Module||g")
-
-		# read original information page
-		wget --quiet --tries=1 --timeout=2 -O - "http://${DEVICE_IP}/in" | sed "s|\}1|\n|g" | sed "s|\}2|\:|g" | tr '>' '\n' > "${TMP_DATA}"
-	fi
+	# read original information page
+	wget --quiet --tries=1 --timeout=2 -O - "http://${DEVICE_IP}/in" | sed "s|\}1|\n|g" | sed "s|\}2|\:|g" | tr '<' '\n' > "${TMP_DATA}"
 
 	# if tasmota module is recognised
-	if [ "${TASMOTA_MODULE}" != "" ] 
+	if [ -s "${TMP_DATA}" ] 
 	then
 		# increment counter
 		NBR_TASMOTA=$((NBR_TASMOTA + 1))
 
 		# read data
-		DEVICE_HOSTNAME=$(grep "Hostname" "${TMP_DATA}" | cut -d':' -f2)
-		TASMOTA_VERSION=$(grep "Program Version:" "${TMP_DATA}" | cut -d':' -f2)
-		TASMOTA_UPTIME=$(grep "Uptime:" "${TMP_DATA}" | cut -d':' -f2-)
-		TASMOTA_MQTT=$(grep "MQTT Full Topic:" "${TMP_DATA}" | cut -d':' -f2-)
-		EXTENSION_TYPE=$(grep "Extension type:" "${TMP_DATA}" | cut -d':' -f2)
-		EXTENSION_VERSION=$(grep "Extension version:" "${TMP_DATA}" | cut -d':' -f2)
+		TASMOTA_MODULE=$(grep "^h3" "${TMP_DATA}" | cut -d'>' -f2)
+		DEVICE_HOSTNAME=$(grep "^Hostname" "${TMP_DATA}" | head -n 1 | cut -d':' -f2)
+		TASMOTA_VERSION=$(grep "Program Version:" "${TMP_DATA}" | cut -d':' -f2 | cut -d'(' -f1)
+		TASMOTA_UPTIME=$(grep "^Uptime:" "${TMP_DATA}" | cut -d':' -f2-)
+		TASMOTA_MQTT=$(grep "^MQTT Topic:" "${TMP_DATA}" | cut -d':' -f2-)
+
+		# read info.json page
+		wget --quiet --tries=1 --timeout=2 -O - "http://${DEVICE_IP}/info.json" | tr -d "\"}" | tr ",{" "\n" > "${TMP_DATA}"
+		if [ -s "${TMP_DATA}" ] 
+		then
+			# read data
+			EXTENSION_TYPE=$(grep "^Type:" "${TMP_DATA}" | cut -d':' -f2)
+			EXTENSION_VERSION=$(grep "^Version:" "${TMP_DATA}" | tail -n 1 | cut -d':' -f2)
+		fi
 
 		# display
 		DEVICE_DESCRIPTION="${TASMOTA_MODULE}, Tasmota ${TASMOTA_VERSION},"
@@ -105,7 +100,7 @@ do
 	fi
 
 	# display
-	if [ "${TASMOTA_MODULE}" != "" -o "${LIST_ALL}" = "ok" ]
+	if [ "${DEVICE_HOSTNAME}" != "" ]
 	then
 		DEVICE_HOSTNAME=$(echo "${DEVICE_HOSTNAME}" | tr '[:upper:]' '[:lower:]')
 		echo " ${DEVICE_IP} [${DEVICE_HOSTNAME}] ${DEVICE_DESCRIPTION}"
