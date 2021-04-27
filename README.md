@@ -13,5 +13,8 @@ Some Tasmota firmware extensions :
 **tasmota-discover** is a simple bash script to list all devices (tasmota and others) available on the same LAN.
 
 **tasmota-flash** is a simple bash script to erase and/or flash ESP8266 and ESP32 decices.
+To be able to use it, you first need to :
+  * download and extract esptool.zip to any directory
+  * update tasmota-flash **ROOT_TOOLS** variable with this directory path
 
 These projects are explained in detail under http://www.bernaerts-nicolas.fr/iot/
