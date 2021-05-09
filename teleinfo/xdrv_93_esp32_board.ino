@@ -6,6 +6,7 @@
     08/11/2020 - v1.0 - Creation
     15/03/2021 - v1.1 - Detect model board in config page
     10/04/2021 - v1.2 - Remove use of String to avoid heap fragmentation 
+    02/05/2021 - v1.3 - Remove JSON data (now handled by IPAddress) 
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -32,17 +33,12 @@
 // web configuration page
 #define D_PAGE_BOARD_CONFIG  "/board"
 
+// commands
 #define D_CMND_BOARD         "board"
 
+// strings
 #define D_BOARD              "ESP32 board"
-#define D_BOARD_WIFI         "Wifi"
-#define D_BOARD_ETH          "Ethernet"
 #define D_BOARD_CONFIG       "Configure ESP32"
-
-// JSON strings
-#define D_JSON_ESP32_ETH     "Eth"
-#define D_JSON_ESP32_MAC     "MAC"
-#define D_JSON_ESP32_IP      "IP"
 
 // form strings
 const char BOARD_FORM_START[] PROGMEM  = "<form method='get' action='%s'>\n";
@@ -90,15 +86,6 @@ void ESP32BoardInit ()
   }
 }
 
-// Show JSON status (for MQTT)
-void ESP32BoardShowJSON ()
-{
-  // append to MQTT message
-  ResponseAppend_P (PSTR (",\"%s\":{"), D_JSON_ESP32_ETH);
-  ResponseAppend_P (PSTR ("\"%s\":\"%s\","), D_JSON_ESP32_ETH, ETH.macAddress().c_str ());
-  ResponseAppend_P (PSTR ("\"%s\":\"%s\"}"), D_JSON_ESP32_IP,  ETH.localIP().toString().c_str ());
-}
-
 /*********************************************\
  *                   Web
 \*********************************************/
@@ -110,35 +97,6 @@ void ESP32BoardWebConfigButton ()
 {
   // heater and meter configuration button
   WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>"), D_PAGE_BOARD_CONFIG, D_BOARD_CONFIG);
-}
-
-// append board info to main page
-void ESP32BoardWebSensor ()
-{
-  int  index;
-  char str_header[2][16];
-  char str_data[2][16];
-  char str_lf[8];
-
-  // init
-  for (index = 0; index < 2; index ++) str_header[index][0] = 0;
-  for (index = 0; index < 2; index ++) str_data[index][0] = 0;
-  str_lf[0] = 0;
-
-  // display wifi IP address
-  strcpy (str_header[0], D_BOARD_WIFI);
-  strcpy (str_data[0], WiFi.localIP().toString().c_str ());
-
-  // display Ethernet IP address
-  if (ETH.macAddress ().length () > 0)
-  {
-    strcpy (str_lf, "<br>");
-    strcpy (str_header[1], D_BOARD_ETH);
-    strcpy (str_data[1], ETH.localIP().toString().c_str ());
-  }
-
-  // affichage IP wifi et ethernet
-  WSContentSend_PD (PSTR("{s}%s%s%s{m}%s%s%s{e}"), str_header[0], str_lf, str_header[1], str_data[0], str_lf, str_data[1]);
 }
 
 // board config page
@@ -220,9 +178,6 @@ bool Xdrv93 (uint8_t function)
     case FUNC_INIT:
       ESP32BoardInit ();
       break;
-   case FUNC_JSON_APPEND:
-      ESP32BoardShowJSON ();
-      break;
 
 #ifdef USE_WEBSERVER
     case FUNC_WEB_ADD_HANDLER:
@@ -232,10 +187,8 @@ bool Xdrv93 (uint8_t function)
     case FUNC_WEB_ADD_BUTTON:
       ESP32BoardWebConfigButton ();
       break;
-    case FUNC_WEB_SENSOR:
-      ESP32BoardWebSensor ();
-      break;
 #endif  // USE_WEBSERVER
+
   }
   return false;
 }

@@ -43,6 +43,7 @@
     10/04/2021 - v7.7.2 - Remove use of String to avoid heap fragmentation 
     14/04/2021 - v7.8   - Calculate Cos phi and Active power (W) 
     21/04/2021 - v8.0   - Fixed IP configuration and change in Cos phi calculation
+    29/04/2021 - v8.1   - Bug fix in serial port management and realtime energy totals
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -95,7 +96,7 @@
 
 // extension
 #define EXTENSION_NAME "Teleinfo"             // name
-#define EXTENSION_VERSION "8.0"               // version
+#define EXTENSION_VERSION "8.1"               // version
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 
 // MQTT default

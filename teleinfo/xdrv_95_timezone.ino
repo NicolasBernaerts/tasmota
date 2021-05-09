@@ -56,7 +56,6 @@ const char D_TIMEZONE_OFFSET[] PROGMEM = "Offset to GMT (mn)";
 const char D_TIMEZONE_MONTH[]  PROGMEM = "Month (1:jan ... 12:dec)";
 const char D_TIMEZONE_WEEK[]   PROGMEM = "Week (0:last ... 4:fourth)";
 const char D_TIMEZONE_DAY[]    PROGMEM = "Day of week (1:sun ... 7:sat)";
-const char D_TIMEZONE_JSON[]   PROGMEM = "\"Timezone\":{\"STD\":{\"Offset\":%d,\"Month\":%d,\"Week\":%d,\"Day\":%d},\"DST\":{\"Offset\":%d,\"Month\":%d,\"Week\":%d,\"Day\":%d}}";
 
 // offloading commands
 enum TimezoneCommands { CMND_TIMEZONE_NTP, CMND_TIMEZONE_STDO, CMND_TIMEZONE_STDM, CMND_TIMEZONE_STDW, CMND_TIMEZONE_STDD, CMND_TIMEZONE_DSTO, CMND_TIMEZONE_DSTM, CMND_TIMEZONE_DSTW, CMND_TIMEZONE_DSTD };
@@ -71,21 +70,25 @@ const char TZ_FIELD_INPUT[]    PROGMEM = "<p>%s<span style='float:right;font-siz
  *                  Functions
 \**************************************************/
 
-
 // Show JSON status (for MQTT)
 void TimezoneShowJSON (bool append)
 {
-  char str_json[TIMEZONE_JSON_MAX];
+  // add , in append mode or { in direct publish mode
+  if (append) ResponseAppend_P (PSTR (",")); else Response_P (PSTR ("{"));
 
   // generate string
-  sprintf (str_json, D_TIMEZONE_JSON, Settings.toffset[0], Settings.tflag[0].month, Settings.tflag[0].week, Settings.tflag[0].dow, Settings.toffset[1], Settings.tflag[1].month, Settings.tflag[1].week, Settings.tflag[1].dow);
+  ResponseAppend_P (PSTR ("\"Timezone\":{"));
+  ResponseAppend_P (PSTR ("\"%s\":{\"Offset\":%d,\"Month\":%d,\"Week\":%d,\"Day\":%d}"), "STD", Settings.toffset[0], Settings.tflag[0].month, Settings.tflag[0].week, Settings.tflag[0].dow);
+  ResponseAppend_P (PSTR (","));
+  ResponseAppend_P (PSTR ("\"%s\":{\"Offset\":%d,\"Month\":%d,\"Week\":%d,\"Day\":%d}"), "DST", Settings.toffset[1], Settings.tflag[1].month, Settings.tflag[1].week, Settings.tflag[1].dow);
+  ResponseAppend_P (PSTR ("}"));
 
-  // if append mode, add json string to MQTT message
-  if (append) ResponseAppend_P (PSTR (",%s"), str_json);
-  else Response_P (PSTR ("{%s}"), str_json);
-  
   // publish it if not in append mode
-  if (!append) MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
+  if (!append)
+  {
+    ResponseAppend_P (PSTR ("}"));
+    MqttPublishPrefixTopic_P (TELE, PSTR (D_RSLT_SENSOR));
+  } 
 }
 
 // init main status
@@ -166,7 +169,7 @@ void TimezoneWebSensor ()
   // dislay local time
   current_time = LocalTime ();
   BreakTime (current_time, current_dst);
-  WSContentSend_PD (PSTR ("<tr><div style='text-align:center;'>%02d:%02d:%02d</div></tr>\n"), current_dst.hour, current_dst.minute, current_dst.second);
+  WSContentSend_P (PSTR ("<tr><div style='text-align:center;'>%02d:%02d:%02d</div></tr>\n"), current_dst.hour, current_dst.minute, current_dst.second);
 }
 
 // Timezone configuration web page
@@ -252,10 +255,10 @@ void TimezoneWebPageConfigure ()
   WSContentSend_P (PSTR ("</form>\n"));
 
   // configuration button
-  WSContentSpaceButton(BUTTON_CONFIGURATION);
+  WSContentSpaceButton (BUTTON_CONFIGURATION);
 
   // end of page
-  WSContentStop();
+  WSContentStop ();
 }
 
 #endif  // USE_WEBSERVER
