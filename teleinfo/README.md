@@ -64,8 +64,8 @@ Between your Energy meter and your Tasmota device, you'll need an adapter like t
 
 With modern Linky meters, **4.7k** resistor should be replaced by a **1.5k** resistor.
 
-You need to connect your adapter output **Tx** to any available port of your Tasmota device.
-This port should be declared as **TInfo RX**.
+You need to connect your adapter output **Tx** to any available serial port of your Tasmota device.
+This port should be declared as **TInfo RX** and should be connected to your device UART.
 
 For example, you can use :
   * ESP8266 : **GPIO3 (RXD)** port
