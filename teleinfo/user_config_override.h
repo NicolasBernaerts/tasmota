@@ -114,8 +114,8 @@
 #define MQTT_FULLTOPIC     "%topic%/%prefix%/"
 #undef FRIENDLY_NAME
 #define FRIENDLY_NAME      "Teleinfo"
-#undef MQTT_MAX_PACKET_SIZE
-#define MQTT_MAX_PACKET_SIZE   2200
+//#undef MQTT_MAX_PACKET_SIZE
+//#define MQTT_MAX_PACKET_SIZE   2200
 
 // disable serial log
 #undef SERIAL_LOG_LEVEL 

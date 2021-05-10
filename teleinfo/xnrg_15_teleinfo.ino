@@ -813,6 +813,10 @@ void TeleinfoInit ()
     // disable all message lines
     for (index = 0; index < TELEINFO_LINE_MAX; index ++) teleinfo_message.line[index].checksum = 0;
 
+    // disable timezone and enable IP address JSON
+    timezone_publish_json  = false;
+    ipaddress_publish_json = true;
+
     // log
     AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Hardware serial port initialised on %s"), str_chip);
   }
@@ -825,7 +829,6 @@ void TeleinfoInit ()
 
     // log
     AddLog (LOG_LEVEL_INFO, PSTR ("TIC: No hardware serial port declared on %s"), str_chip);
-
   }
 }
 
@@ -875,6 +878,7 @@ void TeleinfoGraphInit ()
 void TeleinfoReceiveData ()
 {
   bool  overload = false;
+  bool  first_reading;
   char  recv_serial, checksum;
   int   index, phase;
   long  current_total, power_total, counter_total;
@@ -983,11 +987,19 @@ void TeleinfoReceiveData ()
         // if total power counter has changed
         if (teleinfo_counter.total != counter_total)
         {
-          // update totals
+          // update counter total
+          first_reading = (teleinfo_counter.total == 0);
           teleinfo_counter.total = counter_total;
+
+          // update totals
           Energy.total = (float)counter_total / 1000;
           if (Energy.start_energy == 0) Energy.start_energy = Energy.total;
           Energy.daily = Energy.total - Energy.start_energy;
+          Energy.kWhtoday = Energy.daily * 100;
+          Energy.kWhtoday_delta = 0;
+
+          // update total energy counter and store energy totals if first reading
+          if (first_reading) EnergyUpdateTotal((float) teleinfo_counter.total, false);
 
           // update cos phi calculation
           TeleinfoUpdateCosPhi ();
@@ -1542,7 +1554,7 @@ void TeleinfoWebSensor ()
   }
 
   // else error message
-  else WSContentSend_P (PSTR ("{s}%s{m}Not configured{e}"), D_TELEINFO);
+  else WSContentSend_P (PSTR ("{s}%s{m}Check configuration{e}"), D_TELEINFO);
 }
 
 // Teleinfo web page

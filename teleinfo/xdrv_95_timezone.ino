@@ -57,6 +57,9 @@ const char D_TIMEZONE_MONTH[]  PROGMEM = "Month (1:jan ... 12:dec)";
 const char D_TIMEZONE_WEEK[]   PROGMEM = "Week (0:last ... 4:fourth)";
 const char D_TIMEZONE_DAY[]    PROGMEM = "Day of week (1:sun ... 7:sat)";
 
+// variables
+bool timezone_publish_json = true;
+
 // offloading commands
 enum TimezoneCommands { CMND_TIMEZONE_NTP, CMND_TIMEZONE_STDO, CMND_TIMEZONE_STDM, CMND_TIMEZONE_STDW, CMND_TIMEZONE_STDD, CMND_TIMEZONE_DSTO, CMND_TIMEZONE_DSTM, CMND_TIMEZONE_DSTW, CMND_TIMEZONE_DSTD };
 const char kTimezoneCommands[] PROGMEM = "ntp|stdo|stdm|sdtw|stdd|dsto|dstm|dstw|dstd";
@@ -279,6 +282,9 @@ bool Xdrv95 (uint8_t function)
       break;
     case FUNC_COMMAND:
       result = TimezoneMqttCommand ();
+      break;
+    case FUNC_JSON_APPEND:
+      if (timezone_publish_json) TimezoneShowJSON (true);
       break;
 
 #ifdef USE_WEBSERVER
