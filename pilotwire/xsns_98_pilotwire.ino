@@ -33,7 +33,7 @@
     04/11/2020 - v6.11 - Tasmota 9.0 compatibility
     11/11/2020 - v6.12 - Update to Offload v2.5
                          Add /data.json for history data
-    23/04/2021 - v6.2  - Add fixed IP and remove use of String to avoid heap fragmentation
+    23/04/2021 - v6.20 - Add fixed IP and remove use of String to avoid heap fragmentation
 
   Settings are stored using weighting scale parameters :
     - Settings.weight_reference             = Fil pilote mode
