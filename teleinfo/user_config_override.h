@@ -44,6 +44,7 @@
     14/04/2021 - v7.8   - Calculate Cos phi and Active power (W) 
     21/04/2021 - v8.0   - Fixed IP configuration and change in Cos phi calculation
     29/04/2021 - v8.1   - Bug fix in serial port management and realtime energy totals
+    16/05/2021 - v8.1.1 - Control initial baud rate to avoid crash (thanks to Seb)
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -96,12 +97,12 @@
 
 // extension
 #define EXTENSION_NAME "Teleinfo"             // name
-#define EXTENSION_VERSION "8.1"               // version
+#define EXTENSION_VERSION "8.1.1"             // version
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 
 // MQTT default
 #undef MQTT_HOST
-#define MQTT_HOST          "openhab"
+#define MQTT_HOST          "mqtt.local"
 #undef MQTT_PORT
 #define MQTT_PORT          1883              
 #undef MQTT_USER
@@ -114,8 +115,6 @@
 #define MQTT_FULLTOPIC     "%topic%/%prefix%/"
 #undef FRIENDLY_NAME
 #define FRIENDLY_NAME      "Teleinfo"
-//#undef MQTT_MAX_PACKET_SIZE
-//#define MQTT_MAX_PACKET_SIZE   2200
 
 // disable serial log
 #undef SERIAL_LOG_LEVEL 

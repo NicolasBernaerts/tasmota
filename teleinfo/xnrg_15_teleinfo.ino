@@ -47,6 +47,7 @@
     14/04/2021 - v7.8   - Calculate Cos phi and Active power (W)
     21/04/2021 - v8.0   - Fixed IP configuration and change in Cos phi calculation
     29/04/2021 - v8.1   - Bug fix in serial port management and realtime energy totals
+    16/05/2021 - v8.1.1 - Control initial baud rate to avoid crash (thanks to Seb)
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -89,7 +90,6 @@
 #define TELEINFO_VOLTAGE_HIGH        240        // maximum acceptable voltage
 #define TELEINFO_PHASE_MAX           3          // maximum number of phases
 #define TELEINFO_INDEX_MAX           10         // maximum number of total power counters
-#define TELEINFO_SERIAL_BUFFER       4          // teleinfo serial buffer
 #define TELEINFO_STORE_PERIOD        1800       // store energy totals every 30mn
 
 // graph data
@@ -182,7 +182,7 @@ const char kTeleinfoEtiquetteName[] PROGMEM = "|ADCO|ADSC|PTEC|NGTF|EAIT|IINST|I
 // TIC - modes and rates
 enum TeleinfoMode { TIC_MODE_UNDEFINED, TIC_MODE_HISTORIC, TIC_MODE_STANDARD };
 const char kTeleinfoModeName[] PROGMEM = "|Historique|Standard";
-const int ARR_TELEINFO_RATE[] = { 0, 1200, 2400, 4800, 9600, 19200 }; 
+const uint16_t ARR_TELEINFO_RATE[] = { 0, 1200, 2400, 4800, 9600, 19200 }; 
 
 // TIC - tarifs
 //                                           [  Toutes   ] [ Creuses       Pleines   ] [ Normales   Pointe Mobile] [Creuses Bleu  Creuses Blanc  Creuses Rouge  Pleines Bleu  Pleines Blanc  Pleines Rouge] [ Pointe   Pleines Hiver  Creuses Hiver  Pleine demi-saison  Creuses demi-saison  Pleines Ete  Creuses Ete  Juillet-Aout] [Pointe Mobile  Hiver       Demi-saison  Hiver Mobile  Demi-saison Mobile  Saison Creuse Mobile] [Pointe    Pleines Hiver  Creuses Hiver  Pleines Ete  Creuses Ete] [   Base    ] [Pleines    Creuses   ]
@@ -195,7 +195,7 @@ const char kTeleinfoPeriodName[] PROGMEM = "Toutes|Creuses|Pleines|Normales|Poin
 enum TeleinfoConfigDiffusion { TELEINFO_POLICY_NEVER, TELEINFO_POLICY_MESSAGE, TELEINFO_POLICY_PERCENT, TELEINFO_POLICY_TELEMETRY, TELEINFO_POLICY_MAX };
 const char TELEINFO_CFG_LABEL0[] PROGMEM = "Never";
 const char TELEINFO_CFG_LABEL1[] PROGMEM = "Every TIC message";
-const char TELEINFO_CFG_LABEL2[] PROGMEM = "When Power change (± 1%)";
+const char TELEINFO_CFG_LABEL2[] PROGMEM = "When Power fluctuates (± 5%)";
 const char TELEINFO_CFG_LABEL3[] PROGMEM = "With Telemetry only";
 const char *const ARR_TELEINFO_CFG_LABEL[] = { TELEINFO_CFG_LABEL0, TELEINFO_CFG_LABEL1, TELEINFO_CFG_LABEL2, TELEINFO_CFG_LABEL3 };
 
@@ -235,7 +235,7 @@ HardwareSerial *teleinfo_serial = nullptr;
 #endif // ESP286 & ESP32
 
 // teleinfo data
-struct {
+static struct {
   int    phase   = 1;                                 // number of phases
   int    mode    = TIC_MODE_UNDEFINED;                // meter mode
   long   voltage = TELEINFO_VOLTAGE;                  // contract reference voltage
@@ -246,13 +246,13 @@ struct {
 } teleinfo_contract;
 
 // teleinfo current line
-struct {
+static struct {
   char str_text[TELEINFO_STRING_LINE_MAX];
   char separator;
 } teleinfo_line;
 
 // teleinfo power counters
-struct {
+static struct {
   long papp     = 0;                          // total apparent power
   long total    = 0;                          // total of all indexes for current contract
   int  nb_index = TELEINFO_INDEX_MAX;         // number of indexes in current contract      
@@ -260,7 +260,7 @@ struct {
 } teleinfo_counter;
 
 // cos phi data
-struct {
+static struct {
   uint32_t start_time  = 0;                   // timestamp of measurement start (ms)
   uint32_t update_time = 0;                   // timestamp of last measurement update (ms)
   uint32_t start_total = 0;                   // total counter at start of measurement (Wh)
@@ -278,7 +278,7 @@ struct tic_phase {
   long  papp_last;                          // last published apparent power
   float cos_phi;                            // cos phi
 }; 
-tic_phase teleinfo_phase[TELEINFO_PHASE_MAX];
+static tic_phase teleinfo_phase[TELEINFO_PHASE_MAX];
 
 // TIC message array
 struct tic_line {
@@ -287,10 +287,12 @@ struct tic_line {
   char checksum;
 };
 
-struct {
+static struct {
   bool overload   = false;            // overload has been detected
   bool received   = false;            // one full message has been received
   bool percent    = false;            // power has changed of more than 1% on one phase
+  bool send_tic   = false;            // flag to ask to send TIC JSON
+  bool send_meter = false;            // flag to ask to send Meter JSON
   long nb_message = 0;                // number of received messages
   long nb_data    = 0;                // number of received data (lines)
   long nb_error   = 0;                // number of checksum errors
@@ -323,7 +325,7 @@ struct tic_period {
   uint8_t  arr_volt[TELEINFO_PHASE_MAX][TELEINFO_GRAPH_SAMPLE];   // array min and max voltage delta
   uint8_t  arr_cosphi[TELEINFO_PHASE_MAX][TELEINFO_GRAPH_SAMPLE]; // array of cos phi
 }; 
-tic_period teleinfo_graph[TELEINFO_PERIOD_MAX];
+static tic_period teleinfo_graph[TELEINFO_PERIOD_MAX];
 
 /****************************************\
  *               Icons
@@ -363,7 +365,7 @@ void TeleinfoSetPolicyTIC (int policy)
 }
 
 // get Meter data publication policy
-int TeleinfoGetPolicyData ()
+int TeleinfoGetPolicyMeter ()
 {
   int policy;
 
@@ -384,11 +386,16 @@ void TeleinfoSetPolicyData (int policy)
 // get teleinfo baud rate
 uint16_t TeleinfoGetBaudRate ()
 {
+  bool     is_conform = false;
+  int      index;
   uint16_t actual_rate;
 
   // read actual teleinfo baud rate
-  actual_rate = Settings.sbaudrate;
-  if (actual_rate > 19200) actual_rate = 0;
+  actual_rate = Settings.sbaudrate * 300;
+
+  // check if rate is within allowed rates
+  for (index = 0; index < 6; index ++) if (actual_rate == ARR_TELEINFO_RATE[index]) is_conform = true;
+  if (!is_conform) actual_rate = 0;
   
   return actual_rate;
 }
@@ -396,16 +403,12 @@ uint16_t TeleinfoGetBaudRate ()
 // set teleinfo baud rate
 void TeleinfoSetBaudRate (uint16_t new_rate)
 {
-  // if within range, set baud rate
-  if (new_rate <= 19200)
-  {
-    // if mode has changed
-    if (Settings.sbaudrate != new_rate)
-    {
-      // save mode
-      Settings.sbaudrate = new_rate;
-    }
-  }
+  bool is_conform = false;
+  int  index;
+
+  // check if rate is within allowed rates and set baud rate if conform
+  for (index = 0; index < 6; index ++) if (new_rate == ARR_TELEINFO_RATE[index]) is_conform = true;
+  if (is_conform) Settings.sbaudrate = new_rate / 300;
 }
 
 // validate graph access data
@@ -543,11 +546,7 @@ int TeleinfoGetGraphCosPhi (int period, int phase, int index)
   int value = 1;
 
   // if all provided data are valid, get graph data
-  if (TeleinfoValidateGraphAccess (period, phase, index))
-  {
-    // if voltage has been stored
-    value = (int)teleinfo_graph[period].arr_cosphi[phase][index];
-  }
+  if (TeleinfoValidateGraphAccess (period, phase, index)) value = (int)teleinfo_graph[period].arr_cosphi[phase][index];
 
   return value;
 }
@@ -734,7 +733,6 @@ void TeleinfoInit ()
 {
   int      index;
   uint16_t baud_rate;
-  char     str_chip[16];
 
   // get teleinfo speed
   baud_rate = TeleinfoGetBaudRate ();
@@ -745,9 +743,6 @@ void TeleinfoInit ()
   {
 
 #ifdef ESP8266
-
-    // init
-    strcpy (str_chip, "ESP8266");
 
     // create serial port
     teleinfo_serial = new TasmotaSerial (Pin (GPIO_TELEINFO_RX), -1, 1);
@@ -763,14 +758,8 @@ void TeleinfoInit ()
 
 #else  // ESP32
 
-    // init
-    strcpy (str_chip, "ESP32");
-
     // use UART2 (some board have USB on UART1)
     teleinfo_serial = new HardwareSerial (2);
-
-    // set buffer to 256 (to handle 19200bps with 100ms loop)
-    teleinfo_serial->setRxBufferSize (256); 
 
     // init UART          
     teleinfo_serial->begin (baud_rate, SERIAL_7E1, Pin(GPIO_TELEINFO_RX), -1);
@@ -779,7 +768,7 @@ void TeleinfoInit ()
 
   }
 
-  // if teleinfo enabled in hardware mode
+  // if teleinfo enabled, init variables
   if (teleinfo_enabled)
   {
     // init hardware energy counters
@@ -816,20 +805,10 @@ void TeleinfoInit ()
     // disable timezone and enable IP address JSON
     timezone_publish_json  = false;
     ipaddress_publish_json = true;
-
-    // log
-    AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Hardware serial port initialised on %s"), str_chip);
   }
 
   // else disable energy driver
-  else
-  {
-    // disable energy driver
-    TasmotaGlobal.energy_driver = ENERGY_NONE;
-
-    // log
-    AddLog (LOG_LEVEL_INFO, PSTR ("TIC: No hardware serial port declared on %s"), str_chip);
-  }
+  else TasmotaGlobal.energy_driver = ENERGY_NONE;
 }
 
 void TeleinfoGraphInit ()
@@ -877,21 +856,25 @@ void TeleinfoGraphInit ()
 // function to handle received teleinfo data
 void TeleinfoReceiveData ()
 {
-  bool  overload = false;
-  bool  first_reading;
-  char  recv_serial, checksum;
-  int   index, phase;
-  long  current_total, power_total, counter_total;
-  float active_power;
-  char  str_etiquette[TELEINFO_STRING_ETIQUETTE_MAX];
-  char  str_donnee[TELEINFO_STRING_LINE_MAX];
-  char  str_result[TELEINFO_STRING_LINE_MAX];
+  bool     overload = false;
+  bool     first_reading;
+  char     recv_serial, checksum;
+  int      index, phase;
+  long     current_total, power_total, counter_total;
+  float    active_power;
+  uint32_t timeout;
+  char     str_etiquette[TELEINFO_STRING_ETIQUETTE_MAX];
+  char     str_donnee[TELEINFO_STRING_LINE_MAX];
+  char     str_result[TELEINFO_STRING_LINE_MAX];
 
-  while (teleinfo_serial->available() > TELEINFO_SERIAL_BUFFER) 
+  // set receive loop timeout
+  timeout = millis () + 10;
+
+  // serial receive loop
+  while (!TimeReached (timeout) && teleinfo_serial->available()) 
   {
     // read caracter
     recv_serial = teleinfo_serial->read(); 
-
     switch (recv_serial)
     {
       // ---------------------------
@@ -962,7 +945,7 @@ void TeleinfoReceiveData ()
           if (teleinfo_phase[phase].papp > teleinfo_contract.ssousc) teleinfo_message.overload = true;
 
           // detect more than 1% power change
-          if (abs (teleinfo_phase[phase].papp_last - teleinfo_phase[phase].papp) > (teleinfo_contract.ssousc / 100))
+          if (abs (teleinfo_phase[phase].papp_last - teleinfo_phase[phase].papp) > (5 * teleinfo_contract.ssousc / 100))
           {
             teleinfo_message.percent = true;
             teleinfo_phase[phase].papp_last = teleinfo_phase[phase].papp;
@@ -1229,14 +1212,15 @@ void TeleinfoReceiveData ()
         if (strlen (teleinfo_line.str_text) < TELEINFO_STRING_LINE_MAX - 1) strncat (teleinfo_line.str_text, &recv_serial, 1);
         break;
     }
+
+    // give back control to background tasks
+    yield ();
   }
 }
 
 // if needed, update graph display values and check if data should be published
 void TeleinfoEverySecond ()
 {
-  bool     publish_tic  = false;
-  bool     publish_data = false;
   int      publish_policy;
   int      period, phase;
   uint16_t current_volt;
@@ -1295,23 +1279,27 @@ void TeleinfoEverySecond ()
 
   // check if TIC should be published
   publish_policy = TeleinfoGetPolicyTIC ();
-  if (teleinfo_message.overload && (publish_policy != TELEINFO_POLICY_NEVER))   publish_tic = true;
-  if (teleinfo_message.received && (publish_policy == TELEINFO_POLICY_MESSAGE)) publish_tic = true;
-  if (teleinfo_message.percent  && (publish_policy == TELEINFO_POLICY_PERCENT)) publish_tic = true;
+  if (teleinfo_message.overload && (publish_policy != TELEINFO_POLICY_NEVER))   teleinfo_message.send_tic = true;
+  if (teleinfo_message.received && (publish_policy == TELEINFO_POLICY_MESSAGE)) teleinfo_message.send_tic = true;
+  if (teleinfo_message.percent  && (publish_policy == TELEINFO_POLICY_PERCENT)) teleinfo_message.send_tic = true;
   
   // check if Meter data should be published
-  publish_policy = TeleinfoGetPolicyData ();
-  if (teleinfo_message.overload && (publish_policy != TELEINFO_POLICY_NEVER))   publish_data = true;
-  if (teleinfo_message.received && (publish_policy == TELEINFO_POLICY_MESSAGE)) publish_data = true;
-  if (teleinfo_message.percent  && (publish_policy == TELEINFO_POLICY_PERCENT)) publish_data = true;
+  publish_policy = TeleinfoGetPolicyMeter ();
+  if (teleinfo_message.overload && (publish_policy != TELEINFO_POLICY_NEVER))   teleinfo_message.send_meter = true;
+  if (teleinfo_message.received && (publish_policy == TELEINFO_POLICY_MESSAGE)) teleinfo_message.send_meter = true;
+  if (teleinfo_message.percent  && (publish_policy == TELEINFO_POLICY_PERCENT)) teleinfo_message.send_meter = true;
 
   // reset message flags
   teleinfo_message.overload = false;
   teleinfo_message.received = false;
   teleinfo_message.percent  = false;
 
+  // give back control to background tasks
+  yield ();
+
   // if current or overload has been updated, publish teleinfo data
-  if (publish_tic || publish_data) TeleinfoShowJSON (false, publish_tic, publish_data);
+  if (teleinfo_message.send_meter) TeleinfoShowJSON (false, false, true);
+  if (teleinfo_message.send_tic)   TeleinfoShowJSON (false, true, false);
 }
 
 // update graph history data
@@ -1360,6 +1348,9 @@ void TeleinfoGenerateTicJSON ()
 
   // end of TIC section
   ResponseAppend_P (PSTR ("}"));
+
+  // TIC has been published
+  teleinfo_message.send_tic = false;
 }
 
 // Generate JSON with Meter informations
@@ -1398,19 +1389,26 @@ void TeleinfoGenerateMeterJSON ()
 
   // end of Meter section
   ResponseAppend_P (PSTR ("}"));
+
+  // Meter has been published
+  teleinfo_message.send_meter = false;
 }
 
 // Show JSON status (for MQTT)
-void TeleinfoShowJSON (bool append, bool publish_tic, bool publish_data)
+void TeleinfoShowJSON (bool append, bool allow_tic, bool allow_meter)
 {
+  // if telemetry call, check for JSON update according to update policy
+  if (append && (TELEINFO_POLICY_NEVER != TeleinfoGetPolicyTIC ())) teleinfo_message.send_tic = true;
+  if (append && (TELEINFO_POLICY_NEVER != TeleinfoGetPolicyMeter ())) teleinfo_message.send_meter = true;
+
   // if not in append mode, start with current time   {"Time":"xxxxxxxx"
   if (!append) Response_P (PSTR ("{\"%s\":\"%s\""), D_JSON_TIME, GetDateAndTime (DT_LOCAL).c_str ());
 
-  // if Meter section should be published
-  if (publish_data) TeleinfoGenerateMeterJSON ();
-
   // if TIC section should be published
-  if (publish_tic) TeleinfoGenerateTicJSON ();
+  if (allow_tic && teleinfo_message.send_tic) TeleinfoGenerateTicJSON ();
+
+  // if Meter section should be published
+  if (allow_meter && teleinfo_message.send_meter) TeleinfoGenerateMeterJSON ();
 
   // generate MQTT message according to append mode
   if (!append)
@@ -1629,7 +1627,7 @@ void TeleinfoWebPageConfig ()
   WSContentSend_P (TELEINFO_FIELD_STOP);
 
   // teleinfo meter data diffusion selection
-  policy_mode = TeleinfoGetPolicyData ();
+  policy_mode = TeleinfoGetPolicyMeter ();
   WSContentSend_P (TELEINFO_FIELD_START, PSTR ("Send Meter data"));
   for (index = 0; index < TELEINFO_POLICY_MAX; index++)
   {
@@ -1712,6 +1710,9 @@ void TeleinfoWebJsonData ()
       }
       WSContentSend_P (PSTR ("]"));
     }
+
+    // give back control to background tasks
+    yield ();
   }
 
   // end of page
@@ -1908,6 +1909,9 @@ void TeleinfoWebGraphData ()
 
   for (phase = 0; phase < teleinfo_contract.phase; phase++)
   {
+    // give back control to background tasks
+    yield ();
+
     // if phase graph should be displayed
     phase_display = (str_phase[phase] != '0');
     if (phase_display)
@@ -2231,7 +2235,7 @@ void TeleinfoWebPageGraph ()
   graph_height  = TeleinfoWebGetArgValue (D_CMND_TELEINFO_HEIGHT, TELEINFO_GRAPH_HEIGHT,  100, INT_MAX);
 
   // calculate graph bottom padding
-  graph_bottom = 68 * graph_height / TELEINFO_GRAPH_HEIGHT;
+  graph_bottom = graph_height + 20;
 
   // check phase display argument
   if (Webserver->hasArg (D_CMND_TELEINFO_PHASE))
@@ -2295,7 +2299,8 @@ void TeleinfoWebPageGraph ()
   WSContentSend_P (PSTR ("div.period {width:70px;}\n"));
   WSContentSend_P (PSTR ("div.data {width:70px;}\n"));
   WSContentSend_P (PSTR ("div.size {width:30px;}\n"));
-  WSContentSend_P (PSTR (".svg-container {position:relative;vertical-align:middle;overflow:hidden;width:100%%;max-width:%dpx;padding-bottom:%dvw;}\n"), TELEINFO_GRAPH_WIDTH, graph_bottom);
+//  WSContentSend_P (PSTR (".svg-container {position:relative;vertical-align:middle;overflow:hidden;width:100%%;max-width:%dpx;padding-bottom:%dvw;}\n"), TELEINFO_GRAPH_WIDTH, graph_bottom);
+  WSContentSend_P (PSTR (".svg-container {position:relative;width:100%%;max-width:%dpx;padding-bottom:%dpx;margin:auto;}\n"), TELEINFO_GRAPH_WIDTH, graph_bottom);
   WSContentSend_P (PSTR (".svg-content {display:inline-block;position:absolute;top:0;left:0;}\n"));
   WSContentSend_P (PSTR ("</style>\n"));
 
@@ -2414,28 +2419,20 @@ bool Xnrg15 (uint8_t function)
 // teleinfo sensor
 bool Xsns99 (uint8_t function)
 {
-  bool publish_tic, publish_data;
-
   // swtich according to context
   switch (function) 
   {
     case FUNC_INIT:
       TeleinfoGraphInit ();
       break;
-    case FUNC_EVERY_100_MSECOND:
+    case FUNC_EVERY_50_MSECOND:
       if (teleinfo_enabled && (TasmotaGlobal.uptime > 4)) TeleinfoReceiveData ();
       break;
     case FUNC_EVERY_SECOND:
       TeleinfoEverySecond ();
       break;
     case FUNC_JSON_APPEND:
-      if (teleinfo_enabled)
-      {
-        // get publication policy
-        publish_tic  = (TeleinfoGetPolicyTIC ()  != TELEINFO_POLICY_NEVER);
-        publish_data = (TeleinfoGetPolicyData () != TELEINFO_POLICY_NEVER);
-        TeleinfoShowJSON (true, publish_tic, publish_data);
-      }
+      if (teleinfo_enabled && (TasmotaGlobal.uptime > 4)) TeleinfoShowJSON (true, false, true);
       break;
 
 #ifdef USE_WEBSERVER
