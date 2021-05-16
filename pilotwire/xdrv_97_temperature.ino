@@ -3,10 +3,8 @@
   
   Copyright (C) 2020  Nicolas Bernaerts
     15/01/2020 - v1.0 - Creation with management of remote MQTT sensor
+    23/04/2021 - v1.1 - Remove use of String to avoid heap fragmentation
                       
-  Settings are stored using weighting scale parameters :
-    - Settings.free_f03  = MQTT Instant temperature (power data|Temperature MQTT topic;Temperature JSON key)
-
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
@@ -28,7 +26,6 @@
 #define XDRV_97                     97
 #define XSNS_97                     97
 
-#define TEMPERATURE_BUFFER_SIZE     128
 #define TEMPERATURE_TIMEOUT_5MN     300000
 
 #define TEMPERATURE_PARAM_TOPIC     4
@@ -53,9 +50,9 @@ enum TemperatureCommands { CMND_TEMPERATURE_TOPIC, CMND_TEMPERATURE_KEY };
 const char kTemperatureCommands[] PROGMEM = D_CMND_TEMPERATURE_TOPIC "|" D_CMND_TEMPERATURE_KEY;
 
 // form topic style
-const char str_temp_fieldset_start[] PROGMEM = "<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n";
-const char str_temp_fieldset_stop[] PROGMEM = "</fieldset></p>\n";
-const char str_temp_input[] PROGMEM = "<p>%s<span style='float:right;font-size:0.7rem;'>%s</span><br><input name='%s' value='%s'></p>\n";
+const char TEMPERATURE_FIELDSET_START[] PROGMEM = "<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n";
+const char TEMPERATURE_FIELDSET_STOP[] PROGMEM = "</fieldset></p>\n";
+const char TEMPERATURE_FIELD_INPUT[] PROGMEM = "<p>%s<span style='float:right;font-size:0.7rem;'>%s</span><br><input name='%s' value='%s'></p>\n";
 
 /*************************************************\
  *               Variables
@@ -122,29 +119,31 @@ void TemperatureSetValue (float new_temperature)
 // Show JSON status (for MQTT)
 void TemperatureShowJSON (bool append)
 {
-  String str_json, str_topic, str_key;
-  float  temperature;
+  float temperature;
+  char  str_value[8];
 
   // if temperature is available
   temperature = TemperatureGetValue ();
   if (!isnan (temperature))
   {
-    // read data
-    str_topic = TemperatureGetMqttTopic ();
-    str_key   = TemperatureGetMqttKey ();
+    // add , in append mode or { in publish mode
+    if (append) ResponseAppend_P (PSTR (",")); else Response_P (PSTR ("{"));
+
 
     // temperature  -->  "Temperature":{"Value":18.5,"Topic":"mqtt/topic/of/temperature","Key":"Temp"}
-    str_json  = "\"" + String (D_JSON_TEMPERATURE) + "\":{";
-    str_json += "\"" + String (D_JSON_TEMPERATURE_VALUE) + "\":" + String (temperature,1) + ",";
-    str_json += "\"" + String (D_JSON_TEMPERATURE_TOPIC) + "\":\"" + str_topic + "\",";
-    str_json += "\"" + String (D_JSON_TEMPERATURE_KEY) + "\":\"" + str_key + "\"}";
+    ResponseAppend_P (PSTR ("\"%s\":{"), D_JSON_TEMPERATURE);
 
-    // if append mode, add json string to MQTT message
-    if (append) ResponseAppend_P (PSTR(",%s"), str_json.c_str ());
-    else Response_P (PSTR("{%s}"), str_json.c_str ());
+    ext_snprintf_P (str_value, sizeof(str_value), PSTR ("%1_f"), &temperature);
+    ResponseAppend_P (PSTR ("\"%s\":%s,\"%s\":\"%s\",\"%s\":\"%s\""), D_JSON_TEMPERATURE_VALUE, str_value, D_JSON_TEMPERATURE_TOPIC, TemperatureGetMqttTopic (), D_JSON_TEMPERATURE_KEY, TemperatureGetMqttKey ());
 
-    // if not in append mode, publish message 
-    if (!append) MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
+    ResponseAppend_P (PSTR ("}"));
+
+    // publish it if not in append mode
+    if (!append)
+    {
+      ResponseAppend_P (PSTR ("}"));
+      MqttPublishPrefixTopic_P (TELE, PSTR (D_RSLT_SENSOR));
+    } 
   }
 }
 
@@ -180,12 +179,12 @@ bool TemperatureMqttCommand ()
 // MQTT connexion update
 void TemperatureCheckMqttConnexion ()
 {
-  bool   is_connected;
-  String str_topic;
+  bool        is_connected;
+  const char* pstr_topic;
 
   // if topic defined, check MQTT connexion
-  str_topic = TemperatureGetMqttTopic ();
-  if (str_topic.length () > 0)
+  pstr_topic = TemperatureGetMqttTopic ();
+  if (strlen (pstr_topic) > 0)
   {
     // if connected to MQTT server
     is_connected = MqttIsConnected();
@@ -195,13 +194,13 @@ void TemperatureCheckMqttConnexion ()
       if (temperature_topic_subscribed == false)
       {
         // subscribe to temperature meter
-        MqttSubscribe(str_topic.c_str ());
+        MqttSubscribe (pstr_topic);
 
         // subscription done
         temperature_topic_subscribed = true;
 
         // log
-        AddLog_P2(LOG_LEVEL_INFO, PSTR("MQT: Subscribed to %s"), str_topic.c_str ());
+        AddLog (LOG_LEVEL_INFO, PSTR ("MQT: Subscribed to %s"), pstr_topic);
       }
     }
 
@@ -213,44 +212,31 @@ void TemperatureCheckMqttConnexion ()
 // read received MQTT data to retrieve temperature
 bool TemperatureMqttData ()
 {
-  bool    data_handled = false;
-  int     idx_value;
-  String  str_topic, str_key;
-  String  str_mailbox_topic, str_mailbox_data, str_mailbox_value;
+  bool        data_handled = false;
+  float       temperature;
+  const char* pstr_topic;
+  const char* pstr_key;
+  char*       pstr_result;
+  char        str_buffer[64];
 
   // if MQTT subscription is active
   if (temperature_topic_subscribed == true)
   {
-    // get topics to compare
-    str_mailbox_topic = XdrvMailbox.topic;
-    str_key   = TemperatureGetMqttKey ();
-    str_topic = TemperatureGetMqttTopic ();
-
-    // get temperature (removing SPACE and QUOTE)
-    str_mailbox_data  = XdrvMailbox.data;
-    str_mailbox_data.replace (" ", "");
-    str_mailbox_data.replace ("\"", "");
-
-    // if topic is the temperature
-    if (str_mailbox_topic.compareTo(str_topic) == 0)
+    pstr_topic = TemperatureGetMqttTopic ();
+    if (strcmp (pstr_topic, XdrvMailbox.topic) == 0)
     {
-      // if a temperature key is defined, find the value in the JSON chain
-      if (str_key.length () > 0)
-      {
-        str_key += ":";
-      idx_value = str_mailbox_data.indexOf (str_key);
-        if (idx_value >= 0) idx_value = str_mailbox_data.indexOf (':', idx_value + 1);
-        if (idx_value >= 0) str_mailbox_value = str_mailbox_data.substring (idx_value + 1);
-      }
+      // log and counter increment
+      AddLog (LOG_LEVEL_INFO, PSTR ("MQT: Received %s"), pstr_topic);
 
-      // else, no temperature key provided, data holds the value
-      else str_mailbox_value = str_mailbox_data;
+      // look for temperature key
+      pstr_key = TemperatureGetMqttKey ();
+      sprintf (str_buffer, "\"%s\":", pstr_key);
+      pstr_result = strstr (XdrvMailbox.data, str_buffer);
+      if (pstr_result != nullptr) temperature = atof (pstr_result + strlen (str_buffer));
+      data_handled |= (pstr_result != nullptr);
 
-      // convert and update temperature
-      TemperatureSetValue (str_mailbox_value.toFloat ());
-
-      // data from message has been handled
-      data_handled = true;
+      // update current temperature
+      TemperatureSetValue (temperature);
     }
   }
 
@@ -272,52 +258,51 @@ void TemperatureWebButton ()
 // Temperature MQTT setting web page
 void TemperatureWebPage ()
 {
-  bool   state_pullup;
-  char   argument[TEMPERATURE_BUFFER_SIZE];
-  String str_topic, str_key, str_pullup;
+  const char* pstr_text;
+  char        str_argument[64];
 
   // if access not allowed, close
-  if (!HttpCheckPriviledgedAccess()) return;
+  if (!HttpCheckPriviledgedAccess ()) return;
 
   // page comes from save button on configuration page
-  if (Webserver->hasArg("save"))
+  if (Webserver->hasArg ("save"))
   {
     // set MQTT topic according to 'ttopic' parameter
-    WebGetArg (D_CMND_TEMPERATURE_TOPIC, argument, TEMPERATURE_BUFFER_SIZE);
-    TemperatureSetMqttTopic (argument);
+    WebGetArg (D_CMND_TEMPERATURE_TOPIC, str_argument, sizeof (str_argument));
+    TemperatureSetMqttTopic (str_argument);
 
     // set JSON key according to 'tkey' parameter
-    WebGetArg (D_CMND_TEMPERATURE_KEY, argument, TEMPERATURE_BUFFER_SIZE);
-    TemperatureSetMqttKey (argument);
+    WebGetArg (D_CMND_TEMPERATURE_KEY, str_argument, sizeof (str_argument));
+    TemperatureSetMqttKey (str_argument);
   }
 
   // beginning of form
   WSContentStart_P (D_TEMPERATURE_CONFIGURE);
   WSContentSendStyle ();
-  WSContentSend_P (PSTR("<form method='get' action='%s'>\n"), D_PAGE_TEMPERATURE);
+  WSContentSend_P (PSTR ("<form method='get' action='%s'>\n"), D_PAGE_TEMPERATURE);
 
   // remote sensor section  
   // --------------
-  WSContentSend_P (str_temp_fieldset_start, D_TEMPERATURE_REMOTE);
+  WSContentSend_P (TEMPERATURE_FIELDSET_START, D_TEMPERATURE_REMOTE);
 
   // remote sensor mqtt topic
-  str_topic = TemperatureGetMqttTopic ();
-  WSContentSend_P (str_temp_input, D_TEMPERATURE_TOPIC, D_CMND_TEMPERATURE_TOPIC, D_CMND_TEMPERATURE_TOPIC, str_topic.c_str ());
+  pstr_text = TemperatureGetMqttTopic ();
+  WSContentSend_P (TEMPERATURE_FIELD_INPUT, D_TEMPERATURE_TOPIC, D_CMND_TEMPERATURE_TOPIC, D_CMND_TEMPERATURE_TOPIC, pstr_text);
 
   // remote sensor json key
-  str_key = TemperatureGetMqttKey ();
-  WSContentSend_P (str_temp_input, D_TEMPERATURE_KEY, D_CMND_TEMPERATURE_KEY, D_CMND_TEMPERATURE_KEY, str_key.c_str ());
-  WSContentSend_P (str_temp_fieldset_stop);
+  pstr_text = TemperatureGetMqttKey ();
+  WSContentSend_P (TEMPERATURE_FIELD_INPUT, D_TEMPERATURE_KEY, D_CMND_TEMPERATURE_KEY, D_CMND_TEMPERATURE_KEY, pstr_text);
+  WSContentSend_P (TEMPERATURE_FIELDSET_STOP);
 
   // end of form and save button
   WSContentSend_P (PSTR ("<p><button name='save' type='submit' class='button bgrn'>%s</button></p>\n"), D_SAVE);
-  WSContentSend_P (PSTR("</form>\n"));
+  WSContentSend_P (PSTR ("</form>\n"));
 
   // configuration button
-  WSContentSpaceButton(BUTTON_CONFIGURATION);
+  WSContentSpaceButton (BUTTON_CONFIGURATION);
 
   // end of page
-  WSContentStop();
+  WSContentStop ();
 }
 
 #endif  // USE_WEBSERVER

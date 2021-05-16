@@ -22,7 +22,6 @@
     13/03/2020 - v5.6   - Add time to graph
     05/04/2020 - v5.7   - Add timezone management
     18/04/2020 - v6.0   - Handle direct connexion of heater in addition to pilotwire
-    16/05/2020 - v6.1   - Add /json page and outside mode in JSON
     20/05/2020 - v6.2   - Add configuration for first NTP server
     26/05/2020 - v6.3   - Add Information JSON page
     07/07/2020 - v6.4   - Change MQTT subscription and parameters
@@ -37,7 +36,9 @@
     18/10/2020 - v6.10  - Handle priorities as list of device types
                           Add randomisation to reconnexion
     04/11/2020 - v6.11  - Tasmota 9.0 compatibility
-    11/11/2020 - v6.12 - Update to Offload v2.5
+    11/11/2020 - v6.12  - Update to Offload v2.5
+                          Add /data.json for history data
+    23/04/2021 - v6.2   - Add fixed IP and remove use of String to avoid heap fragmentation
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -81,19 +82,19 @@
  *    Pilotwire firmware configuration
 \********************************************/
 
-#define USE_INFOJSON                          // Add support for Information JSON page
+#define USE_IPADDRESS                         // Add fixed IP configuration page
 #define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_OFFLOADING                        // Add support for MQTT maximum power offloading
 #define USE_TEMPERATURE_MQTT                  // Add support for MQTT temperature sensor
 #define USE_PILOTWIRE                         // Add support for France Pilotwire protocol for electrical heaters
 
-#define EXTENSION_VERSION "6.12"              // version
+#define EXTENSION_VERSION "6.2"              // version
 #define EXTENSION_NAME    "Pilotwire"         // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
 
 // MQTT default
 #undef MQTT_HOST
-#define MQTT_HOST          "openhab"
+#define MQTT_HOST          "mqtt.local"
 #undef MQTT_PORT
 #define MQTT_PORT          1883              
 #undef MQTT_USER
@@ -101,14 +102,14 @@
 #undef MQTT_PASS
 #define MQTT_PASS          ""
 #undef MQTT_TOPIC
-#define MQTT_TOPIC         "filpilote_%06X"
+#define MQTT_TOPIC         "pilotwire_%06X"
 #undef MQTT_FULLTOPIC
 #define MQTT_FULLTOPIC     "%topic%/%prefix%/"
 #undef FRIENDLY_NAME
 #define FRIENDLY_NAME      "Fil Pilote"
 
 // default template : Sonoff Basic with non inverted LED
-#define USER_TEMPLATE "{\"NAME\":\"Sonoff Basic Pilotwire\",\"GPIO\":[32,1,1,1,1,0,0,0,224,288,1,0,0,0],\"FLAG\":0,\"BASE\":1}"
+#define USER_TEMPLATE "{\"NAME\":\"Sonoff Pilotwire\",\"GPIO\":[32,1,1,1,1,0,0,0,224,288,1,0,0,0],\"FLAG\":0,\"BASE\":1}"
 #undef FALLBACK_MODULE
 #define FALLBACK_MODULE  USER_MODULE
 
