@@ -24,6 +24,7 @@
     23/10/2020 - v2.3   - Update control page in real time
     05/11/2020 - v2.4   - Tasmota 9.0 compatibility
     11/11/2020 - v2.5   - Add offload history pages (/histo and /histo.json)
+    23/04/2021 - v3.0   - Add fixed IP and remove use of String to avoid heap fragmentation
                    
   Settings are stored using unused KNX parameters :
     - Settings.knx_GA_addr[0]   = Power of plugged appliance (W) 
@@ -98,8 +99,8 @@
 #define D_JSON_OFFLOAD_KEY_MAX  "KeyMax"
 
 #define MQTT_OFFLOAD_TOPIC      "compteur/tele/SENSOR"
-#define MQTT_OFFLOAD_KEY_INST   "SINSTS"
-#define MQTT_OFFLOAD_KEY_MAX    "SSOUSC"
+#define MQTT_OFFLOAD_KEY_INST   "P"
+#define MQTT_OFFLOAD_KEY_MAX    "PREF"
 
 #define D_OFFLOAD               "Offload"
 #define D_OFFLOAD_EVENT         "Events"
@@ -125,6 +126,7 @@
 #define D_OFFLOAD_RANDOM        "Random"
 #define D_OFFLOAD_TOGGLE        "Toggle plug switch"
 
+#define D_OFFLOAD_UNIT_VA       "VA"
 #define D_OFFLOAD_UNIT_W        "W"
 #define D_OFFLOAD_UNIT_SEC      "sec."
 #define D_OFFLOAD_UNIT_PERCENT  "%"
@@ -398,15 +400,11 @@ void OffloadSetDeviceType (uint16_t new_type)
 }
 
 // get instant power MQTT topic
-String OffloadGetPowerTopic (bool get_default)
+void OffloadGetPowerTopic (bool get_default, char* pstr_result, int size_result)
 {
-  String str_result;
-
   // get value or default value if not set
-  str_result = SettingsText (SET_OFFLOAD_TOPIC);
-  if (get_default == true || str_result == "") str_result = MQTT_OFFLOAD_TOPIC;
-
-  return str_result;
+  strlcpy (pstr_result, SettingsText (SET_OFFLOAD_TOPIC), size_result);
+  if (get_default == true || strlen (pstr_result) == 0) strlcpy (pstr_result, MQTT_OFFLOAD_TOPIC, size_result);
 }
 
 // set power MQTT topic
@@ -416,15 +414,11 @@ void OffloadSetPowerTopic (char* str_topic)
 }
 
 // get contract power JSON key
-String OffloadGetContractPowerKey (bool get_default)
+void OffloadGetContractPowerKey (bool get_default, char* pstr_result, int size_result)
 {
-  String str_result;
-
   // get value or default value if not set
-  str_result = SettingsText (SET_OFFLOAD_KEY_MAX);
-  if (get_default == true || str_result == "") str_result = MQTT_OFFLOAD_KEY_MAX;
-
-  return str_result;
+  strlcpy (pstr_result, SettingsText (SET_OFFLOAD_KEY_MAX), size_result);
+  if (get_default == true || strlen (pstr_result) == 0) strlcpy (pstr_result, MQTT_OFFLOAD_KEY_MAX, size_result);
 }
 
 // set contract power JSON key
@@ -434,15 +428,18 @@ void OffloadSetContractPowerKey (char* str_key)
 }
 
 // get instant power JSON key
-String OffloadGetInstPowerKey (bool get_default)
+void OffloadGetInstPowerKey (bool get_default, char* pstr_result, int size_result)
 {
-  String str_result;
+  char str_phase[4];
 
   // get value or default value if not set
-  str_result = SettingsText (SET_OFFLOAD_KEY_INST);
-  if (get_default == true || str_result == "") str_result = MQTT_OFFLOAD_KEY_INST + String (OffloadGetPhase ());
-
-  return str_result;
+  strlcpy (pstr_result, SettingsText (SET_OFFLOAD_KEY_INST), size_result);
+  if (get_default == true || strlen (pstr_result) == 0)
+  {
+    itoa (OffloadGetPhase (), str_phase, sizeof (str_phase));
+    strlcpy (pstr_result, MQTT_OFFLOAD_KEY_INST, size_result);
+    strcat (pstr_result, str_phase);
+  } 
 }
 
 // set instant power JSON key
@@ -515,7 +512,7 @@ void OffloadSetRelayMode (bool is_managed)
 }
 
 // activate offload state
-bool OffloadActivate ()
+void OffloadActivate ()
 {
   // set flag to signal offload has just been set
   offload_flag.just_set     = true;
@@ -540,7 +537,7 @@ bool OffloadActivate ()
   }
 
   // get relay state and log
-  AddLog_P2(LOG_LEVEL_INFO, PSTR("PWR: Offload starts (relay = %d)"), offload_status.relay_state);
+  AddLog (LOG_LEVEL_INFO, PSTR ("PWR: Offload starts (relay = %d)"), offload_status.relay_state);
 }
 
 // remove offload state
@@ -558,90 +555,85 @@ void OffloadRemove ()
   if ((offload_flag.relay_managed) && (offload_status.relay_state == 1)) ExecuteCommandPower (1, POWER_ON, SRC_MAX);
 
   // log offloading removal
-  AddLog_P2(LOG_LEVEL_INFO, PSTR("PWR: Offload stops (relay = %d)"), offload_status.relay_state);
+  AddLog (LOG_LEVEL_INFO, PSTR ("PWR: Offload stops (relay = %d)"), offload_status.relay_state);
 }
 
 // Show JSON status (for MQTT)
 void OffloadShowJSON (bool append)
 {
-  bool     is_offloaded;
-  uint16_t power_max, power_device, power_contract, delay_before, delay_after;
-  int      adjust_contract;
-  String   str_mqtt, str_json, str_status;
+  char str_buffer[64];
 
   // web client needs update
   offload_flag.web_updated = true;
 
-  // read data
-  is_offloaded    = OffloadIsOffloaded ();
-  delay_before    = OffloadGetDelayBeforeOffload ();
-  delay_after     = OffloadGetDelayBeforeRemoval ();
-  power_device    = OffloadGetDevicePower ();
-  power_max       = OffloadGetMaxPower ();
-  power_contract  = OffloadGetContractPower ();
-  adjust_contract = OffloadGetContractAdjustment ();
+  // add , in append mode or { in direct publish mode
+  if (append) ResponseAppend_P (PSTR (",")); else Response_P (PSTR ("{"));
 
   // "Offload":{
   //   "State":"OFF","Stage":1,
-  //   "Phase":2,"Before":1,"After":5,"Device":1000,"Contract":5000,"Topic":"...","KeyInst":"...","KeyMax":"..."  //           
+  //   "Phase":2,"Before":1,"After":5,"Device":1000,"Contract":5000,"Topic":"...","KeyInst":"...","KeyMax":"..."       
   //   }
-  str_json = "\"" + String (D_JSON_OFFLOAD) + "\":{";
+  ResponseAppend_P (PSTR ("\"%s\":{"), D_JSON_OFFLOAD);
   
   // dynamic data
-  if (is_offloaded == true) str_status = MQTT_STATUS_ON; else str_status = MQTT_STATUS_OFF;
-  str_json += "\"" + String (D_JSON_OFFLOAD_STATE) + "\":\"" + str_status + "\"";
-  str_json += ",\"" + String (D_JSON_OFFLOAD_STAGE) + "\":" + String (offload_status.stage);
+  if (OffloadIsOffloaded ()) strcpy (str_buffer, MQTT_STATUS_ON); else strcpy (str_buffer, MQTT_STATUS_OFF);
+  ResponseAppend_P (PSTR ("\"%s\":\"%s\",\"%s\":%d"), D_JSON_OFFLOAD_STATE, str_buffer, D_JSON_OFFLOAD_STAGE, offload_status.stage);
   
   // static data
   if (append == true) 
   {
-    str_json += ",\"" + String (D_JSON_OFFLOAD_PHASE) + "\":" + OffloadGetPhase ();
-    str_json += ",\"" + String (D_JSON_OFFLOAD_BEFORE) + "\":" + String (delay_before);
-    str_json += ",\"" + String (D_JSON_OFFLOAD_AFTER) + "\":" + String (delay_after);
-    str_json += ",\"" + String (D_JSON_OFFLOAD_DEVICE) + "\":" + String (power_device);
-    str_json += ",\"" + String (D_JSON_OFFLOAD_MAX) + "\":" + String (power_max);
-    str_json += ",\"" + String (D_JSON_OFFLOAD_CONTRACT) + "\":" + String (power_contract);
-    str_json += ",\"" + String (D_JSON_OFFLOAD_ADJUST) + "\":" + String (adjust_contract);
-    str_json += ",\"" + String (D_JSON_OFFLOAD_TOPIC) + "\":\"" + OffloadGetPowerTopic (false) + "\"";
-    str_json += ",\"" + String (D_JSON_OFFLOAD_KEY_INST) + "\":\"" + OffloadGetInstPowerKey (false) + "\"";
-    str_json += ",\"" + String (D_JSON_OFFLOAD_KEY_MAX) + "\":\"" + OffloadGetContractPowerKey (false) + "\"";
+    // offloading phase number and delays
+    ResponseAppend_P (PSTR (",\"%s\":%d,\"%s\":%d,\"%s\":%d"), D_JSON_OFFLOAD_PHASE, OffloadGetPhase (), D_JSON_OFFLOAD_BEFORE, OffloadGetDelayBeforeOffload (), D_JSON_OFFLOAD_AFTER, OffloadGetDelayBeforeRemoval ());
+
+    // offloading power metrics
+    ResponseAppend_P (PSTR (",\"%s\":%d,\"%s\":%d,\"%s\":%d,\"%s\":%d"), D_JSON_OFFLOAD_DEVICE, OffloadGetDevicePower (), D_JSON_OFFLOAD_MAX, OffloadGetMaxPower (), D_JSON_OFFLOAD_CONTRACT, OffloadGetContractPower (), D_JSON_OFFLOAD_ADJUST, OffloadGetContractAdjustment ());
+
+    // offloading power MQTT topic
+    OffloadGetPowerTopic (false, str_buffer, sizeof (str_buffer));
+    ResponseAppend_P (PSTR (",\"%s\":\"%s\""), D_JSON_OFFLOAD_TOPIC, str_buffer);
+
+    // offloading instant power MQTT key
+    OffloadGetInstPowerKey (false, str_buffer, sizeof (str_buffer));
+    ResponseAppend_P (PSTR (",\"%s\":\"%s\""), D_JSON_OFFLOAD_KEY_INST, str_buffer);
+
+    // offloading contract power MQTT key
+    OffloadGetContractPowerKey (false, str_buffer, sizeof (str_buffer));
+    ResponseAppend_P (PSTR (",\"%s\":\"%s\""), D_JSON_OFFLOAD_KEY_MAX, str_buffer);
   }
 
-  str_json += "}";
-
-  // generate MQTT message according to append mode
-  if (append) ResponseAppend_P (PSTR(",%s"), str_json.c_str ());
-  else Response_P (PSTR("{%s}"), str_json.c_str ());
+  ResponseAppend_P (PSTR ("}"));
 
   // publish it if not in append mode
-  if (!append) MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
+  if (!append)
+  {
+    ResponseAppend_P (PSTR ("}"));
+    MqttPublishPrefixTopic_P (TELE, PSTR (D_RSLT_SENSOR));
+  } 
 }
 
 // check and update MQTT power subsciption after disconnexion
 void OffloadCheckConnexion ()
 {
-  bool   is_connected;
-  String str_topic;
+  bool is_connected;
+  char str_buffer[64];
 
   // check MQTT connexion
-  is_connected = MqttIsConnected();
+  is_connected = MqttIsConnected ();
   if (is_connected)
   {
     // if still no subsciption to power topic
     if (offload_flag.topic_subscribed == false)
     {
       // check power topic availability
-      str_topic = OffloadGetPowerTopic (false);
-      if (str_topic.length () > 0) 
+      OffloadGetPowerTopic (false, str_buffer, sizeof (str_buffer));
+      if (strlen (str_buffer) > 0) 
       {
         // subscribe to power meter
-        MqttSubscribe(str_topic.c_str ());
+        MqttSubscribe (str_buffer);
+        AddLog (LOG_LEVEL_INFO, PSTR ("MQT: Subscribed to %s"), str_buffer);
 
         // subscription done
         offload_flag.topic_subscribed = true;
-
-        // log
-        AddLog_P2(LOG_LEVEL_INFO, PSTR("MQT: Subscribed to %s"), str_topic.c_str ());
       }
     }
   }
@@ -702,42 +694,33 @@ bool OffloadMqttCommand ()
 bool OffloadMqttData ()
 {
   bool    data_handled = false;
-  int     idx_value, mqtt_power;
-  String  str_data, str_topic, str_key;
+  int     mqtt_power = 0;
+  char    str_buffer[64];
+  char    str_key[64];
+  char*   pstr_result;
 
   // if topic is the instant house power
-  str_topic = OffloadGetPowerTopic (false);
-  if (str_topic == XdrvMailbox.topic)
+  OffloadGetPowerTopic (false, str_buffer, sizeof (str_buffer));
+  if (strcmp (str_buffer, XdrvMailbox.topic) == 0)
   {
     // log and counter increment
-    AddLog_P2(LOG_LEVEL_INFO, PSTR("MQT: Received %s"), str_topic.c_str ());
+    AddLog (LOG_LEVEL_INFO, PSTR ("MQT: Received %s"), str_buffer);
     offload_status.time_message = LocalTime ();
 
-    // get message data (removing SPACE and QUOTE)
-    str_data  = XdrvMailbox.data;
-    str_data.replace (" ", "");
-    str_data.replace ("\"", "");
+    // look for instant power key
+    OffloadGetInstPowerKey (false, str_buffer, sizeof (str_buffer));
+    sprintf (str_key, "\"%s\":", str_buffer);
+    pstr_result = strstr (XdrvMailbox.data, str_key);
+    if (pstr_result != nullptr) offload_status.power_inst = atoi (pstr_result + strlen (str_key));
+    data_handled |= (pstr_result != nullptr);
 
-    // if instant power key is present
-    str_key = OffloadGetInstPowerKey (false) + ":";
-    idx_value = str_data.indexOf (str_key);
-    if (idx_value >= 0) idx_value = str_data.indexOf (':', idx_value + 1);
-    if (idx_value >= 0)
-    {
-      offload_status.power_inst = str_data.substring (idx_value + 1).toInt ();
-      data_handled = true;
-    }
-
-    // if max power key is present
-    str_key = OffloadGetContractPowerKey (false) + ":";
-    idx_value = str_data.indexOf (str_key);
-    if (idx_value >= 0) idx_value = str_data.indexOf (':', idx_value + 1);
-    if (idx_value >= 0)
-    {
-      mqtt_power = str_data.substring (idx_value + 1).toInt ();
-      if (mqtt_power > 0) OffloadSetContractPower ((uint16_t)mqtt_power);
-      data_handled = true;
-    }
+    // look for max power key
+    OffloadGetContractPowerKey (false, str_buffer, sizeof (str_buffer));
+    sprintf (str_key, "\"%s\":", str_buffer);
+    pstr_result = strstr (XdrvMailbox.data, str_key);
+    if (pstr_result != nullptr) mqtt_power = atoi (pstr_result + strlen (str_key));
+    if (mqtt_power > 0) OffloadSetContractPower ((uint16_t)mqtt_power);
+    data_handled |= (pstr_result != nullptr);
   }
 
   return data_handled;
@@ -945,7 +928,7 @@ void OffloadWebPageHistoryJson ()
 
   // start of data page
   WSContentBegin(200, CT_HTML);
-  WSContentSend_P (PSTR("{\"event\":["));
+  WSContentSend_P (PSTR ("{\"event\":["));
 
   // loop thru offload events array
   for (index = 1; index <= OFFLOAD_EVENT_MAX; index++)
@@ -954,66 +937,66 @@ void OffloadWebPageHistoryJson ()
     index_array = (index + offload_event.index) % OFFLOAD_EVENT_MAX;
     if (offload_event.arr_event[index_array].time_start != UINT32_MAX)
     {
-      if (first_value) WSContentSend_P (PSTR("{")); else WSContentSend_P (PSTR(",{"));
+      if (first_value) WSContentSend_P (PSTR ("{")); else WSContentSend_P (PSTR (",{"));
       first_value = false;
 
       // start time
       BreakTime (offload_event.arr_event[index_array].time_start, event_dst);
       if (event_dst.year < 1970) event_dst.year += 1970;
-      WSContentSend_P (PSTR(",\"start\":\"%d-%02d-%02dT%02d:%02d:%02d.000Z\""), event_dst.year, event_dst.month, event_dst.day_of_month, event_dst.hour, event_dst.minute, event_dst.second);
+      WSContentSend_P (PSTR (",\"start\":\"%d-%02d-%02dT%02d:%02d:%02d.000Z\""), event_dst.year, event_dst.month, event_dst.day_of_month, event_dst.hour, event_dst.minute, event_dst.second);
 
       // release time
-      WSContentSend_P (PSTR(",\"stop\":\""));
+      WSContentSend_P (PSTR (",\"stop\":\""));
       if (offload_event.arr_event[index_array].time_stop != UINT32_MAX)
       {
         BreakTime (offload_event.arr_event[index_array].time_stop, event_dst);
         if (event_dst.year < 1970) event_dst.year += 1970;
-        WSContentSend_P (PSTR("%d-%02d-%02dT%02d:%02d:%02d.000Z"), event_dst.year, event_dst.month, event_dst.day_of_month, event_dst.hour, event_dst.minute, event_dst.second);
+        WSContentSend_P (PSTR ("%d-%02d-%02dT%02d:%02d:%02d.000Z"), event_dst.year, event_dst.month, event_dst.day_of_month, event_dst.hour, event_dst.minute, event_dst.second);
       }
-      WSContentSend_P (PSTR("\"}"));
+      WSContentSend_P (PSTR ("\"}"));
 
       // duration
-      WSContentSend_P (PSTR(",\"duration\":\""));
-      if (offload_event.arr_event[index_array].duration != UINT32_MAX) WSContentSend_P (PSTR("%d"), offload_event.arr_event[index_array].duration);
-      WSContentSend_P (PSTR("\"}"));
+      WSContentSend_P (PSTR (",\"duration\":\""));
+      if (offload_event.arr_event[index_array].duration != UINT32_MAX) WSContentSend_P (PSTR ("%d"), offload_event.arr_event[index_array].duration);
+      WSContentSend_P (PSTR ("\"}"));
 
       // overload power
-      WSContentSend_P (PSTR("\"power\":%d"), offload_event.arr_event[index_array].power);
+      WSContentSend_P (PSTR ("\"power\":%d"), offload_event.arr_event[index_array].power);
     }
   }
 
   // end of page
-  WSContentSend_P (PSTR("]}"));
+  WSContentSend_P (PSTR ("]}"));
   WSContentEnd();
 }
 
 // append offloading state to main page
-bool OffloadWebSensor ()
+void OffloadWebSensor ()
 {
   uint16_t index, device_power;
   uint32_t time_now, time_left, time_end;
-  String   str_title, str_text;
+  char     str_text[40], str_value[8];
   uint32_t message_delay;
   TIME_T   message_dst;
 
   // display device type
   index = OffloadGetDeviceType ();
-  WSContentSend_PD (PSTR("{s}%s %s{m}%s{e}"), D_OFFLOAD_DEVICE, D_OFFLOAD_TYPE, arr_offload_device_label[index]);
+  WSContentSend_PD (PSTR ("{s}%s %s{m}%s{e}"), D_OFFLOAD_DEVICE, D_OFFLOAD_TYPE, arr_offload_device_label[index]);
 
   // display appliance type
   time_left = (uint32_t) OffloadGetDelayBeforeOffload ();
-  WSContentSend_PD (PSTR("{s}%s <small>(Off/On)</small>{m}%d / %d %s{e}"), D_OFFLOAD_DELAY, time_left, offload_status.delay_removal, D_OFFLOAD_UNIT_SEC);
+  WSContentSend_PD (PSTR ("{s}%s <small>(Off/On)</small>{m}%d / %d %s{e}"), D_OFFLOAD_DELAY, time_left, offload_status.delay_removal, D_OFFLOAD_UNIT_SEC);
 
   // device power
   index = OffloadGetPhase ();
   device_power = OffloadGetDevicePower ();
-  WSContentSend_PD (PSTR("{s}%s <small><i>[phase %d]</i></small>{m}%d W{e}"), D_OFFLOAD_POWER, index, device_power);
+  WSContentSend_PD (PSTR ("{s}%s <small><i>[phase %d]</i></small>{m}%d W{e}"), D_OFFLOAD_POWER, index, device_power);
 
   // if house power is subscribed, display power
   if (offload_flag.topic_subscribed)
   {
     // calculate delay since last power message
-    str_text = "...";
+    strcpy (str_text, "...");
     if (offload_status.time_message > 0)
     {
       // calculate delay
@@ -1021,21 +1004,30 @@ bool OffloadWebSensor ()
       BreakTime (message_delay, message_dst);
 
       // generate readable format
-      str_text = "";
-      if (message_dst.hour > 0) str_text += String (message_dst.hour) + "h";
-      if (message_dst.hour > 0 || message_dst.minute > 0) str_text += String (message_dst.minute) + "m";
-      str_text += String (message_dst.second) + "s";
+      strcpy (str_text, "");
+      if (message_dst.hour > 0)
+      {
+        sprintf (str_value, "%dh", message_dst.hour);
+        strlcat (str_text, str_value, sizeof (str_text));
+      }
+      if (message_dst.hour > 0 || message_dst.minute > 0)
+      {
+        sprintf (str_value, "%dm", message_dst.minute);
+        strlcat (str_text, str_value, sizeof (str_text));
+      }
+      sprintf (str_value, "%ds", message_dst.second);
+      strlcat (str_text, str_value, sizeof (str_text));
     }
 
     // display current power and max power limit
     device_power = OffloadGetMaxPower ();
-    if (device_power > 0) WSContentSend_PD (PSTR("{s}%s <small><i>[%s]</i></small>{m}<b>%d</b> / %d W{e}"), D_OFFLOAD_CONTRACT, str_text.c_str (), offload_status.power_inst, device_power);
+    if (device_power > 0) WSContentSend_PD (PSTR ("{s}%s <small><i>[%s]</i></small>{m}<b>%d</b> / %d W{e}"), D_OFFLOAD_CONTRACT, str_text, offload_status.power_inst, device_power);
 
     // switch according to current state
     time_now  = millis () / 1000;
     time_left = 0;
-    str_text  = "";
-    str_title = D_OFFLOAD;
+    strcpy (str_text, "");
+    strcpy (str_value, "");
     
     switch (offload_status.stage)
     { 
@@ -1043,24 +1035,27 @@ bool OffloadWebSensor ()
       case OFFLOAD_BEFORE:
         time_end = offload_status.time_stage + (uint32_t) OffloadGetDelayBeforeOffload ();
         if (time_end > time_now) time_left = time_end - time_now;
-        str_text = "<span style='color:orange;'>Starting in <b>" + String (time_left) + " sec.</b></span>";
+        strcpy (str_value, "orange");
+        sprintf (str_text, "Starting in <b>%d sec.</b>" , time_left);
         break;
 
       // calculate number of ms left before offload removal
       case OFFLOAD_AFTER:
         time_end = offload_status.time_stage + offload_status.delay_removal;
         if (time_end > time_now) time_left = time_end - time_now;
-        str_text = "<span style='color:red;'>Ending in <b>" + String (time_left) + " sec.</b></span>";
+        strcpy (str_value, "red");
+        sprintf (str_text, "Ending in <b>%d sec.</b>", time_left);
         break;
 
       // device is offloaded
       case OFFLOAD_ACTIVE:
-        str_text = "<span style='color:red;'><b>Active</b></span>";
+        strcpy (str_value, "red");
+        strlcpy (str_text, "<b>Active</b>", sizeof (str_text));
         break;
     }
     
     // display current state
-    if (str_text.length () > 0) WSContentSend_PD (PSTR("{s}%s{m}%s{e}"), str_title.c_str (), str_text.c_str ());
+    if (strlen (str_text) > 0) WSContentSend_PD (PSTR ("{s}%s{m}<span style='color:%s;'>%s</span>{e}"), D_OFFLOAD, str_value, str_text);
   }
 }
 
@@ -1069,8 +1064,8 @@ void OffloadWebPageConfig ()
 {
   int      index, value, result, device;
   uint16_t power;
-  char     argument[64];
-  String   str_text, str_default;
+  char     str_argument[32];
+  char     str_default[32];
 
   // if access not allowed, close
   if (!HttpCheckPriviledgedAccess()) return;
@@ -1079,48 +1074,48 @@ void OffloadWebPageConfig ()
   if (Webserver->hasArg("save"))
   {
     // set power of heater according to 'power' parameter
-    WebGetArg (D_CMND_OFFLOAD_DEVICE, argument, 64);
-    if (strlen(argument) > 0) OffloadSetDevicePower ((uint16_t)atoi (argument));
+    WebGetArg (D_CMND_OFFLOAD_DEVICE, str_argument, sizeof (str_argument));
+    if (strlen (str_argument) > 0) OffloadSetDevicePower ((uint16_t)atoi (str_argument));
 
     // set contract power limit according to 'contract' parameter
-    WebGetArg (D_CMND_OFFLOAD_TYPE, argument, 64);
-    if (strlen(argument) > 0) OffloadSetDeviceType ((uint16_t)atoi (argument));
+    WebGetArg (D_CMND_OFFLOAD_TYPE, str_argument, sizeof (str_argument));
+    if (strlen (str_argument) > 0) OffloadSetDeviceType ((uint16_t)atoi (str_argument));
 
     // set contract power limit according to 'contract' parameter
-    WebGetArg (D_CMND_OFFLOAD_CONTRACT, argument, 64);
-    if (strlen(argument) > 0) OffloadSetContractPower ((uint16_t)atoi (argument));
+    WebGetArg (D_CMND_OFFLOAD_CONTRACT, str_argument, sizeof (str_argument));
+    if (strlen (str_argument) > 0) OffloadSetContractPower ((uint16_t)atoi (str_argument));
 
     // set contract power limit according to 'adjust' parameter
-    WebGetArg (D_CMND_OFFLOAD_ADJUST, argument, 64);
-    if (strlen(argument) > 0) OffloadSetContractAdjustment (atoi (argument));
+    WebGetArg (D_CMND_OFFLOAD_ADJUST, str_argument, sizeof (str_argument));
+    if (strlen (str_argument) > 0) OffloadSetContractAdjustment (atoi (str_argument));
 
     // set phase number according to 'phase' parameter
-    WebGetArg (D_CMND_OFFLOAD_PHASE, argument, 64);
-    if (strlen(argument) > 0) OffloadSetPhase ((uint16_t)atoi (argument));
+    WebGetArg (D_CMND_OFFLOAD_PHASE, str_argument, sizeof (str_argument));
+    if (strlen (str_argument) > 0) OffloadSetPhase ((uint16_t)atoi (str_argument));
 
     // set delay in sec. before offloading device according to 'before' parameter
-    WebGetArg (D_CMND_OFFLOAD_BEFORE, argument, 64);
-    if (strlen(argument) > 0) OffloadSetDelayBeforeOffload ((uint16_t)atoi (argument));
+    WebGetArg (D_CMND_OFFLOAD_BEFORE, str_argument, sizeof (str_argument));
+    if (strlen (str_argument) > 0) OffloadSetDelayBeforeOffload ((uint16_t)atoi (str_argument));
 
     // set delay in sec. after offloading device according to 'after' parameter
-    WebGetArg (D_CMND_OFFLOAD_AFTER, argument, 64);
-    if (strlen(argument) > 0) OffloadSetDelayBeforeRemoval ((uint16_t)atoi (argument));
+    WebGetArg (D_CMND_OFFLOAD_AFTER, str_argument, sizeof (str_argument));
+    if (strlen (str_argument) > 0) OffloadSetDelayBeforeRemoval ((uint16_t)atoi (str_argument));
 
     // set random delay in sec. according to 'random' parameter
-    WebGetArg (D_CMND_OFFLOAD_RANDOM, argument, 64);
-    if (strlen(argument) > 0) OffloadSetDelayRandom ((uint16_t)atoi (argument));
+    WebGetArg (D_CMND_OFFLOAD_RANDOM,str_argument, sizeof (str_argument));
+    if (strlen (str_argument) > 0) OffloadSetDelayRandom ((uint16_t)atoi (str_argument));
 
     // set MQTT topic according to 'topic' parameter
-    WebGetArg (D_CMND_OFFLOAD_TOPIC, argument, 64);
-    if (strlen(argument) > 0) OffloadSetPowerTopic (argument);
+    WebGetArg (D_CMND_OFFLOAD_TOPIC, str_argument, sizeof (str_argument));
+    if (strlen (str_argument) > 0) OffloadSetPowerTopic (str_argument);
 
     // set JSON key according to 'inst' parameter
-    WebGetArg (D_CMND_OFFLOAD_KEY_INST, argument, 64);
-    if (strlen(argument) > 0) OffloadSetInstPowerKey (argument);
+    WebGetArg (D_CMND_OFFLOAD_KEY_INST, str_argument, sizeof (str_argument));
+    if (strlen (str_argument) > 0) OffloadSetInstPowerKey (str_argument);
 
     // set JSON key according to 'max' parameter
-    WebGetArg (D_CMND_OFFLOAD_KEY_MAX, argument, 64);
-    if (strlen(argument) > 0) OffloadSetContractPowerKey (argument);
+    WebGetArg (D_CMND_OFFLOAD_KEY_MAX, str_argument, sizeof (str_argument));
+    if (strlen (str_argument) > 0) OffloadSetContractPowerKey (str_argument);
 
     // restart device
     WebRestart (1);
@@ -1131,14 +1126,14 @@ void OffloadWebPageConfig ()
   WSContentSendStyle ();
 
   // specific style
-  WSContentSend_P (PSTR("<style>\n"));
-  WSContentSend_P (PSTR("p.half {display:inline-block;width:47%%;margin-right:2%%;}\n"));
-  WSContentSend_P (PSTR("p.third {display:inline-block;width:30%%;margin-right:2%%;}\n"));
-  WSContentSend_P (PSTR("span.key {float:right;font-size:0.7rem;}\n"));
-  WSContentSend_P (PSTR("input.switch {background:#aaa;}\n"));
-  WSContentSend_P (PSTR("</style>\n"));
+  WSContentSend_P (PSTR ("<style>\n"));
+  WSContentSend_P (PSTR ("p.half {display:inline-block;width:47%%;margin-right:2%%;}\n"));
+  WSContentSend_P (PSTR ("p.third {display:inline-block;width:30%%;margin-right:2%%;}\n"));
+  WSContentSend_P (PSTR ("span.key {float:right;font-size:0.7rem;}\n"));
+  WSContentSend_P (PSTR ("input.switch {background:#aaa;}\n"));
+  WSContentSend_P (PSTR ("</style>\n"));
 
-  WSContentSend_P (PSTR("<form method='get' action='%s'>\n"), D_PAGE_OFFLOAD_CONFIG);
+  WSContentSend_P (PSTR ("<form method='get' action='%s'>\n"), D_PAGE_OFFLOAD_CONFIG);
 
   // --------------
   //     Device  
@@ -1148,35 +1143,35 @@ void OffloadWebPageConfig ()
 
   // appliance type
   result = (int) OffloadGetDeviceType ();
-  WSContentSend_P (PSTR("<p>%s<span class='key'>%s</span>\n"), D_OFFLOAD_TYPE, D_CMND_OFFLOAD_TYPE);
-  WSContentSend_P (PSTR("<select name='%s' id='%s'>\n"), D_CMND_OFFLOAD_TYPE, D_CMND_OFFLOAD_TYPE);
+  WSContentSend_P (PSTR ("<p>%s<span class='key'>%s</span>\n"), D_OFFLOAD_TYPE, D_CMND_OFFLOAD_TYPE);
+  WSContentSend_P (PSTR ("<select name='%s' id='%s'>\n"), D_CMND_OFFLOAD_TYPE, D_CMND_OFFLOAD_TYPE);
   for (index = 0; index < OFFLOAD_DEVICE_MAX; index ++)
   {
     device = arr_offload_device_available[index];
     if (device < OFFLOAD_DEVICE_MAX)
     {
-      if (device == result) str_text = "selected"; else str_text = "";
-      WSContentSend_P (PSTR("<option value='%d' %s>%s</option>\n"), device, str_text.c_str (), arr_offload_device_label[device]);
+      if (device == result) strcpy (str_argument, D_OFFLOAD_SELECTED); else strcpy (str_argument, "");
+      WSContentSend_P (PSTR ("<option value='%d' %s>%s</option>\n"), device, str_argument, arr_offload_device_label[device]);
     }
   }
-  WSContentSend_P (PSTR("</select>\n"));
-  WSContentSend_P (PSTR("</p>\n"));
+  WSContentSend_P (PSTR ("</select>\n"));
+  WSContentSend_P (PSTR ("</p>\n"));
 
   // device power
   power = OffloadGetDevicePower ();
-  str_text = D_OFFLOAD_POWER + String (" (") + D_OFFLOAD_UNIT_W + String (")");
-  WSContentSend_P (OFFLOAD_INPUT_NUMBER, "none", str_text.c_str (), D_CMND_OFFLOAD_DEVICE, "none", D_CMND_OFFLOAD_DEVICE, D_CMND_OFFLOAD_DEVICE, 0, 65000, 1,  power);
+  sprintf (str_argument, "%s (%s)", D_OFFLOAD_POWER, D_OFFLOAD_UNIT_W);
+  WSContentSend_P (OFFLOAD_INPUT_NUMBER, "none", str_argument, D_CMND_OFFLOAD_DEVICE, "none", D_CMND_OFFLOAD_DEVICE, D_CMND_OFFLOAD_DEVICE, 0, 65000, 1,  power);
 
   // delays
   value = (int) OffloadGetDelayBeforeOffload ();
-  str_text = D_OFFLOAD_BEFORE + String (" (sec)");
-  WSContentSend_P (OFFLOAD_INPUT_NUMBER, "third", str_text.c_str (), D_CMND_OFFLOAD_BEFORE, "switch", D_CMND_OFFLOAD_BEFORE, D_CMND_OFFLOAD_BEFORE, 0, 60, 1, value);
+  sprintf (str_argument, "%s (%s)", D_OFFLOAD_BEFORE, D_OFFLOAD_UNIT_SEC);
+  WSContentSend_P (OFFLOAD_INPUT_NUMBER, "third", str_argument, D_CMND_OFFLOAD_BEFORE, "switch", D_CMND_OFFLOAD_BEFORE, D_CMND_OFFLOAD_BEFORE, 0, 60, 1, value);
   value = (int) OffloadGetDelayBeforeRemoval ();
-  str_text = D_OFFLOAD_AFTER + String (" (sec)");
-  WSContentSend_P (OFFLOAD_INPUT_NUMBER, "third", str_text.c_str (), D_CMND_OFFLOAD_AFTER, "switch", D_CMND_OFFLOAD_AFTER, D_CMND_OFFLOAD_AFTER, 0, 600, 1, value);
+  sprintf (str_argument, "%s (%s)", D_OFFLOAD_AFTER, D_OFFLOAD_UNIT_SEC);
+  WSContentSend_P (OFFLOAD_INPUT_NUMBER, "third", str_argument, D_CMND_OFFLOAD_AFTER, "switch", D_CMND_OFFLOAD_AFTER, D_CMND_OFFLOAD_AFTER, 0, 600, 1, value);
   value = (int) OffloadGetDelayRandom ();
-  str_text = D_OFFLOAD_RANDOM + String (" (sec)");
-  WSContentSend_P (OFFLOAD_INPUT_NUMBER, "third", str_text.c_str (), D_CMND_OFFLOAD_RANDOM, "switch", D_CMND_OFFLOAD_RANDOM, D_CMND_OFFLOAD_RANDOM, 0, 60, 1, value);
+  sprintf (str_argument, "%s (%s)", D_OFFLOAD_RANDOM, D_OFFLOAD_UNIT_SEC);
+  WSContentSend_P (OFFLOAD_INPUT_NUMBER, "third", str_argument, D_CMND_OFFLOAD_RANDOM, "switch", D_CMND_OFFLOAD_RANDOM, D_CMND_OFFLOAD_RANDOM, 0, 60, 1, value);
   
   WSContentSend_P (OFFLOAD_FIELDSET_STOP);
 
@@ -1188,23 +1183,25 @@ void OffloadWebPageConfig ()
 
   // contract power
   power = OffloadGetContractPower ();
-  WSContentSend_P (OFFLOAD_INPUT_NUMBER, "none", D_OFFLOAD_CONTRACT, D_CMND_OFFLOAD_CONTRACT, "none", D_CMND_OFFLOAD_CONTRACT, D_CMND_OFFLOAD_CONTRACT, 0, 65000, 1, power);
+  sprintf (str_argument, "%s (%s)", D_OFFLOAD_CONTRACT, D_OFFLOAD_UNIT_VA);
+  WSContentSend_P (OFFLOAD_INPUT_NUMBER, "none", str_argument, D_CMND_OFFLOAD_CONTRACT, "none", D_CMND_OFFLOAD_CONTRACT, D_CMND_OFFLOAD_CONTRACT, 0, 65000, 1, power);
 
   // contract adjustment
   value = OffloadGetContractAdjustment ();
-  WSContentSend_P (OFFLOAD_INPUT_NUMBER, "half", D_OFFLOAD_ADJUST, D_CMND_OFFLOAD_ADJUST, "none", D_CMND_OFFLOAD_ADJUST, D_CMND_OFFLOAD_ADJUST, -99, 100, 1, value);
+  sprintf (str_argument, "%s (%s)", D_OFFLOAD_ADJUST, D_OFFLOAD_UNIT_PERCENT);
+  WSContentSend_P (OFFLOAD_INPUT_NUMBER, "half", str_argument, D_CMND_OFFLOAD_ADJUST, "none", D_CMND_OFFLOAD_ADJUST, D_CMND_OFFLOAD_ADJUST, -99, 100, 1, value);
 
   // phase
   value = (int) OffloadGetPhase ();
-  WSContentSend_P (PSTR("<p class='%s'>%s<span class='key'>%s</span>\n"), "half", D_OFFLOAD_PHASE, D_CMND_OFFLOAD_PHASE);
-  WSContentSend_P (PSTR("<select name='%s' id='%s'>\n"), D_CMND_OFFLOAD_PHASE, D_CMND_OFFLOAD_PHASE);
+  WSContentSend_P (PSTR ("<p class='%s'>%s<span class='key'>%s</span>\n"), "half", D_OFFLOAD_PHASE, D_CMND_OFFLOAD_PHASE);
+  WSContentSend_P (PSTR ("<select name='%s' id='%s'>\n"), D_CMND_OFFLOAD_PHASE, D_CMND_OFFLOAD_PHASE);
   for (index = 1; index <= OFFLOAD_PHASE_MAX; index ++)
   {
-    if (index == value) str_text = "selected"; else str_text = "";
-    WSContentSend_P (PSTR("<option value='%d' %s>%d</option>\n"), index, str_text.c_str (), index);
+    if (index == value) strcpy (str_argument, D_OFFLOAD_SELECTED); else strcpy (str_argument, "");
+    WSContentSend_P (PSTR ("<option value='%d' %s>%d</option>\n"), index, str_argument, index);
   }
-  WSContentSend_P (PSTR("</select>\n"));
-  WSContentSend_P (PSTR("</p>\n"));
+  WSContentSend_P (PSTR ("</select>\n"));
+  WSContentSend_P (PSTR ("</p>\n"));
 
   WSContentSend_P (OFFLOAD_FIELDSET_STOP);
 
@@ -1215,67 +1212,67 @@ void OffloadWebPageConfig ()
   WSContentSend_P (OFFLOAD_FIELDSET_START, D_OFFLOAD_METER);
 
   // instant power mqtt topic
-  str_text    = OffloadGetPowerTopic (false);
-  str_default = OffloadGetPowerTopic (true);
-  if (str_text == str_default) str_text = "";
-  WSContentSend_P (OFFLOAD_INPUT_TEXT, D_OFFLOAD_TOPIC, D_CMND_OFFLOAD_TOPIC, D_CMND_OFFLOAD_TOPIC, str_text.c_str (), str_default.c_str ());
+  OffloadGetPowerTopic (false, str_argument, sizeof (str_argument));
+  OffloadGetPowerTopic (true, str_default, sizeof (str_default));
+  if (strcmp (str_argument, str_default) == 0) strcpy (str_argument, "");
+  WSContentSend_P (OFFLOAD_INPUT_TEXT, D_OFFLOAD_TOPIC, D_CMND_OFFLOAD_TOPIC, D_CMND_OFFLOAD_TOPIC, str_argument, str_default);
 
   // max power json key
-  str_text    = OffloadGetContractPowerKey (false);
-  str_default = OffloadGetContractPowerKey (true);
-  if (str_text == str_default) str_text = "";
-  WSContentSend_P (OFFLOAD_INPUT_TEXT, D_OFFLOAD_KEY_MAX, D_CMND_OFFLOAD_KEY_MAX, D_CMND_OFFLOAD_KEY_MAX, str_text.c_str (), str_default.c_str ());
+  OffloadGetContractPowerKey (false, str_argument, sizeof (str_argument));
+  OffloadGetContractPowerKey (true, str_default, sizeof (str_default));
+  if (strcmp (str_argument, str_default) == 0) strcpy (str_argument, "");
+  WSContentSend_P (OFFLOAD_INPUT_TEXT, D_OFFLOAD_KEY_MAX, D_CMND_OFFLOAD_KEY_MAX, D_CMND_OFFLOAD_KEY_MAX, str_argument, str_default);
 
   // instant power json key
-  str_text    = OffloadGetInstPowerKey (false);
-  str_default = OffloadGetInstPowerKey (true);
-  if (str_text == str_default) str_text = "";
-  WSContentSend_P (OFFLOAD_INPUT_TEXT, D_OFFLOAD_KEY_INST, D_CMND_OFFLOAD_KEY_INST, D_CMND_OFFLOAD_KEY_INST, str_text.c_str (), str_default.c_str ());
+  OffloadGetInstPowerKey (false, str_argument, sizeof (str_argument));
+  OffloadGetInstPowerKey (true, str_default, sizeof (str_default));
+  if (strcmp (str_argument, str_default) == 0) strcpy (str_argument, "");
+  WSContentSend_P (OFFLOAD_INPUT_TEXT, D_OFFLOAD_KEY_INST, D_CMND_OFFLOAD_KEY_INST, D_CMND_OFFLOAD_KEY_INST, str_argument, str_default);
 
   WSContentSend_P (OFFLOAD_FIELDSET_STOP);
-  WSContentSend_P (PSTR("<br>\n"));
+  WSContentSend_P (PSTR ("<br>\n"));
 
   // ------------
   //    Script  
   // ------------
 
-  WSContentSend_P (PSTR("<script type='text/javascript'>\n"));
+  WSContentSend_P (PSTR ("<script type='text/javascript'>\n"));
 
-  WSContentSend_P (PSTR("var arr_delay_before = [%d"), arr_offload_delay_before[0]);
-  for (index = 1; index < OFFLOAD_DEVICE_MAX; index ++) WSContentSend_P (PSTR(",%d"), arr_offload_delay_before[index]);
-  WSContentSend_P (PSTR("];\n"));
+  WSContentSend_P (PSTR ("var arr_delay_before = [%d"), arr_offload_delay_before[0]);
+  for (index = 1; index < OFFLOAD_DEVICE_MAX; index ++) WSContentSend_P (PSTR (",%d"), arr_offload_delay_before[index]);
+  WSContentSend_P (PSTR ("];\n"));
 
-  WSContentSend_P (PSTR("var arr_delay_after = [%d"), arr_offload_delay_after[0]);
-  for (index = 1; index < OFFLOAD_DEVICE_MAX; index ++) WSContentSend_P (PSTR(",%d"), arr_offload_delay_after[index]);
-  WSContentSend_P (PSTR("];\n"));
+  WSContentSend_P (PSTR ("var arr_delay_after = [%d"), arr_offload_delay_after[0]);
+  for (index = 1; index < OFFLOAD_DEVICE_MAX; index ++) WSContentSend_P (PSTR (",%d"), arr_offload_delay_after[index]);
+  WSContentSend_P (PSTR ("];\n"));
 
-  WSContentSend_P (PSTR("var arr_delay_random = [%d"), arr_offload_delay_random[0]);
-  for (index = 1; index < OFFLOAD_DEVICE_MAX; index ++) WSContentSend_P (PSTR(",%d"), arr_offload_delay_random[index]);
-  WSContentSend_P (PSTR("];\n"));
+  WSContentSend_P (PSTR ("var arr_delay_random = [%d"), arr_offload_delay_random[0]);
+  for (index = 1; index < OFFLOAD_DEVICE_MAX; index ++) WSContentSend_P (PSTR (",%d"), arr_offload_delay_random[index]);
+  WSContentSend_P (PSTR ("];\n"));
 
-  WSContentSend_P (PSTR("var device_type  = document.getElementById ('type');\n"));
-  WSContentSend_P (PSTR("var delay_before = document.getElementById ('before');\n"));
-  WSContentSend_P (PSTR("var delay_after  = document.getElementById ('after');\n"));
-  WSContentSend_P (PSTR("var delay_random = document.getElementById ('random');\n"));
+  WSContentSend_P (PSTR ("var device_type  = document.getElementById ('type');\n"));
+  WSContentSend_P (PSTR ("var delay_before = document.getElementById ('before');\n"));
+  WSContentSend_P (PSTR ("var delay_after  = document.getElementById ('after');\n"));
+  WSContentSend_P (PSTR ("var delay_random = document.getElementById ('random');\n"));
 
-  WSContentSend_P (PSTR("device_type.onchange = function () {\n"));
-  WSContentSend_P (PSTR("delay_before.value = arr_delay_before[this.value];\n"));
-  WSContentSend_P (PSTR("delay_after.value = arr_delay_after[this.value];\n"));
-  WSContentSend_P (PSTR("delay_random.value = arr_delay_random[this.value];\n"));
-  WSContentSend_P (PSTR("}\n"));
+  WSContentSend_P (PSTR ("device_type.onchange = function () {\n"));
+  WSContentSend_P (PSTR ("delay_before.value = arr_delay_before[this.value];\n"));
+  WSContentSend_P (PSTR ("delay_after.value = arr_delay_after[this.value];\n"));
+  WSContentSend_P (PSTR ("delay_random.value = arr_delay_random[this.value];\n"));
+  WSContentSend_P (PSTR ("}\n"));
 
-  WSContentSend_P (PSTR("</script>\n"));
+  WSContentSend_P (PSTR ("</script>\n"));
 
   // save button  
   // -----------
   WSContentSend_P (PSTR ("<p><button name='save' type='submit' class='button bgrn'>%s</button></p>\n"), D_SAVE);
-  WSContentSend_P (PSTR("</form>\n"));
+  WSContentSend_P (PSTR ("</form>\n"));
 
   // configuration button
-  WSContentSpaceButton(BUTTON_CONFIGURATION);
+  WSContentSpaceButton (BUTTON_CONFIGURATION);
 
   // end of page
-  WSContentStop();
+  WSContentStop ();
 }
 
 // Offload history page
@@ -1324,12 +1321,12 @@ void OffloadWebPageHistory ()
       counter ++;
 
       // beginning of line
-      WSContentSend_P (PSTR("<tr>"));
+      WSContentSend_P (PSTR ("<tr>"));
 
       // start time
       BreakTime (offload_event.arr_event[index_array].time_start, event_dst);
       if (event_dst.year < 1970) event_dst.year += 1970;
-      WSContentSend_P (PSTR("<td>%d-%02d-%02d %02d:%02d:%02d</td>"), event_dst.year, event_dst.month, event_dst.day_of_month, event_dst.hour, event_dst.minute, event_dst.second);
+      WSContentSend_P (PSTR ("<td>%d-%02d-%02d %02d:%02d:%02d</td>"), event_dst.year, event_dst.month, event_dst.day_of_month, event_dst.hour, event_dst.minute, event_dst.second);
 
       // release time and duration
       if (offload_event.arr_event[index_array].time_stop != UINT32_MAX)
@@ -1337,28 +1334,28 @@ void OffloadWebPageHistory ()
         // release time
         BreakTime (offload_event.arr_event[index_array].time_stop, event_dst);
         if (event_dst.year < 1970) event_dst.year += 1970;
-        WSContentSend_P (PSTR("<td>%d-%02d-%02d %02d:%02d:%02d</td>"), event_dst.year, event_dst.month, event_dst.day_of_month, event_dst.hour, event_dst.minute, event_dst.second);
+        WSContentSend_P (PSTR ("<td>%d-%02d-%02d %02d:%02d:%02d</td>"), event_dst.year, event_dst.month, event_dst.day_of_month, event_dst.hour, event_dst.minute, event_dst.second);
 
         // duration
-        WSContentSend_P (PSTR("<td>"));
+        WSContentSend_P (PSTR ("<td>"));
         BreakTime (offload_event.arr_event[index_array].duration, event_dst);
-        if (event_dst.days > 0) WSContentSend_P (PSTR("%dh "), event_dst.days);
-        if (offload_event.arr_event[index_array].duration >= 3600) WSContentSend_P (PSTR("%dh "), event_dst.hour);
-        if (offload_event.arr_event[index_array].duration >= 60) WSContentSend_P (PSTR("%dm "), event_dst.minute);
-        WSContentSend_P (PSTR("%ds</td>"), event_dst.second);
+        if (event_dst.days > 0) WSContentSend_P (PSTR ("%dh "), event_dst.days);
+        if (offload_event.arr_event[index_array].duration >= 3600) WSContentSend_P (PSTR ("%dh "), event_dst.hour);
+        if (offload_event.arr_event[index_array].duration >= 60) WSContentSend_P (PSTR ("%dm "), event_dst.minute);
+        WSContentSend_P (PSTR ("%ds</td>"), event_dst.second);
       }
-      else WSContentSend_P (PSTR("<td colspan=2>Currently active</td>"));
+      else WSContentSend_P (PSTR ("<td colspan=2>Currently active</td>"));
 
       // overload power
-      WSContentSend_P (PSTR("<td>%d</td>"), offload_event.arr_event[index_array].power);
+      WSContentSend_P (PSTR ("<td>%d</td>"), offload_event.arr_event[index_array].power);
 
       // end of line
-      WSContentSend_P (PSTR("</tr>"));
+      WSContentSend_P (PSTR ("</tr>"));
     }
   }
 
   // if no event
-  if (counter == 0) WSContentSend_P (PSTR("<td colspan=4>No offload event recorded</td>"));
+  if (counter == 0) WSContentSend_P (PSTR ("<td colspan=4>No offload event recorded</td>"));
 
   // end of table and end of page
   WSContentSend_P (PSTR ("</table></div>\n"));

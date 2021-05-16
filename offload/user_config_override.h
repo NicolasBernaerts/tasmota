@@ -24,6 +24,7 @@
     23/10/2020 - v2.3   - Update control page in real time
     05/11/2020 - v2.4   - Tasmota 9.0 compatibility
     11/11/2020 - v2.5   - Add offload history pages (/histo and /histo.json)
+    23/04/2021 - v3.0   - Add fixed IP and remove use of String to avoid heap fragmentation
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -67,17 +68,17 @@
  *    Pilotwire firmware configuration
 \********************************************/
 
-#define USE_INFOJSON                          // Add support for Information JSON page
+#define USE_IPADDRESS                         // Add fixed IP configuration page
 #define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_OFFLOADING                        // Add support for MQTT maximum power offloading
 
-#define EXTENSION_VERSION "2.5"               // version
+#define EXTENSION_VERSION "3.0"               // version
 #define EXTENSION_NAME "Offloading"           // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 
 // MQTT default
 #undef MQTT_HOST
-#define MQTT_HOST          "openhab.local"
+#define MQTT_HOST          "mqtt.local"
 #undef MQTT_PORT
 #define MQTT_PORT          1883              
 #undef MQTT_USER
