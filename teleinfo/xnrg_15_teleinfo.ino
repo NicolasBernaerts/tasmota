@@ -85,75 +85,81 @@
 #define XSNS_99   99
 
 // teleinfo constant
-#define TELEINFO_VOLTAGE             230        // default voltage provided
-#define TELEINFO_VOLTAGE_REF         200        // voltage reference for max power calculation
-#define TELEINFO_VOLTAGE_LOW         220        // minimum acceptable voltage
-#define TELEINFO_VOLTAGE_HIGH        240        // maximum acceptable voltage
-#define TELEINFO_PHASE_MAX           3          // maximum number of phases
-#define TELEINFO_INDEX_MAX           10         // maximum number of total power counters
-#define TELEINFO_STORE_PERIOD        1800       // store energy totals every 30mn
-#define TELEINFO_PERCENT_CHANGE      2          // 2% of power change to publish JSON
+#define TELEINFO_VOLTAGE                230        // default voltage provided
+#define TELEINFO_VOLTAGE_REF            200        // voltage reference for max power calculation
+#define TELEINFO_VOLTAGE_LOW            220        // minimum acceptable voltage
+#define TELEINFO_VOLTAGE_HIGH           240        // maximum acceptable voltage
+#define TELEINFO_PHASE_MAX              3          // maximum number of phases
+#define TELEINFO_INDEX_MAX              10         // maximum number of total power counters
+#define TELEINFO_STORE_PERIOD           1800       // store energy totals every 30mn
+#define TELEINFO_PERCENT_CHANGE         2          // 2% of power change to publish JSON
 
 // graph data
-#define TELEINFO_GRAPH_SAMPLE        300         // number of samples per period
-#define TELEINFO_GRAPH_WIDTH         1200        // graph width
-#define TELEINFO_GRAPH_HEIGHT        800         // default graph height
-#define TELEINFO_GRAPH_STEP          200         // graph height mofification step
-#define TELEINFO_GRAPH_PERCENT_START 10     
-#define TELEINFO_GRAPH_PERCENT_STOP  90
-
-// string size
-#define TELEINFO_STRING_ID_MAX        16        // max length of TIC contract ID
-#define TELEINFO_STRING_VALUE_MAX     12        // max length of numerical value
-#define TELEINFO_STRING_PERIOD_MAX    32        // max mength of period literal name
-#define TELEINFO_STRING_HEADER_MAX    12        // max length of main screen header
-#define TELEINFO_STRING_DISPLAY_MAX   32        // max length of main screen displayed value
-#define TELEINFO_PART_MAX             4         // maximum number of parts in a line
-#define TELEINFO_LINE_MAX             74        // maximum number of lines handled in a TIC message
-#define TELEINFO_STRING_LINE_MAX      128       // maximum size of a received TIC line
-#define TELEINFO_STRING_ETIQUETTE_MAX 12        // maximum size of a TIC etiquette
-#define TELEINFO_STRING_DONNEE_MAX    32        // maximum size of a TIC donnee
+#define TELEINFO_GRAPH_WIDTH            1200        // graph width
+#define TELEINFO_GRAPH_HEIGHT           800         // default graph height
+#define TELEINFO_GRAPH_STEP             200         // graph height mofification step
+#define TELEINFO_GRAPH_PERCENT_START    10     
+#define TELEINFO_GRAPH_PERCENT_STOP     90
 
 #ifdef ESP32
-#undef TELEINFO_STRING_DONNEE_MAX
-#define TELEINFO_STRING_DONNEE_MAX    92
-#endif
+  #define TELEINFO_GRAPH_SAMPLE         900      // number of samples per graph data
+#else       // ESP8286
+  #define TELEINFO_GRAPH_SAMPLE         300
+#endif      // ESP32 & ESP8286
+
+
+// string size
+#define TELEINFO_STRING_ID_MAX          16        // max length of TIC contract ID
+#define TELEINFO_STRING_VALUE_MAX       12        // max length of numerical value
+#define TELEINFO_STRING_PERIOD_MAX      32        // max mength of period literal name
+#define TELEINFO_STRING_HEADER_MAX      12        // max length of main screen header
+#define TELEINFO_STRING_DISPLAY_MAX     32        // max length of main screen displayed value
+#define TELEINFO_PART_MAX               4         // maximum number of parts in a line
+#define TELEINFO_LINE_MAX               74        // maximum number of lines handled in a TIC message
+#define TELEINFO_STRING_LINE_MAX        128       // maximum size of a received TIC line
+#define TELEINFO_STRING_ETIQUETTE_MAX   12        // maximum size of a TIC etiquette
+
+#ifdef ESP32
+  #define TELEINFO_STRING_DONNEE_MAX    92      // maximum size of a TIC donnee
+#else     // ESP8266
+  #define TELEINFO_STRING_DONNEE_MAX    32      
+#endif    // ESP32 & ESP8286
 
 // commands
-#define D_CMND_TELEINFO_MODE         "mode"
-#define D_CMND_TELEINFO_ETH          "eth"
-#define D_CMND_TELEINFO_PHASE        "phase"
-#define D_CMND_TELEINFO_PERIOD       "period"
-#define D_CMND_TELEINFO_DATA         "data"
-#define D_CMND_TELEINFO_HEIGHT       "height"
-#define D_CMND_TELEINFO_CFG_RATE     "rate"
-#define D_CMND_TELEINFO_CFG_TIC      "tic"
-#define D_CMND_TELEINFO_CFG_DATA     "data"
+#define D_CMND_TELEINFO_MODE            "mode"
+#define D_CMND_TELEINFO_ETH             "eth"
+#define D_CMND_TELEINFO_PHASE           "phase"
+#define D_CMND_TELEINFO_PERIOD          "period"
+#define D_CMND_TELEINFO_DATA            "data"
+#define D_CMND_TELEINFO_HEIGHT          "height"
+#define D_CMND_TELEINFO_CFG_RATE        "rate"
+#define D_CMND_TELEINFO_CFG_TIC         "tic"
+#define D_CMND_TELEINFO_CFG_DATA        "data"
 
 // JSON TIC extensions
-#define TELEINFO_JSON_METER          "METER"
-#define TELEINFO_JSON_TIC            "TIC"
-#define TELEINFO_JSON_PERIOD         "PERIOD"
-#define TELEINFO_JSON_PHASE          "PHASE"
-#define TELEINFO_JSON_ID             "ID"
-#define TELEINFO_JSON_IREF           "IREF"
-#define TELEINFO_JSON_PREF           "PREF"
+#define TELEINFO_JSON_METER             "METER"
+#define TELEINFO_JSON_TIC               "TIC"
+#define TELEINFO_JSON_PERIOD            "PERIOD"
+#define TELEINFO_JSON_PHASE             "PHASE"
+#define TELEINFO_JSON_ID                "ID"
+#define TELEINFO_JSON_IREF              "IREF"
+#define TELEINFO_JSON_PREF              "PREF"
 
 // interface strings
-#define D_TELEINFO                   "Teleinfo"
-#define D_TELEINFO_TIC               "TIC"
-#define D_TELEINFO_MESSAGE           "Messages"
-#define D_TELEINFO_CONTRACT          "Contract"
-#define D_TELEINFO_HEURES            "Heures"
-#define D_TELEINFO_ERROR             "Errors"
-#define D_TELEINFO_MODE              "Mode"
-#define D_TELEINFO_RESET             "Message reset"
-#define D_TELEINFO_PERIOD            "Period"
-#define D_TELEINFO_GRAPH             "Graph"
-#define D_TELEINFO_CHECKSUM          "Checksum"
-#define D_TELEINFO_BAUD              "Bauds"
-#define D_TELEINFO_DATA              "Data"
-#define D_TELEINFO_DIFFUSION         "Diffusion"
+#define D_TELEINFO                      "Teleinfo"
+#define D_TELEINFO_TIC                  "TIC"
+#define D_TELEINFO_MESSAGE              "Messages"
+#define D_TELEINFO_CONTRACT             "Contract"
+#define D_TELEINFO_HEURES               "Heures"
+#define D_TELEINFO_ERROR                "Errors"
+#define D_TELEINFO_MODE                 "Mode"
+#define D_TELEINFO_RESET                "Message reset"
+#define D_TELEINFO_PERIOD               "Period"
+#define D_TELEINFO_GRAPH                "Graph"
+#define D_TELEINFO_CHECKSUM             "Checksum"
+#define D_TELEINFO_BAUD                 "Bauds"
+#define D_TELEINFO_DATA                 "Data"
+#define D_TELEINFO_DIFFUSION            "Diffusion"
 
 // web URL
 const char D_TELEINFO_PAGE_CONFIG[]      PROGMEM = "/tic-cfg";
@@ -208,7 +214,7 @@ const long ARR_TELEINFO_PERIOD_SAMPLE[] = { 1800/TELEINFO_GRAPH_SAMPLE, 86400/TE
 
 // graph - display
 enum TeleinfoGraphDisplay { TELEINFO_DISPLAY_PACT, TELEINFO_DISPLAY_PAPP, TELEINFO_DISPLAY_VOLT, TELEINFO_DISPLAY_COSPHI, TELEINFO_DISPLAY_MAX };    // available graph displays
-const char kTeleinfoGraphDisplay[] PROGMEM = "Pact|Papp|Volt|Cos φ";                                                                                 // data display labels
+const char kTeleinfoGraphDisplay[] PROGMEM = "W|VA|V|Cosφ";                                                                                 // data display labels
 
 // graph - phase colors
 const char TELEINFO_PHASE_COLOR0[] PROGMEM = "#5dade2";    // blue
@@ -832,8 +838,6 @@ void TeleinfoInit ()
   {
     // init hardware energy counters
     Settings.flag3.hardware_energy_total = true;
-//    RtcSettings.energy_kWhtotal = 0;
-//    RtcSettings.energy_kWhtoday = 0;
     Settings.energy_kWhtotal    = 0;
 
     // set default energy parameters
@@ -2329,7 +2333,8 @@ void TeleinfoWebPageGraph ()
 {
   bool phase_display;
   int  index, phase;
-  int  graph_period, graph_display, graph_bottom;  
+  int  graph_period, graph_display;  
+  long percentage;
   char str_data[16];
   char str_phase[16];
   char str_text[16];
@@ -2338,9 +2343,6 @@ void TeleinfoWebPageGraph ()
   graph_period  = TeleinfoWebGetArgValue (D_CMND_TELEINFO_PERIOD, TELEINFO_PERIOD_LIVE,  0,   TELEINFO_PERIOD_MAX - 1);
   graph_display = TeleinfoWebGetArgValue (D_CMND_TELEINFO_DATA,   TELEINFO_DISPLAY_PACT, 0,   TELEINFO_DISPLAY_MAX - 1);
   teleinfo_graph_height  = TeleinfoWebGetArgValue (D_CMND_TELEINFO_HEIGHT, teleinfo_graph_height, 100, INT_MAX);
-
-  // calculate graph bottom padding
-  graph_bottom = teleinfo_graph_height + 20;
 
   // check phase display argument
   if (Webserver->hasArg (D_CMND_TELEINFO_PHASE))
@@ -2367,7 +2369,7 @@ void TeleinfoWebPageGraph ()
   WSContentSend_P (PSTR ("   if (arr_param[0]==1)\n"));
   WSContentSend_P (PSTR ("   {\n"));
   WSContentSend_P (PSTR ("    str_random=Math.floor(Math.random()*100000);\n"));
-  WSContentSend_P (PSTR ("    document.getElementById('data').data='%s?period=%d&data=%d&height=%d&phase=%s&rnd='+str_random;\n"), D_TELEINFO_PAGE_GRAPH_DATA, graph_period, graph_display, teleinfo_graph_height, str_phase);
+  WSContentSend_P (PSTR ("    document.getElementById('data').data='%s?period=%d&data=%d&phase=%s&rnd='+str_random;\n"), D_TELEINFO_PAGE_GRAPH_DATA, graph_period, graph_display, str_phase);
   WSContentSend_P (PSTR ("   }\n"));
   WSContentSend_P (PSTR ("   num_param=arr_param.length;\n"));
   WSContentSend_P (PSTR ("   for (i=1;i<num_param;i++)\n"));
@@ -2402,9 +2404,10 @@ void TeleinfoWebPageGraph ()
   WSContentSend_P (PSTR ("div.item {display:inline-block;padding:0.2rem auto;margin:1px;border:none;border-radius:4px;}\n"));
   WSContentSend_P (PSTR ("div.choice a div.item:hover {background:#aaa;}\n"));
   WSContentSend_P (PSTR ("div.period {width:70px;}\n"));
-  WSContentSend_P (PSTR ("div.data {width:70px;}\n"));
+  WSContentSend_P (PSTR ("div.data {width:50px;}\n"));
   WSContentSend_P (PSTR ("div.size {width:30px;}\n"));
-  WSContentSend_P (PSTR (".svg-container {position:relative;width:100%%;max-width:%dpx;padding-bottom:%dpx;margin:auto;}\n"), TELEINFO_GRAPH_WIDTH, graph_bottom);
+  percentage = (100 * teleinfo_graph_height / TELEINFO_GRAPH_WIDTH) + 2; 
+  WSContentSend_P (PSTR (".svg-container {position:relative;width:100%%;max-width:%dpx;padding-top:%d%%;margin:auto;}\n"), TELEINFO_GRAPH_WIDTH, percentage);
   WSContentSend_P (PSTR (".svg-content {display:inline-block;position:absolute;top:0;left:0;}\n"));
   WSContentSend_P (PSTR ("</style>\n"));
 
