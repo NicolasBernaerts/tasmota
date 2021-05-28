@@ -403,9 +403,11 @@ uint16_t TeleinfoGetBaudRate ()
   int      index;
   uint16_t actual_rate;
 
+  // adjust baud rate from previous version
+  if (Settings.sbaudrate > 384) Settings.sbaudrate = Settings.sbaudrate / 300;
+
   // read actual teleinfo baud rate
-  if (Settings.sbaudrate > 384) actual_rate = Settings.sbaudrate;         // rate stored as real value
-    else actual_rate = Settings.sbaudrate * 300;                          // rate stored following tasmota standard
+  actual_rate = Settings.sbaudrate * 300;
 
   // check if rate is within allowed rates
   for (index = 0; index < 6; index ++) if (actual_rate == ARR_TELEINFO_RATE[index]) is_conform = true;
