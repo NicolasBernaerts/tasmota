@@ -5,6 +5,7 @@
     15/03/2020 - v1.0 - Creation
     17/09/2020 - v1.1 - Adaptation for Tasmota 8.4
     19/09/2020 - v1.2 - Switch to sensor only
+    01/05/2021 - v1.3 - Remove use of String to avoid heap fragmentation 
                       
   Settings are stored using Settings Text
 
@@ -28,7 +29,6 @@
 
 #define XSNS_97                  97
 
-#define HUMIDITY_BUFFER_SIZE     128
 #define HUMIDITY_TIMEOUT_5MN     300000
 
 #define D_PAGE_HUMIDITY          "humidity"
@@ -56,34 +56,37 @@ const char HUMIDITY_TOPIC_STYLE[] PROGMEM = "style='float:right;font-size:0.7rem
 \*************************************************/
 
 // variables
-float    humidity_mqtt_value       = NAN;          // current humidity
-bool     humidity_topic_subscribed = false;        // flag for humidity subscription
-uint32_t humidity_last_update      = 0;            // last time (in millis) humidity was updated
+struct {
+  bool     subscribed  = false;        // flag for humidity subscription
+  uint32_t last_update = 0;            // last time (in millis) humidity was updated
+  float    value       = NAN;          // current humidity
+} mqtt_humidity;
+
 
 /**************************************************\
  *                  Accessors
 \**************************************************/
 
 // get current humidity MQTT topic (humidity topic;humidity key)
-String HumidityGetMqttTopic ()
+char* HumidityGetMqttTopic ()
 {
   return SettingsText (SET_HUMIDITY_TOPIC);
 }
 
 // get current humidity JSON key (humidity topic;humidity key)
-String HumidityGetMqttKey ()
+char* HumidityGetMqttKey ()
 {
   return SettingsText (SET_HUMIDITY_KEY);
 }
 
 // set current humidity MQTT topic (humidity topic;humidity key)
-void HumiditySetMqttTopic (char* str_topic)
+void HumiditySetMqttTopic (char *str_topic)
 {
   SettingsUpdateText (SET_HUMIDITY_TOPIC, str_topic);
 }
 
 // set current humidity JSON key (humidity topic;humidity key)
-void HumiditySetMqttKey (char* str_key)
+void HumiditySetMqttKey (char *str_key)
 {
   SettingsUpdateText (SET_HUMIDITY_KEY, str_key);
 }
@@ -98,44 +101,55 @@ float HumidityGetValue ( )
   uint32_t time_now = millis ();
 
   // if no update for 5 minutes, humidity not available
-  if (time_now - humidity_last_update > HUMIDITY_TIMEOUT_5MN) humidity_mqtt_value = NAN;
+  if (time_now - mqtt_humidity.last_update > HUMIDITY_TIMEOUT_5MN) mqtt_humidity.value = NAN;
 
-  return humidity_mqtt_value;
+  return mqtt_humidity.value;
 }
 
 // update humidity
 void HumiditySetValue (float new_humidity)
 {
   // update current humidity
-  humidity_mqtt_value = new_humidity;
+  mqtt_humidity.value = new_humidity;
 
   // humidity updated
-  humidity_last_update = millis ();
+  mqtt_humidity.last_update = millis ();
 }
 
 // generate JSON status (for MQTT)
 void HumidityShowJSON (bool append)
 {
-  String str_json, str_topic, str_key;
-  float  humidity;
+  float value;
+  char  *pstr_topic, *pstr_key;
+  char  str_text[8];
 
-  // read data
-  str_topic = HumidityGetMqttTopic ();
-  str_key   = HumidityGetMqttKey ();
-  humidity  = HumidityGetValue ();
+  // add , in append mode or { in direct publish mode
+  if (append) ResponseAppend_P (PSTR (",")); else Response_P (PSTR ("{"));
 
-  // humidity  -->  "Humidity":{"Value":18.5,"Topic":"mqtt/topic/of/temperature","Key":"Temp"}
-  str_json =  "\"" + String (D_JSON_HUMIDITY) + "\":{";
-  str_json += "\"" + String (D_JSON_HUMIDITY_VALUE) + "\":" + String (humidity, 1) + ",";
-  str_json += "\"" + String (D_JSON_HUMIDITY_TOPIC) + "\":\"" + str_topic + "\",";
-  str_json += "\"" + String (D_JSON_HUMIDITY_KEY) + "\":\"" + str_key + "\"}";
+  // generate string :   "Humidity":{"Value":18.5,"Topic":"mqtt/topic/of/humidity","Key":"mqtt key"}
+  ResponseAppend_P (PSTR ("\"%s\":{"), D_JSON_HUMIDITY);
 
-  // if append mode, add json string to MQTT message
-  if (append) ResponseAppend_P (PSTR(",%s"), str_json.c_str ());
-  else Response_P (PSTR("{%s}"), str_json.c_str ());
-  
+  // humidity value
+  value = HumidityGetValue ();
+  ext_snprintf_P (str_text, sizeof(str_text), PSTR ("%1_f"), &value);
+  ResponseAppend_P (PSTR ("\"%s\":%s"), D_JSON_HUMIDITY_VALUE, str_text);
+
+  // humidity MQTT topic
+  pstr_topic = HumidityGetMqttTopic ();
+  ResponseAppend_P (PSTR ("\"%s\":\"%s\""), D_JSON_HUMIDITY_TOPIC, pstr_topic);
+
+  // humidity MQTT key
+  pstr_key = HumidityGetMqttKey ();
+  ResponseAppend_P (PSTR ("\"%s\":\"%s\""), D_JSON_HUMIDITY_KEY, pstr_key);
+
+  ResponseAppend_P (PSTR ("}"));
+
   // publish it if not in append mode
-  if (!append) MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
+  if (!append)
+  {
+    ResponseAppend_P (PSTR ("}"));
+    MqttPublishPrefixTopic_P (TELE, PSTR (D_RSLT_SENSOR));
+  } 
 }
 
 // Handle humidity MQTT commands
@@ -170,76 +184,61 @@ bool HumidityMqttCommand ()
 // MQTT connexion update
 void HumidityCheckMqttConnexion ()
 {
-  bool   is_connected;
-  String str_topic;
-
-  // get temperature MQTT topic
-  str_topic = HumidityGetMqttTopic ();
+  char *pstr_topic;
 
   // if topic defined, check MQTT connexion
-  if (str_topic.length () > 0)
+  pstr_topic = HumidityGetMqttTopic ();
+  if (strlen (pstr_topic) > 0)
   {
     // if connected to MQTT server
-    is_connected = MqttIsConnected();
-    if (is_connected)
+    if (MqttIsConnected ())
     {
       // if still no subsciption to humidity topic
-      if (humidity_topic_subscribed == false)
+      if (mqtt_humidity.subscribed == false)
       {
         // subscribe to humidity meter
-        MqttSubscribe(str_topic.c_str ());
-
-        // subscription done
-        humidity_topic_subscribed = true;
+        mqtt_humidity.subscribed = true;
+        MqttSubscribe (pstr_topic);
 
         // log
-        AddLog_P2(LOG_LEVEL_INFO, PSTR("MQT: Subscribed to %s"), str_topic.c_str ());
+        AddLog (LOG_LEVEL_INFO, PSTR ("MQT: Subscribed to %s"), pstr_topic);
       }
     }
 
     // else disconnected : topic not subscribed
-    else humidity_topic_subscribed = false;
+    else mqtt_humidity.subscribed = false;
   }
 }
 
 // read received MQTT data to retrieve humidity
 bool HumidityMqttData ()
 {
-  bool    data_handled = false;
-  int     idx_value;
-  String  str_topic, str_key;
-  String  str_mailbox_topic, str_mailbox_data, str_mailbox_value;
+  bool       data_handled = false;
+  float      humidity;
+  const char *pstr_topic, *pstr_key;
+  char       *pstr_result;
+  char       str_buffer[64];
 
-  // get topics to compare
-  str_mailbox_topic = XdrvMailbox.topic;
-  str_key   = HumidityGetMqttKey ();
-  str_topic = HumidityGetMqttTopic ();
-
-  // get humidity (removing SPACE and QUOTE)
-  str_mailbox_data  = XdrvMailbox.data;
-  str_mailbox_data.replace (" ", "");
-  str_mailbox_data.replace ("\"", "");
-
-  // if topic is the humidity
-  if (str_mailbox_topic.compareTo(str_topic) == 0)
+  // if MQTT subscription is active
+  if (mqtt_humidity.subscribed)
   {
-    // if a humidity key is defined, find the value in the JSON chain
-    if (str_key.length () > 0)
+    // look for humidity topic
+    pstr_topic = HumidityGetMqttTopic ();
+    if (strcmp (pstr_topic, XdrvMailbox.topic) == 0)
     {
-      str_key += ":";
-      idx_value = str_mailbox_data.indexOf (str_key);
-      if (idx_value >= 0) idx_value = str_mailbox_data.indexOf (':', idx_value + 1);
-      if (idx_value >= 0) str_mailbox_value = str_mailbox_data.substring (idx_value + 1);
+      // log and counter increment
+      AddLog (LOG_LEVEL_INFO, PSTR ("MQT: Received %s"), pstr_topic);
+
+      // look for humidity key
+      pstr_key = HumidityGetMqttKey ();
+      sprintf (str_buffer, "\"%s\":", pstr_key);
+      pstr_result = strstr (XdrvMailbox.data, str_buffer);
+      if (pstr_result != nullptr) humidity = atof (pstr_result + strlen (str_buffer));
+      data_handled |= (pstr_result != nullptr);
+
+      // update current humidity
+      HumiditySetValue (humidity);
     }
-
-    // else, no humidity key provided, data holds the value
-    else str_mailbox_value = str_mailbox_data;
-
-    // convert and update humidity
-    HumiditySetValue (str_mailbox_value.toFloat ());
-
-    // data from message has been handled
-    data_handled = true;
   }
 
   return data_handled;
@@ -258,24 +257,25 @@ void HumidityWebButton ()
 }
 
 // append Humidity sensor to main page
-bool HumidityWebSensor ()
+void HumidityWebSensor ()
 {
-  float  humidity;
-  String str_humidity;
+  float humidity;
+  char  str_humidity[8];
 
   // read humidity
-  humidity = HumidityGetValue ( );
-  str_humidity = String (humidity);
-
-  // display
-  if (!isnan(humidity)) WSContentSend_PD (PSTR("{s}%s{m}%s{e}"), D_HUMIDITY_REMOTE, str_humidity.c_str());
+  humidity = HumidityGetValue ();
+  if (!isnan(humidity))
+  {
+    ext_snprintf_P (str_humidity, sizeof (str_humidity), PSTR ("%1_f"), &humidity);
+    WSContentSend_PD (PSTR("{s}%s{m}%s{e}"), D_HUMIDITY_REMOTE, str_humidity);
+  }
 }
 
 // Humidity MQTT setting web page
 void HumidityWebPage ()
 {
-  char   argument[HUMIDITY_BUFFER_SIZE];
-  String str_topic, str_key;
+  char  str_argument[64];
+  char  *pstr_topic, *pstr_key;
 
   // if access not allowed, close
   if (!HttpCheckPriviledgedAccess()) return;
@@ -284,12 +284,12 @@ void HumidityWebPage ()
   if (Webserver->hasArg("save"))
   {
     // set MQTT topic according to 'htopic' parameter
-    WebGetArg (D_CMND_HUMIDITY_TOPIC, argument, HUMIDITY_BUFFER_SIZE);
-    HumiditySetMqttTopic (argument);
+    WebGetArg (D_CMND_HUMIDITY_TOPIC, str_argument, sizeof (str_argument));
+    HumiditySetMqttTopic (str_argument);
 
     // set JSON key according to 'hkey' parameter
-    WebGetArg (D_CMND_HUMIDITY_KEY, argument, HUMIDITY_BUFFER_SIZE);
-    HumiditySetMqttKey (argument);
+    WebGetArg (D_CMND_HUMIDITY_KEY, str_argument, sizeof (str_argument));
+    HumiditySetMqttKey (str_argument);
   }
 
   // beginning of form
@@ -302,12 +302,12 @@ void HumidityWebPage ()
   WSContentSend_P (PSTR("<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n"), D_HUMIDITY_REMOTE);
 
   // remote sensor mqtt topic
-  str_topic = HumidityGetMqttTopic ();
-  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input name='%s' value='%s'></p>\n"), D_HUMIDITY_TOPIC, HUMIDITY_TOPIC_STYLE, D_CMND_HUMIDITY_TOPIC, D_CMND_HUMIDITY_TOPIC, str_topic.c_str ());
+  pstr_topic = HumidityGetMqttTopic ();
+  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br><input name='%s' value='%s'></p>\n"), D_HUMIDITY_TOPIC, HUMIDITY_TOPIC_STYLE, D_CMND_HUMIDITY_TOPIC, D_CMND_HUMIDITY_TOPIC, pstr_topic);
 
   // remote sensor json key
-  str_key = HumidityGetMqttKey ();
-  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br/><input name='%s' value='%s'><br/>\n"), D_HUMIDITY_KEY, HUMIDITY_TOPIC_STYLE, D_CMND_HUMIDITY_KEY, D_CMND_HUMIDITY_KEY, str_key.c_str ());
+  pstr_key = HumidityGetMqttKey ();
+  WSContentSend_P (PSTR ("<p>%s<span %s>%s</span><br/><input name='%s' value='%s'><br/>\n"), D_HUMIDITY_KEY, HUMIDITY_TOPIC_STYLE, D_CMND_HUMIDITY_KEY, D_CMND_HUMIDITY_KEY, pstr_key);
   WSContentSend_P (PSTR("</fieldset></p>\n"));
 
   // end of form and save button

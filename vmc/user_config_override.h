@@ -17,6 +17,8 @@
     18/10/2020 - v3.1 - Expose icons on web server
     30/10/2020 - v3.2 - Real time graph page update
     05/11/2020 - v3.3 - Tasmota 9.0 compatibility
+    11/11/2020 - v3.4 - Add /data.json for history data
+    01/05/2021 - v3.5 - Add fixed IP and remove use of String to avoid heap fragmentation 
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -60,18 +62,18 @@
  *    Pilotwire firmware configuration
 \********************************************/
 
-#define USE_INFOJSON                          // Add support for Information JSON page
+#define USE_IPADDRESS                         // Add fixed IP configuration page
 #define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_HUMIDITY_MQTT                     // Add support for remote MQTT humididity acquisition  
 #define USE_VMC                               // Add support for VMC management
 
-#define EXTENSION_VERSION "3.3"               // version
+#define EXTENSION_VERSION "3.5"               // version
 #define EXTENSION_NAME "VMC"                  // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 
 // MQTT default
 #undef MQTT_HOST
-#define MQTT_HOST          "openhab.local"
+#define MQTT_HOST          "mqtt.local"
 #undef MQTT_PORT
 #define MQTT_PORT          1883              
 #undef MQTT_USER
@@ -97,14 +99,14 @@
 #undef USE_EMULATION_HUE                      // Hue Bridge emulation for Alexa (+14k code, +2k mem common)
 #undef USE_EMULATION_WEMO                     // Belkin WeMo emulation for Alexa (+6k code, +2k mem common)
 #undef USE_CUSTOM                             // Custom features
-#undef USE_DISCOVERY                          // Discovery services for both MQTT and web server
+//#undef USE_DISCOVERY                        // Discovery services for both MQTT and web server
 //#undef WEBSERVER_ADVERTISE                  // Provide access to webserver by name <Hostname>.local/
-#undef MQTT_HOST_DISCOVERY                    // Find MQTT host server (overrides MQTT_HOST if found)
+//#undef MQTT_HOST_DISCOVERY                  // Find MQTT host server (overrides MQTT_HOST if found)
 //#undef USE_TIMERS                           // support for up to 16 timers
 //#undef USE_TIMERS_WEB                       // support for timer webpage
 //#undef USE_SUNRISE                          // support for Sunrise and sunset tools
 //#undef SUNRISE_DAWN_ANGLE DAWN_NORMAL       // Select desired Dawn Angle from
-#undef USE_RULES                              // Disable support for rules
+//#undef USE_RULES                            // Support for rules
 
 #undef ROTARY_V1                              // Add support for Rotary Encoder as used in MI Desk Lamp (+0k8 code)
 #undef USE_SONOFF_RF                          // Add support for Sonoff Rf Bridge (+3k2 code)

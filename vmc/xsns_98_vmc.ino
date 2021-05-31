@@ -17,6 +17,9 @@
     08/10/2020 - v3.0 - Handle graph with js auto update
     18/10/2020 - v3.1 - Expose icons on web server
     30/10/2020 - v3.2 - Real time graph page update
+    05/11/2020 - v3.3 - Tasmota 9.0 compatibility
+    11/11/2020 - v3.4 - Add /data.json for history data
+    01/05/2021 - v3.5 - Remove use of String to avoid heap fragmentation 
 
   Settings are stored using weighting scale parameters :
     - Settings.weight_reference   = VMC mode
@@ -45,6 +48,7 @@
 
 // web configuration page
 #define D_PAGE_VMC_CONFIG       "vmc"
+#define D_PAGE_VMC_DATA         "data.json"
 #define D_PAGE_VMC_CONTROL      "control"
 #define D_PAGE_VMC_BASE_SVG     "base.svg"
 #define D_PAGE_VMC_DATA_SVG     "data.svg"
@@ -106,9 +110,6 @@
 #define VMC_TARGET_DEFAULT      50
 #define VMC_THRESHOLD_MAX       10
 #define VMC_THRESHOLD_DEFAULT   2
-
-// buffer
-#define VMC_BUFFER_SIZE         128
 
 // vmc humidity source
 enum VmcSources { VMC_SOURCE_NONE, VMC_SOURCE_LOCAL, VMC_SOURCE_REMOTE };
@@ -198,28 +199,25 @@ struct {
 \**************************************************/
 
 // get VMC label according to state
-String VmcGetStateLabel (uint8_t state)
+void VmcGetStateLabel (uint8_t state, char* pstr_label, size_t size_label)
 {
-  String str_label;
-
   // get label
+  strcpy (pstr_label, "");
   switch (state)
   {
    case VMC_MODE_DISABLED:          // Disabled
-     str_label = D_VMC_DISABLED;
+     strlcpy (pstr_label, D_VMC_DISABLED, size_label);
      break;
    case VMC_MODE_LOW:               // Forced Low speed
-     str_label = D_VMC_LOW;
+     strlcpy (pstr_label, D_VMC_LOW, size_label);
      break;
    case VMC_MODE_HIGH:              // Forced High speed
-     str_label = D_VMC_HIGH;
+     strlcpy (pstr_label, D_VMC_HIGH, size_label);
      break;
    case VMC_MODE_AUTO:              // Automatic mode
-     str_label = D_VMC_AUTO;
+     strlcpy (pstr_label, D_VMC_AUTO, size_label);
      break;
   }
-  
-  return str_label;
 }
 
 // get VMC state from relays state
@@ -249,9 +247,6 @@ uint8_t VmcGetRelayState ()
 // set relays state
 void VmcSetRelayState (uint8_t new_state)
 {
-  // set number of relay to start command
-//  devices_present = vmc_devices_present;
-
   // set relays
   switch (new_state)
   {
@@ -268,9 +263,6 @@ void VmcSetRelayState (uint8_t new_state)
       ExecuteCommandPower (1, POWER_ON, SRC_IGNORE);
       break;
   }
-
-  // reset number of relay
-//  devices_present = 0;
 }
 
 // get vmc actual mode
@@ -390,61 +382,66 @@ uint8_t VmcGetThreshold ()
 // Show JSON status (for MQTT)
 void VmcShowJSON (bool append)
 {
-  uint8_t humidity, vmc_value, vmc_mode;
+  uint8_t humidity, value, vmc_mode;
   float   temperature;
-  String  str_json, str_text;
+  char    str_text[16];
 
   // get mode and humidity
   vmc_mode = VmcGetMode ();
-  str_text = VmcGetStateLabel (vmc_mode);
+  VmcGetStateLabel (vmc_mode, str_text, sizeof (str_text));
+  
+  // add , in append mode or { in direct publish mode
+  if (append) ResponseAppend_P (PSTR (",")); else Response_P (PSTR ("{"));
 
   // vmc mode  -->  "VMC":{"Relay":2,"Mode":4,"Label":"Automatic","Humidity":70.5,"Target":50,"Temperature":18.4}
-  str_json  = "\"" + String (D_JSON_VMC) + "\":{";
-  str_json += "\"" + String (D_JSON_VMC_RELAY) + "\":"   + String (TasmotaGlobal.devices_present) + ",";
-  str_json += "\"" + String (D_JSON_VMC_MODE)  + "\":"   + String (vmc_mode) + ",";
-  str_json += "\"" + String (D_JSON_VMC_LABEL) + "\":\"" + str_text + "\",";
+  ResponseAppend_P (PSTR ("\"%s\":{"), D_JSON_VMC);
+  ResponseAppend_P (PSTR ("\"%s\":%d"), D_JSON_VMC_RELAY, TasmotaGlobal.devices_present);
+  ResponseAppend_P (PSTR (",\"%s\":%d"), D_JSON_VMC_MODE, vmc_mode);
+  ResponseAppend_P (PSTR (",\"%s\":\"%s\""), D_JSON_VMC_LABEL, str_text);
 
   // temperature
   temperature = VmcGetTemperature ();
-  if (!isnan(temperature)) str_text = String (temperature, 1); else str_text = "n/a";
-  str_json += "\"" + String (D_JSON_VMC_TEMPERATURE) + "\":" + str_text + ",";
+  ext_snprintf_P (str_text, sizeof(str_text), PSTR ("%1_f"), &temperature);
+  ResponseAppend_P (PSTR (",\"%s\":%s"), D_JSON_VMC_TEMPERATURE, str_text);
 
   // humidity level
   humidity = VmcGetHumidity ();
-  if (humidity != UINT8_MAX) str_text = String (humidity); else str_text = "n/a";
-  str_json += "\"" + String (D_JSON_VMC_HUMIDITY) + "\":" + str_text + ",";
+  if (humidity != UINT8_MAX) sprintf (str_text, "%d", humidity); else strcpy (str_text, "n/a");
+  ResponseAppend_P (PSTR (",\"%s\":%s"), D_JSON_VMC_HUMIDITY, str_text);
 
   // target humidity
-  vmc_value = VmcGetTargetHumidity ();
-  str_json += "\"" + String (D_JSON_VMC_TARGET) + "\":" + String (vmc_value) + ",";
+  value = VmcGetTargetHumidity ();
+  ResponseAppend_P (PSTR (",\"%s\":%d"), D_JSON_VMC_TARGET, value);
 
   // humidity thresold
-  vmc_value = VmcGetThreshold ();
-  str_json += "\"" + String (D_JSON_VMC_THRESHOLD) + "\":" + String (vmc_value) + "}";
+  value = VmcGetThreshold ();
+  ResponseAppend_P (PSTR (",\"%s\":%d"), D_JSON_VMC_THRESHOLD, value);
+
+  ResponseAppend_P (PSTR ("}"));
 
   // if VMC mode is enabled
   if (vmc_mode != VMC_MODE_DISABLED)
   {
     // get relay state and label
-    vmc_value = VmcGetRelayState ();
-    str_text  = VmcGetStateLabel (vmc_value);
+    value = VmcGetRelayState ();
+    VmcGetStateLabel (value, str_text, sizeof (str_text));
 
     // relay state  -->  ,"State":{"Mode":1,"Label":"On"}
-    str_json += ",";
-    str_json += "\"" + String (D_JSON_VMC_STATE) + "\":{";
-    str_json += "\"" + String (D_JSON_VMC_MODE)  + "\":"   + String (vmc_value) + ",";
-    str_json += "\"" + String (D_JSON_VMC_LABEL) + "\":\"" + str_text + "\"}";
+    ResponseAppend_P (PSTR (",\"%s\":{"), D_JSON_VMC_STATE);
+    ResponseAppend_P (PSTR ("\"%s\":%d"), D_JSON_VMC_MODE, value);
+    ResponseAppend_P (PSTR (",\"%s\":\"%s\""), D_JSON_VMC_LABEL, str_text);
+    ResponseAppend_P (PSTR ("}"));
   }
 
   // add remote humidity to JSON
   HumidityShowJSON (true);
 
-  // if append mode, add json string to MQTT message
-  if (append) ResponseAppend_P (PSTR(",%s"), str_json.c_str ());
-  else Response_P (PSTR("{%s}"), str_json.c_str ());
-  
   // publish it if not in append mode
-  if (!append) MqttPublishPrefixTopic_P (TELE, PSTR(D_RSLT_SENSOR));
+  if (!append)
+  {
+    ResponseAppend_P (PSTR ("}"));
+    MqttPublishPrefixTopic_P (TELE, PSTR (D_RSLT_SENSOR));
+  }
 }
 
 // Handle VMC MQTT commands
@@ -500,9 +497,9 @@ void VmcUpdateGraphData ()
 
   // init current values
   vmc_graph.temperature = NAN;
-  vmc_graph.humidity    = UINT8_MAX;
-  vmc_graph.target      = UINT8_MAX;
-  vmc_graph.state       = VMC_STATE_OFF;
+  vmc_graph.humidity = UINT8_MAX;
+  vmc_graph.target = UINT8_MAX;
+  vmc_graph.state = VMC_STATE_OFF;
 
   // increase graph data index and reset if max reached
   vmc_graph.index ++;
@@ -666,25 +663,27 @@ void VmceWebIconState ()
 // A4 : graph update (1:update, empty if no update)
 void VmcWebUpdate ()
 {
-  String str_text;
+  float temperature;
+  char  str_text[16];
+  char  str_value[8];
 
   // A1 : icon state update
-  if (vmc_web.state) str_text = "1";
-  str_text += ";";
+  if (vmc_web.state) strcpy (str_text, "1;"); else strcpy (str_text, ";");
 
   // A2 : temperature value
-  if (vmc_web.temperature) str_text += String (VmcGetTemperature (), 1);
-  str_text += ";";
+  temperature = VmcGetTemperature ();
+  if (vmc_web.temperature) ext_snprintf_P (str_value, sizeof(str_value), PSTR ("%1_f;"), &temperature); else strcpy (str_value, ";");
+  strlcat (str_text, str_value, sizeof (str_text));
 
   // A3 : humidity value
-  if (vmc_web.humidity) str_text += String (VmcGetHumidity ());
-  str_text += ";";
+  if (vmc_web.humidity) sprintf (str_text, "%d;", VmcGetHumidity ()); else strcpy (str_value, ";");
+  strlcat (str_text, str_value, sizeof (str_text));
 
   // A4 : graph update
-  if (vmc_web.graph) str_text += "1";
+  if (vmc_web.graph) strlcat (str_text, "1", sizeof (str_text));
 
   // send result
-  Webserver->send (200, "text/plain", str_text.c_str (), str_text.length ());
+  Webserver->send (200, "text/plain", str_text, strlen (str_text));
 
   // reset web flags
   vmc_web.state       = false;
@@ -693,25 +692,12 @@ void VmcWebUpdate ()
   vmc_web.graph       = false;
 }
 
-// append VMC control button to main page
-void VmcWebMainButton ()
-{
-  // VMC control page button
-  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), D_PAGE_VMC_CONTROL, D_VMC_CONTROL);
-}
-
-// append VMC configuration button to configuration page
-void VmcWebConfigButton ()
-{
-  // VMC configuration button
-  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>"), D_PAGE_VMC_CONFIG, D_VMC_CONFIGURE);
-}
-
 // append VMC state to main page
-bool VmcWebSensor ()
+void VmcWebSensor ()
 {
   uint8_t mode, humidity, target;
-  String  str_title, str_text, str_value, str_source, str_color;
+  char    str_source[8], str_value[8];
+  char    str_title[32], str_text[32];
 
   // if automatic mode, display humidity and target humidity
   mode = VmcGetMode ();
@@ -722,65 +708,68 @@ bool VmcWebSensor ()
     target   = VmcGetTargetHumidity ();
 
     // handle sensor source
+    strcpy (str_source, "");
+    strcpy (str_value, "");
     switch (vmc_status.humidity_source)
     {
       case VMC_SOURCE_NONE:  // no humidity source available 
-        str_source = "";
-        str_value  = "--";
+        strcpy (str_value, "--");
         break;
       case VMC_SOURCE_LOCAL:  // local humidity source used 
-        str_source = D_VMC_LOCAL;
-        str_value  = String (humidity);
+        sprintf (str_source, " (%s)", D_VMC_LOCAL);
+        sprintf (str_value, "%d", humidity);
         break;
       case VMC_SOURCE_REMOTE:  // remote humidity source used 
-        str_source = D_VMC_REMOTE;
-        str_value  = String (humidity);
+        sprintf (str_source, " (%s)", D_VMC_REMOTE);
+        sprintf (str_value, "%d", humidity);
         break;
     }
 
     // set title and text
-    str_title = D_VMC_HUMIDITY;
-    if (str_source.length() > 0) str_title += " (" + str_source + ")";
-    str_text  = "<b>" + str_value + "</b> / " + String (target) + "%";
+    strcpy (str_title, D_VMC_HUMIDITY);
+    strlcat (str_title, str_source, sizeof (str_title));
+
+    // set text
+    sprintf (str_text, "<b>%s</b> / %d%", str_value, target);
 
     // display
-    WSContentSend_PD (PSTR("{s}%s{m}%s{e}"), str_title.c_str(), str_text.c_str());
+    WSContentSend_PD (PSTR ("{s}%s{m}%s{e}"), str_title, str_text);
   }
 
   // display vmc icon status
-  WSContentSend_PD (PSTR("<tr><td colspan=2 style='width:100%;text-align:center;padding:10px;'><img height=64 src='state.png' ></td></tr>\n"));
+  WSContentSend_PD (PSTR ("<tr><td colspan=2 style='width:100%;text-align:center;padding:10px;'><img height=64 src='state.png' ></td></tr>\n"));
 }
 
 // VMC web page
 void VmcWebPageConfig ()
 {
   uint8_t value, humidity;
-  char    argument[VMC_BUFFER_SIZE];
-  String  str_text;
+  char    str_argument[8];
+  char    str_text[16];
 
   // if access not allowed, close
-  if (!HttpCheckPriviledgedAccess()) return;
+  if (!HttpCheckPriviledgedAccess ()) return;
 
   // page comes from save button on configuration page
-  if (Webserver->hasArg("save"))
+  if (Webserver->hasArg ("save"))
   {
     // get VMC mode according to MODE parameter
-    WebGetArg (D_CMND_VMC_MODE, argument, VMC_BUFFER_SIZE);
-    if (strlen(argument) > 0) VmcSetMode ((uint8_t) atoi (argument)); 
+    WebGetArg (D_CMND_VMC_MODE, str_argument, sizeof (str_argument));
+    if (strlen(str_argument) > 0) VmcSetMode ((uint8_t) atoi (str_argument)); 
 
     // get VMC target humidity according to TARGET parameter
-    WebGetArg (D_CMND_VMC_TARGET, argument, VMC_BUFFER_SIZE);
-    if (strlen(argument) > 0) VmcSetTargetHumidity ((uint8_t) atoi (argument));
+    WebGetArg (D_CMND_VMC_TARGET, str_argument, sizeof (str_argument));
+    if (strlen(str_argument) > 0) VmcSetTargetHumidity ((uint8_t) atoi (str_argument));
 
     // get VMC humidity threshold according to THRESHOLD parameter
-    WebGetArg (D_CMND_VMC_THRESHOLD, argument, VMC_BUFFER_SIZE);
-    if (strlen(argument) > 0) VmcSetThreshold ((uint8_t) atoi (argument));
+    WebGetArg (D_CMND_VMC_THRESHOLD, str_argument, sizeof (str_argument));
+    if (strlen(str_argument) > 0) VmcSetThreshold ((uint8_t) atoi (str_argument));
   }
 
   // beginning of form
   WSContentStart_P (D_VMC_CONFIGURE);
   WSContentSendStyle ();
-  WSContentSend_P (PSTR("<form method='get' action='%s'>\n"), D_PAGE_VMC_CONFIG);
+  WSContentSend_P (PSTR ("<form method='get' action='%s'>\n"), D_PAGE_VMC_CONFIG);
 
   WSContentSend_P (PSTR ("<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n"), D_VMC_PARAMETERS);
 
@@ -792,20 +781,20 @@ void VmcWebPageConfig ()
   WSContentSend_P (PSTR ("<p>%s<br/><select name='%s'>"), D_VMC_MODE, D_CMND_VMC_MODE);
   
   // selection : disabled
-  if (value == VMC_MODE_DISABLED) str_text = "selected"; else str_text = "";
-  WSContentSend_P (VMC_INPUT_OPTION, VMC_MODE_DISABLED, str_text.c_str (), D_VMC_DISABLED);
+  if (value == VMC_MODE_DISABLED) strcpy (str_text, "selected"); else strcpy (str_text, "");
+  WSContentSend_P (VMC_INPUT_OPTION, VMC_MODE_DISABLED, str_text, D_VMC_DISABLED);
 
   // selection : low speed
-  if (value == VMC_MODE_LOW) str_text = "selected"; else str_text = "";
-  WSContentSend_P (VMC_INPUT_OPTION, VMC_MODE_LOW, str_text.c_str (), D_VMC_LOW);
+  if (value == VMC_MODE_LOW) strcpy (str_text, "selected"); else strcpy (str_text, "");
+  WSContentSend_P (VMC_INPUT_OPTION, VMC_MODE_LOW, str_text, D_VMC_LOW);
 
   // selection : high speed
-  if (value == VMC_MODE_HIGH) str_text = "selected"; else str_text = "";
-  WSContentSend_P (VMC_INPUT_OPTION, VMC_MODE_HIGH, str_text.c_str (), D_VMC_HIGH);
+  if (value == VMC_MODE_HIGH) strcpy (str_text, "selected"); else strcpy (str_text, "");
+  WSContentSend_P (VMC_INPUT_OPTION, VMC_MODE_HIGH, str_text, D_VMC_HIGH);
 
   // selection : automatic
-  if (value == VMC_MODE_AUTO) str_text = "selected"; else str_text = "";
-  if (humidity != UINT8_MAX) WSContentSend_P (VMC_INPUT_OPTION, VMC_MODE_AUTO, str_text.c_str (), D_VMC_AUTO);
+  if (value == VMC_MODE_AUTO) strcpy (str_text, "selected"); else strcpy (str_text, "");
+  if (humidity != UINT8_MAX) WSContentSend_P (VMC_INPUT_OPTION, VMC_MODE_AUTO, str_text, D_VMC_AUTO);
 
   // selection : end
   WSContentSend_P (PSTR ("</select></p>\n"));
@@ -818,7 +807,7 @@ void VmcWebPageConfig ()
   value = VmcGetThreshold ();
   WSContentSend_P (VMC_INPUT_NUMBER, D_VMC_THRESHOLD, D_CMND_VMC_THRESHOLD, VMC_THRESHOLD_MAX, value);
 
-  WSContentSend_P (PSTR("</fieldset></p>\n"));
+  WSContentSend_P (PSTR ("</fieldset></p>\n"));
 
   // save button
   WSContentSend_P (PSTR ("<p><button name='save' type='submit' class='button bgrn'>%s</button></p>\n"), D_SAVE);
@@ -831,15 +820,98 @@ void VmcWebPageConfig ()
   WSContentStop ();
 }
 
+// Data history JSON page
+void VmcWebPageDataJson ()
+{
+  bool     first_value;
+  uint16_t index, index_array;
+  char     str_value[8];
+
+  // start of data page
+  WSContentBegin (200, CT_HTML);
+
+  // device name
+  WSContentSend_P (PSTR ("{\"name\":\"%s\""), SettingsText(SET_DEVICENAME));
+
+  // loop thru humidity array
+  WSContentSend_P (PSTR (",\"humidity\":["));
+  first_value = true;
+  for (index = 1; index <= VMC_GRAPH_SAMPLE; index++)
+  {
+    index_array = (index + vmc_graph.index) % VMC_GRAPH_SAMPLE;
+    if (vmc_graph.arr_humidity[index_array] != UINT8_MAX)
+    {
+      if (first_value) WSContentSend_P (PSTR ("%d"), vmc_graph.arr_humidity[index_array]); 
+      else  WSContentSend_P (PSTR (",%d"), vmc_graph.arr_humidity[index_array]);
+      first_value = false;
+    }
+  }
+  WSContentSend_P (PSTR ("]"));
+
+  // loop thru humidity target array
+  WSContentSend_P (PSTR (",\"target\":["));
+  first_value = true;
+  for (index = 1; index <= VMC_GRAPH_SAMPLE; index++)
+  {
+    index_array = (index + vmc_graph.index) % VMC_GRAPH_SAMPLE;
+    if (vmc_graph.arr_humidity[index_array] != UINT8_MAX)
+    {
+      if (first_value) WSContentSend_P (PSTR ("%d"), vmc_graph.arr_target[index_array]); 
+      else  WSContentSend_P (PSTR (",%d"), vmc_graph.arr_target[index_array]);
+      first_value = false;
+    }
+  }
+  WSContentSend_P (PSTR ("]"));
+
+  // loop thru state array
+  WSContentSend_P (PSTR (",\"state\":["));
+  first_value = true;
+  for (index = 1; index <= VMC_GRAPH_SAMPLE; index++)
+  {
+    index_array = (index + vmc_graph.index) % VMC_GRAPH_SAMPLE;
+    if (vmc_graph.arr_humidity[index_array] != UINT8_MAX)
+    {
+      if (first_value) WSContentSend_P (PSTR ("%d"), vmc_graph.arr_state[index_array]); 
+      else  WSContentSend_P (PSTR (",%d"), vmc_graph.arr_state[index_array]);
+      first_value = false;
+    }
+  }
+  WSContentSend_P (PSTR ("]"));
+
+  // if available, loop thru temperature array
+  if (!isnan (vmc_status.temperature))
+  {
+    WSContentSend_P (PSTR (",\"temperature\":["));
+    first_value = true;
+    for (index = 1; index <= VMC_GRAPH_SAMPLE; index++)
+    {
+      index_array = (index + vmc_graph.index) % VMC_GRAPH_SAMPLE;
+      if (vmc_graph.arr_humidity[index_array] != UINT8_MAX)
+      {
+        ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%1_f"), &vmc_graph.arr_temperature[index_array]);
+        if (first_value) WSContentSend_P (PSTR ("%s"), str_value);
+        else WSContentSend_P (PSTR (",%s"), str_value);
+        first_value = false;
+      }
+    }
+    WSContentSend_P (PSTR ("]"));
+  }
+
+  // end of page
+  WSContentSend_P (PSTR ("}"));
+  WSContentEnd ();
+}
+
 // Temperature & humidity graph frame
 void VmcWebGraphFrame ()
 {
   int   index;
   int   graph_left, graph_right, graph_width;
   float temperature, temp_min, temp_max, temp_scope;
+  char  str_value[8];
 
   // start of SVG graph
-  WSContentBegin(200, CT_HTML);
+  WSContentBegin (200, CT_HTML);
   WSContentSend_P (PSTR ("<svg viewBox='%d %d %d %d' preserveAspectRatio='xMinYMinmeet'>\n"), 0, 0, VMC_GRAPH_WIDTH, VMC_GRAPH_HEIGHT);
 
   // SVG style 
@@ -878,11 +950,21 @@ void VmcWebGraphFrame ()
   WSContentSend_P (VMC_LINE_DASH, graph_left, 75, graph_right, 75);
 
   // temperature units
-  WSContentSend_P (VMC_TEXT_TEMPERATURE, 2, 4,  String (temp_max, 1).c_str ());
-  WSContentSend_P (VMC_TEXT_TEMPERATURE, 2, 27, String (temp_min + temp_scope * 0.75, 1).c_str ());
-  WSContentSend_P (VMC_TEXT_TEMPERATURE, 2, 52, String (temp_min + temp_scope * 0.50, 1).c_str ());
-  WSContentSend_P (VMC_TEXT_TEMPERATURE, 2, 77, String (temp_min + temp_scope * 0.25, 1).c_str ());
-  WSContentSend_P (VMC_TEXT_TEMPERATURE, 2, 99, String (temp_min, 1).c_str ());
+  temperature = temp_max;
+  ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%1_f"), &temperature);
+  WSContentSend_P (VMC_TEXT_TEMPERATURE, 2, 4, str_value);
+  temperature = temp_min + temp_scope * 0.75;
+  ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%1_f"), &temperature);
+  WSContentSend_P (VMC_TEXT_TEMPERATURE, 2, 27, str_value);
+  temperature = temp_min + temp_scope * 0.50;
+  ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%1_f"), &temperature);
+  WSContentSend_P (VMC_TEXT_TEMPERATURE, 2, 52, str_value);
+  temperature = temp_min + temp_scope * 0.25;
+  ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%1_f"), &temperature);
+  WSContentSend_P (VMC_TEXT_TEMPERATURE, 2, 77, str_value);
+  temperature = temp_min;
+  ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%1_f"), &temperature);
+  WSContentSend_P (VMC_TEXT_TEMPERATURE, 2, 99, str_value);
 
   // humidity units
   WSContentSend_P (VMC_TEXT_HUMIDITY, VMC_GRAPH_PERCENT_STOP + 2, 4, 100);
@@ -893,7 +975,7 @@ void VmcWebGraphFrame ()
 
   // end of SVG graph
   WSContentSend_P (PSTR ("</svg>\n"));
-  WSContentEnd();
+  WSContentEnd ();
 }
 
 // Temperature & humidity graph data
@@ -908,7 +990,6 @@ void VmcWebGraphData ()
   float    temperature, temp_min, temp_max, temp_scope;
   TIME_T   current_dst;
   uint32_t current_time;
-  String   str_text;
 
   // vmc state graph position
   graph_off  = VMC_GRAPH_HEIGHT;
@@ -935,7 +1016,7 @@ void VmcWebGraphData ()
   graph_width = graph_right - graph_left;
 
   // start of SVG graph
-  WSContentBegin(200, CT_HTML);
+  WSContentBegin (200, CT_HTML);
   WSContentSend_P (PSTR ("<svg viewBox='%d %d %d %d' preserveAspectRatio='xMinYMinmeet'>\n"), 0, 0, VMC_GRAPH_WIDTH, VMC_GRAPH_HEIGHT);
 
   // SVG style 
@@ -966,10 +1047,10 @@ void VmcWebGraphData ()
       if (vmc_graph.arr_state[array_idx] == VMC_STATE_HIGH) graph_y = graph_high;
       else if (vmc_graph.arr_state[array_idx] == VMC_STATE_LOW) graph_y = graph_low;
       else graph_y = graph_off;
-      WSContentSend_P (PSTR("%d,%d "), graph_x, graph_y);
+      WSContentSend_P (PSTR ("%d,%d "), graph_x, graph_y);
     }
   }
-  WSContentSend_P (PSTR("'/>\n"));
+  WSContentSend_P (PSTR ("'/>\n"));
 
   // loop to display target humidity curve
   WSContentSend_P (PSTR ("<polyline class='target' points='"));
@@ -982,10 +1063,10 @@ void VmcWebGraphData ()
       // calculate current position and add the point to the line
       graph_x = graph_left + (graph_width * index / VMC_GRAPH_SAMPLE);
       graph_y = VMC_GRAPH_HEIGHT - (vmc_graph.arr_target[array_idx] * VMC_GRAPH_HEIGHT / 100);
-      WSContentSend_P (PSTR("%d,%d "), graph_x, graph_y);
+      WSContentSend_P (PSTR ("%d,%d "), graph_x, graph_y);
     }
   }
-  WSContentSend_P (PSTR("'/>\n"));
+  WSContentSend_P (PSTR ("'/>\n"));
 
   // loop to display temperature curve
   WSContentSend_P (PSTR ("<polyline class='temperature' points='"));
@@ -998,10 +1079,10 @@ void VmcWebGraphData ()
       // calculate current position and add the point to the line
       graph_x = graph_left + (graph_width * index / VMC_GRAPH_SAMPLE);
       graph_y = VMC_GRAPH_HEIGHT - int (((vmc_graph.arr_temperature[array_idx] - temp_min) / temp_scope) * VMC_GRAPH_HEIGHT);
-      WSContentSend_P (PSTR("%d,%d "), graph_x, graph_y);
+      WSContentSend_P (PSTR ("%d,%d "), graph_x, graph_y);
     }
   }
-  WSContentSend_P (PSTR("'/>\n"));
+  WSContentSend_P (PSTR ("'/>\n"));
 
   // loop to display humidity curve
   WSContentSend_P (PSTR ("<polyline class='humidity' points='"));
@@ -1014,17 +1095,17 @@ void VmcWebGraphData ()
       // calculate current position and add the point to the line
       graph_x = graph_left + (graph_width * index / VMC_GRAPH_SAMPLE);
       graph_y = VMC_GRAPH_HEIGHT - (vmc_graph.arr_humidity[array_idx] * VMC_GRAPH_HEIGHT / 100);
-      WSContentSend_P (PSTR("%d,%d "), graph_x, graph_y);
+      WSContentSend_P (PSTR ("%d,%d "), graph_x, graph_y);
     }
   }
-  WSContentSend_P (PSTR("'/>\n"));
+  WSContentSend_P (PSTR ("'/>\n"));
 
   // ---------------
   //   Time line
   // ---------------
 
   // get current time
-  current_time = LocalTime();
+  current_time = LocalTime ();
   BreakTime (current_time, current_dst);
 
   // calculate horizontal shift
@@ -1050,7 +1131,7 @@ void VmcWebGraphData ()
 
   // end of SVG graph
   WSContentSend_P (PSTR ("</svg>\n"));
-  WSContentEnd();
+  WSContentEnd ();
 }
 
 // VMC control public web page
@@ -1058,12 +1139,13 @@ void VmcWebPageControl ()
 {
   bool    updated = false;
   uint8_t vmc_mode;
-  String  str_text;
+  float   value;
+  char    str_text[8];
 
   // check if vmc state has changed
-  if (Webserver->hasArg(D_CMND_VMC_LOW)) { updated = true; VmcSetMode (VMC_MODE_LOW); }
-  else if (Webserver->hasArg(D_CMND_VMC_HIGH)) { updated = true; VmcSetMode (VMC_MODE_HIGH); }
-  else if (Webserver->hasArg(D_CMND_VMC_AUTO)) { updated = true; VmcSetMode (VMC_MODE_AUTO); }
+  if (Webserver->hasArg (D_CMND_VMC_LOW)) { updated = true; VmcSetMode (VMC_MODE_LOW); }
+  else if (Webserver->hasArg (D_CMND_VMC_HIGH)) { updated = true; VmcSetMode (VMC_MODE_HIGH); }
+  else if (Webserver->hasArg (D_CMND_VMC_AUTO)) { updated = true; VmcSetMode (VMC_MODE_AUTO); }
 
   // beginning of form without authentification with 60 seconds auto refresh
   WSContentStart_P (D_VMC_CONTROL, false);
@@ -1127,25 +1209,27 @@ void VmcWebPageControl ()
     WSContentSend_P (PSTR ("<div class='title'>%s</div>\n"), SettingsText(SET_DEVICENAME));
 
     // vmc icon status
-    WSContentSend_PD (PSTR("<div><img id='state' src='state.png?rnd=0'></div>\n"));
+    WSContentSend_PD (PSTR ("<div><img id='state' src='state.png?rnd=0'></div>\n"));
 
     // vmc mode selector
     vmc_mode = VmcGetMode ();
     WSContentSend_P (PSTR ("<div>\n"));
-    if (vmc_mode == VMC_MODE_AUTO) str_text="active"; else str_text="";
-    WSContentSend_P (VMC_INPUT_BUTTON, D_CMND_VMC_AUTO, str_text.c_str (), D_VMC_BTN_AUTO);
-    if (vmc_mode == VMC_MODE_LOW) str_text="active"; else str_text="";
-    WSContentSend_P (VMC_INPUT_BUTTON, D_CMND_VMC_LOW, str_text.c_str (), D_VMC_BTN_LOW);
-    if (vmc_mode == VMC_MODE_HIGH) str_text="active"; else str_text="";
-    WSContentSend_P (VMC_INPUT_BUTTON, D_CMND_VMC_HIGH, str_text.c_str (), D_VMC_BTN_HIGH);
+    if (vmc_mode == VMC_MODE_AUTO) strcpy (str_text, "active"); else strcpy (str_text, "");
+    WSContentSend_P (VMC_INPUT_BUTTON, D_CMND_VMC_AUTO, str_text, D_VMC_BTN_AUTO);
+    if (vmc_mode == VMC_MODE_LOW) strcpy (str_text, "active"); else strcpy (str_text, "");
+    WSContentSend_P (VMC_INPUT_BUTTON, D_CMND_VMC_LOW, str_text, D_VMC_BTN_LOW);
+    if (vmc_mode == VMC_MODE_HIGH) strcpy (str_text, "active"); else strcpy (str_text, "");
+    WSContentSend_P (VMC_INPUT_BUTTON, D_CMND_VMC_HIGH, str_text, D_VMC_BTN_HIGH);
     WSContentSend_P (PSTR ("</div>\n"));
 
-    // temperature and humidity values
+    // temperature
     WSContentSend_P (PSTR ("<div>"));
-    str_text = String (VmcGetTemperature (), 1);
-    WSContentSend_P (PSTR ("<span class='temp' id='temp'>%s °C</span>"), str_text.c_str ());
-    str_text = String (VmcGetHumidity ());
-    WSContentSend_P (PSTR ("<span class='humi' id='humi'>%s %%</span>"), str_text.c_str ());
+    value = VmcGetTemperature ();
+    ext_snprintf_P (str_text, sizeof (str_text), PSTR ("%1_f"), &value);
+    WSContentSend_P (PSTR ("<span class='temp' id='temp'>%s °C</span>"), str_text);
+
+    // humidity
+    WSContentSend_P (PSTR ("<span class='humi' id='humi'>%d %%</span>"), VmcGetHumidity ());
     WSContentSend_P (PSTR ("</div>\n"));
 
     // graph base and data
@@ -1189,8 +1273,9 @@ bool Xsns98 (byte callback_id)
 #ifdef USE_WEBSERVER
     case FUNC_WEB_ADD_HANDLER:
       // pages
-      Webserver->on ("/" D_PAGE_VMC_CONFIG,  VmcWebPageConfig);
-      Webserver->on ("/" D_PAGE_VMC_CONTROL, VmcWebPageControl);
+      Webserver->on ("/" D_PAGE_VMC_CONFIG,   VmcWebPageConfig);
+      Webserver->on ("/" D_PAGE_VMC_DATA,     VmcWebPageDataJson);
+      Webserver->on ("/" D_PAGE_VMC_CONTROL,  VmcWebPageControl);
       Webserver->on ("/" D_PAGE_VMC_BASE_SVG, VmcWebGraphFrame);
       Webserver->on ("/" D_PAGE_VMC_DATA_SVG, VmcWebGraphData);
 
@@ -1208,10 +1293,10 @@ bool Xsns98 (byte callback_id)
       VmcWebSensor ();
       break;
     case FUNC_WEB_ADD_MAIN_BUTTON:
-      VmcWebMainButton ();
+      WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), D_PAGE_VMC_CONTROL, D_VMC_CONTROL);
       break;
     case FUNC_WEB_ADD_BUTTON:
-      VmcWebConfigButton ();
+      WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>"), D_PAGE_VMC_CONFIG, D_VMC_CONFIGURE);
       break;
 #endif  // USE_WEBSERVER
 
