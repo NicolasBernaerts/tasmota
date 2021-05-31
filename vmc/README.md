@@ -10,7 +10,7 @@ Humidity sensor can either be :
   * a local SI7021 sensor connected to your Sonoff
   * a remote MQTT humidity sensor
   
-This firmware is based on Tasmota **v9.1** modified with extended MQTT messages.
+This firmware is based on Tasmota **v9.4** modified with extended MQTT messages.
 
 You'll get some extra Web pages on the device :
   * **/control** : page to control operating mode and with a 24h humidity/temperature graph
