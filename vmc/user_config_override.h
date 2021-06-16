@@ -19,6 +19,7 @@
     05/11/2020 - v3.3 - Tasmota 9.0 compatibility
     11/11/2020 - v3.4 - Add /data.json for history data
     01/05/2021 - v3.5 - Add fixed IP and remove use of String to avoid heap fragmentation 
+    15/06/2021 - v3.6 - Bug fixes 
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -67,7 +68,7 @@
 #define USE_HUMIDITY_MQTT                     // Add support for remote MQTT humididity acquisition  
 #define USE_VMC                               // Add support for VMC management
 
-#define EXTENSION_VERSION "3.5"               // version
+#define EXTENSION_VERSION "3.6"               // version
 #define EXTENSION_NAME "VMC"                  // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 
