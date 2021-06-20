@@ -4,6 +4,7 @@
   Copyright (C) 2020  Nicolas Bernaerts
     15/01/2020 - v1.0 - Creation with management of remote MQTT sensor
     23/04/2021 - v1.1 - Remove use of String to avoid heap fragmentation
+    18/06/2021 - v1.2 - Bug fixes
                       
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -59,9 +60,11 @@ const char TEMPERATURE_FIELD_INPUT[] PROGMEM = "<p>%s<span style='float:right;fo
 \*************************************************/
 
 // variables
-float    temperature_mqtt_value       = NAN;          // current temperature
-bool     temperature_topic_subscribed = false;        // flag for temperature subscription
-uint32_t temperature_last_update      = 0;            // last time (in millis) temperature was updated
+struct {
+  bool     subscribed  = false;        // flag for temperature subscription
+  uint32_t last_update = 0;            // last time (in millis) temperature was updated
+  float    value       = NAN;          // current temperature
+} mqtt_temperature;
 
 /**************************************************\
  *                  Accessors
@@ -96,24 +99,25 @@ void TemperatureSetMqttKey (char* str_key)
 \**************************************************/
 
 // get current temperature
-float TemperatureGetValue ( )
+float TemperatureGetValue ()
 {
-  uint32_t time_now = millis ();
+  uint32_t time_over;
 
   // if no update for 5 minutes, temperature not available
-  if (time_now - temperature_last_update > TEMPERATURE_TIMEOUT_5MN) temperature_mqtt_value = NAN;
+  time_over = mqtt_temperature.last_update + TEMPERATURE_TIMEOUT_5MN;
+//  if (TimeReached (time_over)) mqtt_temperature.value = NAN;
 
-  return temperature_mqtt_value;
+  return mqtt_temperature.value;
 }
 
 // update temperature
 void TemperatureSetValue (float new_temperature)
 {
   // set current temperature
-  temperature_mqtt_value = new_temperature;
+  mqtt_temperature.value = new_temperature;
 
   // temperature updated
-  temperature_last_update = millis ();
+  mqtt_temperature.last_update = millis ();
 }
 
 // Show JSON status (for MQTT)
@@ -129,13 +133,10 @@ void TemperatureShowJSON (bool append)
     // add , in append mode or { in publish mode
     if (append) ResponseAppend_P (PSTR (",")); else Response_P (PSTR ("{"));
 
-
     // temperature  -->  "Temperature":{"Value":18.5,"Topic":"mqtt/topic/of/temperature","Key":"Temp"}
     ResponseAppend_P (PSTR ("\"%s\":{"), D_JSON_TEMPERATURE);
-
-    ext_snprintf_P (str_value, sizeof(str_value), PSTR ("%1_f"), &temperature);
+    ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%1_f"), &temperature);
     ResponseAppend_P (PSTR ("\"%s\":%s,\"%s\":\"%s\",\"%s\":\"%s\""), D_JSON_TEMPERATURE_VALUE, str_value, D_JSON_TEMPERATURE_TOPIC, TemperatureGetMqttTopic (), D_JSON_TEMPERATURE_KEY, TemperatureGetMqttKey ());
-
     ResponseAppend_P (PSTR ("}"));
 
     // publish it if not in append mode
@@ -155,7 +156,7 @@ bool TemperatureMqttCommand ()
   char command [CMDSZ];
 
   // check MQTT command
-  command_code = GetCommandCode (command, sizeof(command), XdrvMailbox.topic, kTemperatureCommands);
+  command_code = GetCommandCode (command, sizeof (command), XdrvMailbox.topic, kTemperatureCommands);
 
   // handle command
   switch (command_code)
@@ -191,13 +192,13 @@ void TemperatureCheckMqttConnexion ()
     if (is_connected)
     {
       // if still no subsciption to temperature topic
-      if (temperature_topic_subscribed == false)
+      if (mqtt_temperature.subscribed == false)
       {
         // subscribe to temperature meter
         MqttSubscribe (pstr_topic);
 
         // subscription done
-        temperature_topic_subscribed = true;
+        mqtt_temperature.subscribed = true;
 
         // log
         AddLog (LOG_LEVEL_INFO, PSTR ("MQT: Subscribed to %s"), pstr_topic);
@@ -205,7 +206,7 @@ void TemperatureCheckMqttConnexion ()
     }
 
     // else disconnected : topic not subscribed
-    else temperature_topic_subscribed = false;
+    else mqtt_temperature.subscribed = false;
   }
 }
 
@@ -213,30 +214,45 @@ void TemperatureCheckMqttConnexion ()
 bool TemperatureMqttData ()
 {
   bool        data_handled = false;
-  float       temperature;
+  float       temperature = -100;
   const char* pstr_topic;
   const char* pstr_key;
-  char*       pstr_result;
+  char*       pstr_result = nullptr;
+  char*       pstr_value  = nullptr;
   char        str_buffer[64];
 
   // if MQTT subscription is active
-  if (temperature_topic_subscribed == true)
+  if (mqtt_temperature.subscribed)
   {
+    // if topic is the right one
     pstr_topic = TemperatureGetMqttTopic ();
     if (strcmp (pstr_topic, XdrvMailbox.topic) == 0)
     {
-      // log and counter increment
-      AddLog (LOG_LEVEL_INFO, PSTR ("MQT: Received %s"), pstr_topic);
-
       // look for temperature key
       pstr_key = TemperatureGetMqttKey ();
-      sprintf (str_buffer, "\"%s\":", pstr_key);
+      sprintf (str_buffer, "\"%s\"", pstr_key);
       pstr_result = strstr (XdrvMailbox.data, str_buffer);
-      if (pstr_result != nullptr) temperature = atof (pstr_result + strlen (str_buffer));
-      data_handled |= (pstr_result != nullptr);
+      if (pstr_result != nullptr) pstr_value = strchr (pstr_result, ':');
 
-      // update current temperature
-      TemperatureSetValue (temperature);
+      // if key is found,
+      if (pstr_value != nullptr)
+      {
+        // extract temperature
+        pstr_value++;
+        temperature = strtof (pstr_value, &pstr_result);
+
+        // if temperature has been read
+        data_handled = (pstr_value != pstr_result);
+        if (data_handled)
+        {
+          // save temperature
+          TemperatureSetValue (temperature);
+
+          // log and counter increment
+          ext_snprintf_P (str_buffer, sizeof (str_buffer), PSTR ("%02_f"), &temperature);
+          AddLog (LOG_LEVEL_INFO, PSTR ("MQT: Received temperature as %s °C"), str_buffer);
+        }
+      }
     }
   }
 
@@ -248,12 +264,6 @@ bool TemperatureMqttData ()
 \***********************************************/
 
 #ifdef USE_WEBSERVER
-
-// Temperature configuration button
-void TemperatureWebButton ()
-{
-  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>"), D_PAGE_TEMPERATURE, D_TEMPERATURE_CONFIGURE);
-}
 
 // Temperature MQTT setting web page
 void TemperatureWebPage ()
@@ -347,7 +357,7 @@ bool Xsns97 (uint8_t function)
       Webserver->on ("/" D_PAGE_TEMPERATURE, TemperatureWebPage);
       break;
     case FUNC_WEB_ADD_BUTTON:
-      TemperatureWebButton ();
+      WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>Configure Remote Temperature</button></form></p>"), D_PAGE_TEMPERATURE);
       break;
 #endif  // USE_WEBSERVER
   }

@@ -39,6 +39,7 @@
     11/11/2020 - v6.12  - Update to Offload v2.5
                           Add /data.json for history data
     23/04/2021 - v6.20 - Add fixed IP and remove use of String to avoid heap fragmentation
+    20/06/2021 - v6.21 - Change in remote temperature sensor management (thanks to Bernard Monot) 
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -88,7 +89,7 @@
 #define USE_TEMPERATURE_MQTT                  // Add support for MQTT temperature sensor
 #define USE_PILOTWIRE                         // Add support for France Pilotwire protocol for electrical heaters
 
-#define EXTENSION_VERSION "6.20"              // version
+#define EXTENSION_VERSION "6.21"              // version
 #define EXTENSION_NAME    "Pilotwire"         // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
 
