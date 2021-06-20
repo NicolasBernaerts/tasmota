@@ -68,7 +68,7 @@
 #define USE_HUMIDITY_MQTT                     // Add support for remote MQTT humididity acquisition  
 #define USE_VMC                               // Add support for VMC management
 
-#define EXTENSION_VERSION "3.6"               // version
+#define EXTENSION_VERSION "3.7"               // version
 #define EXTENSION_NAME "VMC"                  // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 

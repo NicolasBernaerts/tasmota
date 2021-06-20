@@ -21,6 +21,7 @@
     11/11/2020 - v3.4 - Add /data.json for history data
     01/05/2021 - v3.5 - Remove use of String to avoid heap fragmentation 
     15/06/2021 - v3.6 - Bug fixes 
+    20/06/2021 - v3.7 - Change in remote humidity sensor management (thanks to Bernard Monot) 
 
   Settings are stored using weighting scale parameters :
     - Settings.weight_reference   = VMC mode
@@ -313,28 +314,27 @@ float VmcGetTemperature ()
 // get current humidity level
 uint8_t VmcGetHumidity ()
 {
-  uint8_t result   = UINT8_MAX;
-  float   humidity = NAN;
+  uint8_t result = VMC_HUMIDITY_MAX;
+  float   humidity;
 
-  // read humidity from local sensor
-  vmc_status.humidity_source = VMC_SOURCE_LOCAL;
+  // try to read remote humidity
+  vmc_status.humidity_source = VMC_SOURCE_REMOTE;
+  humidity = HumidityGetValue ();
+
+  // if no value available, switch to local sensor
+  if (isnan (humidity)) vmc_status.humidity_source = VMC_SOURCE_LOCAL;
 
 #ifdef USE_DHT
-  // if dht sensor present, read it 
-  if (Dht[0].h != 0) humidity = Dht[0].h;
-#endif
-
-  // if not available, read MQTT humidity
   if (isnan (humidity))
   {
-    vmc_status.humidity_source = VMC_SOURCE_REMOTE;
-    humidity = HumidityGetValue ();
+    if (Dht[0].h != 0) humidity = Dht[0].h;
   }
+#endif
 
   // convert to integer and keep in range 0..100
-  if (isnan (humidity) == false)
+  if (!isnan (humidity))
   {
-    result = (uint8_t) humidity;
+    result = (uint8_t) round (humidity);
     if (result > VMC_HUMIDITY_MAX) result = VMC_HUMIDITY_MAX;
   }
 
@@ -649,45 +649,34 @@ void VmcWebIconState ()
 void VmcWebSensor ()
 {
   uint8_t mode, humidity, target;
-  char    str_value[8], str_source[16];
-  char    str_title[32], str_text[32];
+  char    str_title[32];
+  char    str_text[32];
 
-  // if automatic mode, display humidity and target humidity
-  mode = VmcGetMode ();
-  if (mode == VMC_MODE_AUTO)
+  // read mode and current humidity
+  humidity = VmcGetHumidity ();
+  target   = VmcGetTargetHumidity ();
+  mode     = VmcGetMode ();
+
+  // handle sensor source
+  switch (vmc_status.humidity_source)
   {
-    // read current and target humidity
-    humidity = VmcGetHumidity ();
-    target   = VmcGetTargetHumidity ();
-
-    // handle sensor source
-    strcpy (str_source, "");
-    strcpy (str_value, "");
-    switch (vmc_status.humidity_source)
-    {
-      case VMC_SOURCE_NONE:  // no humidity source available 
-        strcpy (str_value, "--");
-        break;
-      case VMC_SOURCE_LOCAL:  // local humidity source used 
-        sprintf (str_source, " (%s)", D_VMC_LOCAL);
-        itoa (humidity, str_value, 10);
-        break;
-      case VMC_SOURCE_REMOTE:  // remote humidity source used 
-        sprintf (str_source, " (%s)", D_VMC_REMOTE);
-        itoa (humidity, str_value, 10);
-        break;
-    }
-
-    // set title with (local) or (remote)
-    strcpy (str_title, D_VMC_HUMIDITY);
-    strlcat (str_title, str_source, sizeof (str_title));
-
-    // set text
-    sprintf (str_text, "<b>%s</b> / %d%%", str_value, target);
-
-    // display
-    WSContentSend_PD (PSTR ("{s}%s{m}%s{e}"), str_title, str_text);
+    case VMC_SOURCE_NONE:  // no humidity source available 
+      strcpy (str_title, "--");
+      break;
+    case VMC_SOURCE_LOCAL:  // local humidity source used 
+      sprintf (str_title, "%s (%s)", D_VMC_HUMIDITY, D_VMC_LOCAL);
+      break;
+    case VMC_SOURCE_REMOTE:  // remote humidity source used 
+      sprintf (str_title, "%s (%s)", D_VMC_HUMIDITY, D_VMC_REMOTE);
+      break;
   }
+  
+  // if automatic mode, add target humidity
+  if (mode == VMC_MODE_AUTO) sprintf (str_text, "<b>%d</b> / %d %%", humidity, target);
+  else sprintf (str_text, "<b>%d</b> %%", humidity);
+
+  // display
+  WSContentSend_PD (PSTR ("{s}%s{m}%s{e}"), str_title, str_text);
 
   // display vmc icon status
   WSContentSend_PD (PSTR ("<tr><td colspan=2 style='width:100%%;text-align:center;padding:10px;'><img height=64 src='state.png' ></td></tr>\n"));
@@ -1153,9 +1142,9 @@ void VmcWebPageControl ()
   WSContentSend_P (PSTR ("img {height:64px;}\n"));
   WSContentSend_P (PSTR ("a:link {text-decoration:none;}\n"));
 
-  WSContentSend_P (PSTR ("div.choice {display:inline-block;font-size:1rem;margin:0.5rem;border:1px #666 solid;background:none;color:#fff;border-radius:6px;}\n"));
+  WSContentSend_P (PSTR ("div.choice {display:inline-block;font-size:1.5rem;margin:0.5rem;border:1px #666 solid;background:none;color:#fff;border-radius:6px;}\n"));
   WSContentSend_P (PSTR ("div.choice a {color:white;}\n"));
-  WSContentSend_P (PSTR ("div.item {display:inline-block;width:70px;padding:0.2rem auto;margin:1px;border:none;border-radius:4px;background:none;}\n"));
+  WSContentSend_P (PSTR ("div.item {display:inline-block;width:80px;padding:0.2rem auto;margin:1px;border:none;border-radius:4px;background:none;}\n"));
   WSContentSend_P (PSTR ("div.item:hover {background:#aaa;}\n"));
   WSContentSend_P (PSTR ("div.active {background:#666;}\n"));
 
