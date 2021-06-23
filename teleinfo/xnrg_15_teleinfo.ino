@@ -49,6 +49,7 @@
     29/04/2021 - v8.1   - Bug fix in serial port management and realtime energy totals
     16/05/2021 - v8.1.1 - Control initial baud rate to avoid crash (thanks to Seb)
     26/05/2021 - v8.2   - Add active power (W) graph
+    22/06/2021 - v8.3   - Change in serial management for ESP32
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -233,11 +234,7 @@ const char TELEINFO_DAY_SAT[] PROGMEM = "Sat";
 const char *const arr_week_day[] = { TELEINFO_DAY_SUN, TELEINFO_DAY_MON, TELEINFO_DAY_TUE, TELEINFO_DAY_WED, TELEINFO_DAY_THU, TELEINFO_DAY_FRI, TELEINFO_DAY_SAT };
 
 // serial port
-#ifdef ESP8266
 TasmotaSerial *teleinfo_serial = nullptr;
-#else  // ESP32
-HardwareSerial *teleinfo_serial = nullptr;
-#endif // ESP286 & ESP32
 
 // teleinfo driver status
 bool teleinfo_enabled = false;
@@ -808,28 +805,21 @@ void TeleinfoInit ()
   teleinfo_enabled = ((TasmotaGlobal.energy_driver == XNRG_15) && PinUsed(GPIO_TELEINFO_RX) && (baud_rate > 0));
   if (teleinfo_enabled)
   {
+    // create and initialise serial port
+    teleinfo_serial = new TasmotaSerial (Pin (GPIO_TELEINFO_RX), -1, 1);
+    teleinfo_enabled = teleinfo_serial->begin (baud_rate, SERIAL_7E1);
 
 #ifdef ESP8266
 
-    // create serial port
-    teleinfo_serial = new TasmotaSerial (Pin (GPIO_TELEINFO_RX), -1, 1);
+    AddLog (LOG_LEVEL_INFO, PSTR ("TIC: ESP8266 serial set to %d bauds"), baud_rate);
 
-    // initialise serial port
-    teleinfo_enabled = teleinfo_serial->begin (baud_rate, SERIAL_7E1);
-
-    // check that it's connected to hardware GPIO
+    // check that it's connected to hardware GPIO and claim serial port
     if (teleinfo_enabled) teleinfo_enabled = teleinfo_serial->hardwareSerial ();
-
-    // claim serial port
     if (teleinfo_enabled) ClaimSerial ();
 
 #else  // ESP32
 
-    // use UART2 (some board have USB on UART1)
-    teleinfo_serial = new HardwareSerial (2);
-
-    // init UART          
-    teleinfo_serial->begin (baud_rate, SERIAL_7E1, Pin(GPIO_TELEINFO_RX), -1);
+    AddLog (LOG_LEVEL_INFO, PSTR ("TIC: ESP32 serial set to %d bauds"), baud_rate);
 
 #endif // ESP286 & ESP32
 
@@ -840,7 +830,7 @@ void TeleinfoInit ()
   {
     // init hardware energy counters
     Settings.flag3.hardware_energy_total = true;
-    Settings.energy_kWhtotal    = 0;
+    Settings.energy_kWhtotal = 0;
 
     // set default energy parameters
     Energy.voltage_available = true;

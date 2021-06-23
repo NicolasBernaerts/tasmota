@@ -5,6 +5,7 @@
     20/04/2021 - v1.0 - Creation 
     22/04/2021 - v1.1 - Merge IPAddress and InfoJson 
     02/05/2021 - v1.2 - Add Ethernet adapter status (ESP32) 
+    22/06/2021 - v1.3 - Change in wifi activation/desactivation 
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -34,7 +35,7 @@
 
 // strings
 #define D_IPADDRESS_WIFI          "Wifi"
-#define D_IPADDRESS_ETHERNET      "Ethernet"
+#define D_IPADDRESS_ETHERNET      "Eth"
 
 // web URL
 const char D_IPADDRESS_PAGE_CONFIG[] PROGMEM = "/ip";
@@ -60,36 +61,30 @@ void IPAddressEverySecond ()
 #ifdef ESP32
 #ifdef USE_ETHERNET
 
-  uint32_t ethernet_ip;
-  char     ip_original[32];
-
-  // if running in Wifi mode and Ethernet adapter is declared
-  if ((ipaddress_adapter == IPADDRESS_WIFI) && (Settings.flag4.network_ethernet == 1))
+  // 10 seconds after boot, if ethernet has got an IP and wifi enable : disable wifi
+  if ((TasmotaGlobal.uptime > 10) && (Settings.flag4.network_wifi == 1) && (0 != (uint32_t)EthernetLocalIP ()))
   {
-    // if Ethernet is UP, disable Wifi        // sve current IP
-    ethernet_ip = (uint32_t)EthernetLocalIP ();
-    if (ethernet_ip != 0)
-    {
-      // disable wifi
-      WifiDisable ();
+    // disable wifi for next reboot
+    Settings.flag4.network_wifi = 0;
+    AddLog (LOG_LEVEL_INFO, PSTR ("ETH: Ethernet got %s, disabling wifi"), EthernetLocalIP ().toString ().c_str ());
+  }
 
-      // log
-      strcpy (ip_original, EthernetLocalIP ().toString ().c_str ());
-      AddLog (LOG_LEVEL_INFO, PSTR ("ETH: Ethernet active on %s, Wifi has been disabled"), ip_original);
+  // else, 10 seconds after boot, if ethernet has no IP and wifi is disabled : enable wifi
+  else if ((TasmotaGlobal.uptime > 10) && (Settings.flag4.network_wifi == 0) && (0 == (uint32_t)EthernetLocalIP ()))
+  {
+    // enable wifi for next reboot
+    Settings.flag4.network_wifi = 1;
+    AddLog (LOG_LEVEL_INFO, PSTR ("ETH: Ethernet got no IP, enabling Wifi"));
+  }
 
-      // if IP is fixed and ethernet IP is different,
-      if ((Settings.ipv4_address[0] != 0) && (Settings.ipv4_address[0] != ethernet_ip))
-      {
-        // configure ethernet adapter with fixed IP
-        ETH.config (Settings.ipv4_address[0], Settings.ipv4_address[1], Settings.ipv4_address[2], Settings.ipv4_address[3]);
+  // else if fixed IP is defined, wifi is not using it, ethernet is different : set fixed IP to ethernet
+  else if ((Settings.ipv4_address[0] != 0) && (WiFi.localIP () != Settings.ipv4_address[0]) && (EthernetLocalIP () != Settings.ipv4_address[0]) && (EthernetLocalIP () != 0))
+  {
+    // configure ethernet adapter with fixed IP
+    ETH.config (Settings.ipv4_address[0], Settings.ipv4_address[1], Settings.ipv4_address[2], Settings.ipv4_address[3]);
 
-        // log
-        AddLog (LOG_LEVEL_INFO, PSTR ("ETH: Changed from %s (DHCP) to %s (Fixed)"), ip_original, EthernetLocalIP ().toString ().c_str ());
-      }
-
-      // default to ethernet adapter
-      ipaddress_adapter = IPADDRESS_ETHERNET;
-    }
+    // log
+    AddLog (LOG_LEVEL_INFO, PSTR ("ETH: IP changed to %s"), EthernetLocalIP ().toString ().c_str ());
   }
 
 #endif // USE_ETHERNET
@@ -119,31 +114,13 @@ void IPAddressShowJSON ()
 // append network adapter info to main page
 void IPAddressWebSensor ()
 {
-  char str_adapter[16];
-  char str_mac[32];
-
+ // display active adapter with MAC address
 #ifdef ESP32
 #ifdef USE_ETHERNET
-  // init
-  strcpy (str_adapter, "");
-  strcpy (str_mac, "");
 
-  // adapter type
-  switch (ipaddress_adapter)
-  { 
-    // display Wifi MAC address
-    case IPADDRESS_WIFI:
-      strcpy (str_adapter, D_IPADDRESS_WIFI);
-      strlcpy (str_mac, WiFi.macAddress ().c_str (), sizeof (str_mac));
-      break;
-    case IPADDRESS_ETHERNET:
-      strcpy (str_adapter, D_IPADDRESS_ETHERNET);
-      strlcpy (str_mac, EthernetMacAddress ().c_str (), sizeof (str_mac));
-      break;
-  }
+    if (strlen (WiFi.macAddress ().c_str ()) > 0) WSContentSend_P (PSTR("{s}%s <small>[%s]</small>{m}%s{e}"), D_IPADDRESS_WIFI, WiFi.macAddress ().c_str (), WiFi.localIP ().toString ().c_str ());
+    if (strlen (EthernetMacAddress ().c_str ()) > 0) WSContentSend_P (PSTR("{s}%s <small>[%s]</small>{m}%s{e}"), D_IPADDRESS_ETHERNET, EthernetMacAddress ().c_str (), EthernetLocalIP ().toString ().c_str ());
 
-  // display active adapter with MAC address
-  WSContentSend_P (PSTR("{s}%s{m}%s{e}"), str_adapter, str_mac);
 #endif // USE_ETHERNET
 #endif // ESP32
 }
@@ -260,8 +237,10 @@ void IPAddressWebPageJSON ()
 
 #ifdef ESP32
 #ifdef USE_ETHERNET
+
   // "Ethernet":{"IP":"xx.xx.xx.xx","MAC":"xx:xx:xx:xx:xx:xx:xx","Host":"hostname"}
   if (Settings.flag4.network_ethernet == 1) WSContentSend_P (PSTR (",\"%s\":{\"IP\":\"%s\",\"MAC\":\"%s\",\"Host\":\"%s\"}"), D_IPADDRESS_ETHERNET, EthernetLocalIP ().toString ().c_str (), EthernetMacAddress (), EthernetHostname ());
+
 #endif // USE_ETHERNET
 #endif // ESP32
 

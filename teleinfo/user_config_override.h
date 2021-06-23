@@ -46,6 +46,7 @@
     29/04/2021 - v8.1   - Bug fix in serial port management and realtime energy totals
     16/05/2021 - v8.1.1 - Control initial baud rate to avoid crash (thanks to Seb)
     26/05/2021 - v8.2   - Add active power (W) graph
+    22/06/2021 - v8.3   - Change in serial management for ESP32
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -98,7 +99,7 @@
 
 // extension
 #define EXTENSION_NAME "Teleinfo"             // name
-#define EXTENSION_VERSION "8.2"               // version
+#define EXTENSION_VERSION "8.3"               // version
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 
 // MQTT default
