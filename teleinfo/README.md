@@ -68,8 +68,9 @@ A more complex diagram can be this one. It will reshape the signal in a cleaner 
 
 ![Complete Teleinfo adapter](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/teleinfo-serial-adapter-complete.png)
 
-You need to connect your adapter output **Tx** to any available serial port of your Tasmota device.
-This port should be declared as **TInfo RX** and should be connected to your device UART.
+You need to connect your adapter output **ESP Rx** to any available serial port of your Tasmota device.
+
+This port should be connected to your ESP UART and be declared as **TInfo RX**.
 
 For example, you can use :
   * ESP8266 : **GPIO3 (RXD)** port
