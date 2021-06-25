@@ -9,9 +9,9 @@ To use it, your need to add one specific ESP8266 extension card connected to the
 
 Here is the adapter board diagram and board design based on a **Wemos mini D1 Pro**.
 
-![Interface diagram](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/korad-interface-diagram.png)  
+![Interface diagram](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/korad-interface-diagram.png)
 
-![Interface board](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/korad-interface-board.png)  
+![Interface board](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/korad-interface-board.png) 
 
 Once you've flashed the specific Tasmota firmware, you should get the following control panel accessible thru Tasmota.
 
