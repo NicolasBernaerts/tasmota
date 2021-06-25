@@ -58,11 +58,15 @@ You'll get one extra Web page on the device :
   * **/tic-graph** : live, daily, weekly or yearly graph
   * **/tic-msg** : real time display of received Teleinfo messages
 
-Between your Energy meter and your Tasmota device, you'll need an adapter like this one :
+Between your Energy meter and your Tasmota device, you'll need an adapter to convert **Teleinfo** signal to **TTL serial**.
 
-![Teleinfo adapter](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/teleinfo-serial-adapter.png)
+A very simple adapter diagram can be this one. Plesae note that with Linky meters, **4.7k** resistor should be replaced by a **1.5k** resistor.
 
-With modern Linky meters, **4.7k** resistor should be replaced by a **1.5k** resistor.
+![Simple Teleinfo adapter](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/teleinfo-serial-adapter.png)
+
+A more complex diagram can be this one. It will reshape the signal in a cleaner way, and variable resistors will allow you to have a better compatibility with different type of meters available.
+
+![Complete Teleinfo adapter](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/teleinfo-serial-adapter-complete.png)
 
 You need to connect your adapter output **Tx** to any available serial port of your Tasmota device.
 This port should be declared as **TInfo RX** and should be connected to your device UART.
