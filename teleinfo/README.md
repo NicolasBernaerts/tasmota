@@ -62,11 +62,19 @@ Between your Energy meter and your Tasmota device, you'll need an adapter to con
 
 A very simple adapter diagram can be this one. Plesae note that with Linky meters, **4.7k** resistor should be replaced by a **1.5k** resistor.
 
-![Simple Teleinfo adapter](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/teleinfo-serial-adapter.png)
+![Simple Teleinfo adapter](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/teleinfo-adapter-simple-diagram.png)
+
+Here is a board example using a monolithic 3.3V power supply and an ESP-01.
+
+![Simple Teleinfo board](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/teleinfo-adapter-simple-board.png)
 
 A more complex diagram can be this one. It will reshape the signal in a cleaner way, and variable resistors will allow you to have a better compatibility with different type of meters available.
 
-![Complete Teleinfo adapter](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/teleinfo-serial-adapter-complete.png)
+![Complete Teleinfo adapter](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/teleinfo-adapter-complete-diagram.png)
+
+Here is a board example using a monolithic 3.3V power supply and an ESP-01.
+
+![Complete Teleinfo board](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/teleinfo-adapter-complete-board.png)
 
 You need to connect your adapter output **ESP Rx** to any available serial port of your Tasmota device.
 
