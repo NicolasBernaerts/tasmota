@@ -1658,7 +1658,7 @@ void PilotwireWebPageControl ()
     WSContentSend_P (PSTR ("img.power {height:64px;}\n"));
 
     // current room temperature
-    WSContentSend_P (PSTR ("div.target {text-align:center;background:#6e2c00;width:14rem;margin:10px auto;border:1px orange solid;border-radius:8px;}\n"));
+    WSContentSend_P (PSTR ("div.target {text-align:center;width:14rem;margin:10px auto;border:1px orange solid;border-radius:8px;}\n"));
 
     WSContentSend_P (PSTR ("div.read {width:60%%;color:orange;padding:0px;margin:0px auto;border:none;}\n"));
     WSContentSend_P (PSTR ("div.read span {color:orange;}\n"));
@@ -1666,7 +1666,7 @@ void PilotwireWebPageControl ()
 
     // control to set room temperature
     WSContentSend_P (PSTR ("div.set {width:100%%;font-size:0.9rem;padding:0px;margin:2px auto;border:none;}\n"));
-    WSContentSend_P (PSTR ("div.set div {display:inline-block;color:orange;background:black;width:auto;padding:0.1rem 0.5rem;margin:0.1rem auto;border:none;border-radius:4px;}\n"));
+    WSContentSend_P (PSTR ("div.set div {display:inline-block;color:orange;background:#6e2c00;width:auto;padding:0.1rem 0.5rem;margin:0.1rem auto;border:none;border-radius:4px;}\n"));
     WSContentSend_P (PSTR ("div.set div.minus {border-top-left-radius:16px;border-bottom-left-radius:16px;padding-left:0.5rem;}\n"));
     WSContentSend_P (PSTR ("div.set div.plus {border-top-right-radius:16px;border-bottom-right-radius:16px;padding-right:0.5rem;}\n"));
     WSContentSend_P (PSTR ("div.set div:hover {color:black;background:orange;}\n"));
