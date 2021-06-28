@@ -6,6 +6,10 @@
     23/04/2021 - v1.1 - Remove use of String to avoid heap fragmentation
     18/06/2021 - v1.2 - Bug fixes
                       
+  Settings are stored using Settings Text :
+    * SET_TEMPERATURE_TOPIC
+    * SET_TEMPERATURE_KEY
+
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or

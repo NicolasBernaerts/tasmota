@@ -1577,10 +1577,10 @@ void PilotwireWebGraphData ()
 // Pilot Wire heater public configuration web page
 void PilotwireWebPageControl ()
 {
-  bool    updated = true;
+  bool    updated = false;
   int     index;
   uint8_t device_mode;
-  float   value;
+  float   value, target;
   char    str_value[8];
 
   // get target temperature
@@ -1593,34 +1593,16 @@ void PilotwireWebPageControl ()
   else if (Webserver->hasArg(D_CMND_PILOTWIRE_ON)) PilotwireSetMode (PILOTWIRE_THERMOSTAT);
 
   // else, if target temperature has been changed
-  else if (Webserver->hasArg(D_CMND_PILOTWIRE_MINUSMINUS)) PilotwireSetTargetTemperature (value - 2  );
-  else if (Webserver->hasArg(D_CMND_PILOTWIRE_MINUS))      PilotwireSetTargetTemperature (value - 0.5);
-  else if (Webserver->hasArg(D_CMND_PILOTWIRE_PLUS))       PilotwireSetTargetTemperature (value + 0.5);
-  else if (Webserver->hasArg(D_CMND_PILOTWIRE_PLUSPLUS))   PilotwireSetTargetTemperature (value + 2  );
-
-  // else no updtate
-  else updated = false;
+  else if (Webserver->hasArg(D_CMND_PILOTWIRE_TARGET))
+  {
+    WebGetArg (D_CMND_PILOTWIRE_TARGET, str_value, sizeof (str_value));
+    PilotwireSetTargetTemperature (atof (str_value));
+  }
 
   // beginning of page
   WSContentStart_P (D_PILOTWIRE_CONTROL, false);
   WSContentSend_P (PSTR ("</script>\n"));
 
-  // if parameters have been updated
-  if (updated)
-  {
-    // update heater status
-    PilotwireUpdateStatus ();
-
-    // auto reload page
-    WSContentSend_P (PSTR ("<meta http-equiv='refresh' content='0;URL=/%s' />\n"), D_PAGE_PILOTWIRE_CONTROL);
-    WSContentSend_P (PSTR ("</head>\n"));
-    WSContentSend_P (PSTR ("<body bgcolor='#252525'></body>\n"));
-    WSContentSend_P (PSTR ("</html>\n"));
-    WSContentEnd ();
-  }
-
-  else
-  {
     // set default min and max graph temperature
     pilotwire_graph.temp_min = PilotwireGetMinTemperature ();
     pilotwire_graph.temp_max = PilotwireGetMaxTemperature ();
@@ -1666,17 +1648,30 @@ void PilotwireWebPageControl ()
     WSContentSend_P (PSTR ("<style>\n"));
     WSContentSend_P (PSTR ("body {color:white;background-color:#252525;font-family:Arial, Helvetica, sans-serif;}\n"));
     WSContentSend_P (PSTR ("div {width:100%%;max-width:800px;margin:0.2rem auto;padding:0;text-align:center;vertical-align:middle;}\n"));
-    WSContentSend_P (PSTR ("div.title {font-size:2rem;font-weight:bold;}\n"));
-    WSContentSend_P (PSTR ("div.temp {font-size:3rem;color:yellow;}\n"));
-    WSContentSend_P (PSTR ("button {font-size:1.5rem;background:none;color:#fff;padding:0.2rem 0.5rem;border:1px #666 solid;border-radius:8px;}\n"));
-    WSContentSend_P (PSTR ("button.power {margin:0.5rem;padding:8px;border-radius:40px;}\n"));
-    WSContentSend_P (PSTR ("button.target {font-size:1.5rem;padding:0.25rem 0.75rem;border-radius:4px;}\n"));
-    WSContentSend_P (PSTR ("button.minus {border-top-left-radius:24px;border-bottom-left-radius:24px;margin-right:0.25rem;padding-left:0.75rem;}\n"));
-    WSContentSend_P (PSTR ("button.plus {border-top-right-radius:24px;border-bottom-right-radius:24px;margin-left:0.25rem;padding-right:0.75rem;}\n"));
+    WSContentSend_P (PSTR ("div.title {font-size:1.5rem;font-weight:bold;margin:10px auto;}\n"));
+    WSContentSend_P (PSTR ("div.temp {font-size:2.5rem;color:yellow;}\n"));
     WSContentSend_P (PSTR ("span.unit {font-size:2rem;margin:0;padding:0 0.25rem 0 0.5rem;}\n"));
-    WSContentSend_P (PSTR ("span.target {font-size:3rem;color:orange;padding:0.25rem 0.75rem;border:1px orange solid;border-radius:8px;}\n"));
 
+    // power button
+    WSContentSend_P (PSTR ("button {background:none;color:#fff;padding:0.2rem 0.5rem;border:1px #666 solid;}\n"));
+    WSContentSend_P (PSTR ("button.power {margin:0.5rem;padding:8px;border-radius:48px;}\n"));
     WSContentSend_P (PSTR ("img.power {height:64px;}\n"));
+
+    // current room temperature
+    WSContentSend_P (PSTR ("div.target {text-align:center;background:#6e2c00;width:14rem;margin:10px auto;border:1px orange solid;border-radius:8px;}\n"));
+
+    WSContentSend_P (PSTR ("div.read {width:60%%;color:orange;padding:0px;margin:0px auto;border:none;}\n"));
+    WSContentSend_P (PSTR ("div.read span {color:orange;}\n"));
+    WSContentSend_P (PSTR ("div.read span.value {font-size:2.5rem;}\n"));
+
+    // control to set room temperature
+    WSContentSend_P (PSTR ("div.set {width:100%%;font-size:0.9rem;padding:0px;margin:2px auto;border:none;}\n"));
+    WSContentSend_P (PSTR ("div.set div {display:inline-block;color:orange;background:black;width:auto;padding:0.1rem 0.5rem;margin:0.1rem auto;border:none;border-radius:4px;}\n"));
+    WSContentSend_P (PSTR ("div.set div.minus {border-top-left-radius:16px;border-bottom-left-radius:16px;padding-left:0.5rem;}\n"));
+    WSContentSend_P (PSTR ("div.set div.plus {border-top-right-radius:16px;border-bottom-right-radius:16px;padding-right:0.5rem;}\n"));
+    WSContentSend_P (PSTR ("div.set div:hover {color:black;background:orange;}\n"));
+
+    // graph
     WSContentSend_P (PSTR (".svg-container {position:relative;vertical-align:middle;overflow:hidden;width:100%%;max-width:%dpx;padding-bottom:65%%;}\n"), PILOTWIRE_GRAPH_WIDTH);
     WSContentSend_P (PSTR (".svg-content {display:inline-block;position:absolute;top:0;left:0;}\n"));
     WSContentSend_P (PSTR ("</style>\n"));
@@ -1699,18 +1694,33 @@ void PilotwireWebPageControl ()
     if (device_mode == PILOTWIRE_THERMOSTAT)
     {
       // button to switch off
-      WSContentSend_P (PSTR ("<div><button class='power' type='submit' name='off'><img class='power' id='mode' src='pw-mode.png' /></button></div>"));
+      WSContentSend_P (PSTR ("<div><button class='power' type='submit' name='off'><img class='power' id='mode' src='pw-mode.png' /></button></div>\n"));
 
-      // target temperature selection
+      // target temperature display
       value = PilotwireGetTargetTemperature ();
       ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%1_f"), &value);
-      WSContentSend_P (PSTR ("<div>\n"));
-      WSContentSend_P (PSTR ("<button class='minus' name='%s'>%s</button>\n"), D_CMND_PILOTWIRE_MINUSMINUS, "- 2");
-      WSContentSend_P (PSTR ("<button class='minus' name='%s'>%s</button>\n"), D_CMND_PILOTWIRE_MINUS, "- 0.5");
-      WSContentSend_P (PSTR ("<span class='target'><span>%s</span><span class='unit'>°C</span></span>\n"), str_value);
-      WSContentSend_P (PSTR ("<button class='plus' name='%s'>%s</button>\n"), D_CMND_PILOTWIRE_PLUS, "+ 0.5");
-      WSContentSend_P (PSTR ("<button class='plus' name='%s'>%s</button>\n"), D_CMND_PILOTWIRE_PLUSPLUS, "+ 2");
-      WSContentSend_P (PSTR ("</div>\n"));
+      WSContentSend_P (PSTR ("<div class='target'>\n"));
+      WSContentSend_P (PSTR ("<div class='read'><span class='value'>%s</span><span class='unit'>°C</span></div>\n"), str_value);
+
+      // target temperature increase / decrease
+      WSContentSend_P (PSTR ("<div class='set'>\n"), str_value);
+
+      target = value - 2;
+      ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%1_f"), &target);
+      WSContentSend_P (PSTR ("<a href='/control?%s=%s'><div class='minus' title='%s °C'>%s</div></a>\n"), D_CMND_PILOTWIRE_TARGET, str_value, str_value, "- 2°");
+      target = value - 0.5;
+      ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%1_f"), &target);
+      WSContentSend_P (PSTR ("<a href='/control?%s=%s'><div class='minus' title='%s °C'>%s</div></a>\n"), D_CMND_PILOTWIRE_TARGET, str_value, str_value, "- 0.5°");
+
+      target = value + 0.5;
+      ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%1_f"), &target);
+      WSContentSend_P (PSTR ("<a href='/control?%s=%s'><div class='plus' title='%s °C'>%s</div></a>\n"), D_CMND_PILOTWIRE_TARGET, str_value, str_value, "+ 0.5°");
+      target = value + 2;
+      ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%1_f"), &target);
+      WSContentSend_P (PSTR ("<a href='/control?%s=%s'><div class='plus' title='%s °C'>%s</div></a>\n"), D_CMND_PILOTWIRE_TARGET, str_value, str_value, "+ 2°");
+
+      WSContentSend_P (PSTR ("</div>\n"));      // set
+      WSContentSend_P (PSTR ("</div>\n"));      // target
     }
 
     // else, display switch on button
@@ -1720,12 +1730,11 @@ void PilotwireWebPageControl ()
     WSContentSend_P (PSTR ("<div class='svg-container'>\n"));
     WSContentSend_P (PSTR ("<object class='svg-content' id='base' type='image/svg+xml' width='%d%%' height='%d%%' data='%s'></object>\n"), 100, 100, D_PAGE_PILOTWIRE_BASE_SVG);
     WSContentSend_P (PSTR ("<object class='svg-content' id='data' type='image/svg+xml' width='%d%%' height='%d%%' data='%s'></object>\n"), 100, 100, D_PAGE_PILOTWIRE_DATA_SVG);
-    WSContentSend_P (PSTR ("</div>\n"));
+    WSContentSend_P (PSTR ("</div>\n"));      // svg-container
 
     // end of page
     WSContentSend_P (PSTR ("</form>\n"));
     WSContentStop ();
-  }
 }
 
 #endif  // USE_WEBSERVER
