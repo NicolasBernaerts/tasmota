@@ -27,12 +27,15 @@ It has been tested succesfully on a **HW-034** (ICSE012A), **HW-149** (ICSE014A)
 ## LC Technology specificities
 
 LC Technology boards work according to 2 different modes :
-  * Mode 1 : a blue LED is ON
-  * Mode 2 : a red LED is ON
+  * **Mode 1** : a **blue LED** is ON
+  * **Mode 2** : a **red LED** is ON
  
-This tasmota firmware handles both modes. But if you are in Mode 1, it will take almost 15 seconds to get an operational boards at boot time. In mode 2, you'll need only 2-3 seconds.
+This tasmota firmware handles both modes. \
+But if you are in Mode 1, it will take almost 15 seconds to get an operational boards at boot time. \
+In mode 2, you'll need only 2-3 seconds.
 
-You switch from Mode 2 to Mode 1 anytime by pressing **S1**. To switch from Mode 1 to Mode 2, you need to press **S1** button while switching on the board. 
+You can switch from **Mode 2 to Mode 1** anytime by pressing **S1**. \
+To switch from **Mode 1 to Mode 2**, you need to press **S1** button **while powering** the board. 
 
 ## ICSE01xA specificities
 
