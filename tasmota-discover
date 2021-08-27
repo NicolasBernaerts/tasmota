@@ -59,37 +59,51 @@ do
 	# display current IP
 	DEVICE_HOSTNAME=""
 	DEVICE_DESCRIPTION=""
+	EXTENSION_TYPE=""
 
-	# read original information page
-	wget --quiet --tries=1 --timeout=2 -O - "http://${DEVICE_IP}/in" | sed "s|\}1|\n|g" | sed "s|\}2|\:|g" | tr '<' '\n' > "${TMP_DATA}"
-
-	# if tasmota module is recognised
+	# read /info.json page
+	wget --quiet --tries=1 --timeout=2 -O - "http://${DEVICE_IP}/info.json" | tr -d "\"}" | tr ",{" "\n" > "${TMP_DATA}"
 	if [ -s "${TMP_DATA}" ] 
 	then
 		# increment counter
 		NBR_TASMOTA=$((NBR_TASMOTA + 1))
 
 		# read data
-		TASMOTA_MODULE=$(grep "^h3" "${TMP_DATA}" | cut -d'>' -f2)
-		DEVICE_HOSTNAME=$(grep "^Hostname" "${TMP_DATA}" | head -n 1 | cut -d':' -f2)
-		TASMOTA_VERSION=$(grep "Program Version:" "${TMP_DATA}" | cut -d':' -f2 | cut -d'(' -f1)
+		DEVICE_HOSTNAME=$(grep "^Friendly Name:" "${TMP_DATA}" | cut -d':' -f2)
+		TASMOTA_MODULE=$(grep "^Module:" "${TMP_DATA}" | cut -d':' -f2)
+		TASMOTA_VERSION=$(grep "^Program Version" "${TMP_DATA}" | cut -d':' -f2)
 		TASMOTA_UPTIME=$(grep "^Uptime:" "${TMP_DATA}" | cut -d':' -f2-)
-		TASMOTA_MQTT=$(grep "^MQTT Topic:" "${TMP_DATA}" | cut -d':' -f2-)
+		TASMOTA_MQTT=$(grep "^MQTT Full Topic:" "${TMP_DATA}" | cut -d':' -f2-)
+		EXTENSION_TYPE=$(grep "^Extension type:" "${TMP_DATA}" | cut -d':' -f2)
+		EXTENSION_VERSION=$(grep "^Extension version:" "${TMP_DATA}" | cut -d':' -f2)
 
-		# read info.json page
-		wget --quiet --tries=1 --timeout=2 -O - "http://${DEVICE_IP}/info.json" | tr -d "\"}" | tr ",{" "\n" > "${TMP_DATA}"
+	# else, read /in page
+	else
+		# read original information page
+		wget --quiet --tries=1 --timeout=2 -O - "http://${DEVICE_IP}/in" | sed "s|\}1|\n|g" | sed "s|\}2|\:|g" | tr '<' '\n' > "${TMP_DATA}"
 		if [ -s "${TMP_DATA}" ] 
 		then
-			# read data
-			EXTENSION_TYPE=$(grep "^Type:" "${TMP_DATA}" | cut -d':' -f2)
-			EXTENSION_VERSION=$(grep "^Version:" "${TMP_DATA}" | tail -n 1 | cut -d':' -f2)
-		fi
+			# increment counter
+			NBR_TASMOTA=$((NBR_TASMOTA + 1))
 
-		# display
+			# read data
+			DEVICE_HOSTNAME=$(grep "^Hostname" "${TMP_DATA}" | head -n 1 | cut -d':' -f2)
+			TASMOTA_MODULE=$(grep "^h3" "${TMP_DATA}" | cut -d'>' -f2)
+			TASMOTA_VERSION=$(grep "Program Version:" "${TMP_DATA}" | cut -d':' -f2 | cut -d'(' -f1)
+			TASMOTA_UPTIME=$(grep "^Uptime:" "${TMP_DATA}" | cut -d':' -f2-)
+			TASMOTA_MQTT=$(grep "^MQTT Topic:" "${TMP_DATA}" | cut -d':' -f2-)
+		fi
+	fi
+
+	# if device has been recognised as a tasmota
+	if [ "${DEVICE_HOSTNAME}" != "" ]
+	then
+		# pretpare tasmota description
 		DEVICE_DESCRIPTION="${TASMOTA_MODULE}, Tasmota ${TASMOTA_VERSION},"
 		[ "${EXTENSION_TYPE}" != "" ] && DEVICE_DESCRIPTION="${DEVICE_DESCRIPTION} ${EXTENSION_TYPE} ${EXTENSION_VERSION},"
 		DEVICE_DESCRIPTION="${DEVICE_DESCRIPTION} Up ${TASMOTA_UPTIME}, MQTT ${TASMOTA_MQTT}"
 
+	# if all devices should be scanned
 	elif [ "${LIST_ALL}" = "ok" ]
 	then
 		# get hostname from arp
@@ -113,3 +127,4 @@ done
 
 # remove temporary directory
 rm -r "${TMP_DIR}"
+
