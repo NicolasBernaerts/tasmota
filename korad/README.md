@@ -15,4 +15,6 @@ Here is the adapter board diagram and board design based on a **Wemos mini D1 Pr
 
 Once you've flashed the specific Tasmota firmware, you should get the following control panel accessible thru Tasmota.
 
-![Control page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/tasmota-korad-control.png) ![Presets](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/tasmota-korad-preset.png)  
+![Control page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/tasmota-korad-control.png)
+
+![Main page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/tasmota-korad-main.png) ![Presets](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/tasmota-korad-preset.png)  
