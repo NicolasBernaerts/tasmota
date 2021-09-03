@@ -51,7 +51,7 @@ This firmware provides some extra Web page on the device :
 
 Between your Energy meter and your Tasmota device, you'll need an adapter to convert **Teleinfo** signal to **TTL serial**.
 
-A very simple adapter diagram can be this one. Pleasee note that with Linky meters, **4.7k** resistor should be replaced by a **1k** resistor.
+A very simple adapter diagram can be this one. Pleasee note that some Linky meters may need a resistor as low as **1k** instead of **1.5k** to avoid transmission errors.
 
 ![Simple Teleinfo adapter](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/teleinfo-adapter-simple-diagram.png)
 
