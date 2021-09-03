@@ -7,6 +7,8 @@ Korad serial protocol is well documented at https://sigrok.org/wiki/Korad_KAxxxx
 
 To use it, your need to add one specific ESP8266 extension card connected to the internal serial port of the power supply.
 
+A complete explanation with step by step procedure is available at http://www.bernaerts-nicolas.fr/iot/365-tasmota-korad-power-supply-web-mqtt
+
 Here is the adapter board diagram and board design based on a **Wemos mini D1 Pro**.
 
 ![Interface diagram](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/korad-interface-diagram.png)
