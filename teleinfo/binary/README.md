@@ -12,10 +12,13 @@ You can easily partition your ESP8266 or ESP32 with the help of **tasmota-flash*
 Here are the command lines to flash firmware and do partitionning at the same time :
 
 **ESP8266 1Mb**
+
     tasmota-flash --flash 'tasmota.bin'
     
 **ESP8266 4Mb**
+
     tasmota-flash --flash 'tasmota-littlefs.bin'  --partition 'esp8266_partition_app1441k_spiffs1245.csv'
     
 **ESP32 4Mb**
+
     tasmota-flash --esp32 --flash 'tasmota32.bin' --partition 'esp32_partition_app1441k_spiffs1245.csv'
