@@ -47,6 +47,9 @@
     16/05/2021 - v8.1.1 - Control initial baud rate to avoid crash (thanks to Seb)
     26/05/2021 - v8.2   - Add active power (W) graph
     22/06/2021 - v8.3   - Change in serial management for ESP32
+    04/08/2021 - v8.4   - Complete change in VA, W and cos phi measurement based on transmission time
+                          Add PME/PMI ACE6000 management
+                          Add energy update interval configuration
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -86,21 +89,15 @@
  *    Pilotwire firmware configuration
 \********************************************/
 
-// meter simulation
-//#define SIMULATION
-
 // complementary modules
 #define USE_IPADDRESS                         // Add fixed IP configuration page
 #define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_TELEINFO                          // Add support for Teleinfo
 
-// ESP32 specific
-#define USE_ETHERNET                          // Add support for ESP32 Ethernet physical port
-
 // extension
-#define EXTENSION_NAME "Teleinfo"             // name
-#define EXTENSION_VERSION "8.3"               // version
-#define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
+#define EXTENSION_NAME    "Teleinfo"          // name
+#define EXTENSION_VERSION "9.0c"               // version
+#define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
 
 // MQTT default
 #undef MQTT_HOST
@@ -121,6 +118,10 @@
 // disable serial log
 #undef SERIAL_LOG_LEVEL 
 #define SERIAL_LOG_LEVEL   LOG_LEVEL_NONE
+
+// ----------------------
+// Common ESP8266 & ESP32
+// ----------------------
 
 #undef USE_ARDUINO_OTA                        // support for Arduino OTA
 #undef USE_WPS                                // support for WPS as initial wifi configuration tool
@@ -145,6 +146,25 @@
 #undef USE_SUNRISE                            // support for Sunrise and sunset tools
 #undef SUNRISE_DAWN_ANGLE                     // Select desired Dawn Angle from
 //#undef USE_RULES                            // Disable support for rules
+
+// energy drivers
+#undef USE_HLW8012
+#undef USE_CSE7766
+#undef USE_PZEM004T
+#undef USE_MCP39F501
+#undef USE_PZEM_AC
+#undef USE_PZEM_DC
+#undef USE_SDM120
+#undef USE_DDS2382
+#undef USE_SDM630
+#undef USE_DDSU666
+#undef USE_SOLAX_X1
+#undef USE_LE01MR
+#undef USE_BL0940
+#undef USE_IEM3000
+#undef USE_WE517
+#undef USE_SDM72
+#undef USE_CSE7761
 
 #undef ROTARY_V1                              // Add support for Rotary Encoder as used in MI Desk Lamp (+0k8 code)
 #undef USE_SONOFF_RF                          // Add support for Sonoff Rf Bridge (+3k2 code)
@@ -200,6 +220,45 @@
 #undef USE_IR_REMOTE                          // Send IR remote commands using library IRremoteESP8266 and ArduinoJson (+4k3 code, 0k3 mem, 48 iram)
 
 #undef USE_ZIGBEE                             // Enable Zigbee protocol
-#undef USE_ZIGBEE_ZNP                       // Enable ZNP protocol, needed for CC2530 based devices
+#undef USE_ZIGBEE_ZNP                         // Enable ZNP protocol, needed for CC2530 based devices
+
+#undef USE_RC_SWITCH                          // RF send and receive using RCSwitch library
+
+#undef USE_TLS                                // SSL support
+
+#undef USE_THERMOSTAT
+#undef USE_GPS
+#undef USE_WINDMETER
+#undef USE_OPENTHERM
+
+// ----------------------
+//    ESP32 specific
+// ----------------------
+
+#undef USE_BLE_ESP32
+#undef USE_MI_ESP32
+#undef USE_IBEACON
+
+#undef USE_BERRY
+
+#undef USE_DISPLAY
+#undef USE_SR04
+#undef USE_LVGL
+
+#undef USE_ADC                                  // Add support for ADC on GPIO32 to GPIO39
+
+#undef USE_WEBCAM
+
+#undef USE_M5STACK_CORE2
+#undef USE_I2S_AUDIO
+#undef USE_TTGO_WATCH
+
+#undef USE_ALECTO_V2
+#undef USE_RF_SENSOR
+#undef USE_HX711
+#undef USE_MAX31855
+
+#undef USE_MHZ19
+#undef USE_SENSEAIR   
 
 #endif  // _USER_CONFIG_OVERRIDE_H_

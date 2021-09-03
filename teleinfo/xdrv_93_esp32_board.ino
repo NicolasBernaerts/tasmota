@@ -39,6 +39,9 @@
 // strings
 #define D_BOARD              "ESP32 board"
 #define D_BOARD_CONFIG       "Configure ESP32"
+#define D_BOARD_CONNEXION    "Connexion"
+#define D_BOARD_WIFI         "Wifi"
+#define D_BOARD_ETHERNET     "Ethernet"
 
 // form strings
 const char BOARD_FORM_START[] PROGMEM  = "<form method='get' action='%s'>\n";
@@ -79,10 +82,39 @@ void ESP32BoardInit ()
   // if template name is registered, set technical parameters
   if (index >= 0)
   {
-    Settings.flag4.network_ethernet = arr_eth_enable[index];
-    Settings.eth_address  = arr_eth_addr[index];
-    Settings.eth_type     = arr_eth_type[index];
-    Settings.eth_clk_mode = arr_eth_clock[index];
+    Settings->flag4.network_ethernet = arr_eth_enable[index];
+    Settings->eth_address  = arr_eth_addr[index];
+    Settings->eth_type     = arr_eth_type[index];
+    Settings->eth_clk_mode = arr_eth_clock[index];
+  }
+}
+
+void ESP32BoardEverySecond ()
+{
+  // 10 seconds after boot, if ethernet has got an IP and wifi enable : disable wifi
+  if ((TasmotaGlobal.uptime > 10) && (Settings->flag4.network_wifi == 1) && (0 != (uint32_t)EthernetLocalIP ()))
+  {
+    // disable wifi for next reboot
+    Settings->flag4.network_wifi = 0;
+    AddLog (LOG_LEVEL_INFO, PSTR ("ETH: Ethernet got %s, disabling wifi"), EthernetLocalIP ().toString ().c_str ());
+  }
+
+  // else, 10 seconds after boot, if ethernet has no IP and wifi is disabled : enable wifi
+  else if ((TasmotaGlobal.uptime > 10) && (Settings->flag4.network_wifi == 0) && (0 == (uint32_t)EthernetLocalIP ()))
+  {
+    // enable wifi for next reboot
+    Settings->flag4.network_wifi = 1;
+    AddLog (LOG_LEVEL_INFO, PSTR ("ETH: Ethernet got no IP, enabling Wifi"));
+  }
+
+  // else if fixed IP is defined, wifi is not using it, ethernet is different : set fixed IP to ethernet
+  else if ((Settings->ipv4_address[0] != 0) && (WiFi.localIP () != Settings->ipv4_address[0]) && (EthernetLocalIP () != Settings->ipv4_address[0]) && (EthernetLocalIP () != 0))
+  {
+    // configure ethernet adapter with fixed IP
+    ETH.config (Settings->ipv4_address[0], Settings->ipv4_address[1], Settings->ipv4_address[2], Settings->ipv4_address[3]);
+
+    // log
+    AddLog (LOG_LEVEL_INFO, PSTR ("ETH: IP changed to %s"), EthernetLocalIP ().toString ().c_str ());
   }
 }
 
@@ -91,6 +123,14 @@ void ESP32BoardInit ()
 \*********************************************/
 
 #ifdef USE_WEBSERVER
+
+// append network adapter info to main page
+void ESP32BoardWebSensor ()
+{
+  // display active network adapter
+  if (EthernetLocalIP () > 0) WSContentSend_P (PSTR("{s}%s{m}%s{e}"), D_BOARD_CONNEXION, D_BOARD_ETHERNET);
+  if (WiFi.localIP () > 0) WSContentSend_P (PSTR("{s}%s{m}%s{e}"), D_BOARD_CONNEXION, D_BOARD_WIFI);
+}
 
 // append Teleinfo configuration button to configuration page
 void ESP32BoardWebConfigButton ()
@@ -120,10 +160,10 @@ void ESP32BoardWebPageConfig ()
     if (index < ETH_MAX)
     {
       // set technical parameters
-      Settings.flag4.network_ethernet = arr_eth_enable[index];
-      Settings.eth_address  = arr_eth_addr[index];
-      Settings.eth_type     = arr_eth_type[index];
-      Settings.eth_clk_mode = arr_eth_clock[index];
+      Settings->flag4.network_ethernet = arr_eth_enable[index];
+      Settings->eth_address  = arr_eth_addr[index];
+      Settings->eth_type     = arr_eth_type[index];
+      Settings->eth_clk_mode = arr_eth_clock[index];
 
       // apply template as default one
       snprintf_P (str_text, sizeof(str_text), PSTR(D_CMND_BACKLOG " " D_CMND_TEMPLATE " %s; %s 0"), arr_board_tmpl[index], D_CMND_MODULE);
@@ -178,8 +218,14 @@ bool Xdrv93 (uint8_t function)
     case FUNC_INIT:
       ESP32BoardInit ();
       break;
+    case FUNC_EVERY_SECOND:
+      ESP32BoardEverySecond ();
+      break;
 
 #ifdef USE_WEBSERVER
+    case FUNC_WEB_SENSOR:
+      ESP32BoardWebSensor ();
+      break;
     case FUNC_WEB_ADD_HANDLER:
       // pages
       Webserver->on (D_PAGE_BOARD_CONFIG, ESP32BoardWebPageConfig);

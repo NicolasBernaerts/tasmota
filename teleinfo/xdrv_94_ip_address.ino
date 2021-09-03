@@ -33,10 +33,6 @@
 #define D_CMND_IPADDRESS_NETMASK  "nmsk"
 #define D_CMND_IPADDRESS_DNS      "dns"
 
-// strings
-#define D_IPADDRESS_WIFI          "Wifi"
-#define D_IPADDRESS_ETHERNET      "Eth"
-
 // web URL
 const char D_IPADDRESS_PAGE_CONFIG[] PROGMEM = "/ip";
 const char D_IPADDRESS_PAGE_JSON[]   PROGMEM = "/info.json";
@@ -48,59 +44,44 @@ const char D_IPADDRESS_CONFIGURE[] PROGMEM = "Configure IP";
 const char D_IPADDRESS_FIELD_INPUT[] PROGMEM = "<p>%s<br><input type='text' name='%s' value='%_I' minlength='7' maxlength='15'></p>\n";
 
 // variables
-bool    ipaddress_publish_json = true;
-enum    IPAddressAdapter { IPADDRESS_WIFI, IPADDRESS_ETHERNET };
-uint8_t ipaddress_adapter = IPADDRESS_WIFI;
+static struct {
+  bool     publish_json = true;
+  uint32_t address;
+} ipaddress;
 
 /**************************************************\
  *                  Functions
 \**************************************************/
 
-void IPAddressEverySecond ()
+// Get IP connexion status
+bool IPAddressIsConnected ()
 {
+  bool is_connected;
+
+  // wifi
+  is_connected = ((uint32_t)WiFi.localIP () > 0);
+  //WiFi.isConnected ();
+
 #ifdef ESP32
 #ifdef USE_ETHERNET
-
-  // 10 seconds after boot, if ethernet has got an IP and wifi enable : disable wifi
-  if ((TasmotaGlobal.uptime > 10) && (Settings.flag4.network_wifi == 1) && (0 != (uint32_t)EthernetLocalIP ()))
-  {
-    // disable wifi for next reboot
-    Settings.flag4.network_wifi = 0;
-    AddLog (LOG_LEVEL_INFO, PSTR ("ETH: Ethernet got %s, disabling wifi"), EthernetLocalIP ().toString ().c_str ());
-  }
-
-  // else, 10 seconds after boot, if ethernet has no IP and wifi is disabled : enable wifi
-  else if ((TasmotaGlobal.uptime > 10) && (Settings.flag4.network_wifi == 0) && (0 == (uint32_t)EthernetLocalIP ()))
-  {
-    // enable wifi for next reboot
-    Settings.flag4.network_wifi = 1;
-    AddLog (LOG_LEVEL_INFO, PSTR ("ETH: Ethernet got no IP, enabling Wifi"));
-  }
-
-  // else if fixed IP is defined, wifi is not using it, ethernet is different : set fixed IP to ethernet
-  else if ((Settings.ipv4_address[0] != 0) && (WiFi.localIP () != Settings.ipv4_address[0]) && (EthernetLocalIP () != Settings.ipv4_address[0]) && (EthernetLocalIP () != 0))
-  {
-    // configure ethernet adapter with fixed IP
-    ETH.config (Settings.ipv4_address[0], Settings.ipv4_address[1], Settings.ipv4_address[2], Settings.ipv4_address[3]);
-
-    // log
-    AddLog (LOG_LEVEL_INFO, PSTR ("ETH: IP changed to %s"), EthernetLocalIP ().toString ().c_str ());
-  }
-
+  // ethernet
+  is_connected |= ((uint32_t)ETH.localIP () > 0);
 #endif // USE_ETHERNET
 #endif // ESP32
+
+return is_connected;
 }
 
 // Show JSON status (for MQTT)
 void IPAddressShowJSON ()
 {
   // append Wifi data
-  if (WiFi.getMode() != WIFI_OFF) ResponseAppend_P (PSTR (",\"Wifi\":{\"IP\":\"%s\",\"MAC\":\"%s\",\"Host\":\"%s\",\"SSID\":\"%s\",\"Qty\":\"%d\"}"), WiFi.localIP ().toString ().c_str (), WiFi.macAddress ().c_str (), TasmotaGlobal.hostname, SettingsText (SET_STASSID1 + Settings.sta_active), WifiGetRssiAsQuality (WiFi.RSSI ()));
+  if (WiFi.getMode() != WIFI_OFF) ResponseAppend_P (PSTR (",\"Wifi\":{\"IP\":\"%s\",\"MAC\":\"%s\",\"Host\":\"%s\",\"SSID\":\"%s\",\"Qty\":\"%d\"}"), WiFi.localIP ().toString ().c_str (), WiFi.macAddress ().c_str (), TasmotaGlobal.hostname, SettingsText (SET_STASSID1 + Settings->sta_active), WifiGetRssiAsQuality (WiFi.RSSI ()));
 
 #ifdef ESP32
 #ifdef USE_ETHERNET
   // if Ethernet adapter declared, append Ethenet data
-  if (Settings.flag4.network_ethernet == 1) ResponseAppend_P (PSTR (",\"Eth\":{\"IP\":\"%s\",\"MAC\":\"%s\",\"Host\":\"%s\"}"), EthernetLocalIP ().toString ().c_str (), EthernetMacAddress (), EthernetHostname ());
+  if (Settings->flag4.network_ethernet == 1) ResponseAppend_P (PSTR (",\"Eth\":{\"IP\":\"%s\",\"MAC\":\"%s\",\"Host\":\"%s\"}"), EthernetLocalIP ().toString ().c_str (), EthernetMacAddress ().c_str (), EthernetHostname ());
 #endif // USE_ETHERNET
 #endif // ESP32
 }
@@ -110,20 +91,6 @@ void IPAddressShowJSON ()
 \***********************************************/
 
 #ifdef USE_WEBSERVER
-
-// append network adapter info to main page
-void IPAddressWebSensor ()
-{
- // display active adapter with MAC address
-#ifdef ESP32
-#ifdef USE_ETHERNET
-
-    if (strlen (WiFi.macAddress ().c_str ()) > 0) WSContentSend_P (PSTR("{s}%s <small>[%s]</small>{m}%s{e}"), D_IPADDRESS_WIFI, WiFi.macAddress ().c_str (), WiFi.localIP ().toString ().c_str ());
-    if (strlen (EthernetMacAddress ().c_str ()) > 0) WSContentSend_P (PSTR("{s}%s <small>[%s]</small>{m}%s{e}"), D_IPADDRESS_ETHERNET, EthernetMacAddress ().c_str (), EthernetLocalIP ().toString ().c_str ());
-
-#endif // USE_ETHERNET
-#endif // ESP32
-}
 
 // IP address configuration page button
 void IPAddressWebConfigButton ()
@@ -149,8 +116,8 @@ void IPAddressWebPageConfigure ()
     if (strlen (str_argument) > 0)
     {
       ParseIPv4 (&value, str_argument);
-      updated |= (value != Settings.ipv4_address[0]);
-      Settings.ipv4_address[0] = value;
+      updated |= (value != Settings->ipv4_address[0]);
+      Settings->ipv4_address[0] = value;
     }
 
     // gateway
@@ -158,8 +125,8 @@ void IPAddressWebPageConfigure ()
     if (strlen (str_argument) > 0)
     {
       ParseIPv4 (&value, str_argument);
-      updated |= (value != Settings.ipv4_address[1]);
-      Settings.ipv4_address[1] = value;
+      updated |= (value != Settings->ipv4_address[1]);
+      Settings->ipv4_address[1] = value;
     }
 
     // net mask
@@ -167,8 +134,8 @@ void IPAddressWebPageConfigure ()
     if (strlen (str_argument) > 0)
     {
       ParseIPv4 (&value, str_argument);
-      updated |= (value != Settings.ipv4_address[2]);
-      Settings.ipv4_address[2] = value;
+      updated |= (value != Settings->ipv4_address[2]);
+      Settings->ipv4_address[2] = value;
     }
 
     // gateway
@@ -176,8 +143,8 @@ void IPAddressWebPageConfigure ()
     if (strlen (str_argument) > 0)
     {
       ParseIPv4 (&value, str_argument);
-      updated |= (value != Settings.ipv4_address[3]);
-      Settings.ipv4_address[3] = value;
+      updated |= (value != Settings->ipv4_address[3]);
+      Settings->ipv4_address[3] = value;
     }
 
     // if data have been updated, restart
@@ -193,10 +160,10 @@ void IPAddressWebPageConfigure ()
   // ---------------------
   WSContentSend_P (PSTR ("<p><fieldset><legend><b>&nbsp;IP&nbsp;</b></legend>\n"));
 
-  WSContentSend_P (D_IPADDRESS_FIELD_INPUT, PSTR ("Address <small>(0.0.0.0 for DHCP)</small>"), PSTR (D_CMND_IPADDRESS_ADDR),    Settings.ipv4_address[0]);
-  WSContentSend_P (D_IPADDRESS_FIELD_INPUT, PSTR ("Gateway"), PSTR (D_CMND_IPADDRESS_GATEWAY), Settings.ipv4_address[1]);
-  WSContentSend_P (D_IPADDRESS_FIELD_INPUT, PSTR ("Netmask"), PSTR (D_CMND_IPADDRESS_NETMASK), Settings.ipv4_address[2]);
-  WSContentSend_P (D_IPADDRESS_FIELD_INPUT, PSTR ("DNS"),     PSTR (D_CMND_IPADDRESS_DNS),     Settings.ipv4_address[3]);
+  WSContentSend_P (D_IPADDRESS_FIELD_INPUT, PSTR ("Address <small>(0.0.0.0 for DHCP)</small>"), PSTR (D_CMND_IPADDRESS_ADDR),    Settings->ipv4_address[0]);
+  WSContentSend_P (D_IPADDRESS_FIELD_INPUT, PSTR ("Gateway"), PSTR (D_CMND_IPADDRESS_GATEWAY), Settings->ipv4_address[1]);
+  WSContentSend_P (D_IPADDRESS_FIELD_INPUT, PSTR ("Netmask"), PSTR (D_CMND_IPADDRESS_NETMASK), Settings->ipv4_address[2]);
+  WSContentSend_P (D_IPADDRESS_FIELD_INPUT, PSTR ("DNS"),     PSTR (D_CMND_IPADDRESS_DNS),     Settings->ipv4_address[3]);
 
   WSContentSend_P (PSTR ("</fieldset></p><br>\n"));
 
@@ -222,24 +189,40 @@ void IPAddressWebPageJSON ()
   WSContentSend_P ( PSTR ("{"));
 
   // "Module":"NomDuModule","Version":"x.x.x","Uptime":"xxxxxx","Friendly name":"name",
-  WSContentSend_P ( PSTR ("\"Module\":\"%s\",\"Version\":\"%s\",\"Uptime\":\"%s\",\"Name\":\"%s\""), ModuleName ().c_str (), TasmotaGlobal.version, GetUptime ().c_str (), SettingsText (SET_DEVICENAME));
+  WSContentSend_P ( PSTR ("\"Module\":\"%s\""), ModuleName ().c_str ());
+  WSContentSend_P ( PSTR (",\"Program Version\":\"%s\""), TasmotaGlobal.version);
+  WSContentSend_P ( PSTR (",\"Uptime\":\"%s\""), GetUptime ().c_str ());
+  WSContentSend_P ( PSTR (",\"Friendly Name\":\"%s\""), SettingsText (SET_DEVICENAME));
 
 #ifdef EXTENSION_NAME
-  // "Extension":{"Type":"type","Version":"version","Author":"author"}
-  WSContentSend_P ( PSTR (",\"Extension\":{\"Type\":\"%s\",\"Version\":\"%s\",\"Author\":\"%s\"}"), EXTENSION_NAME, EXTENSION_VERSION, EXTENSION_AUTHOR);
+  // "Ext-type":"type","Ext-version":"version","Ext-author":"author"}
+  WSContentSend_P ( PSTR (",\"Extension Type\":\"%s\""), EXTENSION_NAME);
+  WSContentSend_P ( PSTR (",\"Extension Version\":\"%s\""), EXTENSION_VERSION);
+  WSContentSend_P ( PSTR (",\"Extension Aauthor\":\"%s\""), EXTENSION_AUTHOR);
 #endif
 
   // "MQTT":{"Host":"host","Port":"port","Topic":"topic"}
-  WSContentSend_P ( PSTR (",\"MQTT\":{\"Host\":\"%s\",\"Port\":\"%d\",\"Topic\":\"%s\"}"), SettingsText (SET_MQTT_HOST), Settings.mqtt_port, GetTopic_P (stopic, CMND, TasmotaGlobal.mqtt_topic, ""));
+  WSContentSend_P ( PSTR (",\"MQTT Host\":\"%s\""), SettingsText (SET_MQTT_HOST));
+  WSContentSend_P ( PSTR (",\"MQTT Pport\":\"%d\""), Settings->mqtt_port);
+  WSContentSend_P ( PSTR (",\"MQTT Full Topic\":\"%s\""), GetTopic_P (stopic, CMND, TasmotaGlobal.mqtt_topic, ""));
 
   // "Wifi":{"IP":"xx.xx.xx.xx","MAC":"xx:xx:xx:xx:xx:xx:xx","Host":"hostname","SSID":"ssid,"Quality":"70"}
-  WSContentSend_P ( PSTR (",\"%s\":{\"IP\":\"%s\",\"MAC\":\"%s\",\"Host\":\"%s\",\"SSID\":\"%s\",\"Quality\":\"%d\"}"), D_IPADDRESS_WIFI, WiFi.localIP ().toString ().c_str (), WiFi.macAddress ().c_str (), TasmotaGlobal.hostname, SettingsText (SET_STASSID1 + Settings.sta_active), WifiGetRssiAsQuality (WiFi.RSSI ()));
+  WSContentSend_P ( PSTR (",\"Wifi IP\":\"%s\""), WiFi.localIP ().toString ().c_str ());
+  WSContentSend_P ( PSTR (",\"Wifi Mac\":\"%s\""), WiFi.macAddress ().c_str ());
+  WSContentSend_P ( PSTR (",\"Wifi Host\":\"%s\""), TasmotaGlobal.hostname);
+  WSContentSend_P ( PSTR (",\"Wifi Ssid\":\"%s\""), SettingsText (SET_STASSID1 + Settings->sta_active));
+  WSContentSend_P ( PSTR (",\"Wifi Quality\":\"%d\""), WifiGetRssiAsQuality (WiFi.RSSI ()));
 
 #ifdef ESP32
 #ifdef USE_ETHERNET
 
   // "Ethernet":{"IP":"xx.xx.xx.xx","MAC":"xx:xx:xx:xx:xx:xx:xx","Host":"hostname"}
-  if (Settings.flag4.network_ethernet == 1) WSContentSend_P (PSTR (",\"%s\":{\"IP\":\"%s\",\"MAC\":\"%s\",\"Host\":\"%s\"}"), D_IPADDRESS_ETHERNET, EthernetLocalIP ().toString ().c_str (), EthernetMacAddress (), EthernetHostname ());
+  if (Settings->flag4.network_ethernet == 1)
+  {
+    WSContentSend_P (PSTR (",\"Eth IP\":\"%s\""), EthernetLocalIP ().toString ().c_str ());
+    WSContentSend_P (PSTR (",\"Eth Mac\":\"%s\""), EthernetMacAddress ());
+    WSContentSend_P (PSTR (",\"Eth Host\":\"%s\""), EthernetHostname ());
+  }
 
 #endif // USE_ETHERNET
 #endif // ESP32
@@ -262,17 +245,11 @@ bool Xdrv94 (uint8_t function)
   // main callback switch
   switch (function)
   { 
-    case FUNC_EVERY_SECOND:
-      IPAddressEverySecond ();
-      break;
     case FUNC_JSON_APPEND:
-      if (ipaddress_publish_json) IPAddressShowJSON ();
+      if (ipaddress.publish_json) IPAddressShowJSON ();
       break;
 
 #ifdef USE_WEBSERVER
-    case FUNC_WEB_SENSOR:
-      IPAddressWebSensor ();
-      break;
     case FUNC_WEB_ADD_HANDLER:
       Webserver->on (FPSTR (D_IPADDRESS_PAGE_CONFIG), IPAddressWebPageConfigure);
       Webserver->on (FPSTR (D_IPADDRESS_PAGE_JSON), IPAddressWebPageJSON);

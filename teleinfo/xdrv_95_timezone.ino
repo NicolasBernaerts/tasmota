@@ -7,6 +7,7 @@
     22/07/2020 - v1.2 - Memory optimisation 
     10/04/2021 - v1.3 - Remove use of String to avoid heap fragmentation 
     22/04/2021 - v1.4 - Switch to a full Drv (without Sns) 
+    11/07/2021 - v1.5 - Tasmota 9.5 compatibility 
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -57,9 +58,6 @@ const char D_TIMEZONE_MONTH[]  PROGMEM = "Month (1:jan ... 12:dec)";
 const char D_TIMEZONE_WEEK[]   PROGMEM = "Week (0:last ... 4:fourth)";
 const char D_TIMEZONE_DAY[]    PROGMEM = "Day of week (1:sun ... 7:sat)";
 
-// variables
-bool timezone_publish_json = true;
-
 // offloading commands
 enum TimezoneCommands { CMND_TIMEZONE_NTP, CMND_TIMEZONE_STDO, CMND_TIMEZONE_STDM, CMND_TIMEZONE_STDW, CMND_TIMEZONE_STDD, CMND_TIMEZONE_DSTO, CMND_TIMEZONE_DSTM, CMND_TIMEZONE_DSTW, CMND_TIMEZONE_DSTD };
 const char kTimezoneCommands[] PROGMEM = "ntp|stdo|stdm|sdtw|stdd|dsto|dstm|dstw|dstd";
@@ -81,9 +79,9 @@ void TimezoneShowJSON (bool append)
 
   // generate string
   ResponseAppend_P (PSTR ("\"Timezone\":{"));
-  ResponseAppend_P (PSTR ("\"%s\":{\"Offset\":%d,\"Month\":%d,\"Week\":%d,\"Day\":%d}"), "STD", Settings.toffset[0], Settings.tflag[0].month, Settings.tflag[0].week, Settings.tflag[0].dow);
+  ResponseAppend_P (PSTR ("\"%s\":{\"Offset\":%d,\"Month\":%d,\"Week\":%d,\"Day\":%d}"), "STD", Settings->toffset[0], Settings->tflag[0].month, Settings->tflag[0].week, Settings->tflag[0].dow);
   ResponseAppend_P (PSTR (","));
-  ResponseAppend_P (PSTR ("\"%s\":{\"Offset\":%d,\"Month\":%d,\"Week\":%d,\"Day\":%d}"), "DST", Settings.toffset[1], Settings.tflag[1].month, Settings.tflag[1].week, Settings.tflag[1].dow);
+  ResponseAppend_P (PSTR ("\"%s\":{\"Offset\":%d,\"Month\":%d,\"Week\":%d,\"Day\":%d}"), "DST", Settings->toffset[1], Settings->tflag[1].month, Settings->tflag[1].week, Settings->tflag[1].dow);
   ResponseAppend_P (PSTR ("}"));
 
   // publish it if not in append mode
@@ -98,7 +96,7 @@ void TimezoneShowJSON (bool append)
 void TimezoneInit ()
 {
   // set switch mode
-  Settings.timezone = 99;
+  Settings->timezone = 99;
 }
 
 // Handle timezone MQTT commands
@@ -118,28 +116,28 @@ bool TimezoneMqttCommand ()
       SettingsUpdateText(SET_NTPSERVER1, XdrvMailbox.data);
       break;
     case CMND_TIMEZONE_STDO:  // set timezone STD offset
-      Settings.toffset[0] = XdrvMailbox.payload;
+      Settings->toffset[0] = XdrvMailbox.payload;
       break;
     case CMND_TIMEZONE_STDM:  // set timezone STD month switch
-      Settings.tflag[0].month = XdrvMailbox.payload;
+      Settings->tflag[0].month = XdrvMailbox.payload;
       break;
     case CMND_TIMEZONE_STDW:  // set timezone STD week of month switch
-      Settings.tflag[0].week = XdrvMailbox.payload;
+      Settings->tflag[0].week = XdrvMailbox.payload;
       break;
     case CMND_TIMEZONE_STDD:  // set timezone STD day of week switch
-      Settings.tflag[0].dow = XdrvMailbox.payload;
+      Settings->tflag[0].dow = XdrvMailbox.payload;
       break;
     case CMND_TIMEZONE_DSTO:  // set timezone DST offset
-      Settings.toffset[1] = XdrvMailbox.payload;
+      Settings->toffset[1] = XdrvMailbox.payload;
       break;
     case CMND_TIMEZONE_DSTM:  // set timezone DST month switch
-      Settings.tflag[1].month = XdrvMailbox.payload;
+      Settings->tflag[1].month = XdrvMailbox.payload;
       break;
     case CMND_TIMEZONE_DSTW:  // set timezone DST week of month switch
-      Settings.tflag[1].week = XdrvMailbox.payload;
+      Settings->tflag[1].week = XdrvMailbox.payload;
       break;
     case CMND_TIMEZONE_DSTD:  // set timezone DST day of week switch
-      Settings.tflag[1].dow = XdrvMailbox.payload;
+      Settings->tflag[1].dow = XdrvMailbox.payload;
       break;
    default:
       command_handled = false;
@@ -172,7 +170,7 @@ void TimezoneWebSensor ()
   // dislay local time
   current_time = LocalTime ();
   BreakTime (current_time, current_dst);
-  WSContentSend_P (PSTR ("<tr><div style='text-align:center;'>%02d:%02d:%02d</div></tr>\n"), current_dst.hour, current_dst.minute, current_dst.second);
+  WSContentSend_PD (PSTR ("<tr><div style='text-align:center;'>%02d:%02d:%02d</div></tr>\n"), current_dst.hour, current_dst.minute, current_dst.second);
 }
 
 // Timezone configuration web page
@@ -192,35 +190,35 @@ void TimezoneWebPageConfigure ()
 
     // set timezone STD offset according to 'stdo' parameter
     WebGetArg (D_CMND_TIMEZONE_STDO, argument, sizeof (argument));
-    if (strlen (argument) > 0) Settings.toffset[0] = atoi (argument);
+    if (strlen (argument) > 0) Settings->toffset[0] = atoi (argument);
     
     // set timezone STD month switch according to 'stdm' parameter
     WebGetArg (D_CMND_TIMEZONE_STDM, argument, sizeof (argument));
-    if (strlen (argument) > 0) Settings.tflag[0].month = atoi (argument);
+    if (strlen (argument) > 0) Settings->tflag[0].month = atoi (argument);
 
     // set timezone STD week of month switch according to 'stdw' parameter
     WebGetArg (D_CMND_TIMEZONE_STDW, argument, sizeof (argument));
-    if (strlen (argument) > 0) Settings.tflag[0].week = atoi (argument);
+    if (strlen (argument) > 0) Settings->tflag[0].week = atoi (argument);
 
     // set timezone STD day of week switch according to 'stdd' parameter
     WebGetArg (D_CMND_TIMEZONE_STDD, argument, sizeof (argument));
-    if (strlen (argument) > 0) Settings.tflag[0].dow = atoi (argument);
+    if (strlen (argument) > 0) Settings->tflag[0].dow = atoi (argument);
 
     // set timezone DST offset according to 'dsto' parameter
     WebGetArg (D_CMND_TIMEZONE_DSTO, argument, sizeof (argument));
-    if (strlen (argument) > 0) Settings.toffset[1] = atoi (argument);
+    if (strlen (argument) > 0) Settings->toffset[1] = atoi (argument);
     
     // set timezone DST month switch according to 'dstm' parameter
     WebGetArg (D_CMND_TIMEZONE_DSTM, argument, sizeof (argument));
-    if (strlen (argument) > 0) Settings.tflag[1].month = atoi (argument);
+    if (strlen (argument) > 0) Settings->tflag[1].month = atoi (argument);
 
     // set timezone DST week of month switch according to 'dstw' parameter
     WebGetArg (D_CMND_TIMEZONE_DSTW, argument, sizeof (argument));
-    if (strlen (argument) > 0) Settings.tflag[1].week = atoi (argument);
+    if (strlen (argument) > 0) Settings->tflag[1].week = atoi (argument);
 
     // set timezone DST day of week switch according to 'dstd' parameter
     WebGetArg (D_CMND_TIMEZONE_DSTD,argument, sizeof (argument));
-    if (strlen (argument) > 0) Settings.tflag[1].dow = atoi (argument);
+    if (strlen (argument) > 0) Settings->tflag[1].dow = atoi (argument);
   }
 
   // beginning of form
@@ -237,19 +235,19 @@ void TimezoneWebPageConfigure ()
   // Standard Time section  
   // ---------------------
   WSContentSend_P (TZ_FIELDSET_START, D_TIMEZONE_STD);
-  WSContentSend_P (TZ_FIELD_INPUT, D_TIMEZONE_OFFSET, PSTR (D_CMND_TIMEZONE_STDO), PSTR (D_CMND_TIMEZONE_STDO), -720, 720, 1, Settings.toffset[0]);
-  WSContentSend_P (TZ_FIELD_INPUT, D_TIMEZONE_MONTH,  PSTR (D_CMND_TIMEZONE_STDM), PSTR (D_CMND_TIMEZONE_STDM), 1,    12,  1, Settings.tflag[0].month);
-  WSContentSend_P (TZ_FIELD_INPUT, D_TIMEZONE_WEEK,   PSTR (D_CMND_TIMEZONE_STDW), PSTR (D_CMND_TIMEZONE_STDW), 0,    4,   1, Settings.tflag[0].week);
-  WSContentSend_P (TZ_FIELD_INPUT, D_TIMEZONE_DAY,    PSTR (D_CMND_TIMEZONE_STDD), PSTR (D_CMND_TIMEZONE_STDD), 1,    7,   1, Settings.tflag[0].dow);
+  WSContentSend_P (TZ_FIELD_INPUT, D_TIMEZONE_OFFSET, PSTR (D_CMND_TIMEZONE_STDO), PSTR (D_CMND_TIMEZONE_STDO), -720, 720, 1, Settings->toffset[0]);
+  WSContentSend_P (TZ_FIELD_INPUT, D_TIMEZONE_MONTH,  PSTR (D_CMND_TIMEZONE_STDM), PSTR (D_CMND_TIMEZONE_STDM), 1,    12,  1, Settings->tflag[0].month);
+  WSContentSend_P (TZ_FIELD_INPUT, D_TIMEZONE_WEEK,   PSTR (D_CMND_TIMEZONE_STDW), PSTR (D_CMND_TIMEZONE_STDW), 0,    4,   1, Settings->tflag[0].week);
+  WSContentSend_P (TZ_FIELD_INPUT, D_TIMEZONE_DAY,    PSTR (D_CMND_TIMEZONE_STDD), PSTR (D_CMND_TIMEZONE_STDD), 1,    7,   1, Settings->tflag[0].dow);
   WSContentSend_P (TZ_FIELDSET_STOP);
 
   // Daylight Saving Time section  
   // ----------------------------
   WSContentSend_P (TZ_FIELDSET_START, D_TIMEZONE_DST);
-  WSContentSend_P (TZ_FIELD_INPUT, D_TIMEZONE_OFFSET, PSTR (D_CMND_TIMEZONE_DSTO), PSTR (D_CMND_TIMEZONE_DSTO), -720, 720, 1, Settings.toffset[1]);
-  WSContentSend_P (TZ_FIELD_INPUT, D_TIMEZONE_MONTH,  PSTR (D_CMND_TIMEZONE_DSTM), PSTR (D_CMND_TIMEZONE_DSTM), 1,    12,  1, Settings.tflag[1].month);
-  WSContentSend_P (TZ_FIELD_INPUT, D_TIMEZONE_WEEK,   PSTR (D_CMND_TIMEZONE_DSTW), PSTR (D_CMND_TIMEZONE_DSTW), 0,    4,   1, Settings.tflag[1].week);
-  WSContentSend_P (TZ_FIELD_INPUT, D_TIMEZONE_DAY,    PSTR (D_CMND_TIMEZONE_DSTD), PSTR (D_CMND_TIMEZONE_DSTD), 1,    7,   1, Settings.tflag[1].dow);
+  WSContentSend_P (TZ_FIELD_INPUT, D_TIMEZONE_OFFSET, PSTR (D_CMND_TIMEZONE_DSTO), PSTR (D_CMND_TIMEZONE_DSTO), -720, 720, 1, Settings->toffset[1]);
+  WSContentSend_P (TZ_FIELD_INPUT, D_TIMEZONE_MONTH,  PSTR (D_CMND_TIMEZONE_DSTM), PSTR (D_CMND_TIMEZONE_DSTM), 1,    12,  1, Settings->tflag[1].month);
+  WSContentSend_P (TZ_FIELD_INPUT, D_TIMEZONE_WEEK,   PSTR (D_CMND_TIMEZONE_DSTW), PSTR (D_CMND_TIMEZONE_DSTW), 0,    4,   1, Settings->tflag[1].week);
+  WSContentSend_P (TZ_FIELD_INPUT, D_TIMEZONE_DAY,    PSTR (D_CMND_TIMEZONE_DSTD), PSTR (D_CMND_TIMEZONE_DSTD), 1,    7,   1, Settings->tflag[1].dow);
   WSContentSend_P (TZ_FIELDSET_STOP);
 
   // save button  
@@ -261,7 +259,7 @@ void TimezoneWebPageConfigure ()
   WSContentSpaceButton (BUTTON_CONFIGURATION);
 
   // end of page
-  WSContentStop ();
+  WSContentStop();
 }
 
 #endif  // USE_WEBSERVER
@@ -282,9 +280,6 @@ bool Xdrv95 (uint8_t function)
       break;
     case FUNC_COMMAND:
       result = TimezoneMqttCommand ();
-      break;
-    case FUNC_JSON_APPEND:
-      if (timezone_publish_json) TimezoneShowJSON (true);
       break;
 
 #ifdef USE_WEBSERVER
