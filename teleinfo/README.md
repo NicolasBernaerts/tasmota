@@ -1,66 +1,57 @@
 Teleinfo Tasmota firmware for Linky energy meters
 =============
 
-This evolution of Tasmota firmware **v9.4.0** has been enhanced to handle France energy meters using **Teleinfo** protocol.
+This evolution of Tasmota firmware **v9.5** has been enhanced to handle France energy meters using **Teleinfo** protocol.
 These meters are widely known as **Linky**.
 
 This implementation has been tested on :
-  * Single-phase (**monophase**) with TIC **historique**
-  * Single-phase (**monophase**) with TIC **standard**
-  * Three-phase (**triphase**) with TIC **historique**
-  * Three-phase (**triphase**) with TIC **standard**
+  * Sagem classic meter **monophase** with TIC **historique**
+  * Linky meter **monophase** with TIC **historique**
+  * Linky meter **monophase** with TIC **standard**
+  * Linky meter **triphase** with TIC **historique**
+  * Linky meter **triphase** with TIC **standard**
+  * Ace6000 meter **triphase** with TIC **PME/PMI**
 
-It also provides some real time consumption graphs.
-
+It is compatible with **ESP8266** and **ESP32** chipsets.
+ 
 Please note that it is a completly different implementation than the one published early 2020 by Charles Hallard. 
 
-Since **v6.0** onward, it is compatible with **ESP8266** and **ESP32** chipsets.
+This firmware calculates Power Factor (Cos φ) from Teleinfo totals (W) and Instant Power (VA).
+It is evaluated everytime total power increases of a certain amount of W that you can configure.
 
-It provides thru MQTT :
-  * tasmota energy data
-  * all Teleinfo data
-  * some simple Meter data (independent from TIC mode)
+It also provides :
+  * some real time energy graphs (VA, W, V and Cos phi)
+  * some historical energy graphs (if chipset is partitionned with LittleFS)
+  * Some MQTT data (tasmota energy data, Teleinfo data and some plain meter data)
 
 If your linky in in historic mode, it doesn't provide instant voltage. Voltage is then forced to 230V.
 
-Since **v7.8** onward, it calculates Power Factor (Cos φ) from Teleinfo totals (W) and Instant Power (VA).
-It is evaluated everytime total power increases of 10W. So, you now get Active Power in addition to Apparent Power.
-
-Teleinfo data are provided as is :
+Teleinfo data can be transfered thru MQTT with **etiquette** and **donnee**. For example :
   * **ADCO**, **ADCS** = contract number
   * **ISOUSC** = max contract current per phase 
   * **SSOUSC** = max contract power per phase
   * **IINST**, **IINST1**, **IINST2**, **IINST3** = instant current per phase
-  * **SINSTS1**, **SINSTS2**, **SINSTS3** = instant apparent power per phase (seems to be a sum)
   * **ADIR1**, **ADIR2**, **ADIR3** = overload message
+  * ...
 
-These meters are :
-  * Classical electronic meter (white)
-  * Linky meter (green)
-
-Meter data allows easy reading and offloading of electrical appliances or heaters :
+Some meter MQTT data Meter data allows easy reading and offloading of electrical appliances or heaters :
   * **PHASE** = number of phases
-  * **PREF** = contract maximum power per phase 
-  * **IREF** = contract maximum current per phase 
-  * **Ix** = current on phase x 
-  * **Ux** = voltage on phase x 
-  * **Px** = apparent power on phase x 
-  * **Wx** = active power on phase x 
-  * **Cx** = power factor on phase x 
+  * **PREF** = power per phase in the contract (VA) 
+  * **IREF** = current per phase in the contract 
+  * **PMAX** = maximum power per phase including an accetable % of overload (VA)  
+  * **Ix** = instant current on phase **x** 
+  * **Ux** = instant voltage on phase **x** 
+  * **Px** = instant apparent power on phase **x** 
+  * **Wx** = instant active power on phase **x** 
+  * **Cx** = instant power factor on phase **x** 
 
-This firmware is based on Tasmota modified with :
-  * serial as 7 bits, parity Even, 1 stop bit
-  * default speed as 1200 or 9600 bauds
-  * interface to handle teleinfo messages
-  * standard energy MQTT message (IINST, SINSTS, ADIR, ...)
-
-You'll get one extra Web page on the device :
-  * **/tic-graph** : live, daily, weekly or yearly graph
+This firmware provides some extra Web page on the device :
+  * **/tic-graph** : live, daily and weekly graphs
   * **/tic-msg** : real time display of received Teleinfo messages
 
 Between your Energy meter and your Tasmota device, you'll need an adapter to convert **Teleinfo** signal to **TTL serial**.
 
-A very simple adapter diagram can be this one. Plesae note that with Linky meters, **4.7k** resistor should be replaced by a **1.5k** resistor.
+A very simple adapter diagram can be this one. Pleasee note that with Linky meters, **4.7k** resistor should be replaced by a **1k** resistor.
 
 ![Simple Teleinfo adapter](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/teleinfo-adapter-simple-diagram.png)
 
@@ -93,7 +84,7 @@ If you are using an **ESP32** device, you can use its **Ethernet** port after se
 
 Teleinfo protocol is described in this document : https://www.enedis.fr/sites/default/files/Enedis-NOI-CPT_54E.pdf
 
-Pre-compiled version is available under **tasmota.bin.gz** and **tasmota32.bin**.
+Pre-compiled version are available in the **binary** sub-directory.
 
 MQTT result should look like that :
 
