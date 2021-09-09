@@ -6,15 +6,18 @@
 # Revision history :
 #   01/11/2020, V1.0 - Creation by N. Bernaerts
 #   25/04/2021, V1.1 - Update --erase to use blank files
-#   27/08/2021, V1.2 - Add --bootloader and --bootapp options
-#                      Add --partition conversion from CSV to BIN
+#   27/08/2021, V1.2 - Add --partition conversion from CSV to BIN
+#   08/09/2021, V1.3 - Simplify options for ESP32
 # ----------------------------------------------------------
 
 # default files and images
 DEVICE="ESP8266"
 
 # root of tools
-ROOT_TOOLS="$HOME/sources/esptool"
+ROOT_FILES="$HOME/.local/share/esptool"
+BOOTLOADER="${ROOT_FILES}/esp32_bootloader_dout.bin"
+BOOTAPP="${ROOT_FILES}/esp32_boot_app.bin"
+PARTITION="${ROOT_FILES}/esp32_partitions.bin"
 
 # help message if no parameter
 if [ ${#} -eq 0 ];
@@ -27,10 +30,7 @@ then
     echo "  --baud <baud>             Use specific speed (in bauds)"
     echo "  --erase                   Erase device before flash"
     echo "  --flash <file.bin>        Path to image file"
-    echo "  --bootloader <file>       Path to bootloader file (use <default> for default one)"
-    echo "  --bootapp <file>          Path to boot file (use <default> for default one)"
-    echo "  --partition <file.bin>    Path to .bin partition file (use <default> for default one)"
-    echo "              <file.csv>    Path to .csv partition file, that will be converted to BIN"
+    echo "  --partition <file.csv>    Path to .csv partition file (will be converted to BIN)"
     echo "All tools should be placed under ${ROOT_TOOLS}"
     exit 1
 fi
@@ -49,93 +49,92 @@ do
         --baud) shift; BAUD="$1"; shift; ;;
         --erase) ERASE="ok"; shift; ;;
         --flash) FLASH="ok"; shift; IMAGE="$1"; shift; ;;
-        --bootloader) shift; BOOTLOADER="$1"; shift; ;;
-        --bootapp) shift; BOOTAPP="$1"; shift; ;;
-        --partition) shift; PARTITION="$1"; shift; ;;
+        --partition) shift; PARTITION_CSV="$1"; shift; ;;
         *) shift; ;;
     esac
 done
 
-# set environment files
-[ "${BOOTLOADER}" = "default" ] && BOOTLOADER="${ROOT_TOOLS}/bootloader_dout_40m.bin"
-[ "${BOOTAPP}" = "default" ] && BOOTAPP="${ROOT_TOOLS}/boot_app0.bin"
-[ "${PARTITION}" = "default" ] && PARTITION="${ROOT_TOOLS}/partitions.bin"
-
 # check if files exist
 [ ! -f "${IMAGE}" ] && { echo "[error] Image file ${IMAGE} missing"; exit 1; }
-[ "${BOOTLOADER}" != "" -a ! -f "${BOOTLOADER}" ] && { echo "[error] Bootloader ${BOOTLOADER} missing"; exit 1; }
-[ "${BOOTAPP}" != ""    -a ! -f "${BOOTAPP}"    ] && { echo "[error] Boot app ${BOOTAPP} missing"; exit 1; }
-[ "${PARTITION}" != ""  -a ! -f "${PARTITION}"  ] && { echo "[error] Partition table ${PARTITION} missing"; exit 1; }
+
+# prepare environment
+[ ! -d "${ROOT_FILES}" ] && mkdir --parents "${ROOT_FILES}"
+[ ! -f "${BOOTLOADER}" ] && wget -O "${BOOTLOADER}" "https://github.com/NicolasBernaerts/tasmota/blob/master/tools/esp32_bootloader_dout.bin?raw=true"
+[ ! -f "${BOOTAPP}" ] && wget -O "${BOOTAPP}" "https://github.com/NicolasBernaerts/tasmota/blob/master/tools/esp32_boot_app.bin?raw=true"
+[ ! -f "${PARTITION}" ] && wget -O "${PARTITION}" "https://github.com/NicolasBernaerts/tasmota/blob/master/tools/esp32_partitions.bin?raw=true"
 
 # general options
+ARR_PARAM=( )
 [ "${PORT}" != "" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "--port" "${PORT}" )
 [ "${BAUD}" != "" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "--baud" "${BAUD}" )
 
 # generate temporary files and directory
 TMP_DIR=$(mktemp -t -d "flash-XXXXXXXX")
-TMP_PART="${TMP_DIR}/partitions.bin"
+TMP_ERASE="${TMP_DIR}/erase.bin"
+TMP_PART="${TMP_DIR}/partition.bin"
+
+# get device size
+SIZE=$(esptool "${ARR_PARAM[@]}" "flash_id" | grep "flash size" | cut -d':' -f2 | xargs)
+echo "Device is ${SIZE}"
+
+# check if partition conversion from CSV to BIN is needed
+if [ -f "${PARTITION_CSV}" ]
+then
+	echo "Conversion of ${PARTITION_CSV}"
+	gen_esp32part.py "${PARTITION_CSV}" "${TMP_PART}"
+	PARTITION="${TMP_PART}"
+fi
 
 # if erase
 if [ "${ERASE}" = "ok" ]
 then
-	# wait for program mode
-	echo ""
-	echo "---- Erasing ----"
-	echo "  * Set ${DEVICE} in program mode"
-	echo "  * Connect serial port"
-	echo "  * press ENTER to erase"
-	read
-	echo "  * Reading device size"
-	SIZE=$(esptool "${ARR_PARAM[@]}" "flash_id" | grep "flash size" | cut -d':' -f2 | xargs)
-	[ "${SIZE}" != "" ] && BLANK_FILE="${ROOT_TOOLS}/blank_${SIZE}.bin"
-	echo "  * Device is ${SIZE}"
-	echo "  * Erasing ${SIZE} block"
-	[ -f "${BLANK_FILE}" ] && esptool "${ARR_PARAM[@]}" "write_flash" 0x000000 "${BLANK_FILE}" || echo "Impossible to erase : ${BLANK_FILE} missing" 
+	# erase device with file filed with 0
+	echo "-----"
+	echo "Erasing device"
+	dd "if=/dev/zero" "of=${TMP_ERASE}" "bs=${SIZE}" "count=1"
+	esptool "${ARR_PARAM[@]}" "write_flash" "0x000000" "${TMP_ERASE}"
+	sleep 2
 fi
 
 # if flash
 if [ "${FLASH}" = "ok" ]
 then
 	# wait for program mode
-	echo ""
-	echo "---- Flashing ----"
-	echo "  * Set ${DEVICE} in program mode"
-	echo "  * Connect serial port"
-	echo "  * press ENTER to erase"
-	read
-	echo ""
+	echo "-----"
+	echo "Flashing device"
 
-	# check if partition conversion from CSV to BIN is needed
-	[ -f "${PARTITION}" ] && EXTENSION=$(echo "${PARTITION##*.}")
-	if [ "${EXTENSION}" = "csv" ]
-	then
-		echo "Conversion of ${PARTITION}"
-		gen_esp32part.py "${PARTITION}" "${TMP_PART}"
-		PARTITION="${TMP_PART}"
-		echo ""
-	fi
+	# ESP32 option
+	[ "${DEVICE}" = "ESP32" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "--chip" "esp32" "--before" "default_reset" "--after" "hard_reset" )
 
-	# device option
-	if [ "${DEVICE}" = "ESP8266" ]
-	then
-		# set flash specific parameters
-		ARR_PARAM=( "${ARR_PARAM[@]}" "write_flash" "0x0000" "${IMAGE}" )
+	# global options
+	ARR_PARAM=( "${ARR_PARAM[@]}" "write_flash" "--flash_size" "detect" )
 
-	elif [ "${DEVICE}" = "ESP32" ]
+	if [ "${DEVICE}" = "ESP32" ]
 	then
-		ARR_PARAM=( "${ARR_PARAM[@]}" "--chip" "esp32" )
-		ARR_PARAM=( "${ARR_PARAM[@]}" "--before" "default_reset" "--after" "hard_reset" "write_flash" "-z" )
-		ARR_PARAM=( "${ARR_PARAM[@]}" "--flash_mode" "dout" "--flash_freq" "40m" "--flash_size" "detect" )
-		[ -f "${BOOTLOADER}" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "0x1000" "${BOOTLOADER}" )
-		[ -f "${PARTITION}" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "0x8000" "${PARTITION}")
-		[ -f "${BOOTAPP}" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "0xe000" "${BOOTAPP}" )
+		# flashing options
+		ARR_PARAM=( "${ARR_PARAM[@]}" "--flash_mode" "dout" "--flash_freq" "40m" )
+
+		# if device has been erased or if partition is modified, force boot, bootapp and partition flash
+		if [ "${ERASE}" = "ok" -o "${PARTITION_CSV}" != "" ]
+		then
+			ARR_PARAM=( "${ARR_PARAM[@]}" "0x1000" "${BOOTLOADER}" )
+			ARR_PARAM=( "${ARR_PARAM[@]}" "0x8000" "${PARTITION}")
+			ARR_PARAM=( "${ARR_PARAM[@]}" "0xe000" "${BOOTAPP}" )
+		fi
+
+		# set binary image
 		ARR_PARAM=( "${ARR_PARAM[@]}" "0x10000" "${IMAGE}" )
-	fi
 
-	# flash image
-	echo "Flashing options : ${ARR_PARAM[@]}"
-	esptool "${ARR_PARAM[@]}"
+	# ESP8266
+	else
+		# binary image
+		ARR_PARAM=( "${ARR_PARAM[@]}" "0x00000" "${IMAGE}" )
+	fi
 fi
+
+# flash image
+echo "Options : ${ARR_PARAM[@]}"
+esptool "${ARR_PARAM[@]}"
 
 # remove temporary directory
 rm -r "${TMP_DIR}"
