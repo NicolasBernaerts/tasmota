@@ -10,11 +10,8 @@ Some Tasmota firmware extensions :
   * **teleinfo** : manage french Linky meter
   * **vmc** : handle motor controled ventilator according to target humidity level
 
-**tasmota-discover** is a simple bash script to list all devices (tasmota and others) available on the same LAN.
-
-**tasmota-flash** is a simple bash script to erase and/or flash ESP8266 and ESP32 decices.
-To be able to use it, you first need to :
-  * download and extract esptool.zip to any directory
-  * update tasmota-flash **ROOT_TOOLS** variable with this directory path
+In the **tools** folder you'll get 2 simple tools I've written :
+  * **tasmota-discover** to list all devices (tasmota and others) available on the same LAN.
+  * **tasmota-flash** to erase and/or flash ESP8266 and ESP32 decices.
 
 These projects are explained in detail under http://www.bernaerts-nicolas.fr/iot/
