@@ -74,7 +74,7 @@ TMP_ERASE="${TMP_DIR}/erase.bin"
 TMP_PART="${TMP_DIR}/partition.bin"
 
 # get device size
-SIZE=$(esptool "${ARR_PARAM[@]}" "flash_id" | grep "flash size" | cut -d':' -f2 | xargs)
+SIZE=$(esptool "${ARR_PARAM[@]}" "flash_id" | grep "flash size" | cut -d':' -f2 | sed "s/MB/MiB/" | xargs)
 echo "Device is ${SIZE}"
 
 # check if partition conversion from CSV to BIN is needed
