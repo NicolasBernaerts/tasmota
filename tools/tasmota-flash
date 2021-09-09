@@ -8,7 +8,7 @@
 #   25/04/2021, V1.1 - Update --erase to use blank files
 #   27/08/2021, V1.2 - Add --partition conversion from CSV to BIN
 #   08/09/2021, V1.3 - Simplify options for ESP32
-#                      Download ESP32 files from Github
+#                      Download ESP32 default files from Github
 # ----------------------------------------------------------
 
 # default files and images
