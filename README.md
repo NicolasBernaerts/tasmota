@@ -10,7 +10,7 @@ Some Tasmota firmware extensions :
   * **teleinfo** : manage french Linky meter
   * **vmc** : handle motor controled ventilator according to target humidity level
 
-In the **tools** folder you'll get 2 simple tools I've written :
+In the **tools** folder you get 2 simple tools :
   * **tasmota-discover** to list all devices (tasmota and others) available on the same LAN.
   * **tasmota-flash** to erase and/or flash ESP8266 and ESP32 decices.
 
