@@ -47,9 +47,15 @@
     16/05/2021 - v8.1.1 - Control initial baud rate to avoid crash (thanks to Seb)
     26/05/2021 - v8.2   - Add active power (W) graph
     22/06/2021 - v8.3   - Change in serial management for ESP32
-    04/08/2021 - v8.4   - Complete change in VA, W and cos phi measurement based on transmission time
+    04/08/2021 - v9.0   - Tasmota 9.5 compatibility
+                          Add LittleFS historic data record
+                          Complete change in VA, W and cos phi measurement based on transmission time
                           Add PME/PMI ACE6000 management
                           Add energy update interval configuration
+                          Add TIC to TCP bridge (command 'TICtcp 8888' to publish teleinfo stream on port 8888)
+    04/09/2021 - v9.1   - Save settings in LittleFS partition if available
+                          Delete old historic files is parition space low
+    04/09/2021 - v9.1.1 - Add peak VA and V on historic files
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -96,7 +102,7 @@
 
 // extension
 #define EXTENSION_NAME    "Teleinfo"          // name
-#define EXTENSION_VERSION "9.0c"               // version
+#define EXTENSION_VERSION "9.1.1"             // version
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
 
 // MQTT default
