@@ -16,7 +16,7 @@ It is compatible with **ESP8266** and **ESP32** chipsets.
  
 Please note that it is a completly different implementation than the one published early 2020 by Charles Hallard. 
 
-Some of these firmware are using a LittleFS partition to store graph data. Il allows to keep historical data over reboots.
+Some of these firmware versions are using a LittleFS partition to store graph data. Il allows to keep historical data over reboots.
 To take advantage of this feature, make sure to follow partitioning procedure given in the **readme** of the **binary** folder.
 
 This firmware calculates Power Factor (Cos φ) from Teleinfo totals (W) and Instant Power (VA).
@@ -26,6 +26,8 @@ It also provides :
   * some real time energy graphs (VA, W, V and Cos phi)
   * some historical energy graphs (if chipset is partitionned with LittleFS)
   * Some MQTT data (tasmota energy data, Teleinfo data and some plain meter data)
+
+If you are using a LittleFS version, you'll also get peak apparent power and peak voltage on the graphs.
 
 If your linky in in historic mode, it doesn't provide instant voltage. Voltage is then forced to 230V.
 
