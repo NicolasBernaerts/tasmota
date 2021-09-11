@@ -16,6 +16,9 @@ It is compatible with **ESP8266** and **ESP32** chipsets.
  
 Please note that it is a completly different implementation than the one published early 2020 by Charles Hallard. 
 
+Some of these firmware are using a LittleFS partition to store graph data. Il allows to keep historical data over reboots.
+To take advantage of this feature, make sure to follow partitioning procedure given in the **readme** of the **binary** folder.
+
 This firmware calculates Power Factor (Cos φ) from Teleinfo totals (W) and Instant Power (VA).
 It is evaluated everytime total power increases of a certain amount of W that you can configure.
 
@@ -83,8 +86,6 @@ Finaly, in **Configure Teleinfo** you need to select your Teleinfo adapter baud 
 If you are using an **ESP32** device, you can use its **Ethernet** port after selecting the proper board on the **Configure ESP32** menu.
 
 Teleinfo protocol is described in this document : https://www.enedis.fr/sites/default/files/Enedis-NOI-CPT_54E.pdf
-
-Pre-compiled version are available in the **binary** sub-directory.
 
 MQTT result should look like that :
 
