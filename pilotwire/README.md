@@ -20,8 +20,12 @@ Typical diodes to use are **1N4004**. Connexion should be done directly on the r
 
 
 You'll also get a **Thermostat** mode that will allow you to pilot the heater to maintain a target temperature in the room. To activate that mode, you'll need either to :
-  * connect a **local DF18B20** temperature sensor (on **serial RX** for example)
+  * connect a **local DF18B20** temperature sensor (on **GPIO03 serial RX**)
   * declare a **MQTT remote** temperature sensor
+
+Here is the template you can use if you are are using a Sonoff Basic.
+
+![Template Sonoff Basic](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/pilotwire/screen/tasmota-pilotwire-sonoff-template.png) 
 
 You can also declare a **MQTT remote power meter** to handle **automatic offload** when global power is to high according to your energy contract.
 
