@@ -1,0 +1,17 @@
+{
+	"name": "FTP",
+	"description": "Simple FTP Server and Client for using SPIFFS or LittleFS",
+	"keywords": "esp8266, ftp, spiffs, littlefs",
+	"authors":
+		{
+			"name": "Daniel Plasa",
+			"email": "dplasa@gmail.com"
+		},
+	"repository":
+	{
+		"type": "git",
+		"url": "https://github.com/dplasa/espFTPServer"
+	},
+	"frameworks": "Arduino",
+	"platforms": "*"
+}
