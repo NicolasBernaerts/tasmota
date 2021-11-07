@@ -9,6 +9,7 @@
 #   27/08/2021, V1.2 - Add --partition conversion from CSV to BIN
 #   08/09/2021, V1.3 - Simplify options for ESP32
 #                      Download ESP32 default files from Github
+#   07/11/2021, V1.4 - Handle --erase for 16Mb chips (limit erase to 4MB)
 # ----------------------------------------------------------
 
 # default files and images
@@ -29,6 +30,7 @@ then
     echo "  --esp32                   Flash ESP32 device"
     echo "  --port <com>              Use specific COM port"
     echo "  --baud <baud>             Use specific speed (in bauds)"
+    echo "  --noreset                 Do not reset chip (ch340 usb-serial bug fix)"
     echo "  --erase                   Erase device before flash"
     echo "  --flash <file.bin>        Path to image file"
     echo "  --partition <file.csv>    Path to .csv partition file (will be converted to BIN)"
@@ -36,8 +38,8 @@ then
 fi
 
 # check tools availability
-command -v esptool >/dev/null 2>&1 || { echo "[error] Please install esptool"; exit 1; }
-command -v gen_esp32part.py >/dev/null 2>&1 || { echo "[error] Please install gen_esp32part.py"; exit 1; }
+command -v esptool >/dev/null 2>&1 || { zenity --error --text="Please install esptool"; exit 1; }
+command -v gen_esp32part.py >/dev/null 2>&1 || { zenity --error --text="Please install gen_esp32part.py"; exit 1; }
 
 # iterate thru parameters
 while test ${#} -gt 0
@@ -47,6 +49,7 @@ do
         --esp32) DEVICE="ESP32"; shift; ;;
         --port) shift; PORT="$1"; shift; ;;
         --baud) shift; BAUD="$1"; shift; ;;
+        --noreset) NORESET="ok"; shift; ;;
         --erase) ERASE="ok"; shift; ;;
         --flash) FLASH="ok"; shift; IMAGE="$1"; shift; ;;
         --partition) shift; PARTITION_CSV="$1"; shift; ;;
@@ -67,6 +70,7 @@ done
 ARR_PARAM=( )
 [ "${PORT}" != "" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "--port" "${PORT}" )
 [ "${BAUD}" != "" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "--baud" "${BAUD}" )
+[ "${NORESET}" = "ok" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "--before" "no_reset" )
 
 # generate temporary files and directory
 TMP_DIR=$(mktemp -t -d "flash-XXXXXXXX")
@@ -74,7 +78,7 @@ TMP_ERASE="${TMP_DIR}/erase.bin"
 TMP_PART="${TMP_DIR}/partition.bin"
 
 # get device size
-SIZE=$(esptool "${ARR_PARAM[@]}" "flash_id" | grep "flash size" | cut -d':' -f2 | sed "s/MB/MiB/" | xargs)
+SIZE=$(esptool "${ARR_PARAM[@]}" "flash_id" | grep "flash size" | cut -d':' -f2 | cut -d'M' -f1 | xargs)
 echo "Device is ${SIZE}"
 
 # check if partition conversion from CSV to BIN is needed
@@ -91,6 +95,8 @@ then
 	# erase device with file filed with 0
 	echo "-----"
 	echo "Erasing device"
+	[ ${SIZE} -lt 512 -a ${SIZE} -gt 4 ] && SIZE="4"
+	[ ${SIZE} -eq 512 ] && SIZE="${SIZE}kiB" || SIZE="${SIZE}MiB"
 	dd "if=/dev/zero" "of=${TMP_ERASE}" "bs=${SIZE}" "count=1"
 	esptool "${ARR_PARAM[@]}" "write_flash" "0x000000" "${TMP_ERASE}"
 	sleep 2
