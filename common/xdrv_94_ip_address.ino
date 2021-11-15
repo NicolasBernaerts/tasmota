@@ -60,7 +60,6 @@ bool IPAddressIsConnected ()
 
   // wifi
   is_connected = ((uint32_t)WiFi.localIP () > 0);
-  //WiFi.isConnected ();
 
 #ifdef ESP32
 #ifdef USE_ETHERNET

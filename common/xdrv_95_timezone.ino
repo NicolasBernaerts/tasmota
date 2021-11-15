@@ -29,9 +29,6 @@
 
 #define XDRV_95                   95
 
-// constants
-#define TIMEZONE_JSON_MAX         112
-
 // commands
 #define D_CMND_TIMEZONE_NTP       "ntp"
 #define D_CMND_TIMEZONE_STDO      "stdo"
@@ -58,9 +55,9 @@ const char D_TIMEZONE_MONTH[]  PROGMEM = "Month (1:jan ... 12:dec)";
 const char D_TIMEZONE_WEEK[]   PROGMEM = "Week (0:last ... 4:fourth)";
 const char D_TIMEZONE_DAY[]    PROGMEM = "Day of week (1:sun ... 7:sat)";
 
-// offloading commands
-enum TimezoneCommands { CMND_TIMEZONE_NTP, CMND_TIMEZONE_STDO, CMND_TIMEZONE_STDM, CMND_TIMEZONE_STDW, CMND_TIMEZONE_STDD, CMND_TIMEZONE_DSTO, CMND_TIMEZONE_DSTM, CMND_TIMEZONE_DSTW, CMND_TIMEZONE_DSTD };
-const char kTimezoneCommands[] PROGMEM = "ntp|stdo|stdm|sdtw|stdd|dsto|dstm|dstw|dstd";
+// timezone setiing commands
+const char kTimezoneCommands[] PROGMEM = "tz_|ntp|stdo|stdm|sdtw|stdd|dsto|dstm|dstw|dstd";
+void (* const TimezoneCommand[])(void) PROGMEM = { &CmndTimezoneNtp, &CmndTimezoneStdO, &CmndTimezoneStdM, &CmndTimezoneStdW, &CmndTimezoneStdD, &CmndTimezoneDstO, &CmndTimezoneDstM, &CmndTimezoneDstW, &CmndTimezoneDstD };
 
 // constant strings
 const char TZ_FIELDSET_START[] PROGMEM = "<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n";
@@ -99,54 +96,62 @@ void TimezoneInit ()
   Settings->timezone = 99;
 }
 
-// Handle timezone MQTT commands
-bool TimezoneMqttCommand ()
+/***********************************************\
+ *                  Commands
+\***********************************************/
+
+void CmndTimezoneNtp ()
 {
-  bool command_handled = true;
-  int  command_code;
-  char command [CMDSZ];
+  SettingsUpdateText(SET_NTPSERVER1, XdrvMailbox.data);
+  ResponseCmndChar (XdrvMailbox.data);
+}
 
-  // check MQTT command
-  command_code = GetCommandCode (command, sizeof(command), XdrvMailbox.topic, kTimezoneCommands);
+void CmndTimezoneStdO ()
+{
+  Settings->toffset[0] = XdrvMailbox.payload;
+  ResponseCmndNumber (XdrvMailbox.payload);
+}
 
-  // handle command
-  switch (command_code)
-  {
-    case CMND_TIMEZONE_NTP:  // set 1st NTP server
-      SettingsUpdateText(SET_NTPSERVER1, XdrvMailbox.data);
-      break;
-    case CMND_TIMEZONE_STDO:  // set timezone STD offset
-      Settings->toffset[0] = XdrvMailbox.payload;
-      break;
-    case CMND_TIMEZONE_STDM:  // set timezone STD month switch
-      Settings->tflag[0].month = XdrvMailbox.payload;
-      break;
-    case CMND_TIMEZONE_STDW:  // set timezone STD week of month switch
-      Settings->tflag[0].week = XdrvMailbox.payload;
-      break;
-    case CMND_TIMEZONE_STDD:  // set timezone STD day of week switch
-      Settings->tflag[0].dow = XdrvMailbox.payload;
-      break;
-    case CMND_TIMEZONE_DSTO:  // set timezone DST offset
-      Settings->toffset[1] = XdrvMailbox.payload;
-      break;
-    case CMND_TIMEZONE_DSTM:  // set timezone DST month switch
-      Settings->tflag[1].month = XdrvMailbox.payload;
-      break;
-    case CMND_TIMEZONE_DSTW:  // set timezone DST week of month switch
-      Settings->tflag[1].week = XdrvMailbox.payload;
-      break;
-    case CMND_TIMEZONE_DSTD:  // set timezone DST day of week switch
-      Settings->tflag[1].dow = XdrvMailbox.payload;
-      break;
-   default:
-      command_handled = false;
-  }
+void CmndTimezoneStdM ()
+{
+  Settings->tflag[0].month = XdrvMailbox.payload;
+  ResponseCmndNumber (XdrvMailbox.payload);
+}
 
-  // if needed, send updated status
-  if (command_handled == true) TimezoneShowJSON (false);
+void CmndTimezoneStdW ()
+{
+  Settings->tflag[0].week = XdrvMailbox.payload;
+  ResponseCmndNumber (XdrvMailbox.payload);
+}
 
-  return command_handled;
+void CmndTimezoneStdD ()
+{
+  Settings->tflag[0].dow = XdrvMailbox.payload;
+  ResponseCmndNumber (XdrvMailbox.payload);
+}
+
+void CmndTimezoneDstO ()
+{
+  Settings->toffset[1] = XdrvMailbox.payload;
+  ResponseCmndNumber (XdrvMailbox.payload);
+}
+
+void CmndTimezoneDstM ()
+{
+  Settings->tflag[1].month = XdrvMailbox.payload;
+  ResponseCmndNumber (XdrvMailbox.payload);
+}
+
+void CmndTimezoneDstW ()
+{
+  Settings->tflag[1].week = XdrvMailbox.payload;
+  ResponseCmndNumber (XdrvMailbox.payload);
+}
+
+void CmndTimezoneDstD ()
+{
+  Settings->tflag[1].dow = XdrvMailbox.payload;
+  ResponseCmndNumber (XdrvMailbox.payload);
 }
 
 /***********************************************\
@@ -279,7 +284,7 @@ bool Xdrv95 (uint8_t function)
       TimezoneInit ();
       break;
     case FUNC_COMMAND:
-      result = TimezoneMqttCommand ();
+      result = DecodeCommand (kTimezoneCommands, TimezoneCommand);
       break;
 
 #ifdef USE_WEBSERVER
