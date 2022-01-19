@@ -58,6 +58,12 @@ Pilotwire protocol is described at http://www.radiateur-electrique.org/fil-pilot
 
 Pre-compiled version of Tasmota handling fil pilote is available : **tasmota.bin**
 
+If you want to compile it, you need to add following files from **tasmota/common** :
+  * xdrv_50_filesystem_cfg_csv.ino
+  * xdrv_95_timezone.ino
+  * xdrv_94_ip_address.ino
+  * xdrv_97_remote_sensor.ino
+
 Complete setup guide will be available at http://www.bernaerts-nicolas.fr/iot/...
 
 ![Main page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/pilotwire/screen/tasmota-pilotwire-main.png)   ![Config page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/pilotwire/screen/tasmota-pilotwire-config.png)   ![Control page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/pilotwire/screen/tasmota-pilotwire-control.png)
