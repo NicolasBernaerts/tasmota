@@ -1,11 +1,11 @@
 Tasmota modified for Offload and Pilotwire (Fil Pilote) heater protocol
 =============
 
-This evolution of Tasmota firmware has been enhanced to handle France electrical heaters **Fil Pilote** protocol on **Sonoff Basic** and **Sonoff Dual R2**.
+This evolution of Tasmota firmware has been enhanced to handle France electrical heaters **Fil Pilote** protocol on **Sonoff Basic** and **Wemos D1 Mini**.
 
 This firmware handles :
   * a pilotwire 2 orders on **Sonoff Basic**
-  * a pilotwire 4 orders on **Sonoff Dual R2**.
+  * a pilotwire 2 orders on **Sonoff Basic** and **Wemos D1 Mini**
 
 To enable **Pilotwire** mode on a **Sonoff Basic** or **Sonoff Dual R2**, you need to :
   * connect diodes on the Sonoff output port(s)
