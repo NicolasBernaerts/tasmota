@@ -21,6 +21,10 @@ You'll also get a **Thermostat** mode that will allow you to pilot the heater to
   * connect a **local DF18B20** temperature sensor (on **GPIO03 serial RX**)
   * declare a **MQTT remote** temperature sensor
 
+Pilotwire controler provides 2 more options :
+  * open window detection (activated if temperature drops of 0.5°C in less than 4mn, released when temperature goes up 0.2°C)
+  * movement detection (based on RCML0516 declared as switch 1, after 1 hour, decreases temperature of 0.5°C every 30mn down to target temperature)
+  * 
 Here is the template you can use if you are are using a Sonoff Basic.
 
 ![Template Sonoff Basic](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/pilotwire/screen/tasmota-pilotwire-sonoff-template.png) 
@@ -36,12 +40,10 @@ This firmware is based on Tasmota **v9.1** modified to handle **Pilotwire** with
   * extension of JSON MQTT status
   * new specific MQTT commands
   * automatic offload when global power is overloading your contract
-  * timers management (ON = target temperature, OFF = night mode temperature)
+  * timers management (switch ON = go to night mode, switch OFF = go back to normal mode)
   * **/control** public page to control thermostat
   * **/histo** public page to get offloading history
   * **/info.json** to get device main caracteristics
-  * **/data.json** to get device daily temperature and target temperature in JSON format
-  * **/histo.json** to get offload history in JSON format 
 
 MQTT JSON result should look like that :
 
