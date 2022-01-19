@@ -1,4 +1,4 @@
-Tasmota modified for Offload and Pilotwire (Fil Pilote) heater protocol
+Plug management with Offload capacity / Pilotwire (Fil Pilote) heater protocol management
 =============
 
 This evolution of Tasmota firmware has been enhanced to handle France electrical heaters **Fil Pilote** protocol on **Sonoff Basic** and **Wemos D1 Mini**.
