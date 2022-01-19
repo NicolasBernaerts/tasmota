@@ -1,16 +1,17 @@
 Plug management with Offload capacity / Pilotwire (Fil Pilote) heater protocol management
 =============
 
-This evolution of Tasmota firmware has been enhanced to handle France electrical heaters **Fil Pilote** protocol on **Sonoff Basic** and **Wemos D1 Mini**.
+This evolution of Tasmota firmware has been enhanced to handle :
+  * Power plugs with offload capacity when subscribing to MQTT meter
+  * France electrical heaters **Fil Pilote** protocol management
 
-This firmware handles :
-  * a plug switch with offload capacity
-  * a pilotwire 2 orders on **Sonoff Basic** and **Wemos D1 Mini**
+**Offload** has been tested on **Sonoff S26** and **Athom power plug**.
+**Pilotwire** has been tested on **Sonoff Basic** (1Mb), **Wemos D1 Mini** (4Mb) and **Wemos D1 Pro** (16Mb).
 
 To enable **Pilotwire** mode on a **Sonoff Basic** you need to :
   * connect diode on the Sonoff output port
-  * flash provided firmware
-  * Setup configuration pages
+  * connect a temperature sensor to your device
+  * Flash firmware and setup configuration pages
 
 Typical diode to use is **1N4007**. Connexion should be done directly on the relay output :
 
