@@ -7,7 +7,7 @@ This evolution of Tasmota firmware has been enhanced to handle :
 
 **Offload** has been tested on **Sonoff S26** and **Athom power plug**.
 
-**Pilotwire** has been tested on **Sonoff Basic** (1Mb), **Wemos D1 Mini** (4Mb) and **Wemos D1 Pro** (16Mb).
+**Pilotwire** has been tested on **Sonoff Basic** (1Mb), **ESP01** (1Mb) and **Wemos D1 Mini** (4Mb).
 
 To enable **Pilotwire** mode on a **Sonoff Basic** you need to :
   * connect diode on the Sonoff output port
@@ -50,7 +50,7 @@ This firmware is based on Tasmota **v9.1** modified to handle **Pilotwire** with
 MQTT JSON result should look like that :
 
     23:59:26.476 MQT: chambre2nd/tele/STATE = {"Time":"2022-01-19T23:59:26","Uptime":"0T23:10:12","UptimeSec":83412,"Heap":23,"SleepMode":"Dynamic","Sleep":50,"LoadAvg":19,"MqttCount":5,"POWER":"OFF","Wifi":{"AP":1,"SSId":"xxxxxxx-yyyyyyy","BSSId":"30:23:03:xx:xx:xx","Channel":1,"Mode":"11n","RSSI":54,"Signal":-73,"LinkCount":1,"Downtime":"0T00:00:05"}}
-    23:59:26.484 MQT: chambre2nd/tele/SENSOR = {"Time":"2022-01-19T23:59:26","DS18B20":{"Id":"030E97943560","Temperature":16.9},"Pilotwire":{"Mode":2,"Status":2,"Heating":1,"Temperature":16.9,"Target":17.0},"Offload":{"State":0,"Stage":0,"Device":1500},"TempUnit":"C"}
+    23:59:26.484 MQT: chambre2nd/tele/SENSOR = {"Time":"2022-01-19T23:59:26","DS18B20":{"Id":"030E97943560","Temperature":16.9},"Pilotwire":{"Mode":2,"Status":2,"Heating":1,"Temperature":16.9,"Target":17.0,"Detect":128,"Window":0},"Offload":{"State":0,"Stage":0,"Device":1500},"TempUnit":"C"}
 
 
 Pilotwire protocol is described at http://www.radiateur-electrique.org/fil-pilote-radiateur.php
