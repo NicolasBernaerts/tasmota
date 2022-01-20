@@ -66,6 +66,6 @@ If you want to compile it, you need to add following files from my **tasmota/com
 Complete setup guide will be available at http://www.bernaerts-nicolas.fr/iot/...
 
 ![Main page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload-pilotwire/screen/tasmota-pilotwire-main.png) 
-![Offload config page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offpiload-lotwire/screen/tasmota-offload-config.png) 
-![Pilotwire cnfig page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offpiload-lotwire/screen/tasmota-pilotwire-config.png) 
+![Offload config page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload-pilotwire/screen/tasmota-offload-config.png) 
+![Pilotwire cnfig page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload-pilotwire/screen/tasmota-pilotwire-config.png) 
 ![Control page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload-pilotwire/screen/tasmota-pilotwire-control.png)
