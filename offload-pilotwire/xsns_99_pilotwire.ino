@@ -114,6 +114,7 @@
 #define D_JSON_PILOTWIRE_STATUS           "Status"
 #define D_JSON_PILOTWIRE_HEATING          "Heating"
 #define D_JSON_PILOTWIRE_DETECT           "Detect"
+#define D_JSON_PILOTWIRE_WINDOW           "Window"
 #define D_JSON_PILOTWIRE_TARGET           "Target"
 #define D_JSON_PILOTWIRE_TEMPERATURE      "Temperature"
 
@@ -163,14 +164,11 @@
 #define PILOTWIRE_TEMP_SCALE_LOW          18        // limit between economy and medium temperature scale
 #define PILOTWIRE_TEMP_SCALE_HIGH         21        // limit between economy and medium temperature scale
 
-// consant : movement detection
+// constant : movement detection
 #define PILOTWIRE_MOVEMENT_TIMEOUT        30        // timeout after last movement detection (in sec.)
-//#define PILOTWIRE_MOVEMENT_NOBODY_START   60        // if no mvt during 1h, nobody at home (in mn)
-//#define PILOTWIRE_MOVEMENT_NOBODY_DROP    30        // delay between 0.5°C target drop in NOBODY mode (in mn)
-//#define PILOTWIRE_MOVEMENT_VACANCY_START  2880      // if no mvt during 48h, home is vacant (in mn)
-#define PILOTWIRE_MOVEMENT_NOBODY_START   2        // if no mvt during 1h, nobody at home (in mn)
-#define PILOTWIRE_MOVEMENT_NOBODY_DROP    1        // delay between 0.5°C target drop in NOBODY mode (in mn)
-#define PILOTWIRE_MOVEMENT_VACANCY_START  5      // if no mvt during 48h, home is vacant (in mn)
+#define PILOTWIRE_MOVEMENT_NOBODY_START   60        // if no mvt during 1h, nobody at home (in mn)
+#define PILOTWIRE_MOVEMENT_NOBODY_DROP    30        // delay between 0.5°C target drop in NOBODY mode (in mn)
+#define PILOTWIRE_MOVEMENT_VACANCY_START  2880      // if no mvt during 48h, home is vacant (in mn)
 
 // constant : open window detection
 #define PILOTWIRE_WINDOW_SAMPLE_NBR       24        // number of temperature samples to detect opened window (4mn for 1 sample every 10s)
@@ -334,7 +332,7 @@ unsigned int pilotwire_vacancy_len = 626;
 
 // pilotwire : configuration
 struct {
-  bool    window_open = false;                          // enable window open detection
+  bool    window      = false;                          // enable window open detection
   bool    mvt_detect  = false;                          // enable movement detection
   uint8_t device_type = UINT8_MAX;                      // pilotwire or direct connexion
   uint8_t device_mode = UINT8_MAX;                      // running mode (off, on, thermostat)
@@ -738,7 +736,7 @@ void PilotwireWindowUpdateDetection ()
     pilotwire_window.low_temp = min (pilotwire_window.low_temp, pilotwire_temperature.current);
 
     // if current temperature has increased enought, window is closed
-    if (pilotwire_temperature.current - pilotwire_window.low_temp > PILOTWIRE_WINDOW_CLOSE_INCREASE) PilotwireWindowResetDetection ();
+    if (pilotwire_temperature.current - pilotwire_window.low_temp >= PILOTWIRE_WINDOW_CLOSE_INCREASE) PilotwireWindowResetDetection ();
   }
 }
 
@@ -820,8 +818,8 @@ void CmndPilotwireTarget ()
 
 void CmndPilotwireWindow ()
 {
-  if (XdrvMailbox.data_len > 0) pilotwire_config.window_open = (XdrvMailbox.payload != 0);
-  ResponseCmndNumber (pilotwire_config.window_open);
+  if (XdrvMailbox.data_len > 0) pilotwire_config.window = (XdrvMailbox.payload != 0);
+  ResponseCmndNumber (pilotwire_config.window);
 }
 
 void CmndPilotwireMvtDetect ()
@@ -885,8 +883,8 @@ void PilotwireLoadConfig ()
   // retrieve saved settings from flash filesystem
   device_mode = (uint8_t)UfsCfgLoadKeyInt (D_PILOTWIRE_FILE_CFG, D_CMND_PILOTWIRE_MODE, 0);
   pilotwire_config.device_type = (uint8_t)UfsCfgLoadKeyInt (D_PILOTWIRE_FILE_CFG, D_CMND_PILOTWIRE_TYPE, 0);
-  pilotwire_config.window_open = (bool)UfsCfgLoadKeyInt (D_PILOTWIRE_FILE_CFG, D_CMND_PILOTWIRE_WINDOW, 0);
-  pilotwire_config.mvt_detect  = (bool)UfsCfgLoadKeyInt (D_PILOTWIRE_FILE_CFG, D_CMND_PILOTWIRE_MVT, 0);
+  pilotwire_config.window = (bool)UfsCfgLoadKeyInt (D_PILOTWIRE_FILE_CFG, D_CMND_PILOTWIRE_WINDOW, 0);
+  pilotwire_config.mvt_detect = (bool)UfsCfgLoadKeyInt (D_PILOTWIRE_FILE_CFG, D_CMND_PILOTWIRE_MVT, 0);
 
   pilotwire_config.arr_target[PILOTWIRE_TEMP_LOW] = UfsCfgLoadKeyFloat (D_PILOTWIRE_FILE_CFG, D_CMND_PILOTWIRE_LOW, PILOTWIRE_TEMP_DEFAULT_LOW);
   pilotwire_config.arr_target[PILOTWIRE_TEMP_HIGH] = UfsCfgLoadKeyFloat (D_PILOTWIRE_FILE_CFG, D_CMND_PILOTWIRE_HIGH, PILOTWIRE_TEMP_DEFAULT_HIGH);
@@ -903,8 +901,8 @@ void PilotwireLoadConfig ()
   // retrieve saved settings from flash memory
   device_mode = (uint8_t)Settings->knx_CB_addr[0];
   pilotwire_config.device_type = (uint8_t)Settings->knx_CB_addr[1];
-  pilotwire_config.window_open = (bool)Settings->knx_CB_addr[8];
-  pilotwire_config.mvt_detect  = (bool)Settings->knx_CB_addr[9];
+  pilotwire_config.window = (bool)Settings->knx_CB_addr[8];
+  pilotwire_config.mvt_detect = (bool)Settings->knx_CB_addr[9];
 
   pilotwire_config.arr_target[PILOTWIRE_TEMP_LOW]     = (float)Settings->knx_CB_addr[2] / 10;
   pilotwire_config.arr_target[PILOTWIRE_TEMP_HIGH]    = (float)Settings->knx_CB_addr[3] / 10;
@@ -944,7 +942,7 @@ void PilotwireSaveConfig ()
   // save settings into flash filesystem
   UfsCfgSaveKeyInt (D_PILOTWIRE_FILE_CFG, D_CMND_PILOTWIRE_MODE, (int)pilotwire_config.device_mode, true);
   UfsCfgSaveKeyInt (D_PILOTWIRE_FILE_CFG, D_CMND_PILOTWIRE_TYPE, (int)pilotwire_config.device_type, false);
-  UfsCfgSaveKeyInt (D_PILOTWIRE_FILE_CFG, D_CMND_PILOTWIRE_WINDOW, (int)pilotwire_config.window_open, false);
+  UfsCfgSaveKeyInt (D_PILOTWIRE_FILE_CFG, D_CMND_PILOTWIRE_WINDOW, (int)pilotwire_config.window, false);
   UfsCfgSaveKeyInt (D_PILOTWIRE_FILE_CFG, D_CMND_PILOTWIRE_MVT, (int)pilotwire_config.mvt_detect, false);
 
   UfsCfgSaveKeyFloat (D_PILOTWIRE_FILE_CFG, D_CMND_PILOTWIRE_LOW, pilotwire_config.arr_target[PILOTWIRE_TEMP_LOW], false);
@@ -959,7 +957,7 @@ void PilotwireSaveConfig ()
   // save settings into flash memory
   Settings->knx_CB_addr[0] = (uint16_t)pilotwire_config.device_mode;
   Settings->knx_CB_addr[1] = (uint16_t)pilotwire_config.device_type;
-  Settings->knx_CB_addr[8] = (uint16_t)pilotwire_config.window_open;
+  Settings->knx_CB_addr[8] = (uint16_t)pilotwire_config.window;
   Settings->knx_CB_addr[9] = (uint16_t)pilotwire_config.mvt_detect;
 
   Settings->knx_CB_addr[2] = (uint16_t)(10 * pilotwire_config.arr_target[PILOTWIRE_TEMP_LOW]);
@@ -1118,6 +1116,9 @@ void PilotwireShowJSON (bool is_autonomous)
   ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%1_f"), &temperature);
   ResponseAppend_P (PSTR (",\"%s\":%s"), D_JSON_PILOTWIRE_TARGET, str_value);
 
+  // if window open detection enabled, add status
+  if (pilotwire_config.window) ResponseAppend_P (PSTR (",\"%s\":%u"), D_JSON_PILOTWIRE_WINDOW, pilotwire_window.opened);
+
   // if movement detection enabled, add last detection (in minutes)
   if (pilotwire_mvt.last != UINT32_MAX) ResponseAppend_P (PSTR (",\"%s\":%u"), D_JSON_PILOTWIRE_DETECT, (LocalTime () - pilotwire_mvt.last) / 60);
 
@@ -1205,6 +1206,9 @@ void PilotwireEvery250ms ()
   // if device is offloaded, target state is off
   if (is_offloaded) target_state = PILOTWIRE_STATUS_OFF;
 
+  // else if window is opened, target status is OFF
+  else if (pilotwire_window.opened) target_state = PILOTWIRE_STATUS_OFF;
+
   // else if status is OFF
   else if (pilotwire_status.device_mode == PILOTWIRE_STATUS_OFF) target_state = PILOTWIRE_STATUS_OFF;
 
@@ -1275,7 +1279,7 @@ void PilotwireEverySecond ()
   if (pilotwire_config.mvt_detect && pilotwire_mvt.present) PilotwireMovementUpdateDetection ();
 
   // update window open detection
-  if (pilotwire_config.window_open) PilotwireWindowUpdateDetection ();
+  if (pilotwire_config.window) PilotwireWindowUpdateDetection ();
 
   // loop thru the periods, to update graph data to the max on the period
   for (counter = 0; counter < PILOTWIRE_PERIOD_MAX; counter++)
@@ -1590,7 +1594,7 @@ void PilotwireWebPageConfigure ()
 
     // get pilotwire open window detection setting according to 'window' parameter
     WebGetArg (D_CMND_PILOTWIRE_WINDOW, str_argument, sizeof (str_argument));
-    pilotwire_config.window_open = (strcmp (str_argument, "on") == 0);
+    pilotwire_config.window = (strcmp (str_argument, "on") == 0);
 
     // get pilotwire movement detection setting according to 'mvt' parameter
     WebGetArg (D_CMND_PILOTWIRE_MVT, str_argument, sizeof (str_argument));
@@ -1678,7 +1682,7 @@ void PilotwireWebPageConfigure ()
 
   WSContentSend_P (D_CONF_FIELDSET_START, D_PILOTWIRE_OPTION);
 
-  if (pilotwire_config.window_open) strcpy (str_value, D_PILOTWIRE_CHECKED); else strcpy (str_value, "");
+  if (pilotwire_config.window) strcpy (str_value, D_PILOTWIRE_CHECKED); else strcpy (str_value, "");
   WSContentSend_P (PSTR ("<p><input type='checkbox' id='%s' name='%s' %s>\n"), D_CMND_PILOTWIRE_WINDOW, D_CMND_PILOTWIRE_WINDOW, str_value);
   WSContentSend_P (PSTR ("<label for='%s'>%s</label></p>\n"), D_CMND_PILOTWIRE_WINDOW, D_PILOTWIRE_WINDOW);
 
