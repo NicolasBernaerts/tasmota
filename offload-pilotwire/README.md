@@ -16,7 +16,7 @@ To enable **Pilotwire** mode on a **Sonoff Basic** you need to :
 
 Typical diode to use is **1N4007**. Connexion should be done directly on the relay output :
 
-![Sonoff Basic](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload-pilotwire/screen/filpilote-diode-single.jpg)
+![Sonoff Basic](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload-pilotwire/screen/pilotwire-diode-single.jpg)
 
 
 You'll also get a **Thermostat** mode that will allow you to pilot the heater to maintain a target temperature in the room. To activate that mode, you'll need either to :
