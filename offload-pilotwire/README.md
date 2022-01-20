@@ -6,6 +6,7 @@ This evolution of Tasmota firmware has been enhanced to handle :
   * France electrical heaters **Fil Pilote** protocol management
 
 **Offload** has been tested on **Sonoff S26** and **Athom power plug**.
+
 **Pilotwire** has been tested on **Sonoff Basic** (1Mb), **Wemos D1 Mini** (4Mb) and **Wemos D1 Pro** (16Mb).
 
 To enable **Pilotwire** mode on a **Sonoff Basic** you need to :
