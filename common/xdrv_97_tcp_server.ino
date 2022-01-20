@@ -3,6 +3,12 @@
 
   Copyright (C) 2021  Nicolas Bernaerts
 
+  This TCP server sends raw TIC message on a TCP port
+  It is then possible to publish the teleinfo stream on your LAN
+  You can start and stop the server from the console : 
+    - start TCP server on port 8888 : tcp_start 8888
+    - stop TCP server               : tcp_stop
+
   Version history :
     04/08/2021 - v1.0   - Creation
 
@@ -25,12 +31,10 @@
 #define TCP_CLIENT_MAX            2              // maximum number of TCP connexion
 #define TCP_DATA_MAX              64             // buffer size
 
-#define D_CMND_TCPSERVER_ENABLE   "enable"
-
-// TCP - MQTT commands : TCPrun
-enum TCPServerCommands { TCP_CMND_NONE, TCP_CMND_ENABLE };
-const char kTCPServerCommands[] PROGMEM = "TCP" "|" D_CMND_TCPSERVER_ENABLE;
-void (* const TCPServerCommand[])(void) PROGMEM = { &CmndTCPEnable };
+// TCP - MQTT commands
+enum TCPServerCommands { TCP_CMND_NONE, TCP_CMND_START, TCP_CMND_STOP };
+const char kTCPServerCommands[] PROGMEM = "tcp_" "|" "start" "|" "stop";
+void (* const TCPServerCommand[])(void) PROGMEM = { &CmndTCPStart, &CmndTCPStop };
 
 /****************************************\
  *        Class TeleinfoTCPServer
@@ -77,7 +81,7 @@ void TCPServer::stop ()
     for (index = 0; index < TCP_CLIENT_MAX; index++) client[index].stop ();
 
     // log
-    AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Stopping TCP server"));
+    AddLog (LOG_LEVEL_INFO, PSTR ("TCP: Stopping TCP server"));
   }
 }
 
@@ -98,7 +102,7 @@ void TCPServer::start (int port)
     buffer_index = 0;
 
     // log
-    AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Starting TCP server on port %d"), port);
+    AddLog (LOG_LEVEL_INFO, PSTR ("TCP: Starting TCP server on port %d"), port);
   }
 }
 
@@ -159,13 +163,17 @@ void TCPServer::manage_client ()
 TCPServer tcp_server;
 
 // Start TCP server
-void CmndTCPEnable (void)
+void CmndTCPStart (void)
 {
-  // start TCP server
   tcp_server.start (XdrvMailbox.payload);
-
-  // answer command
   ResponseCmndNumber (XdrvMailbox.payload);
+}
+
+// Stop TCP server
+void CmndTCPStop (void)
+{
+  tcp_server.stop ();
+  ResponseCmndDone ();
 }
 
 /***********************************************************\

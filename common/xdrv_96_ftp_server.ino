@@ -4,6 +4,7 @@
   
   Copyright (C) 2021  Nicolas Bernaerts
     02/11/2021 - v1.0 - Creation 
+    19/11/2021 - v1.1 - Tasmota 10 compatibility 
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -43,11 +44,7 @@ void FTPServerInit ()
   {
     // create FTP server
     AddLog (LOG_LEVEL_INFO, PSTR ("FTP: Starting server ..."));
-#ifdef ESP8266
     ftp_server = new FTPServer (LittleFS);
-#else   // ESP32
-    ftp_server = new FTPServer (LITTLEFS);
-#endif  // ESP8266 and ESP32
 
     // start server with login/ pwd
     if (ftp_server != nullptr)
@@ -80,7 +77,6 @@ bool Xdrv96 (uint8_t function)
       FTPServerInit ();
       break;
     case FUNC_LOOP:
-//      if (TasmotaGlobal.uptime > 5) FTPServerHandle ();
       FTPServerLoop ();
       break;
   }
