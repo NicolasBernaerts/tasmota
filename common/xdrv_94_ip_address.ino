@@ -43,6 +43,10 @@ const char D_IPADDRESS_CONFIGURE[] PROGMEM = "Configure IP";
 // constant strings
 const char D_IPADDRESS_FIELD_INPUT[] PROGMEM = "<p>%s<br><input type='text' name='%s' value='%_I' minlength='7' maxlength='15'></p>\n";
 
+/**************************************************\
+ *                  Variables
+\**************************************************/
+
 // variables
 static struct {
   bool     publish_json = true;
@@ -52,6 +56,12 @@ static struct {
 /**************************************************\
  *                  Functions
 \**************************************************/
+
+// Enable JSON publishing
+void IPAddressEnableJSON (bool enable)
+{
+  ipaddress.publish_json = enable;
+}
 
 // Get IP connexion status
 bool IPAddressIsConnected ()

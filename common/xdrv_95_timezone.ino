@@ -64,9 +64,25 @@ const char TZ_FIELDSET_START[] PROGMEM = "<p><fieldset><legend><b>&nbsp;%s&nbsp;
 const char TZ_FIELDSET_STOP[]  PROGMEM = "</fieldset></p>\n";
 const char TZ_FIELD_INPUT[]    PROGMEM = "<p>%s<span style='float:right;font-size:0.7rem;'>%s</span><br><input type='number' name='%s' min='%d' max='%d' step='%d' value='%d'></p>\n";
 
+
+/**************************************************\
+ *                  Variables
+\**************************************************/
+
+// variables
+static struct {
+  bool publish_json = true;
+} timezone;
+
 /**************************************************\
  *                  Functions
 \**************************************************/
+
+// Enable JSON publishing
+void TimezoneEnableJSON (bool enable)
+{
+  timezone.publish_json = enable;
+}
 
 // Show JSON status (for MQTT)
 void TimezoneShowJSON (bool append)
@@ -85,7 +101,7 @@ void TimezoneShowJSON (bool append)
   if (!append)
   {
     ResponseAppend_P (PSTR ("}"));
-    MqttPublishPrefixTopic_P (TELE, PSTR (D_RSLT_SENSOR));
+    MqttPublishTeleSensor ();
   } 
 }
 
@@ -102,56 +118,56 @@ void TimezoneInit ()
 
 void CmndTimezoneNtp ()
 {
-  SettingsUpdateText(SET_NTPSERVER1, XdrvMailbox.data);
-  ResponseCmndChar (XdrvMailbox.data);
+  if (XdrvMailbox.data_len > 0) SettingsUpdateText (SET_NTPSERVER1, XdrvMailbox.data);
+  ResponseCmndChar (SettingsText(SET_NTPSERVER1));
 }
 
 void CmndTimezoneStdO ()
 {
-  Settings->toffset[0] = XdrvMailbox.payload;
-  ResponseCmndNumber (XdrvMailbox.payload);
+  if (XdrvMailbox.data_len > 0) Settings->toffset[0] = XdrvMailbox.payload;
+  ResponseCmndNumber (Settings->toffset[0]);
 }
 
 void CmndTimezoneStdM ()
 {
-  Settings->tflag[0].month = XdrvMailbox.payload;
-  ResponseCmndNumber (XdrvMailbox.payload);
+  if ((XdrvMailbox.data_len > 0) && (XdrvMailbox.payload > 0) && (XdrvMailbox.payload < 13)) Settings->tflag[0].month = XdrvMailbox.payload;
+  ResponseCmndNumber (Settings->tflag[0].month);
 }
 
 void CmndTimezoneStdW ()
 {
-  Settings->tflag[0].week = XdrvMailbox.payload;
-  ResponseCmndNumber (XdrvMailbox.payload);
+  if ((XdrvMailbox.data_len > 0) && (XdrvMailbox.payload >= 0) && (XdrvMailbox.payload < 5)) Settings->tflag[0].week = XdrvMailbox.payload;
+  ResponseCmndNumber (Settings->tflag[0].week);
 }
 
 void CmndTimezoneStdD ()
 {
-  Settings->tflag[0].dow = XdrvMailbox.payload;
-  ResponseCmndNumber (XdrvMailbox.payload);
+  if ((XdrvMailbox.data_len > 0) && (XdrvMailbox.payload > 0) && (XdrvMailbox.payload < 8)) Settings->tflag[0].dow = XdrvMailbox.payload;
+  ResponseCmndNumber (Settings->tflag[0].dow);
 }
 
 void CmndTimezoneDstO ()
 {
-  Settings->toffset[1] = XdrvMailbox.payload;
+  if (XdrvMailbox.data_len > 0) Settings->toffset[1] = XdrvMailbox.payload;
   ResponseCmndNumber (XdrvMailbox.payload);
 }
 
 void CmndTimezoneDstM ()
 {
-  Settings->tflag[1].month = XdrvMailbox.payload;
-  ResponseCmndNumber (XdrvMailbox.payload);
+  if ((XdrvMailbox.data_len > 0) && (XdrvMailbox.payload > 0) && (XdrvMailbox.payload < 13)) Settings->tflag[1].month = XdrvMailbox.payload;
+  ResponseCmndNumber (Settings->tflag[1].month);
 }
 
 void CmndTimezoneDstW ()
 {
-  Settings->tflag[1].week = XdrvMailbox.payload;
-  ResponseCmndNumber (XdrvMailbox.payload);
+  if ((XdrvMailbox.data_len > 0) && (XdrvMailbox.payload >= 0) && (XdrvMailbox.payload < 5)) Settings->tflag[1].week = XdrvMailbox.payload;
+  ResponseCmndNumber (Settings->tflag[1].week);
 }
 
 void CmndTimezoneDstD ()
 {
-  Settings->tflag[1].dow = XdrvMailbox.payload;
-  ResponseCmndNumber (XdrvMailbox.payload);
+  if ((XdrvMailbox.data_len > 0) && (XdrvMailbox.payload > 0) && (XdrvMailbox.payload < 8)) Settings->tflag[1].dow = XdrvMailbox.payload;
+  ResponseCmndNumber (Settings->tflag[1].dow);
 }
 
 /***********************************************\
@@ -285,6 +301,9 @@ bool Xdrv95 (uint8_t function)
       break;
     case FUNC_COMMAND:
       result = DecodeCommand (kTimezoneCommands, TimezoneCommand);
+      break;
+    case FUNC_JSON_APPEND:
+      if (timezone.publish_json) TimezoneShowJSON (true);
       break;
 
 #ifdef USE_WEBSERVER

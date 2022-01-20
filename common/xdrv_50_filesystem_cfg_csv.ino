@@ -109,7 +109,7 @@ int UfsCfgLoadKeyInt (const char* pstr_filename, const char* pstr_key, const int
 {
   bool found;
   char str_value[UFS_CFG_VALUE_MAX];
-  int  result;
+  int  result = INT_MAX;
 
   // open file in read only mode in littlefs filesystem
   found = UfsCfgLoadKey (pstr_filename, pstr_key, str_value, sizeof (str_value));
@@ -124,7 +124,7 @@ float UfsCfgLoadKeyFloat (const char* pstr_filename, const char* pstr_key, const
 {
   bool  found;
   char  str_value[UFS_CFG_VALUE_MAX];
-  float result;
+  float result = NAN;
 
   // open file in read only mode in littlefs filesystem
   found = UfsCfgLoadKey (pstr_filename, pstr_key, str_value, sizeof (str_value));
@@ -198,22 +198,23 @@ bool UfsCsvSeekToStart ()
   return ufs_csv.is_open[UFS_CSV_ACCESS_READ];
 }
 
-bool UfsCsvSeekToEnd ()
+int UfsCsvSeekToEnd ()
 {
+  int      index = -1;
   uint32_t pos_end;
 
   // if file is opened
   if (ufs_csv.is_open[UFS_CSV_ACCESS_READ])
   {
     // set to start of file
-    pos_end = ufs_csv.file[UFS_CSV_ACCESS_READ].size ();
+    pos_end = ufs_csv.file[UFS_CSV_ACCESS_READ].size () - 1;
     ufs_csv.file[UFS_CSV_ACCESS_READ].seek (pos_end);
 
     // read last line
-    UfsCsvPreviousLine ();
+    index = UfsCsvPreviousLine ();
   }
 
-  return ufs_csv.is_open[UFS_CSV_ACCESS_READ];
+  return index;
 }
 
 // read next line and return number of columns in the line
@@ -257,63 +258,85 @@ int UfsCsvNextLine ()
 // read previous line and return true if line exists
 int UfsCsvPreviousLine ()
 {
-  int      index;
+  int      index = -1;
+  uint8_t  current_car;
+  uint32_t pos_search;
+  uint32_t pos_start = UINT32_MAX;
+  uint32_t pos_stop  = UINT32_MAX;
   size_t   length;
-  uint32_t pos_end, pos_start, pos_shift;
   char    *pstr_token;
   char     str_buffer[UFS_CSV_LINE_LENGTH];
 
   // init
   ufs_csv.nb_column = 0;
+  strcpy (str_buffer, "");
+  current_car = '\n';
 
-  // read previous line
-  pos_shift = UFS_CSV_LINE_LENGTH - 1;
-  pos_end = ufs_csv.file[UFS_CSV_ACCESS_READ].position ();
-  if (pos_end < pos_shift) pos_shift = pos_end;
-  pos_start = pos_end - pos_shift;
-  ufs_csv.file[UFS_CSV_ACCESS_READ].seek (pos_start);
-  length = ufs_csv.file[UFS_CSV_ACCESS_READ].readBytes (str_buffer, pos_shift);
-  str_buffer[length] = 0;
+  // get current file position
+  pos_search = ufs_csv.file[UFS_CSV_ACCESS_READ].position ();
 
-  // trim trailing \n
-  pstr_token = str_buffer + strlen(str_buffer) - 1;
-  while ((pstr_token > str_buffer) && (*pstr_token == '\n')) pstr_token--;
-  pstr_token[1] = 0;
-
-  // go to last \n
-  pstr_token = strrchr (str_buffer, '\n');
-  if (pstr_token != nullptr) strcpy (ufs_csv.str_line, pstr_token + 1);
-  else strcpy (ufs_csv.str_line, str_buffer);
-
-  // seek file to the end of previous line
-  pos_start = pstr_token - str_buffer + pos_start;
-  ufs_csv.file[UFS_CSV_ACCESS_READ].seek (pos_start);
-
-  // if line is the header and it should be skipped
-  if (ufs_csv.has_header[UFS_CSV_ACCESS_READ] && (pos_start == 0)) return -1;
-
-  // loop to populate array of values
-  index = 0;
-  pstr_token = strtok (ufs_csv.str_line, ";");
-  while (pstr_token != nullptr)
+  // loop to avoid empty lines
+  while ((current_car == '\n') && (pos_search > 0))
   {
-    if (index < UFS_CSV_COLUMN_MAX) ufs_csv.pstr_value[index++] = pstr_token;
-    pstr_token = strtok (nullptr, ";");
+    current_car = (uint8_t)ufs_csv.file[UFS_CSV_ACCESS_READ].read ();
+
+    if (current_car != '\n') pos_stop = pos_search;
+    if (pos_search > 0) pos_search--;
+    ufs_csv.file[UFS_CSV_ACCESS_READ].seek (pos_search);
   }
-  ufs_csv.nb_column = index;
+
+  // loop to read previous line
+  while ((current_car != '\n') && (pos_search > 0))
+  {
+    current_car = ufs_csv.file[UFS_CSV_ACCESS_READ].read ();
+
+    if (current_car != '\n')
+    {
+      if (pos_search > 0) pos_search--;
+      ufs_csv.file[UFS_CSV_ACCESS_READ].seek (pos_search);
+    }
+    pos_start = pos_search;
+  }
+
+  // get complete line
+  if (pos_stop > pos_start)
+  {
+    // read current line
+    length = ufs_csv.file[UFS_CSV_ACCESS_READ].readBytes (ufs_csv.str_line, pos_stop - pos_start + 1);
+    ufs_csv.str_line[length] = 0;
+
+    // position to caracter before line
+    if (pos_start > 0) pos_start--;
+    ufs_csv.file[UFS_CSV_ACCESS_READ].seek (pos_start);
+
+    // if line is the header and it should be skipped
+    if (ufs_csv.has_header[UFS_CSV_ACCESS_READ] && (pos_start == 0)) return -1;
+
+    // loop to populate array of values
+    index = 0;
+    pstr_token = strtok (ufs_csv.str_line, ";");
+    while (pstr_token != nullptr)
+    {
+      if (index < UFS_CSV_COLUMN_MAX) ufs_csv.pstr_value[index++] = pstr_token;
+      pstr_token = strtok (nullptr, ";");
+    }
+    ufs_csv.nb_column = index;
+  }
 
   return index;
 }
 
 bool UfsCsvOpen (const char* pstr_filename, bool has_header)
 {
-  bool result;
+  bool result = false;
 
   // close file if already opened
   UfsCsvClose (UFS_CSV_ACCESS_READ);
+  
+  // check parameter
+  if (pstr_filename != nullptr) result = ffsp->exists (pstr_filename);
 
   // if file exists
-  result = ffsp->exists (pstr_filename);
   if (result)
   {
     // open file in read mode
@@ -328,7 +351,7 @@ bool UfsCsvOpen (const char* pstr_filename, bool has_header)
     UfsCsvNextLine ();
   }
 
-  return ufs_csv.is_open;
+  return ufs_csv.is_open[UFS_CSV_ACCESS_READ];
 }
 
 void UfsCsvClose (int access_type)
@@ -405,21 +428,25 @@ void UfsCsvAppend (const char* pstr_filename, const char* pstr_line, bool keep_o
 {
   bool exists;
 
-  if (!ufs_csv.is_open[UFS_CSV_ACCESS_WRITE] && pstr_filename)
+  // check parameters
+  if ((pstr_filename == nullptr) || (pstr_line == nullptr)) return;
+
+  // if file is not already opened
+  if (!ufs_csv.is_open[UFS_CSV_ACCESS_WRITE])
   {
-    // check if today's file already exists and open in append mode
+    // check if file already exists and open in append mode
     ufs_csv.file[UFS_CSV_ACCESS_WRITE] = ffsp->open (pstr_filename, "a");
     ufs_csv.is_open[UFS_CSV_ACCESS_WRITE] = true;
   }
 
   // append current line
-  if (ufs_csv.is_open[UFS_CSV_ACCESS_WRITE] && pstr_line)
+  if (ufs_csv.is_open[UFS_CSV_ACCESS_WRITE])
   {
     ufs_csv.file[UFS_CSV_ACCESS_WRITE].print (pstr_line);
     ufs_csv.file[UFS_CSV_ACCESS_WRITE].print ("\n");
   }
 
-  // close file
+  // if needed, close file
   if (ufs_csv.is_open[UFS_CSV_ACCESS_WRITE] && !keep_open)
   {
     ufs_csv.file[UFS_CSV_ACCESS_WRITE].close ();
@@ -435,6 +462,9 @@ void UfsCsvFileRotate (const char* pstr_filename, const int index_min, const int
   int  index;
   char str_original[UFS_FILENAME_SIZE];
   char str_target[UFS_FILENAME_SIZE];
+
+  // check parameter
+  if (pstr_filename == nullptr) return;
 
   // rotate previous daily files
   for (index = index_max; index > index_min; index--)
@@ -463,6 +493,9 @@ uint32_t UfsCsvGetFileSizeKb (const char* pstr_filename)
 {
   uint32_t file_size = 0;
   File     file;
+
+  // check parameter
+  if (pstr_filename == nullptr) return 0;
 
   // if file exists
   if (ffsp->exists (pstr_filename))
