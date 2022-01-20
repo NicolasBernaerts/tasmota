@@ -16,7 +16,7 @@ To enable **Pilotwire** mode on a **Sonoff Basic** you need to :
 
 Typical diode to use is **1N4007**. Connexion should be done directly on the relay output :
 
-![Sonoff Basic](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/pilotwire/screen/filpilote-diode-single.jpg)
+![Sonoff Basic](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload-pilotwire/screen/filpilote-diode-single.jpg)
 
 
 You'll also get a **Thermostat** mode that will allow you to pilot the heater to maintain a target temperature in the room. To activate that mode, you'll need either to :
@@ -29,7 +29,7 @@ Pilotwire controler provides 2 more options :
   * 
 Here is the template you can use if you are are using a Sonoff Basic.
 
-![Template Sonoff Basic](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/pilotwire/screen/tasmota-pilotwire-sonoff-template.png) 
+![Template Sonoff Basic](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload-pilotwire/screen/tasmota-pilotwire-template.png) 
 
 You can also declare a **MQTT remote power meter** to handle **automatic offload** when global power is to high according to your energy contract.
 
@@ -65,4 +65,7 @@ If you want to compile it, you need to add following files from my **tasmota/com
 
 Complete setup guide will be available at http://www.bernaerts-nicolas.fr/iot/...
 
-![Main page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/pilotwire/screen/tasmota-pilotwire-main.png)   ![Config page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/pilotwire/screen/tasmota-pilotwire-config.png)   ![Control page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/pilotwire/screen/tasmota-pilotwire-control.png)
+![Main page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload-pilotwire/screen/tasmota-pilotwire-main.png) 
+![Offload config page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offpiload-lotwire/screen/tasmota-offload-config.png) 
+![Pilotwire cnfig page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offpiload-lotwire/screen/tasmota-pilotwire-config.png) 
+![Control page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload-pilotwire/screen/tasmota-pilotwire-control.png)
