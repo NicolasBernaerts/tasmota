@@ -1,7 +1,15 @@
 /*
   user_config_override.h - user configuration overrides my_user_config.h for Tasmota
 
-  Copyright (C) 2019  Theo Arends
+  Copyright (C) 2020  Theo Arends, Nicolas Bernaerts
+    21/05/2020 - v1.0 - Creation
+    26/05/2020 - v1.1 - Add Information JSON page
+    28/05/2020 - v1.2 - Define number of rings before opening gate
+    30/05/2020 - v1.3 - Separate Intercom and Gate in JSON
+    20/11/2020 - v1.4 - Tasmota 9.1 compatibility
+    01/05/2021 - v1.5 - Add fixed IP and remove use of String to avoid heap fragmentation
+    20/10/2021 - v1.6 - Tasmota 10.1 compatibility, add LittleFS support
+                        Commands start with icom_
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -41,95 +49,177 @@
  *   - All parameters can be persistent changed online using commands via MQTT, WebConsole or Serial.
 \*****************************************************************************************************/
 
-
 /********************************************\
- *    Intercom : configuration starts
+ *     Intercom firmware configuration
 \********************************************/
 
-#define USE_INFOJSON                          // Add support for Information JSON page
-#define USE_TIMEZONE                          // Add support for timezone management
-#define USE_INTERCOM                          // Add support for intercom management
+#define USE_IPADDRESS                         // Fixed IP configuration
+#define USE_TIMEZONE                          // Timezone management
+#define USE_INTERCOM                          // Intercom management
 
-#define EXTENSION_VERSION "1.3"               // version
+#define EXTENSION_VERSION "1.6"               // version
 #define EXTENSION_NAME "Intercom"             // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
 
-#undef APP_SLEEP
-#define APP_SLEEP 1                           // Default to sleep = 1
+// Telegram notification
+#define USE_TELEGRAM
+#define USE_TELEGRAM_EXTENSION
+
+// MQTT default
+#undef MQTT_HOST
+#define MQTT_HOST          "mqtt.local"
+#undef MQTT_PORT
+#define MQTT_PORT          1883              
+#undef MQTT_USER
+#define MQTT_USER          ""
+#undef MQTT_PASS
+#define MQTT_PASS          ""
+#undef MQTT_TOPIC
+#define MQTT_TOPIC         "intercom_%06X"
+#undef MQTT_FULLTOPIC
+#define MQTT_FULLTOPIC     "%topic%/%prefix%/"
+#undef FRIENDLY_NAME
+#define FRIENDLY_NAME      "Intercom"
+
+// disable serial log
+#undef SERIAL_LOG_LEVEL 
+#define SERIAL_LOG_LEVEL   LOG_LEVEL_NONE
+
+// Set JSON template for Sonoff RE5V1C as default
+#define USER_TEMPLATE "{\"NAME\":\"Sonoff RE5V1C\",\"GPIO\":[17,255,255,255,255,255,0,0,21,56,0,0,0],\"FLAG\":0,\"BASE\":18}" 
+
+#undef USE_ARDUINO_OTA                        // support for Arduino OTA
+#undef USE_WPS                                // support for WPS as initial wifi configuration tool
+#undef USE_SMARTCONFIG                        // support for Wifi SmartConfig as initial wifi configuration tool
+#undef USE_DOMOTICZ                           // Domoticz
+#undef USE_HOME_ASSISTANT                     // Home Assistant
+#undef USE_MQTT_TLS                           // TLS support won't work as the MQTTHost is not set
+
+#undef USE_KNX                                // KNX IP Protocol Support
+#undef USE_KNX_WEB_MENU                       // Enable KNX WEB MENU (+8.3k code, +144 mem)
+
+//#undef USE_WEBSERVER                        // Webserver
+#undef USE_EMULATION_HUE                      // Hue Bridge emulation for Alexa (+14k code, +2k mem common)
+#undef USE_EMULATION_WEMO                     // Belkin WeMo emulation for Alexa (+6k code, +2k mem common)
+#undef USE_CUSTOM                             // Custom features
+
+#undef USE_DISCOVERY                          // Discovery services for both MQTT and web server
+#undef WEBSERVER_ADVERTISE                    // Provide access to webserver by name <Hostname>.local/
+#undef MQTT_HOST_DISCOVERY                    // Find MQTT host server (overrides MQTT_HOST if found)
+
+//#undef USE_TIMERS                             // support for up to 16 timers
+//#undef USE_TIMERS_WEB                         // support for timer webpage
+//#undef USE_SUNRISE                            // support for Sunrise and sunset tools
+
+#undef USE_UNISHOX_COMPRESSION                // Add support for string compression in Rules or Scripts
+#undef USE_RULES                              // Disable support for rules
+#undef USE_SCRIPT                             // Add support for script (+17k code)
+
+#undef ROTARY_V1                              // Add support for Rotary Encoder as used in MI Desk Lamp (+0k8 code)
+#undef USE_SONOFF_RF                          // Add support for Sonoff Rf Bridge (+3k2 code)
+#undef USE_RF_FLASH                           // Add support for flashing the EFM8BB1 chip on the Sonoff RF Bridge.
+#undef USE_SONOFF_SC                          // Add support for Sonoff Sc (+1k1 code)
+#undef USE_TUYA_MCU                           // Add support for Tuya Serial MCU
+#undef USE_ARMTRONIX_DIMMERS                  // Add support for Armtronix Dimmers (+1k4 code)
+#undef USE_PS_16_DZ                           // Add support for PS-16-DZ Dimmer (+2k code)
+#undef USE_SONOFF_IFAN                        // Add support for Sonoff iFan02 and iFan03 (+2k code)
+#undef USE_BUZZER                             // Add support for a buzzer (+0k6 code)
+#undef USE_ARILUX_RF                          // Add support for Arilux RF remote controller (+0k8 code, 252 iram (non 2.3.0))
+#undef USE_SHUTTER                            // Add Shutter support for up to 4 shutter with different motortypes (+11k code)
+#undef USE_DEEPSLEEP                          // Add support for deepsleep (+1k code)
+#undef USE_EXS_DIMMER                         // Add support for ES-Store WiFi Dimmer (+1k5 code)
+#undef USE_DEVICE_GROUPS                      // Add support for device groups (+5k5 code)
+#undef USE_DEVICE_GROUPS_SEND                 // Add support for the DevGroupSend command (+0k6 code)
+#undef USE_PWM_DIMMER                         // Add support for MJ-SD01/acenx/NTONPOWER PWM dimmers (+2k2 code, DGR=0k4)
+#undef USE_PWM_DIMMER_REMOTE                  // Add support for remote switches to PWM Dimmer (requires USE_DEVICE_GROUPS) (+0k9 code)
+#undef USE_SONOFF_D1                          // Add support for Sonoff D1 Dimmer (+0k7 code)
+#undef USE_SHELLY_DIMMER                      // Add support for Shelly Dimmer (+3k code)
+#undef SHELLY_CMDS                            // Add command to send co-processor commands (+0k3 code)
+#undef SHELLY_FW_UPGRADE                      // Add firmware upgrade option for co-processor (+3k4 code)
+
+#undef USE_LIGHT                              // Add support for light control
+#undef USE_WS2812                             // WS2812 Led string using library NeoPixelBus (+5k code, +1k mem, 232 iram) - Disable by //
+#undef USE_MY92X1                             // Add support for MY92X1 RGBCW led controller as used in Sonoff B1, Ailight and Lohas
+#undef USE_SM16716                            // Add support for SM16716 RGB LED controller (+0k7 code)
+#undef USE_SM2135                             // Add support for SM2135 RGBCW led control as used in Action LSC (+0k6 code)
+#undef USE_SONOFF_L1                          // Add support for Sonoff L1 led control
+#undef USE_ELECTRIQ_MOODL                     // Add support for ElectriQ iQ-wifiMOODL RGBW LED controller (+0k3 code)
+#undef USE_LIGHT_PALETTE                      // Add support for color palette (+0k7 code)
+#undef USE_LIGHT_VIRTUAL_CT                   // Add support for Virtual White Color Temperature (+1.1k code)
+#undef USE_DGR_LIGHT_SEQUENCE                 // Add support for device group light sequencing (requires USE_DEVICE_GROUPS) (+0k2 code)
+
+#undef USE_COUNTER                            // Enable inputs as counter (+0k8 code)
+
+#undef USE_DS18x20                            // Add support for DS18x20 sensors with id sort, single scan and read retry (+2k6 code)
+
+#undef USE_DHT                                // Disable internal DHT sensor
+
+#undef USE_I2C                                // Disable all I2C sensors and devices
+
+#undef USE_SPI                                // Disable all SPI devices
+
+#undef USE_DISPLAY                            // Add Display support
+
+#undef USE_SERIAL_BRIDGE                      // Disable support for software Serial Bridge (+0k8 code)
 
 #undef USE_ENERGY_SENSOR                      // Disable energy sensors
-#undef USE_ARDUINO_OTA                        // Disable support for Arduino OTA
-#undef USE_WPS                                // Disable support for WPS as initial wifi configuration tool
-#undef USE_SMARTCONFIG                        // Disable support for Wifi SmartConfig as initial wifi configuration tool
-#undef USE_DOMOTICZ                           // Disable Domoticz
-#undef USE_HOME_ASSISTANT                     // Disable Home Assistant
-#undef USE_MQTT_TLS                           // Disable TLS support won't work as the MQTTHost is not set
-#undef USE_KNX                                // Disable KNX IP Protocol Support
-//#undef USE_WEBSERVER                        // Disable Webserver
-#undef USE_EMULATION_HUE                      // Disable Hue Bridge emulation for Alexa (+14k code, +2k mem common)
-#undef USE_EMULATION_WEMO                     // Disable Belkin WeMo emulation for Alexa (+6k code, +2k mem common)
-#undef USE_CUSTOM                             // Disable Custom features
-#undef USE_DISCOVERY                          // Disable Discovery services for both MQTT and web server
-//#undef USE_TIMERS                             // Disable support for up to 16 timers
-//#undef USE_TIMERS_WEB                         // Disable support for timer webpage
-//#undef USE_SUNRISE                          // Disable support for Sunrise and sunset tools
-//#undef USE_RULES                            // Disable support for rules
-#undef USE_I2C                                // Disable all I2C sensors and devices
-#undef USE_DHT                                // Disable internal DHT sensor
-#undef USE_DS18x20                            // Disable DS18x20 sensor
-#undef USE_SPI                                // Disable all SPI devices
-#undef USE_BH1750                             // Enable BH1750 sensor
-#undef USE_BMP                                // Enable BMP085/BMP180/BMP280/BME280 sensors
-#undef USE_SHT3X                              // Enable SHT3x
-#undef USE_SGP30                              // Enable SGP30 sensor
-#undef USE_LM75AD                             // Enable LM75AD sensor
-#undef USE_DISPLAY                            // Disable Display support
-#undef USE_MHZ19                              // Disable support for MH-Z19 CO2 sensor
-#undef USE_SENSEAIR                           // Disable support for SenseAir K30, K70 and S8 CO2 sensor
-#undef USE_PMS5003                            // Disable support for PMS5003 and PMS7003 particle concentration sensor
-#undef USE_NOVA_SDS                           // Disable support for SDS011 and SDS021 particle concentration sensor
-#undef USE_SERIAL_BRIDGE                      // Disable support for software Serial Bridge
-#undef USE_SDM120                             // Disable support for Eastron SDM120-Modbus energy meter
-#undef USE_SDM630                             // Disable support for Eastron SDM630-Modbus energy meter
-#undef USE_MP3_PLAYER                         // Disable DFPlayer Mini MP3 Player RB-DFR-562 commands: play, volume and stop
+#undef USE_ENERGY_MARGIN_DETECTION            // Add support for Energy Margin detection (+1k6 code)
+#undef USE_ENERGY_POWER_LIMIT                 // Add additional support for Energy Power Limit detection (+1k2 code)
+#undef USE_PZEM004T                           // Add support for PZEM004T Energy monitor (+2k code)
+#undef USE_PZEM_AC                            // Add support for PZEM014,016 Energy monitor (+1k1 code)
+#undef USE_PZEM_DC                            // Add support for PZEM003,017 Energy monitor (+1k1 code)
+#undef USE_MCP39F501                          // Add support for MCP39F501 Energy monitor as used in Shelly 2 (+3k1 code)
+#undef USE_ENERGY_DUMMY                       // Add support for dummy Energy monitor allowing user values (+0k7 code)
+#undef USE_HLW8012                            // Add support for HLW8012, BL0937 or HJL-01 Energy Monitor for Sonoff Pow and WolfBlitz
+#undef USE_CSE7766                            // Add support for CSE7766 Energy Monitor for Sonoff S31 and Pow R2
+#undef USE_PZEM004T                           // Add support for PZEM004T Energy monitor (+2k code)
+#undef USE_PZEM_AC                            // Add support for PZEM014,016 Energy monitor (+1k1 code)
+#undef USE_PZEM_DC                            // Add support for PZEM003,017 Energy monitor (+1k1 code)
+#undef USE_MCP39F501                          // Add support for MCP39F501 Energy monitor as used in Shelly 2 (+3k1 code)
+#undef USE_SDM72                              // Add support for Eastron SDM72-Modbus energy monitor (+0k3 code)
+#undef USE_SDM120                             // Add support for Eastron SDM120-Modbus energy monitor (+1k1 code)
+#undef USE_SDM630                             // Add support for Eastron SDM630-Modbus energy monitor (+0k6 code)
+#undef USE_DDS2382                            // Add support for Hiking DDS2382 Modbus energy monitor (+0k6 code)
+#undef USE_DDSU666                            // Add support for Chint DDSU666 Modbus energy monitor (+0k6 code)
+#undef USE_SOLAX_X1                           // Add support for Solax X1 series Modbus log info (+3k1 code)
+#undef USE_LE01MR                             // Add support for F&F LE-01MR Modbus energy monitor (+1k code)
+#undef USE_BL09XX                             // Add support for various BL09XX Energy monitor as used in Blitzwolf SHP-10 or Sonoff Dual R3 v2 (+1k6 code)
+#undef USE_TELEINFO                           // Add support for Teleinfo via serial RX interface (+5k2 code, +168 RAM + SmartMeter LinkedList Values RAM)
+#undef USE_IEM3000                            // Add support for Schneider Electric iEM3000-Modbus series energy monitor (+0k8 code)
 
-#undef USE_SONOFF_RF                            // Add support for Sonoff Rf Bridge (+3k2 code)
-#undef USE_RF_FLASH                           // Add support for flashing the EFM8BB1 chip on the Sonoff RF Bridge. C2CK must be connected to GPIO4, C2D to GPIO5 on the PCB (+2k7 code)
-#undef USE_SONOFF_SC                            // Add support for Sonoff Sc (+1k1 code)
-#undef USE_TUYA_MCU                             // Add support for Tuya Serial MCU
-#undef USE_ARMTRONIX_DIMMERS                  // Disable support for Armtronix Dimmers (+1k4 code)
-#undef USE_PS_16_DZ                           // Disable support for PS-16-DZ Dimmer
-#undef USE_SONOFF_IFAN                          // Add support for Sonoff iFan02 and iFan03 (+2k code)
-#undef USE_BUZZER                               // Add support for a buzzer (+0k6 code)
-#undef USE_ARILUX_RF                            // Add support for Arilux RF remote controller (+0k8 code, 252 iram (non 2.3.0))
-#undef USE_DEEPSLEEP 
-#undef USE_AZ7798                             // Disable support for AZ-Instrument 7798 CO2 datalogger
-#undef USE_PN532_HSU                          // Disable support for PN532 using HSU (Serial) interface (+1k8 code, 140 bytes mem)
+#undef USE_IR_REMOTE                          // Send IR remote commands using library IRremoteESP8266 and ArduinoJson (+4k3 code, 0k3 mem, 48 iram)
+#undef USE_IR_SEND_NEC                        // Support IRsend NEC protocol
+#undef USE_IR_SEND_RC5                        // Support IRsend Philips RC5 protocol
+#undef USE_IR_SEND_RC6                        // Support IRsend Philips RC6 protocol
+#undef USE_IR_RECEIVE                         // Support for IR receiver (+7k2 code, 264 iram)
 
-#undef USE_ENERGY_MARGIN_DETECTION            // Disable support for Energy Margin detection (+1k6 code)
-#undef USE_ENERGY_POWER_LIMIT                 // Disable additional support for Energy Power Limit detection (+1k2 code)
-#undef USE_PZEM004T                           // Disable PZEM004T energy sensor
-#undef USE_PZEM_AC                            // Disable PZEM014,016 Energy monitor
-#undef USE_PZEM_DC                            // Disable PZEM003,017 Energy monitor
-#undef USE_MCP39F501                          // Disable MCP39F501 Energy monitor as used in Shelly 2
+#undef USE_ZIGBEE                             // Enable serial communication with Zigbee CC2530 flashed with ZNP (+49k code, +3k mem)
+#undef USE_ZIGBEE_ZNP                         // Enable ZNP protocol, needed for CC2530 based devices
+#undef USE_ZIGBEE_EZSP                        // Enable EZSP protocol, needed for EFR32 EmberZNet based devices, like Sonoff Zigbee bridge                                             
+#undef USE_ZIGBEE_EEPROM                      // Use the EEPROM from the Sonoff ZBBridge to save Zigbee configuration and data
+#undef USE_ZBBRIDGE_TLS                       // TLS support for zbbridge
 
-#undef USE_MAX31855                           // Disable MAX31855 K-Type thermocouple sensor using softSPI
-#undef USE_IR_REMOTE                          // Disable IR driver
-#undef USE_WS2812                             // Disable WS2812 Led string
-#undef USE_ARILUX_RF                          // Disable support for Arilux RF remote controller
-#undef USE_SR04                               // Disable support for for HC-SR04 ultrasonic devices
-#undef USE_TM1638                             // Disable support for TM1638 switches copying Switch1 .. Switch8
-#undef USE_HX711                              // Disable support for HX711 load cell
-#undef USE_RF_FLASH                           // Disable support for flashing the EFM8BB1 chip on the Sonoff RF Bridge. C2CK must be connected to GPIO4, C2D to GPIO5 on the PCB
-#undef USE_TX20_WIND_SENSOR                   // Disable support for La Crosse TX20 anemometer
-#undef USE_RC_SWITCH                          // Disable support for RF transceiver using library RcSwitch
-#undef USE_RF_SENSOR                          // Disable support for RF sensor receiver (434MHz or 868MHz) (+0k8 code)
-#undef DEBUG_THEO                             // Disable debug code
-#undef USE_DEBUG_DRIVER                       // Disable debug code
+#undef USE_TM1638                             // Add support for TM1638 switches copying Switch1 .. Switch8 (+1k code)
+#undef USE_HX711                              // Add support for HX711 load cell (+1k5 code)
+#undef USE_HX711_GUI                          // Add optional web GUI to HX711 as scale (+1k8 code)
+#undef USE_TX20_WIND_SENSOR                   // Add support for La Crosse TX20 anemometer (+2k6/0k8 code)
+#undef USE_TX23_WIND_SENSOR                   // Add support for La Crosse TX23 anemometer (+2k7/1k code)
+#undef USE_WINDMETER                          // Add support for analog anemometer (+2k2 code)
+#undef USE_FTC532                             // Add support for FTC532 8-button touch controller (+0k6 code)
+#undef USE_RC_SWITCH                          // Add support for RF transceiver using library RcSwitch (+2k7 code, 460 iram)
+#undef USE_RF_SENSOR                          // Add support for RF sensor receiver (434MHz or 868MHz) (+0k8 code)
+#undef USE_THEO_V2                            // Add support for decoding Theo V2 sensors as documented on https://sidweb.nl using 434MHz RF sensor receiver (+1k4 code)
+#undef USE_ALECTO_V2                          // Add support for decoding Alecto V2 sensors like ACH2010, WS3000 and DKW2012 weather stations using 868MHz RF sensor receiver (+1k7 code)
+#undef USE_HRE                                // Add support for Badger HR-E Water Meter (+1k4 code)
+#undef USE_A4988_STEPPER                      // Add support for A4988/DRV8825 stepper-motor-driver-circuit (+10k5 code)
+#undef USE_PROMETHEUS                         // Add support for https://prometheus.io/ metrics exporting over HTTP /metrics endpoint
+#undef USE_NEOPOOL                            // Add support for Sugar Valley NeoPool Controller - also known under brands Hidrolife, Aquascenic, Oxilife, Bionet, Hidroniser, UVScenic, 
 
-/*********************************************************************************************\
- *    Motion : configuration stops
-\*********************************************************************************************/
+#undef USE_THERMOSTAT                         // Add support for Thermostat
+
+#undef USE_TIMEPROP                           // Add support for the timeprop feature (+9k1 code)
+#undef USE_PID                                // Add suport for the PID  feature (+11k2 code)
 
 
 #endif  // _USER_CONFIG_OVERRIDE_H_
+
