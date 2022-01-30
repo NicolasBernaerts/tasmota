@@ -9,3 +9,9 @@ It needs a small electronic interface board which is described in the **diagram.
 
 ![Intercom adapter](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/intercom/diagram.png)
 
+If you want to compile it, you need to add following files from my **tasmota/common** repository :
+  * xdrv_40_telegram_extension.ino
+  * xdrv_50_filesystem_cfg_csv.ino
+  * xdrv_95_timezone.ino
+  * xdrv_94_ip_address.ino
+
