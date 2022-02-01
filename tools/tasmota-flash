@@ -10,6 +10,7 @@
 #   08/09/2021, V1.3 - Simplify options for ESP32
 #                      Download ESP32 default files from Github
 #   07/11/2021, V1.4 - Handle --erase for 16Mb chips (limit erase to 4MB)
+#   31/01/2022, V1.5 - Use esptool.py to fully handle 16 Mb chips
 # ----------------------------------------------------------
 
 # default files and images
@@ -38,7 +39,7 @@ then
 fi
 
 # check tools availability
-command -v esptool >/dev/null 2>&1 || { zenity --error --text="Please install esptool"; exit 1; }
+command -v esptool.py >/dev/null 2>&1 || { zenity --error --text="Please install esptool.py"; exit 1; }
 command -v gen_esp32part.py >/dev/null 2>&1 || { zenity --error --text="Please install gen_esp32part.py"; exit 1; }
 
 # iterate thru parameters
@@ -78,8 +79,7 @@ TMP_ERASE="${TMP_DIR}/erase.bin"
 TMP_PART="${TMP_DIR}/partition.bin"
 
 # get device size
-SIZE=$(esptool "${ARR_PARAM[@]}" "flash_id" | grep "flash size" | cut -d':' -f2 | cut -d'M' -f1 | xargs)
-echo "Device is ${SIZE}"
+SIZE=$(esptool.py "${ARR_PARAM[@]}" "flash_id" | grep "flash size" | cut -d':' -f2 | cut -d'M' -f1 | xargs)
 
 # check if partition conversion from CSV to BIN is needed
 if [ -f "${PARTITION_CSV}" ]
@@ -95,10 +95,8 @@ then
 	# erase device with file filed with 0
 	echo "-----"
 	echo "Erasing device"
-	[ ${SIZE} -lt 512 -a ${SIZE} -gt 4 ] && SIZE="4"
-	[ ${SIZE} -eq 512 ] && SIZE="${SIZE}kiB" || SIZE="${SIZE}MiB"
-	dd "if=/dev/zero" "of=${TMP_ERASE}" "bs=${SIZE}" "count=1"
-	esptool "${ARR_PARAM[@]}" "write_flash" "0x000000" "${TMP_ERASE}"
+	echo "Parameters : ${ARR_PARAM[@]} erase_flash"
+	esptool.py "${ARR_PARAM[@]}" "erase_flash"
 	sleep 2
 fi
 
@@ -115,6 +113,7 @@ then
 	# global options
 	ARR_PARAM=( "${ARR_PARAM[@]}" "write_flash" "--flash_size" "detect" )
 
+	# ESP32
 	if [ "${DEVICE}" = "ESP32" ]
 	then
 		# flashing options
@@ -136,13 +135,11 @@ then
 		# binary image
 		ARR_PARAM=( "${ARR_PARAM[@]}" "0x00000" "${IMAGE}" )
 	fi
-fi
 
-# flash image
-echo "Options : ${ARR_PARAM[@]}"
-esptool "${ARR_PARAM[@]}"
+	# flash image
+	echo "Parameters : ${ARR_PARAM[@]}"
+	esptool.py "${ARR_PARAM[@]}"
+fi
 
 # remove temporary directory
 rm -r "${TMP_DIR}"
-
-
