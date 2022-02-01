@@ -39,8 +39,8 @@ then
 fi
 
 # check tools availability
-command -v esptool.py >/dev/null 2>&1 || { zenity --error --text="Please install esptool.py"; exit 1; }
-command -v gen_esp32part.py >/dev/null 2>&1 || { zenity --error --text="Please install gen_esp32part.py"; exit 1; }
+command -v esptool.py >/dev/null 2>&1 || { echo "[error] Please install esptool.py"; exit 1; }
+command -v gen_esp32part.py >/dev/null 2>&1 || { echo "[error] Please install gen_esp32part.py"; exit 1; }
 
 # iterate thru parameters
 while test ${#} -gt 0
