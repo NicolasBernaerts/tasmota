@@ -4,6 +4,7 @@ Each binary has its own specificities :
   * **teleinfo.bin** : target is ESP8266 with 1M memory. It won't handle LittleFS to store hirstorical files.
   * **teleinfo-1m128k.bin** : target is ESP8266 with 1M memory. It handles a small 128k LittleFS partition to store historical files.
   * **teleinfo-4m2m.bin** : target is ESP8266 with 4M memory. It handles a 2M LittleFS partition to store historical files.
+  * **teleinfo-16m14m.bin** : target is ESP8266 with 16M memory. It handles a 14M LittleFS partition to store historical files.
   * **teleinfo32.bin** : target is ESP32 with 4M memory. It handles a 1.2M LittleFS partition to store historical files.
 
 If you want to flash these binaries, you'll need to use **esptool**.
