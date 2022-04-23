@@ -1,4 +1,4 @@
-Teleinfo Tasmota firmware for Linky energy meters
+Teleinfo Tasmota firmware for Linky meters
 =============
 
 Presentation
