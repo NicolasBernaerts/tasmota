@@ -4,7 +4,7 @@ Teleinfo Tasmota firmware for Linky meters
 Presentation
 ------------
 
-This evolution of Tasmota firmware **v10.0** has been enhanced to handle France energy meters known as **Linky** using **Teleinfo** protocol.
+This evolution of Tasmota firmware has been enhanced to handle France energy meters known as **Linky** using **Teleinfo** protocol.
 
 This implementation has been tested on :
   * Sagem classic meter **monophase** with TIC **historique**
@@ -101,15 +101,17 @@ To stop streaming, you just need to stop the embedded TCP server thru tasmota co
 FTP server
 ----------
 
-This firmware runs a simple FTP server. Il allows you to connect automatically to retrieve daily and weekly energy logs.
+If you are using a build with a LittleFS partition, this firmware runs a simple FTP server.
 
-FTP server is automatically started. 
-
-Its main limitation is that it can only one connexion at a time. So you need to limit simultaneous connexions to **1** in your FTP client. Otherwise, connexion will fail.
+Il allows you to connect automatically to retrieve daily and weekly energy logs. It is automatically started. 
 
 Credentials are :
   * login : **teleinfo**
   * password : **teleinfo**
+
+This embedded FTP server main limitation is that it can only one connexion at a time. \
+So you need to limit simultaneous connexions to **1** on your FTP client. Otherwise, connexion will fail.
+
 
 Adapter
 -------
@@ -123,14 +125,6 @@ A very simple adapter diagram can be this one. Pleasee note that some Linky mete
 Here is a board example using a monolithic 3.3V power supply and an ESP-01.
 
 ![Simple Teleinfo board](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/teleinfo-adapter-simple-board.png)
-
-A more complex diagram can be this one. It will reshape the signal in a cleaner way, and variable resistors will allow you to have a better compatibility with different type of meters available.
-
-![Complete Teleinfo adapter](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/teleinfo-adapter-complete-diagram.png)
-
-Here is a board example using a monolithic 3.3V power supply and an ESP-01.
-
-![Complete Teleinfo board](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/teleinfo-adapter-complete-board.png)
 
 You need to connect your adapter output **ESP Rx** to any available serial port of your Tasmota device.
 
