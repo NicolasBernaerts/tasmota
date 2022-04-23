@@ -117,10 +117,11 @@ So you need to limit simultaneous connexions to **1** on your FTP client. Otherw
 Compilation
 -----------
 
-If you want to compile this firmware version, you just need :
+If you want to compile this firmware version, you just need to :
 1. install official tasmota sources
-2. place or replace files in this repository
-3. add other files form the **tasmota/common** repository
+2. place or replace files from this repository
+3. place specific files from **tasmota/common** repository
+4. install **FTPClientServer** library
 
 Here are the files needed from the **tasmota/common** repository :
 * xdrv_50_filesystem_cfg_csv.ino
