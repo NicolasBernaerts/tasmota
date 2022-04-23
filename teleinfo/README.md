@@ -36,6 +36,8 @@ If you are using a LittleFS version, you'll also get peak apparent power and pea
 
 If your linky in in historic mode, it doesn't provide instant voltage. Voltage is then forced to 230V.
 
+Pre-compiled versions are available in the **birary** folder.
+
 Teleinfo protocol is described in this document : https://www.enedis.fr/sites/default/files/Enedis-NOI-CPT_54E.pdf
 
 MQTT data
@@ -112,6 +114,25 @@ Credentials are :
 This embedded FTP server main limitation is that it can only one connexion at a time. \
 So you need to limit simultaneous connexions to **1** on your FTP client. Otherwise, connexion will fail.
 
+Compilation
+-----------
+
+If you want to compile this firmware version, you just need :
+1. install official tasmota sources
+2. place or replace files in this repository
+3. add other files form the **tasmota/common** repository
+
+Here are the files needed from the **tasmota/common** repository :
+* xdrv_50_filesystem_cfg_csv.ino
+* xdrv_93_esp32_board.ino
+* xdrv_94_ip_address.ino
+* xdrv_95_timezone.ino
+* xdrv_96_ftp_server.ino
+* xdrv_97_tcp_server.ino
+
+You also need to place all files from **tasmota/common/FTPClientServer** under **lib/default/FTPClientServer**.
+
+If everything goes fine, you should be able to compile your own build.
 
 Adapter
 -------
