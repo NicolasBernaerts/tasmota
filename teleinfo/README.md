@@ -122,13 +122,15 @@ If you want to compile this firmware version, you just need to :
 3. place specific files from **tasmota/common** repository
 4. install **FTPClientServer** library
 
-Here are the files needed from the **tasmota/common** repository :
-* xdrv_50_filesystem_cfg_csv.ino
-* xdrv_93_esp32_board.ino
-* xdrv_94_ip_address.ino
-* xdrv_95_timezone.ino
-* xdrv_96_ftp_server.ino
-* xdrv_97_tcp_server.ino
+Here are the files needed from the **tasmota/common** repository and where to place them in your project :
+* **esp32_partition_app1441k_spiffs1245.csv**
+* boards/**esp8266_16M14M.json**
+* tasmota/**xdrv_50_filesystem_cfg_csv.ino**
+* tasmota/**xdrv_93_esp32_board.ino**
+* tasmota/**xdrv_94_ip_address.ino**
+* tasmota/**xdrv_95_timezone.ino**
+* tasmota/**xdrv_96_ftp_server.ino**
+* tasmota/**xdrv_97_tcp_server.ino**
 
 You also need to place all files from **tasmota/common/FTPClientServer** under **lib/default/FTPClientServer**.
 
