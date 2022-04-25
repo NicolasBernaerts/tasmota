@@ -131,8 +131,7 @@ Here are the files needed from the **tasmota/common** repository and where to pl
 * tasmota/**xdrv_95_timezone.ino**
 * tasmota/**xdrv_96_ftp_server.ino**
 * tasmota/**xdrv_97_tcp_server.ino**
-
-You also need to place all files from **tasmota/common/FTPClientServer** under **lib/default/FTPClientServer**.
+* lib/default/**FTPClientServer** (extract content of **FTPClientServer.zip**) 
 
 If everything goes fine, you should be able to compile your own build.
 
