@@ -82,9 +82,9 @@ To retrieve the complete teleinfo stream over your LAN, you just need to start t
         11:39:49.840 TCP: Starting TCP server on port 8888
         11:39:49.844 MQT: turenne/compteur/stat/RESULT = {"tcp_start":"Done"}
 
-You can now follow your teleinfo stream in real time on any Linux pc thru **nc**
+You can now receive your Linky teleinfo stream in real time on any Linux pc :
 
-    # nc 192.168.10.50 8888
+    # nc 192.168.1.10 8888
         SMAXSN-1	E220422144756	05210	W
         CCASN	E220423110000	01468	:
         CCASN-1	E220423100000	01444	Q
@@ -94,10 +94,10 @@ You can now follow your teleinfo stream in real time on any Linux pc thru **nc**
 
 To stop streaming, you just need to stop the embedded TCP server thru tasmota console :
 
-    # tcp_start 8888
-        11:39:49.836 CMD: tcp_start 8888
-        11:39:49.840 TCP: Starting TCP server on port 8888
-        11:39:49.844 MQT: turenne/compteur/stat/RESULT = {"tcp_start":"Done"}
+    # tcp_stop
+        11:59:49.836 CMD: tcp_stop
+        11:59:49.840 TCP: Stoping TCP server
+        11:59:49.844 MQT: turenne/compteur/stat/RESULT = {"tcp_stop":"Done"}
 
 FTP server
 ----------
