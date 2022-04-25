@@ -35,6 +35,8 @@ If you are using a LittleFS version, you'll also get peak apparent power and pea
 
 If your linky in in historic mode, it doesn't provide instant voltage. Voltage is then forced to 230V.
 
+If you are using an **ESP32** board, you can use the wired connexion by selection the proper board model in **Configuration/ESP32 board**.
+
 Pre-compiled versions are available in the [**binary**](https://github.com/NicolasBernaerts/tasmota/tree/master/teleinfo/binary) folder.
 
 Teleinfo protocol is described in [this document](https://www.enedis.fr/sites/default/files/Enedis-NOI-CPT_54E.pdf)
@@ -160,8 +162,6 @@ For example, you can use :
 Finaly, in **Configure Teleinfo** you need to select your Teleinfo adapter baud rate :
   * **1200** (original white meter or green Linky in historic mode)
   * **9600** (green Linky in standard mode)
-
-If you are using an **ESP32** device, you can use its **Ethernet** port after selecting the proper board on the **Configure ESP32** menu.
 
 Complete setup guide is available at http://www.bernaerts-nicolas.fr/iot/...
 
