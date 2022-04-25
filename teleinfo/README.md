@@ -35,9 +35,9 @@ If you are using a LittleFS version, you'll also get peak apparent power and pea
 
 If your linky in in historic mode, it doesn't provide instant voltage. Voltage is then forced to 230V.
 
-Pre-compiled versions are available in the **birary** folder.
+Pre-compiled versions are available in the [**binary**](https://github.com/NicolasBernaerts/tasmota/tree/master/teleinfo/binary) folder.
 
-Teleinfo protocol is described in this document : https://www.enedis.fr/sites/default/files/Enedis-NOI-CPT_54E.pdf
+Teleinfo protocol is described in [this document](https://www.enedis.fr/sites/default/files/Enedis-NOI-CPT_54E.pdf)
 
 MQTT data
 ---------
