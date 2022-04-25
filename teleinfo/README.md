@@ -21,8 +21,7 @@ Please note that it is a completly different implementation than the one publish
 Some of these firmware versions are using a LittleFS partition to store graph data. Il allows to keep historical data over reboots.
 To take advantage of this feature, make sure to follow partitioning procedure given in the **readme** of the **binary** folder.
 
-This firmware calculates Power Factor (Cos φ) from Teleinfo totals (W) and Instant Power (VA).
-It is evaluated everytime total power increases of a certain amount of W that you can configure.
+This firmware calculates Power Factor (Cos φ) from Teleinfo totals (W) and Instant Power (VA). It is calculated everytime total power increases.
 
 This firmware provides some extra Web page on the device :
   * **/tic-graph** : live, daily and weekly graphs (VA, W, V and Cos phi)
