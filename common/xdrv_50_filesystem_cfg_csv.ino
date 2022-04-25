@@ -10,6 +10,7 @@
     01/09/2021 - v1.0 - Creation
     29/09/2021 - v1.1 - Add .cfg files management
     15/10/2021 - v1.2 - Add reverse CSV line navigation
+    01/04/2022 - v1.3 - Add software watchdog to avoid locked loop
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -486,6 +487,9 @@ void UfsCsvFileRotate (const char* pstr_filename, const int index_min, const int
       ffsp->rename (str_original, str_target);
       AddLog (LOG_LEVEL_INFO, PSTR ("UFS: renamed %s to %s"), str_original, str_target);
     }
+
+    // give control back to system to avoid watchdog
+    yield ();
   }
 }
 
@@ -517,7 +521,10 @@ void UfsCsvCleanupFileSystem (uint32_t size_minimum)
   uint32_t size_available;
   time_t   file_time;
   char     str_filename[UFS_FILENAME_SIZE];
-  File     root_dir, current_file; 
+  File     root_dir; 
+
+  // open root directory
+  root_dir = dfsp->open ("/", UFS_FILE_READ);
 
   // loop till minimum space is available
   size_available = UfsInfo (1, 0);
@@ -529,23 +536,27 @@ void UfsCsvCleanupFileSystem (uint32_t size_minimum)
     file_time = time (NULL);
 
     // loop thru filesystem to get oldest CSV file
-    root_dir = dfsp->open ("/", UFS_FILE_READ);
     while (true) 
     {
       // read next file
-      current_file = root_dir.openNextFile();
+      File current_file = root_dir.openNextFile();
       if (!current_file) break;
 
       // check if file is candidate for removal
       is_candidate  = (strstr (current_file.name (), ".csv") != nullptr);
       is_candidate |= (strstr (current_file.name (), ".CSV") != nullptr);
       is_candidate &= (current_file.getLastWrite () < file_time);
+
+      // if candidate, save file name
       if (is_candidate)
       {
         strcpy (str_filename, "/");
         strlcat (str_filename, current_file.name (), sizeof (str_filename));
         file_time = current_file.getLastWrite ();
       }
+
+      // close file
+      current_file.close ();
     }
 
     // remove oldest CSV file
@@ -554,8 +565,13 @@ void UfsCsvCleanupFileSystem (uint32_t size_minimum)
 
     // read new space left
     size_available = UfsInfo (1, 0);
-  }
-}
 
+    // give control back to system to avoid watchdog
+    yield ();
+  }
+
+  // close directory
+  root_dir.close ();
+}
 
 #endif    // USE_UFILESYS

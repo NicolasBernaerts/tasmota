@@ -32,8 +32,8 @@
 FTPServer *ftp_server = nullptr;
 
 // commands : MQTT
-#define FTP_SERVER_LOGIN          "Teleinfo"
-#define FTP_SERVER_PASSWORD       "Teleinfo"
+#define FTP_SERVER_LOGIN          "teleinfo"
+#define FTP_SERVER_PASSWORD       "teleinfo"
 
 
 // Create FTP server

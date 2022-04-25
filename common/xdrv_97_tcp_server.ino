@@ -45,8 +45,8 @@ class TCPServer
 {
 public:
   TCPServer ();
-  void start (int port);
-  void stop ();
+  bool start (int port);
+  bool stop ();
   void send (char to_send);
   void manage_client ();
 
@@ -65,9 +65,10 @@ TCPServer::TCPServer ()
   buffer_index = 0;
 }
 
-void TCPServer::stop ()
+bool TCPServer::stop ()
 {
-  int index; 
+  bool cmd_done = false;
+  int  index; 
 
   // if already running, stop previous server
   if (server != nullptr)
@@ -80,19 +81,24 @@ void TCPServer::stop ()
     // stop all clients
     for (index = 0; index < TCP_CLIENT_MAX; index++) client[index].stop ();
 
-    // log
+    // validate and log
+    cmd_done = true;
     AddLog (LOG_LEVEL_INFO, PSTR ("TCP: Stopping TCP server"));
   }
+
+  return cmd_done;
 }
 
-void TCPServer::start (int port)
+bool TCPServer::start (int port)
 {
-  // if already running, stop previous server
-  stop ();
+  bool cmd_done = false;
 
   // if port defined, start new server
   if (port > 0)
   {
+    // if server already started, stop it
+    if (server != nullptr) stop ();
+
     // create and start server
     server = new WiFiServer (port);
     server->begin ();
@@ -101,9 +107,12 @@ void TCPServer::start (int port)
     // reset buffer index
     buffer_index = 0;
 
-    // log
+    // validate and log
+    cmd_done = true;
     AddLog (LOG_LEVEL_INFO, PSTR ("TCP: Starting TCP server on port %d"), port);
   }
+
+  return cmd_done;
 }
 
 // TCP server data send
@@ -162,18 +171,28 @@ void TCPServer::manage_client ()
 // TCP server instance
 TCPServer tcp_server;
 
+/***********************************************************\
+ *                      Commands
+\***********************************************************/
+
 // Start TCP server
 void CmndTCPStart (void)
 {
-  tcp_server.start (XdrvMailbox.payload);
-  ResponseCmndNumber (XdrvMailbox.payload);
+  bool result = false;
+
+  if ((XdrvMailbox.data_len > 0) && (XdrvMailbox.payload > 0)) result = tcp_server.start (XdrvMailbox.payload);
+ 
+  if (result) ResponseCmndDone (); else ResponseCmndFailed ();
 }
 
 // Stop TCP server
 void CmndTCPStop (void)
 {
-  tcp_server.stop ();
-  ResponseCmndDone ();
+  bool result = false;
+
+  result = tcp_server.stop ();
+
+  if (result) ResponseCmndDone (); else ResponseCmndFailed ();
 }
 
 /***********************************************************\

@@ -60,7 +60,7 @@ const char kTimezoneCommands[] PROGMEM = "tz_|ntp|stdo|stdm|sdtw|stdd|dsto|dstm|
 void (* const TimezoneCommand[])(void) PROGMEM = { &CmndTimezoneNtp, &CmndTimezoneStdO, &CmndTimezoneStdM, &CmndTimezoneStdW, &CmndTimezoneStdD, &CmndTimezoneDstO, &CmndTimezoneDstM, &CmndTimezoneDstW, &CmndTimezoneDstD };
 
 // constant strings
-const char TZ_FIELDSET_START[] PROGMEM = "<p><fieldset><legend><b>&nbsp;%s&nbsp;</b></legend>\n";
+const char TZ_FIELDSET_START[] PROGMEM = "<p><fieldset><legend><b>&nbsp;%s %s&nbsp;</b></legend>\n";
 const char TZ_FIELDSET_STOP[]  PROGMEM = "</fieldset></p>\n";
 const char TZ_FIELD_INPUT[]    PROGMEM = "<p>%s<span style='float:right;font-size:0.7rem;'>%s</span><br><input type='number' name='%s' min='%d' max='%d' step='%d' value='%d'></p>\n";
 
@@ -249,13 +249,13 @@ void TimezoneWebPageConfigure ()
 
   // NTP server section  
   // ---------------------
-  WSContentSend_P (TZ_FIELDSET_START, D_TIMEZONE_NTP);
+  WSContentSend_P (TZ_FIELDSET_START, "🖥️", D_TIMEZONE_NTP);
   WSContentSend_P (PSTR ("<p>%s<span style='float:right;font-size:0.7rem;'>%s</span><br><input type='text' name='%s' value='%s'></p>\n"), D_TIMEZONE_NTP, PSTR (D_CMND_TIMEZONE_NTP), PSTR (D_CMND_TIMEZONE_NTP), SettingsText(SET_NTPSERVER1));
   WSContentSend_P (TZ_FIELDSET_STOP);
 
   // Standard Time section  
   // ---------------------
-  WSContentSend_P (TZ_FIELDSET_START, D_TIMEZONE_STD);
+  WSContentSend_P (TZ_FIELDSET_START, "🕞", D_TIMEZONE_STD);
   WSContentSend_P (TZ_FIELD_INPUT, D_TIMEZONE_OFFSET, PSTR (D_CMND_TIMEZONE_STDO), PSTR (D_CMND_TIMEZONE_STDO), -720, 720, 1, Settings->toffset[0]);
   WSContentSend_P (TZ_FIELD_INPUT, D_TIMEZONE_MONTH,  PSTR (D_CMND_TIMEZONE_STDM), PSTR (D_CMND_TIMEZONE_STDM), 1,    12,  1, Settings->tflag[0].month);
   WSContentSend_P (TZ_FIELD_INPUT, D_TIMEZONE_WEEK,   PSTR (D_CMND_TIMEZONE_STDW), PSTR (D_CMND_TIMEZONE_STDW), 0,    4,   1, Settings->tflag[0].week);
@@ -264,7 +264,7 @@ void TimezoneWebPageConfigure ()
 
   // Daylight Saving Time section  
   // ----------------------------
-  WSContentSend_P (TZ_FIELDSET_START, D_TIMEZONE_DST);
+  WSContentSend_P (TZ_FIELDSET_START, "🕤", D_TIMEZONE_DST);
   WSContentSend_P (TZ_FIELD_INPUT, D_TIMEZONE_OFFSET, PSTR (D_CMND_TIMEZONE_DSTO), PSTR (D_CMND_TIMEZONE_DSTO), -720, 720, 1, Settings->toffset[1]);
   WSContentSend_P (TZ_FIELD_INPUT, D_TIMEZONE_MONTH,  PSTR (D_CMND_TIMEZONE_DSTM), PSTR (D_CMND_TIMEZONE_DSTM), 1,    12,  1, Settings->tflag[1].month);
   WSContentSend_P (TZ_FIELD_INPUT, D_TIMEZONE_WEEK,   PSTR (D_CMND_TIMEZONE_DSTW), PSTR (D_CMND_TIMEZONE_DSTW), 0,    4,   1, Settings->tflag[1].week);

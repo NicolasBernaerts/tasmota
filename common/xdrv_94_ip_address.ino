@@ -167,7 +167,7 @@ void IPAddressWebPageConfigure ()
 
   // IP address section  
   // ---------------------
-  WSContentSend_P (PSTR ("<p><fieldset><legend><b>&nbsp;IP&nbsp;</b></legend>\n"));
+  WSContentSend_P (PSTR ("<p><fieldset><legend><b>&nbsp;🔗 IP&nbsp;</b></legend>\n"));
 
   WSContentSend_P (D_IPADDRESS_FIELD_INPUT, PSTR ("Address <small>(0.0.0.0 for DHCP)</small>"), PSTR (D_CMND_IPADDRESS_ADDR),    Settings->ipv4_address[0]);
   WSContentSend_P (D_IPADDRESS_FIELD_INPUT, PSTR ("Gateway"), PSTR (D_CMND_IPADDRESS_GATEWAY), Settings->ipv4_address[1]);
