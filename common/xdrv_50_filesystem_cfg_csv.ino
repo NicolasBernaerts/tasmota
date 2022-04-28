@@ -428,9 +428,11 @@ float UfsCsvGetColumnFloat (const int column, int action = UFS_CSV_NONE)
 void UfsCsvAppend (const char* pstr_filename, const char* pstr_line, bool keep_open = false) 
 {
   bool exists;
+  int  position;
 
   // check parameters
   if ((pstr_filename == nullptr) || (pstr_line == nullptr)) return;
+  if ((strlen (pstr_filename) == 0) || (strlen (pstr_line) == 0)) return;
 
   // if file is not already opened
   if (!ufs_csv.is_open[UFS_CSV_ACCESS_WRITE])
@@ -443,8 +445,12 @@ void UfsCsvAppend (const char* pstr_filename, const char* pstr_line, bool keep_o
   // append current line
   if (ufs_csv.is_open[UFS_CSV_ACCESS_WRITE])
   {
+    // write the string
     ufs_csv.file[UFS_CSV_ACCESS_WRITE].print (pstr_line);
-    ufs_csv.file[UFS_CSV_ACCESS_WRITE].print ("\n");
+
+    // append '\n' if needed
+    position = strlen (pstr_line) - 1;
+    if (pstr_line[position] != '\n') ufs_csv.file[UFS_CSV_ACCESS_WRITE].print ("\n");
   }
 
   // if needed, close file
