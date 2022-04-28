@@ -61,6 +61,7 @@
     13/03/2022 - v9.4   - Change keys to ISUB and PSUB in METER section
     20/03/2022 - v9.5   - Change serial init and in active power calculation
     01/04/2022 - v9.6   - Add software watchdog feed to avoid lock
+    22/04/2022 - v9.7   - Option to minimise LittleFS writes (day:every 1h and week:every 6h)
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -126,7 +127,7 @@
 // extension data
 #define EXTENSION_NAME    "Teleinfo"          // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
-#define EXTENSION_VERSION "9.6"               // version
+#define EXTENSION_VERSION "9.7"               // version
 
 // MQTT default
 #undef MQTT_HOST

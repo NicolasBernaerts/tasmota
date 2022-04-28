@@ -73,6 +73,7 @@
     13/03/2022 - v9.4   - Change keys to ISUB and PSUB in METER section
     20/03/2022 - v9.5   - Change serial init and major rework in active power calculation
     01/04/2022 - v9.6   - Add software watchdog feed to avoid lock
+    22/04/2022 - v9.7   - Option to minimise LittleFS writes (day:every 1h and week:every 6h)
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -161,11 +162,13 @@ TasmotaSerial *teleinfo_serial = nullptr;
 // commands : MQTT
 #define D_CMND_TELEINFO_ENABLE          "enable"
 #define D_CMND_TELEINFO_RATE            "rate"
+#define D_CMND_TELEINFO_LOG_POLICY      "log"
 #define D_CMND_TELEINFO_MSG_POLICY      "msgp"
 #define D_CMND_TELEINFO_MSG_TYPE        "msgt"
 #define D_CMND_TELEINFO_INTERVAL        "ival"
 #define D_CMND_TELEINFO_ADJUST          "adj"
-#define D_CMND_TELEINFO_ROTATE          "rotate"
+#define D_CMND_TELEINFO_ROTATE          "rot"
+#define D_CMND_TELEINFO_MINIMIZE        "mini"
 
 #define D_CMND_TELEINFO_NBDAILY         "daily"
 #define D_CMND_TELEINFO_NBWEEKLY        "weekly"
@@ -202,6 +205,7 @@ TasmotaSerial *teleinfo_serial = nullptr;
 #define D_TELEINFO_PERIOD               "Period"
 
 // Historic data files
+#define TELEINFO_HISTO_BUFFER_MAX       2048      // log buffer
 #define TELEINFO_HISTO_DAY_MAX          31        // max number of daily histotisation files
 #define TELEINFO_HISTO_WEEK_MAX         52        // max number of weekly histotisation files
 #define TELEINFO_HISTO_LINE_LENGTH      256       // maximum line length in CSV files
@@ -232,17 +236,18 @@ const char D_TELEINFO_PAGE_TIC_PNG[]      PROGMEM = "/tic.png";
 // web strings
 const char D_TELEINFO_CONFIG[]            PROGMEM = "Configure Teleinfo";
 const char TELEINFO_INPUT_RADIO[]         PROGMEM = "<p><input type='radio' name='%s' value='%d' %s>%s</p>\n";
-const char TELEINFO_INPUT_NUMBER[]        PROGMEM = "<span>%s<br><input type='number' name='%s' min='%d' max='%d' step='1' value='%d'></span>";
+const char TELEINFO_INPUT_CHECKBOX[]      PROGMEM = "<p><input type='checkbox' name='%s' %s>%s</p>\n";
+const char TELEINFO_INPUT_NUMBER[]        PROGMEM = "<p>%s<br><input type='number' name='%s' min='%d' max='%d' step='1' value='%d'></p>\n";
 const char TELEINFO_FIELD_START[]         PROGMEM = "<p><fieldset><legend><b>&nbsp;%s %s&nbsp;</b></legend>\n";
-const char TELEINFO_FIELD_STOP[]          PROGMEM = "</fieldset></p><br>\n";
+const char TELEINFO_FIELD_STOP[]          PROGMEM = "</fieldset></p>\n<br>\n";
 const char TELEINFO_HTML_POWER[]          PROGMEM = "<text class='power' x='%d%%' y='%d%%'>%s</text>\n";
 const char TELEINFO_HTML_DASH[]           PROGMEM = "<line class='dash' x1='%d%%' y1='%d%%' x2='%d%%' y2='%d%%' />\n";
 const char TELEINFO_HTML_BAR[]            PROGMEM = "<tr><div style='margin:4px;padding:0px;background-color:#ddd;border-radius:4px;'><div style='font-size:0.75rem;font-weight:bold;padding:0px;text-align:center;border:1px solid #bbb;border-radius:4px;color:#444;background-color:%s;width:%d%%;'>%d%%</div></div></tr>\n";
 
 // TIC - MQTT commands : TICenable, TICrate, TICtele, TICmeter, TICival, TICdelta, TICadj and TICtcp
-enum TeleinfoCommands { TIC_CMND_NONE, TIC_CMND_ENABLE, TIC_CMND_RATE, TIC_CMND_POLICYTIC, TIC_CMND_POLICYMETER, TIC_CMND_INTERVAL, TIC_CMND_ADJUST, TIC_CMND_NBDAILY, TIC_CMND_NBWEEKLY };
-const char kTeleinfoCommands[]            PROGMEM = "tic_" "|" D_CMND_TELEINFO_ENABLE "|" D_CMND_TELEINFO_RATE "|" D_CMND_TELEINFO_MSG_POLICY "|" D_CMND_TELEINFO_MSG_TYPE "|" D_CMND_TELEINFO_INTERVAL "|" D_CMND_TELEINFO_ADJUST "|" D_CMND_TELEINFO_ROTATE;
-void (* const TeleinfoCommand[])(void)    PROGMEM = { &CmndTeleinfoEnable, &CmndTeleinfoRate, &CmndTeleinfoMessagePolicy, &CmndTeleinfoMessageType, &CmndTeleinfoInterval, &CmndTeleinfoAdjust, &CmndTeleinfoRotate };
+enum TeleinfoCommands { TIC_CMND_NONE, TIC_CMND_ENABLE, TIC_CMND_RATE, TIC_CMND_POLICYTIC, TIC_CMND_POLICYMETER, TIC_CMND_POLICYLOG, TIC_CMND_INTERVAL, TIC_CMND_ADJUST, TIC_CMND_NBDAILY, TIC_CMND_NBWEEKLY };
+const char kTeleinfoCommands[]            PROGMEM = "tic_" "|" D_CMND_TELEINFO_ENABLE "|" D_CMND_TELEINFO_RATE "|" D_CMND_TELEINFO_MSG_POLICY "|" D_CMND_TELEINFO_MSG_TYPE "|" D_CMND_TELEINFO_LOG_POLICY "|" D_CMND_TELEINFO_INTERVAL "|" D_CMND_TELEINFO_ADJUST "|" D_CMND_TELEINFO_ROTATE;
+void (* const TeleinfoCommand[])(void)    PROGMEM = { &CmndTeleinfoEnable, &CmndTeleinfoRate, &CmndTeleinfoMessagePolicy, &CmndTeleinfoMessageType, &CmndTeleinfoLogPolicy, &CmndTeleinfoInterval, &CmndTeleinfoAdjust, &CmndTeleinfoRotate };
 
 // TIC - specific etiquettes
 enum TeleinfoEtiquette { TIC_NONE, TIC_ADCO, TIC_ADSC, TIC_PTEC, TIC_NGTF, TIC_EAIT, TIC_IINST, TIC_IINST1, TIC_IINST2, TIC_IINST3, TIC_ISOUSC, TIC_PS, TIC_PAPP, TIC_SINSTS, TIC_BASE, TIC_EAST, TIC_HCHC, TIC_HCHP, TIC_EJPHN, TIC_EJPHPM, TIC_BBRHCJB, TIC_BBRHPJB, TIC_BBRHCJW, TIC_BBRHPJW, TIC_BBRHCJR, TIC_BBRHPJR, TIC_ADPS, TIC_ADIR1, TIC_ADIR2, TIC_ADIR3, TIC_URMS1, TIC_URMS2, TIC_URMS3, TIC_UMOY1, TIC_UMOY2, TIC_UMOY3, TIC_IRMS1, TIC_IRMS2, TIC_IRMS3, TIC_SINSTS1, TIC_SINSTS2, TIC_SINSTS3, TIC_PTCOUR, TIC_PTCOUR1, TIC_PREF, TIC_PCOUP, TIC_LTARF, TIC_EASF01, TIC_EASF02, TIC_EASF03, TIC_EASF04, TIC_EASF05, TIC_EASF06, TIC_EASF07, TIC_EASF08, TIC_EASF09, TIC_EASF10, TIC_ADS, TIC_CONFIG, TIC_EAPS, TIC_EAS, TIC_EAPPS, TIC_PREAVIS, TIC_MAX };
@@ -267,9 +272,10 @@ enum TeleinfoMessageType { TELEINFO_TYPE_NONE, TELEINFO_TYPE_METER, TELEINFO_TYP
 const char kTeleinfoMessageType[] PROGMEM = "None|METER only|TIC only|METER and TIC";
 
 // graph - periods
-enum TeleinfoGraphPeriod { TELEINFO_PERIOD_LIVE, TELEINFO_PERIOD_DAY, TELEINFO_PERIOD_WEEK, TELEINFO_PERIOD_MAX };                                                              // available graph periods
-const char kTeleinfoGraphPeriod[] PROGMEM = "Live|Day|Week";                                                                                                                    // period labels
-const long ARR_TELEINFO_PERIOD_SAMPLE[] = { 3600 / TELEINFO_GRAPH_SAMPLE, 86400 / TELEINFO_GRAPH_SAMPLE, 604800 / TELEINFO_GRAPH_SAMPLE };                                      // number of seconds between samples
+enum TeleinfoGraphPeriod { TELEINFO_PERIOD_LIVE, TELEINFO_PERIOD_DAY, TELEINFO_PERIOD_WEEK, TELEINFO_PERIOD_MAX };                              // available graph periods
+const char kTeleinfoGraphPeriod[] PROGMEM = "Live|Day|Week";                                                                                    // period labels
+const long ARR_TELEINFO_PERIOD_WINDOW[] = { 3600 / TELEINFO_GRAPH_SAMPLE, 86400 / TELEINFO_GRAPH_SAMPLE, 604800 / TELEINFO_GRAPH_SAMPLE };      // time window between samples (sec.)
+const long ARR_TELEINFO_PERIOD_FLUSH[]  = { 1, 3600, 21600 };                                                                                   // max time between log flush (sec.)
 
 // graph - display
 enum TeleinfoGraphDisplay { TELEINFO_UNIT_VA, TELEINFO_UNIT_W, TELEINFO_UNIT_V, TELEINFO_UNIT_COSPHI, TELEINFO_UNIT_MAX };                                                      // available graph displays
@@ -291,6 +297,9 @@ enum TeleinfoPowerTarget { TIC_POWER_UPDATE_COUNTER, TIC_POWER_UPDATE_PAPP, TIC_
 // serial port management
 enum TeleinfoSerialStatus { TIC_SERIAL_INIT, TIC_SERIAL_ACTIVE, TIC_SERIAL_STOPPED, TIC_SERIAL_FAILED };
 
+// log write policy
+enum TeleinfoLogPolicy { TELEINFO_LOG_BUFFERED, TELEINFO_LOG_IMMEDIATE, TELEINFO_LOG_MAX};
+
 /****************************************\
  *                 Data
 \****************************************/
@@ -298,8 +307,9 @@ enum TeleinfoSerialStatus { TIC_SERIAL_INIT, TIC_SERIAL_ACTIVE, TIC_SERIAL_STOPP
 // teleinfo : configuration
 static struct {
   uint16_t baud_rate   = 1200;                      // meter transmission rate (bauds)
-  int  msg_policy      = TELEINFO_POLICY_TELEMETRY; // publishing policy for TIC data
-  int  msg_type        = TELEINFO_TYPE_METER;       // publishing policy for TIC data
+  int  log_policy      = TELEINFO_LOG_BUFFERED;     // log writing policy
+  int  msg_policy      = TELEINFO_POLICY_TELEMETRY; // publishing policy for data
+  int  msg_type        = TELEINFO_TYPE_METER;       // type of data to publish (METER and/or TIC)
   int  update_interval = 720;                       // update interval
   int  calc_delta      = 1;                         // minimum delta for power calculation
   int  percent_adjust  = 100;                       // percentage adjustment to maximum contract power
@@ -406,6 +416,14 @@ struct tic_period {
 }; 
 static tic_period teleinfo_period[TELEINFO_PERIOD_MAX];
 
+// teleinfo : log data
+struct tic_log {
+  uint32_t time_flush;                              // timestamp of next flush
+  String   str_filename;                            // current log filename
+  String   str_buffer;                              // pre log buffer
+}; 
+static tic_log teleinfo_log[TELEINFO_PERIOD_MAX];
+
 // teleinfo : graph data
 struct tic_graph {
   uint8_t arr_papp[ENERGY_MAX_PHASES][TELEINFO_GRAPH_SAMPLE];     // array of apparent power graph values
@@ -456,6 +474,7 @@ uint16_t TeleinfoValidateBaudRate (uint16_t baud_rate)
   return baud_rate;
 }
 
+/*
 // Validate message publication policy
 int TeleinfoValidatePolicy (int new_policy)
 {
@@ -483,6 +502,7 @@ int TeleinfoValidateContractAdjustment (int adjust)
   if ((adjust < TELEINFO_PERCENT_MIN) || (adjust > TELEINFO_PERCENT_MAX)) adjust = 100;
   return adjust;
 }
+*/
 
 /**************************************************\
  *                  Commands
@@ -496,25 +516,31 @@ void CmndTeleinfoRate (void)
 
 void CmndTeleinfoMessagePolicy (void)
 {
-  if (XdrvMailbox.data_len > 0) teleinfo_config.msg_policy = TeleinfoValidatePolicy (XdrvMailbox.payload);
+  if ((XdrvMailbox.data_len > 0) && (XdrvMailbox.payload >= 0) && (XdrvMailbox.payload < TELEINFO_POLICY_MAX)) teleinfo_config.msg_policy = XdrvMailbox.payload;
   ResponseCmndNumber (teleinfo_config.msg_policy);
 }
 
 void CmndTeleinfoMessageType (void)
 {
-  if (XdrvMailbox.data_len > 0) teleinfo_config.msg_type = TeleinfoValidateType (XdrvMailbox.payload);
+  if ((XdrvMailbox.data_len > 0) && (XdrvMailbox.payload >= 0) && (XdrvMailbox.payload < TELEINFO_TYPE_MAX)) teleinfo_config.msg_type = XdrvMailbox.payload;
   ResponseCmndNumber (teleinfo_config.msg_type);
+}
+
+void CmndTeleinfoLogPolicy (void)
+{
+  if ((XdrvMailbox.data_len > 0) && (XdrvMailbox.payload < TELEINFO_LOG_MAX)) teleinfo_config.log_policy = XdrvMailbox.payload;
+  ResponseCmndNumber (teleinfo_config.log_policy);
 }
 
 void CmndTeleinfoInterval (void)
 {
-  if (XdrvMailbox.data_len > 0) teleinfo_config.update_interval = TeleinfoValidateUpdateInterval (XdrvMailbox.payload);
+  if ((XdrvMailbox.data_len > 0) && (XdrvMailbox.payload >= TELEINFO_INTERVAL_MIN) && (XdrvMailbox.payload <= TELEINFO_INTERVAL_MAX)) teleinfo_config.update_interval = XdrvMailbox.payload;
   ResponseCmndNumber (teleinfo_config.update_interval);
 }
 
 void CmndTeleinfoAdjust (void)
 {
-  if (XdrvMailbox.data_len > 0) teleinfo_config.percent_adjust = TeleinfoValidateContractAdjustment (XdrvMailbox.payload);
+  if ((XdrvMailbox.data_len > 0) && (XdrvMailbox.payload >= TELEINFO_PERCENT_MIN) && (XdrvMailbox.payload <= TELEINFO_PERCENT_MAX)) teleinfo_config.percent_adjust = XdrvMailbox.payload;
   ResponseCmndNumber (teleinfo_config.percent_adjust);
 }
 
@@ -633,10 +659,11 @@ void TeleinfoLoadConfig ()
 
   // retrieve saved settings from flash filesystem
   teleinfo_config.baud_rate       = TeleinfoValidateBaudRate (UfsCfgLoadKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_RATE));
-  teleinfo_config.msg_policy      = TeleinfoValidatePolicy (UfsCfgLoadKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_MSG_POLICY));
-  teleinfo_config.msg_type        = TeleinfoValidatePolicy (UfsCfgLoadKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_MSG_TYPE));
-  teleinfo_config.update_interval = TeleinfoValidateUpdateInterval (UfsCfgLoadKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_INTERVAL));
-  teleinfo_config.percent_adjust  = TeleinfoValidateContractAdjustment (UfsCfgLoadKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_ADJUST));
+  teleinfo_config.log_policy      = UfsCfgLoadKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_LOG_POLICY);
+  teleinfo_config.msg_policy      = UfsCfgLoadKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_MSG_POLICY);
+  teleinfo_config.msg_type        = UfsCfgLoadKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_MSG_TYPE);
+  teleinfo_config.update_interval = UfsCfgLoadKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_INTERVAL);
+  teleinfo_config.percent_adjust  = UfsCfgLoadKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_ADJUST);
   teleinfo_config.nb_daily        = UfsCfgLoadKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_NBDAILY, TELEINFO_DAILY_DEFAULT);
   teleinfo_config.nb_weekly       = UfsCfgLoadKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_NBWEEKLY, TELEINFO_WEEKLY_DEFAULT);
   teleinfo_config.height          = UfsCfgLoadKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_HEIGHT, TELEINFO_GRAPH_HEIGHT);
@@ -648,15 +675,22 @@ void TeleinfoLoadConfig ()
 
   // retrieve saved settings from flash memory
   teleinfo_config.baud_rate       = TeleinfoValidateBaudRate (Settings->sbaudrate * 300);
-  teleinfo_config.msg_policy      = TeleinfoValidatePolicy ((int)Settings->weight_reference);
-  teleinfo_config.msg_type        = TeleinfoValidatePolicy ((int)Settings->weight_calibration);
-  teleinfo_config.update_interval = TeleinfoValidateUpdateInterval ((int)Settings->weight_item);
-  teleinfo_config.percent_adjust  = TeleinfoValidateContractAdjustment ((int)Settings->weight_change);
+  teleinfo_config.msg_policy      = (int)Settings->weight_reference;
+  teleinfo_config.msg_type        = (int)Settings->weight_calibration;
+  teleinfo_config.update_interval = (int)Settings->weight_item;
+  teleinfo_config.percent_adjust  = (int)Settings->weight_change;
 
   // log
   AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Config loaded from flash memory"));
 
 # endif     // USE_UFILESYS
+
+  // validate boundaries
+  if (teleinfo_config.log_policy >= TELEINFO_LOG_MAX) teleinfo_config.log_policy = TELEINFO_LOG_BUFFERED;
+  if ((teleinfo_config.msg_policy < 0) || (teleinfo_config.msg_policy >= TELEINFO_POLICY_MAX)) teleinfo_config.msg_policy = TELEINFO_POLICY_TELEMETRY;
+  if (teleinfo_config.msg_type >= TELEINFO_TYPE_MAX) teleinfo_config.msg_type = TELEINFO_TYPE_METER;
+  if ((teleinfo_config.update_interval < TELEINFO_INTERVAL_MIN) || (teleinfo_config.update_interval > TELEINFO_INTERVAL_MAX)) teleinfo_config.update_interval = TELEINFO_INTERVAL_MAX;
+  if ((teleinfo_config.percent_adjust < TELEINFO_PERCENT_MIN) || (teleinfo_config.percent_adjust > TELEINFO_PERCENT_MAX)) teleinfo_config.percent_adjust = 100;
 }
 
 // Save configuration to Settings or to LittleFS
@@ -666,6 +700,7 @@ void TeleinfoSaveConfig ()
 
   // save settings into flash filesystem
   UfsCfgSaveKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_RATE,       teleinfo_config.baud_rate,       true);
+  UfsCfgSaveKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_LOG_POLICY, teleinfo_config.log_policy,      false);
   UfsCfgSaveKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_MSG_POLICY, teleinfo_config.msg_policy,      false);
   UfsCfgSaveKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_MSG_TYPE,   teleinfo_config.msg_type,        false);
   UfsCfgSaveKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_INTERVAL,   teleinfo_config.update_interval, false);
@@ -990,14 +1025,31 @@ long TeleinfoHistoGetData (int data, int period, int phase, int index, bool incr
   return value;
 }
 
+// Flush log data to littlefs
+void TeleinfoHistoFlushData (int period)
+{
+  // if buffer is filled, save buffer to log
+  if (teleinfo_log[period].str_buffer.length () > 0)
+  {
+    UfsCsvAppend (teleinfo_log[period].str_filename.c_str (), teleinfo_log[period].str_buffer.c_str (), false);
+    teleinfo_log[period].str_buffer = "";
+  }
+
+  // set next flush time
+  teleinfo_log[period].time_flush = millis () + 1000 * ARR_TELEINFO_PERIOD_FLUSH[period];
+}
+
 // Save historisation data
-void TeleinfoHistoSaveData (int period)
+void TeleinfoHistoSaveData (int period, uint8_t log_policy)
 {
   int    phase, index, line;
   TIME_T now_dst;
   char   str_filename[UFS_FILENAME_SIZE];
   char   str_line[TELEINFO_HISTO_LINE_LENGTH];
   char   str_value[32];
+
+  // check boundaries
+  if ((period != TELEINFO_PERIOD_DAY) && (period != TELEINFO_PERIOD_WEEK)) return;
 
   // extract current time data
   BreakTime (LocalTime (), now_dst);
@@ -1006,20 +1058,26 @@ void TeleinfoHistoSaveData (int period)
   if (period == TELEINFO_PERIOD_WEEK)
   {
     sprintf_P (str_filename, D_TELEINFO_HISTO_FILE_WEEKLY, 0);
-    line = (((now_dst.day_of_week + 5) % 7) * 86400 + now_dst.hour * 3600 + now_dst.minute * 60) / ARR_TELEINFO_PERIOD_SAMPLE[period];
+    line = (((now_dst.day_of_week + 5) % 7) * 86400 + now_dst.hour * 3600 + now_dst.minute * 60) / ARR_TELEINFO_PERIOD_WINDOW[period];
   }
 
   // else target is daily records
   else if (period == TELEINFO_PERIOD_DAY)
   {
     sprintf_P (str_filename, D_TELEINFO_HISTO_FILE_DAILY, 0);
-    line = (now_dst.hour * 3600 + now_dst.minute * 60) / ARR_TELEINFO_PERIOD_SAMPLE[period];
+    line = (now_dst.hour * 3600 + now_dst.minute * 60) / ARR_TELEINFO_PERIOD_WINDOW[period];
   }
 
   else return;
 
-  // if new file, generate header
-  if (!ffsp->exists (str_filename))
+  // if log file name has changed
+  if (teleinfo_log[period].str_filename != str_filename) TeleinfoHistoFlushData (period);
+
+  // set log filename
+  teleinfo_log[period].str_filename = str_filename;
+
+  // if buffer empty and new file, generate header
+  if (!ffsp->exists (str_filename) && teleinfo_log[period].str_buffer.length () == 0)
   {
     strcpy_P (str_line, PSTR ("Idx;Date;Time"));
     for (phase = 0; phase < teleinfo_contract.phase; phase++)
@@ -1037,9 +1095,10 @@ void TeleinfoHistoSaveData (int period)
       strlcat (str_line, ";", sizeof (str_line));
       strlcat (str_line, str_value, sizeof (str_line));
     }
+    strlcat (str_line, "\n", sizeof (str_line));
 
-    // add header to history CSV file
-    UfsCsvAppend (str_filename, str_line, false);
+    // add header to the buffer
+    teleinfo_log[period].str_buffer += str_line;
   }
 
   // calculate line index (previous line + 1 or calculated line index if difference is more than one index)
@@ -1065,9 +1124,13 @@ void TeleinfoHistoSaveData (int period)
     strlcat (str_line, ";", sizeof (str_line));
     strlcat (str_line, str_value, sizeof (str_line));
   }
+  strlcat (str_line, "\n", sizeof (str_line));
 
-  // add data to history CSV file
-  UfsCsvAppend (str_filename, str_line, false);
+  // add line to the buffer
+  teleinfo_log[period].str_buffer += str_line;
+
+  // if log should be saved now
+  if ((log_policy == TELEINFO_LOG_IMMEDIATE) || (teleinfo_log[period].str_buffer.length () > TELEINFO_HISTO_BUFFER_MAX)) TeleinfoHistoFlushData (period);
 }
 
 #endif    // USE_UFILESYS
@@ -1099,7 +1162,7 @@ void TeleinfoGraphSaveData (int period)
     value = UINT8_MAX;
 
     // save average and peak value over the period
-    if (teleinfo_contract.ssousc > 0) power = (long)(teleinfo_period[period].papp_sum[phase] / ARR_TELEINFO_PERIOD_SAMPLE[period]);
+    if (teleinfo_contract.ssousc > 0) power = (long)(teleinfo_period[period].papp_sum[phase] / ARR_TELEINFO_PERIOD_WINDOW[period]);
     teleinfo_graph.papp[phase] = power;
     teleinfo_graph.papp_peak[phase] = teleinfo_period[period].papp_peak[phase];
 
@@ -1124,7 +1187,7 @@ void TeleinfoGraphSaveData (int period)
     value = UINT8_MAX;
 
     // save average value over the period
-    if (teleinfo_contract.ssousc > 0) power = (long)(teleinfo_period[period].pact_sum[phase] / ARR_TELEINFO_PERIOD_SAMPLE[period]);
+    if (teleinfo_contract.ssousc > 0) power = (long)(teleinfo_period[period].pact_sum[phase] / ARR_TELEINFO_PERIOD_WINDOW[period]);
     if (power > teleinfo_graph.papp[phase]) power = teleinfo_graph.papp[phase];
     teleinfo_graph.pact[phase] = power;
 
@@ -1164,12 +1227,12 @@ void TeleinfoGraphSaveData (int period)
     // -----------
 
     // save average value over the period
-    teleinfo_graph.cosphi[phase] = (int)(teleinfo_period[period].cosphi_sum[phase] / ARR_TELEINFO_PERIOD_SAMPLE[period]);
+    teleinfo_graph.cosphi[phase] = (int)(teleinfo_period[period].cosphi_sum[phase] / ARR_TELEINFO_PERIOD_WINDOW[period]);
 
     // if needed, save dynamic memory graph data
     if (period < TELEINFO_MEMORY_PERIOD_MAX) teleinfo_graph.data[period].arr_cosphi[phase][index] = (uint8_t)teleinfo_graph.cosphi[phase];
 
-    // reset period data
+    // reset period _
     teleinfo_period[period].cosphi_sum[phase] = 0;
   }
 
@@ -1180,7 +1243,7 @@ void TeleinfoGraphSaveData (int period)
 
 #ifdef USE_UFILESYS
     // if needed, save data to history file
-    if (ufs_type && histo_update) TeleinfoHistoSaveData (period);
+    if (ufs_type && histo_update) TeleinfoHistoSaveData (period, teleinfo_config.log_policy);
 #endif    // USE_UFILESYS
 }
 
@@ -1341,7 +1404,8 @@ void TeleinfoInit ()
 // Teleinfo graph data initialisation
 void TeleinfoGraphInit ()
 {
-  int index, phase, period;
+  int      index, phase, period;
+  uint32_t time_now = millis ();
 
   // initialise period data
   for (period = 0; period < TELEINFO_PERIOD_MAX; period++)
@@ -1362,6 +1426,9 @@ void TeleinfoGraphInit ()
       teleinfo_period[period].pact_sum[phase]   = 0;
       teleinfo_period[period].cosphi_sum[phase] = 0;
     }
+
+    // set initial log flush time
+    teleinfo_log[period].time_flush = time_now + 1000 * ARR_TELEINFO_PERIOD_FLUSH[period];
   }
 
   // initialise graph data
@@ -1391,6 +1458,12 @@ void TeleinfoSaveBeforeRestart ()
 
   // update energy total (in kwh)
   EnergyUpdateTotal ();
+
+#ifdef USE_UFILESYS
+  // flush logs
+  TeleinfoHistoFlushData ( TELEINFO_PERIOD_DAY);
+  TeleinfoHistoFlushData ( TELEINFO_PERIOD_WEEK);
+#endif      // USE_UFILESYS
 }
 
 // Rotation of log files
@@ -1403,6 +1476,10 @@ void TeleinfoRotateLogs ()
 
   // log default method
   AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Rotate log files"));
+
+  // flush logs
+  TeleinfoHistoFlushData ( TELEINFO_PERIOD_DAY);
+  TeleinfoHistoFlushData ( TELEINFO_PERIOD_WEEK);
 
   // calculate minimum file size from lastest daily file
   sprintf_P (str_filename, D_TELEINFO_HISTO_FILE_DAILY, 0);
@@ -2143,13 +2220,27 @@ void TeleinfoEverySecond ()
 
         // update highest apparent power level
         if (teleinfo_phase[phase].papp > teleinfo_period[period].papp_peak[phase]) teleinfo_period[period].papp_peak[phase] = teleinfo_phase[phase].papp;
-      } 
+      }
+
+#ifdef USE_UFILESYS
+      // if max buffer time reached, flush to littlefs
+      if (TimeReached (teleinfo_log[period].time_flush)) 
+      {
+        // save buffer to log file
+        UfsCsvAppend (teleinfo_log[period].str_filename.c_str (), teleinfo_log[period].str_buffer.c_str (), false);
+        teleinfo_log[period].str_buffer = "";
+
+        // set next flush time
+        teleinfo_log[period].time_flush = millis () + 1000 * ARR_TELEINFO_PERIOD_FLUSH[period];
+      }
+#endif    // USE_UFILESYS
+
     }
 
     // increment graph period counter and update graph data if needed
     if (teleinfo_period[period].counter == 0) TeleinfoGraphSaveData (period);
     teleinfo_period[period].counter ++;
-    teleinfo_period[period].counter = teleinfo_period[period].counter % ARR_TELEINFO_PERIOD_SAMPLE[period];
+    teleinfo_period[period].counter = teleinfo_period[period].counter % ARR_TELEINFO_PERIOD_WINDOW[period];
   }
 
   // check if message should be published
@@ -2416,7 +2507,7 @@ void TeleinfoWebSensor ()
 }
 
 // Teleinfo web page
-void TeleinfoWebPageConfig ()
+void TeleinfoWebPageConfigure ()
 {
   int  index, value, rate_mode;
   uint16_t rate_baud;
@@ -2431,25 +2522,30 @@ void TeleinfoWebPageConfig ()
   {
     // parameter 'sendp' : set TIC messages diffusion policy
     WebGetArg (D_CMND_TELEINFO_MSG_POLICY, str_text, sizeof (str_text));
-    if (strlen (str_text) > 0) teleinfo_config.msg_policy = TeleinfoValidatePolicy (atoi (str_text));
+    if (strlen (str_text) > 0) teleinfo_config.msg_policy = atoi (str_text);
 
     // parameter 'sendt' : set data messages diffusion policy
     WebGetArg (D_CMND_TELEINFO_MSG_TYPE, str_text, sizeof (str_text));
-    if (strlen (str_text) > 0) teleinfo_config.msg_type = TeleinfoValidateType (atoi (str_text));
+    if (strlen (str_text) > 0) teleinfo_config.msg_type = atoi (str_text);
 
     // parameter 'ival' : set energy publication interval
     WebGetArg (D_CMND_TELEINFO_INTERVAL, str_text, sizeof (str_text));
-    if (strlen (str_text) > 0) teleinfo_config.update_interval = TeleinfoValidateUpdateInterval (atoi (str_text));
+    if (strlen (str_text) > 0) teleinfo_config.update_interval = atoi (str_text);
 
     // parameter 'adjust' : set contract power limit adjustment in %
     WebGetArg (D_CMND_TELEINFO_ADJUST, str_text, sizeof (str_text));
-    if (strlen (str_text) > 0) teleinfo_config.percent_adjust = TeleinfoValidateContractAdjustment (atoi (str_text));
+    if (strlen (str_text) > 0) teleinfo_config.percent_adjust = atoi (str_text);
 
     // get current and new teleinfo rate
     WebGetArg (D_CMND_TELEINFO_RATE, str_text, sizeof (str_text));
     if (strlen (str_text) > 0) teleinfo_config.baud_rate = TeleinfoValidateBaudRate (atoi (str_text));
 
 #ifdef USE_UFILESYS
+
+    // parameter 'nbday' : set number of daily historisation files
+    WebGetArg (D_CMND_TELEINFO_MINIMIZE, str_text, sizeof (str_text));
+    if (strlen (str_text) > 0) teleinfo_config.log_policy = TELEINFO_LOG_BUFFERED;
+      else teleinfo_config.log_policy = TELEINFO_LOG_IMMEDIATE;
 
     // parameter 'nbday' : set number of daily historisation files
     WebGetArg (D_CMND_TELEINFO_NBDAILY, str_text, sizeof (str_text));
@@ -2513,6 +2609,9 @@ void TeleinfoWebPageConfig ()
 
   // teleinfo historisation parameters
   WSContentSend_P (TELEINFO_FIELD_START,  "🗂️", PSTR ("Historisation"));
+  if (teleinfo_config.log_policy == TELEINFO_LOG_BUFFERED) strcpy (str_select, "checked");
+    else strcpy (str_select, "");
+  WSContentSend_P (TELEINFO_INPUT_CHECKBOX, D_CMND_TELEINFO_MINIMIZE, str_select, PSTR ("Minimize write on filesystem"));
   WSContentSend_P (TELEINFO_INPUT_NUMBER, PSTR ("Number of daily files"), D_CMND_TELEINFO_NBDAILY, 1, 365, teleinfo_config.nb_daily);
   WSContentSend_P (TELEINFO_INPUT_NUMBER, PSTR ("Number of weekly files"), D_CMND_TELEINFO_NBWEEKLY, 0, 52, teleinfo_config.nb_weekly);
   WSContentSend_P (TELEINFO_FIELD_STOP);
@@ -2695,11 +2794,11 @@ void TeleinfoWebGraphTime (int period, int histo)
     case TELEINFO_PERIOD_LIVE:
       // calculate horizontal shift
       unit_width  = graph_width / 6;
-      shift_unit  = time_dst.minute % 5;
-      shift_width = unit_width - (unit_width * shift_unit / 5) - (unit_width * time_dst.second / 300);
+      shift_unit  = time_dst.minute % 10;
+      shift_width = unit_width - (unit_width * shift_unit / 10) - (unit_width * time_dst.second / 600);
 
-      // calculate first time displayed by substracting (5 * 5mn + shift) to current time
-      current_time -= 1500;
+      // calculate first time displayed by substracting (5 * 10mn + shift) to current time
+      current_time -= 3000;
       current_time -= (shift_unit * 60); 
 
       // display 5 mn separation lines with time
@@ -2707,7 +2806,7 @@ void TeleinfoWebGraphTime (int period, int histo)
       {
         // convert back to date and increase time of 5mn
         BreakTime (current_time, time_dst);
-        current_time += 300;
+        current_time += 600;
 
         // display separation line and time
         graph_x = graph_left + shift_width + (index * unit_width);
@@ -3014,6 +3113,9 @@ void TeleinfoWebGraphData ()
 
   bool file_exists;
   char str_filename[UFS_FILENAME_SIZE];
+
+  // if data is for current period file, force flush for the period
+  if (histo == 0) TeleinfoHistoFlushData (period);
 
   // if not live data, open data file
   file_exists = TeleinfoHistoGetFilename (period, histo, str_filename);
@@ -3487,7 +3589,7 @@ bool Xsns99 (uint8_t function)
 #ifdef USE_WEBSERVER
     case FUNC_WEB_ADD_HANDLER:
       // config
-      Webserver->on (FPSTR (D_TELEINFO_PAGE_CONFIG), TeleinfoWebPageConfig);
+      Webserver->on (FPSTR (D_TELEINFO_PAGE_CONFIG), TeleinfoWebPageConfigure);
 
       // TIC message
       Webserver->on (FPSTR (D_TELEINFO_PAGE_TIC), TeleinfoWebPageTic);
