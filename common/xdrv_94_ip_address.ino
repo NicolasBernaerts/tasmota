@@ -6,6 +6,7 @@
     22/04/2021 - v1.1 - Merge IPAddress and InfoJson 
     02/05/2021 - v1.2 - Add Ethernet adapter status (ESP32) 
     22/06/2021 - v1.3 - Change in wifi activation/desactivation 
+    07/05/2022 - v1.4 - Add command to enable JSON publishing 
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -43,25 +44,40 @@ const char D_IPADDRESS_CONFIGURE[] PROGMEM = "Configure IP";
 // constant strings
 const char D_IPADDRESS_FIELD_INPUT[] PROGMEM = "<p>%s<br><input type='text' name='%s' value='%_I' minlength='7' maxlength='15'></p>\n";
 
+// MQTT commands : ip_pub
+const char kIPAddressCommands[]        PROGMEM = "ip_|pub";
+void (*const IPAddressCommand[])(void) PROGMEM = { &CmndIPAddressPublish };
+
 /**************************************************\
  *                  Variables
 \**************************************************/
 
 // variables
 static struct {
-  bool     publish_json = true;
+  bool     publish_json = false;
   uint32_t address;
 } ipaddress;
+
+/***************************************\
+ *               Commands
+\***************************************/
+
+// set motion detection rearm flag
+void CmndIPAddressPublish ()
+{
+  if (XdrvMailbox.data_len > 0)
+  {
+    // update flag
+    if (strcasecmp (XdrvMailbox.data, "OFF") == 0) ipaddress.publish_json = false;
+    else if (strcasecmp (XdrvMailbox.data, "ON") == 0) ipaddress.publish_json = true;
+    else ipaddress.publish_json = (XdrvMailbox.payload > 0);
+  }
+  ResponseCmndNumber (ipaddress.publish_json);
+}
 
 /**************************************************\
  *                  Functions
 \**************************************************/
-
-// Enable JSON publishing
-void IPAddressEnableJSON (bool enable)
-{
-  ipaddress.publish_json = enable;
-}
 
 // Get IP connexion status
 bool IPAddressIsConnected ()
@@ -254,6 +270,9 @@ bool Xdrv94 (uint8_t function)
   // main callback switch
   switch (function)
   { 
+    case FUNC_COMMAND:
+      result = DecodeCommand (kIPAddressCommands, IPAddressCommand);
+      break;
     case FUNC_JSON_APPEND:
       if (ipaddress.publish_json) IPAddressShowJSON ();
       break;

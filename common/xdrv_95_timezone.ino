@@ -8,6 +8,7 @@
     10/04/2021 - v1.3 - Remove use of String to avoid heap fragmentation 
     22/04/2021 - v1.4 - Switch to a full Drv (without Sns) 
     11/07/2021 - v1.5 - Tasmota 9.5 compatibility 
+    07/05/2022 - v1.6 - Add command to enable JSON publishing 
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -56,14 +57,13 @@ const char D_TIMEZONE_WEEK[]   PROGMEM = "Week (0:last ... 4:fourth)";
 const char D_TIMEZONE_DAY[]    PROGMEM = "Day of week (1:sun ... 7:sat)";
 
 // timezone setiing commands
-const char kTimezoneCommands[] PROGMEM = "tz_|ntp|stdo|stdm|sdtw|stdd|dsto|dstm|dstw|dstd";
-void (* const TimezoneCommand[])(void) PROGMEM = { &CmndTimezoneNtp, &CmndTimezoneStdO, &CmndTimezoneStdM, &CmndTimezoneStdW, &CmndTimezoneStdD, &CmndTimezoneDstO, &CmndTimezoneDstM, &CmndTimezoneDstW, &CmndTimezoneDstD };
+const char kTimezoneCommands[] PROGMEM = "tz_|pub|ntp|stdo|stdm|sdtw|stdd|dsto|dstm|dstw|dstd";
+void (* const TimezoneCommand[])(void) PROGMEM = { &CmndTimezonePublish, &CmndTimezoneNtp, &CmndTimezoneStdO, &CmndTimezoneStdM, &CmndTimezoneStdW, &CmndTimezoneStdD, &CmndTimezoneDstO, &CmndTimezoneDstM, &CmndTimezoneDstW, &CmndTimezoneDstD };
 
 // constant strings
 const char TZ_FIELDSET_START[] PROGMEM = "<p><fieldset><legend><b>&nbsp;%s %s&nbsp;</b></legend>\n";
 const char TZ_FIELDSET_STOP[]  PROGMEM = "</fieldset></p>\n";
 const char TZ_FIELD_INPUT[]    PROGMEM = "<p>%s<span style='float:right;font-size:0.7rem;'>%s</span><br><input type='number' name='%s' min='%d' max='%d' step='%d' value='%d'></p>\n";
-
 
 /**************************************************\
  *                  Variables
@@ -71,18 +71,12 @@ const char TZ_FIELD_INPUT[]    PROGMEM = "<p>%s<span style='float:right;font-siz
 
 // variables
 static struct {
-  bool publish_json = true;
+  bool publish_json = false;
 } timezone;
 
 /**************************************************\
  *                  Functions
 \**************************************************/
-
-// Enable JSON publishing
-void TimezoneEnableJSON (bool enable)
-{
-  timezone.publish_json = enable;
-}
 
 // Show JSON status (for MQTT)
 void TimezoneShowJSON (bool append)
@@ -115,6 +109,19 @@ void TimezoneInit ()
 /***********************************************\
  *                  Commands
 \***********************************************/
+
+// set motion detection rearm flag
+void CmndTimezonePublish ()
+{
+  if (XdrvMailbox.data_len > 0)
+  {
+    // update flag
+    if (strcasecmp (XdrvMailbox.data, "OFF") == 0) timezone.publish_json = false;
+    else if (strcasecmp (XdrvMailbox.data, "ON") == 0) timezone.publish_json = true;
+    else timezone.publish_json = (XdrvMailbox.payload > 0);
+  }
+  ResponseCmndNumber (timezone.publish_json);
+}
 
 void CmndTimezoneNtp ()
 {
