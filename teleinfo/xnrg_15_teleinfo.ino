@@ -1,14 +1,14 @@
 /*
-  xnrg_16_teleinfo.ino - France Teleinfo energy sensor support for Sonoff-Tasmota
+  xnrg_15_teleinfo.ino - France Teleinfo energy sensor support for Sonoff-Tasmota
 
-  Copyright (C) 2019-2021  Nicolas Bernaerts
+  Copyright (C) 2019-2022  Nicolas Bernaerts
 
   Connexions :
     * On ESP8266, Teleinfo Rx must be connected to GPIO3 (as it must be forced to 7E1)
     * On ESP32, Teleinfo Rx must NOT be connected to GPIO3 (to avoid nasty ESP32 ESP_Restart bug where ESP32 hangs if restarted when Rx is under heavy load)
-    * Teleinfo EN may be connected to any GPIO starting from GPIO5 ...
+    * Teleinfo EN may (or may not) be connected to any GPIO starting from GPIO5 ...
    
-  If LittleFS partition is available, config is stored in /config.ini.
+  If LittleFS partition is available, config is stored in /teleinfo.cfg
   If no partition is available, settings are stored using Settings->weight parameters :
     - Settings->weight_reference   = Message publication policy
     - Settings->weight_calibration = Type of message publication policy
@@ -473,36 +473,6 @@ uint16_t TeleinfoValidateBaudRate (uint16_t baud_rate)
   
   return baud_rate;
 }
-
-/*
-// Validate message publication policy
-int TeleinfoValidatePolicy (int new_policy)
-{
-  if ((new_policy < 0) || (new_policy >= TELEINFO_POLICY_MAX)) new_policy = TELEINFO_POLICY_TELEMETRY;
-  return new_policy;
-}
-
-// Validate message publication type
-int TeleinfoValidateType (int new_type)
-{
-  if ((new_type < 0) || (new_type >= TELEINFO_TYPE_MAX)) new_type = TELEINFO_TYPE_METER;
-  return new_type;
-}
-
-// Validate that energy update interval is within boundaries
-int TeleinfoValidateUpdateInterval (int interval)
-{
-  if ((interval < TELEINFO_INTERVAL_MIN) || (interval > TELEINFO_INTERVAL_MAX)) interval = TELEINFO_INTERVAL_MAX;
-  return interval;
-}
-
-// Validate that contract percentage adjustment is within boundaries
-int TeleinfoValidateContractAdjustment (int adjust)
-{
-  if ((adjust < TELEINFO_PERCENT_MIN) || (adjust > TELEINFO_PERCENT_MAX)) adjust = 100;
-  return adjust;
-}
-*/
 
 /**************************************************\
  *                  Commands
@@ -2702,6 +2672,7 @@ void TeleinfoWebPageTic ()
   WSContentSend_P (PSTR ("table {width:100%%;max-width:400px;margin:0px auto;border:none;background:none;color:#fff;border-collapse:collapse;}\n"));
   WSContentSend_P (PSTR ("th,td {font-size:1rem;padding:0.2rem 0.1rem;border:1px #666 solid;}\n"));
   WSContentSend_P (PSTR ("th {font-style:bold;background:#555;}\n"));
+  WSContentSend_P (PSTR ("th.label {width:30%%;}\n"));
   WSContentSend_P (PSTR ("th.value {width:60%%;}\n"));
   WSContentSend_P (PSTR ("</style>\n"));
 
@@ -2718,7 +2689,7 @@ void TeleinfoWebPageTic ()
 
   // display table with header
   WSContentSend_P (PSTR ("<div><table>\n"));
-  WSContentSend_P (PSTR ("<tr><th>Etiquette</th><th class='value'>Valeur</th><th>Checksum</th></tr>\n"));
+  WSContentSend_P (PSTR ("<tr><th class='label'>🏷️</th><th class='value'>📄</th><th>✅</th></tr>\n"));
 
   // loop to display TIC messsage lines
   for (index = 0; index < teleinfo_message.line_max; index ++)
