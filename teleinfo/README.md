@@ -24,8 +24,8 @@ To take advantage of this feature, make sure to follow partitioning procedure gi
 This firmware calculates Power Factor (Cos φ) from Teleinfo totals (W) and Instant Power (VA). It is calculated everytime total power increases.
 
 This firmware provides some extra Web page on the device :
-  * **/tic-graph** : live, daily and weekly graphs (VA, W, V and Cos phi)
-  * **/tic-msg** : real time display of last received Teleinfo message
+  * **/graph** : live, daily and weekly graphs (VA, W, V and Cos phi)
+  * **/msg** : real time display of last received Teleinfo message
 
 It also provides :
   * a TCP server to stream teleinfo
