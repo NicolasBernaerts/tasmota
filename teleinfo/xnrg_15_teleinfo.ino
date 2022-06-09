@@ -74,6 +74,7 @@
     20/03/2022 - v9.5   - Change serial init and major rework in active power calculation
     01/04/2022 - v9.6   - Add software watchdog feed to avoid lock
     22/04/2022 - v9.7   - Option to minimise LittleFS writes (day:every 1h and week:every 6h)
+    09/06/2022 - v9.7.1 - Correction of EAIT bug
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -125,6 +126,7 @@ TasmotaSerial *teleinfo_serial = nullptr;
 #define TELEINFO_WEEKLY_DEFAULT         8         // default number of weekly files
 
 // graph data
+#define TELEINFO_GRAPH_SAMPLE           300       // number of samples per graph data (should divide 3600)
 #define TELEINFO_GRAPH_WIDTH            1200      // graph width
 #define TELEINFO_GRAPH_HEIGHT           600       // default graph height
 #define TELEINFO_GRAPH_STEP             200       // graph height mofification step
@@ -153,10 +155,8 @@ TasmotaSerial *teleinfo_serial = nullptr;
 // LITTLEFS specificities
 #ifdef USE_UFILESYS
   #define TELEINFO_MEMORY_PERIOD_MAX    1         // memory graph for LIVE only
-  #define TELEINFO_GRAPH_SAMPLE         600       // number of samples per graph data (should divide 3600)
 #else
   #define TELEINFO_MEMORY_PERIOD_MAX    3         // memory graph for LIVE, DAY and WEEK
-  #define TELEINFO_GRAPH_SAMPLE         300       // number of samples per graph data (should divide 3600)
 #endif    // USE_UFILESYS
 
 // commands : MQTT
@@ -224,14 +224,14 @@ const char D_TELEINFO_HISTO_FILE_WEEKLY[] PROGMEM = "/week-%d.csv";
 #endif    // USE_UFILESYS
 
 // web URL
-const char D_TELEINFO_PAGE_CONFIG[]       PROGMEM = "/tic-cfg";
-const char D_TELEINFO_PAGE_TIC[]          PROGMEM = "/tic-msg";
-const char D_TELEINFO_PAGE_TIC_UPD[]      PROGMEM = "/tic-msg.upd";
-const char D_TELEINFO_PAGE_GRAPH[]        PROGMEM = "/tic-graph";
-const char D_TELEINFO_PAGE_GRAPH_FRAME[]  PROGMEM = "/tic-base.svg";
-const char D_TELEINFO_PAGE_GRAPH_DATA[]   PROGMEM = "/tic-data.svg";
-const char D_TELEINFO_PAGE_GRAPH_UPD[]    PROGMEM = "/tic-graph.upd";
-const char D_TELEINFO_PAGE_TIC_PNG[]      PROGMEM = "/tic.png";
+const char D_TELEINFO_ICON_PNG[]          PROGMEM = "/icon.png";
+const char D_TELEINFO_PAGE_CONFIG[]       PROGMEM = "/config";
+const char D_TELEINFO_PAGE_TIC[]          PROGMEM = "/tic";
+const char D_TELEINFO_PAGE_TIC_UPD[]      PROGMEM = "/tic.upd";
+const char D_TELEINFO_PAGE_GRAPH[]        PROGMEM = "/graph";
+const char D_TELEINFO_PAGE_GRAPH_UPD[]    PROGMEM = "/graph.upd";
+const char D_TELEINFO_PAGE_GRAPH_FRAME[]  PROGMEM = "/base.svg";
+const char D_TELEINFO_PAGE_GRAPH_DATA[]   PROGMEM = "/data.svg";
 
 // web strings
 const char D_TELEINFO_CONFIG[]            PROGMEM = "Configure Teleinfo";
@@ -272,10 +272,11 @@ enum TeleinfoMessageType { TELEINFO_TYPE_NONE, TELEINFO_TYPE_METER, TELEINFO_TYP
 const char kTeleinfoMessageType[] PROGMEM = "None|METER only|TIC only|METER and TIC";
 
 // graph - periods
-enum TeleinfoGraphPeriod { TELEINFO_PERIOD_LIVE, TELEINFO_PERIOD_DAY, TELEINFO_PERIOD_WEEK, TELEINFO_PERIOD_MAX };                              // available graph periods
-const char kTeleinfoGraphPeriod[] PROGMEM = "Live|Day|Week";                                                                                    // period labels
-const long ARR_TELEINFO_PERIOD_WINDOW[] = { 3600 / TELEINFO_GRAPH_SAMPLE, 86400 / TELEINFO_GRAPH_SAMPLE, 604800 / TELEINFO_GRAPH_SAMPLE };      // time window between samples (sec.)
-const long ARR_TELEINFO_PERIOD_FLUSH[]  = { 1, 3600, 21600 };                                                                                   // max time between log flush (sec.)
+enum TeleinfoGraphPeriod { TELEINFO_PERIOD_LIVE, TELEINFO_PERIOD_DAY, TELEINFO_PERIOD_WEEK, TELEINFO_PERIOD_MAX };                           // available graph periods
+const char kTeleinfoGraphPeriod[] PROGMEM = "Live|Day|Week";                                                                                 // period labels
+const char kTeleinfoFilePrefix[]  PROGMEM = "|day|week";                                                                                     // historisation file prefix
+const long ARR_TELEINFO_PERIOD_WINDOW[] = { 3600 / TELEINFO_GRAPH_SAMPLE, 86400 / TELEINFO_GRAPH_SAMPLE, 604800 / TELEINFO_GRAPH_SAMPLE };   // time window between samples (sec.)
+const long ARR_TELEINFO_PERIOD_FLUSH[]  = { 1, 3600, 21600 };                                                                                // max time between log flush (sec.)
 
 // graph - display
 enum TeleinfoGraphDisplay { TELEINFO_UNIT_VA, TELEINFO_UNIT_W, TELEINFO_UNIT_V, TELEINFO_UNIT_COSPHI, TELEINFO_UNIT_MAX };                                                      // available graph displays
@@ -283,8 +284,7 @@ const char kTeleinfoGraphDisplay[] PROGMEM = "VA|W|V|cosφ";                    
 enum TeleinfoHistoDisplay { TELEINFO_HISTO_VA, TELEINFO_HISTO_W, TELEINFO_HISTO_V, TELEINFO_HISTO_COSPHI, TELEINFO_HISTO_PEAK_VA, TELEINFO_HISTO_PEAK_V, TELEINFO_HISTO_MAX };  // available graph displays
 
 // graph - phase colors
-enum TeleinfoGraphColor { TELEINFO_COLOR_BLUE, TELEINFO_COLOR_ORANGE, TELEINFO_COLOR_GREEN };        // available graph colors
-const char kTeleinfoGraphColorPhase[] PROGMEM = "#6bc4ff|#ffca74|#7a7fb3";                                                                                                                     // data display labels
+const char kTeleinfoGraphColorPhase[] PROGMEM = "#6bc4ff|#ffca74|#7a7fb3";            // blue, orange, green                                                                                                           // data display labels
 const char kTeleinfoGraphColorPeak[]  PROGMEM = "#5dade2|#d9ad67|#64d394";                                                                                                                     // data display labels
 
 // week days name for graph
@@ -947,18 +947,16 @@ bool TeleinfoHistoGetDate (int period, int histo, char* pstr_text)
 bool TeleinfoHistoGetFilename (int period, int histo, char* pstr_filename)
 {
   bool exists = false;
+  char str_period[16];
 
-  // set filename according to period
-  strcpy (pstr_filename, "");
-  switch (period)
-  {
-    case TELEINFO_PERIOD_DAY:
-      sprintf_P (pstr_filename, D_TELEINFO_HISTO_FILE_DAILY, histo);
-      break;
-    case TELEINFO_PERIOD_WEEK:
-      sprintf_P (pstr_filename, D_TELEINFO_HISTO_FILE_WEEKLY, histo);
-      break;
-  }
+  // check parameters
+  if (pstr_filename == nullptr) return false;
+
+  // get file prefix according to period
+  GetTextIndexed (str_period, sizeof (str_period), period, kTeleinfoFilePrefix);
+
+  // generate filename
+  sprintf_P (pstr_filename, PSTR ("/%s-%d.csv"), str_period, histo);
 
   // if filename defined, check existence
   if (strlen (pstr_filename) > 0) exists = ffsp->exists (pstr_filename);
@@ -1613,7 +1611,6 @@ void TeleinfoReceiveData ()
                 break;
 
               // Instant Current
-              case TIC_EAIT:
               case TIC_IINST:
               case TIC_IRMS1:
               case TIC_IINST1:
@@ -1775,6 +1772,7 @@ void TeleinfoReceiveData ()
               case TIC_EJPHN:
               case TIC_BBRHCJB:
               case TIC_EASF01:
+              case TIC_EAIT:
                 counter = atoll (str_donnee);
                 is_valid = ((counter < LONG_LONG_MAX) && (counter > teleinfo_meter.index[0]));
                 if (is_valid) teleinfo_meter.index[0] = counter;
@@ -2026,7 +2024,7 @@ void TeleinfoReceiveData ()
             else if (message_ms > 0)
             {
               increment = teleinfo_calc.papp_current_counter - teleinfo_calc.papp_previous_counter;
-              teleinfo_phase[0].papp = teleinfo_phase[0].papp / 2 + 3600000 / (long)message_ms * increment / 2;
+              teleinfo_phase[0].papp = teleinfo_phase[0].papp / 2 + 3600000 * increment / 2 / (long)message_ms;
               teleinfo_calc.papp_previous_counter = teleinfo_calc.papp_current_counter;
             }
 
@@ -2061,7 +2059,7 @@ void TeleinfoReceiveData ()
             else if (message_ms > 0)
             {
               increment = teleinfo_calc.pact_current_counter - teleinfo_calc.pact_previous_counter;
-              teleinfo_phase[0].pact = teleinfo_phase[0].pact / 2 + 3600000 / (long)message_ms * increment / 2;
+              teleinfo_phase[0].pact = teleinfo_phase[0].pact / 2 + 3600000 * increment / 2 / (long)message_ms;
               teleinfo_calc.pact_previous_counter = teleinfo_calc.pact_current_counter;
               teleinfo_meter.nb_update++;
             }
@@ -2070,7 +2068,7 @@ void TeleinfoReceiveData ()
             if (teleinfo_phase[0].pact > teleinfo_phase[0].papp) teleinfo_phase[0].pact = teleinfo_phase[0].papp;
 
             // calculate cos phi
-            teleinfo_phase[0].cosphi = 100 * (float)teleinfo_phase[0].pact / (float)teleinfo_phase[0].papp;
+            if (teleinfo_phase[0].papp > 0) teleinfo_phase[0].cosphi = 100 * (float)teleinfo_phase[0].pact / (float)teleinfo_phase[0].papp;
 
             // update previous message timestamp
             teleinfo_calc.previous_time_message = teleinfo_message.timestamp;
@@ -2370,7 +2368,7 @@ void TeleinfoWebSensor ()
   int  index, phase, period;
   long percentage;
   char str_text[32];
-  char str_header[32];
+  char str_header[64];
   char str_data[128];
 
   // display according to serial receiver status
@@ -2682,7 +2680,7 @@ void TeleinfoWebPageTic ()
 
   // meter name and teleinfo icon
   WSContentSend_P (PSTR ("<div class='title'>%s</div>\n"), SettingsText (SET_DEVICENAME));
-  WSContentSend_P (PSTR ("<div><a href='/'><img height=64 src='%s'></a></div>\n"), D_TELEINFO_PAGE_TIC_PNG);
+  WSContentSend_P (PSTR ("<div><a href='/'><img height=64 src='%s'></a></div>\n"), D_TELEINFO_ICON_PNG);
 
   // display counter
   WSContentSend_P (PSTR ("<div><span id='count'>%d</span></div>\n"), teleinfo_meter.nb_message);
@@ -3359,7 +3357,7 @@ void TeleinfoWebGraphPage ()
   WSContentSend_P (PSTR ("<div class='title'>%s</div>\n"), SettingsText(SET_DEVICENAME));
 
   // display icon
-  WSContentSend_P (PSTR ("<div><a href='/'><img height=64 src='%s'></a></div>\n"), D_TELEINFO_PAGE_TIC_PNG);
+  WSContentSend_P (PSTR ("<div><a href='/'><img height=64 src='%s'></a></div>\n"), D_TELEINFO_ICON_PNG);
 
   // -----------------
   //      Values
@@ -3400,10 +3398,10 @@ void TeleinfoWebGraphPage ()
 
   WSContentSend_P (PSTR ("<div class='incr right'>\n"));
   index = teleinfo_config.height + TELEINFO_GRAPH_STEP;
-  WSContentSend_P (PSTR ("<a href='%s?period=%d&data=%d&histo=%d&height=%d&phase=%s'><div class='item size'>%s</div></a>"), D_TELEINFO_PAGE_GRAPH, period, data, histo, index, str_phase, "+");
+  WSContentSend_P (PSTR ("<a href='%s?period=%d&data=%d&histo=%d&height=%d&phase=%s'><div class='item size'>%s</div></a>"), D_TELEINFO_PAGE_GRAPH, period, data, histo, index, str_phase, "⬆️");
   WSContentSend_P (PSTR ("<br>"));
   index = teleinfo_config.height - TELEINFO_GRAPH_STEP;
-  WSContentSend_P (PSTR ("<a href='%s?period=%d&data=%d&histo=%d&height=%d&phase=%s'><div class='item size'>%s</div></a>"), D_TELEINFO_PAGE_GRAPH, period, data, histo, index, str_phase, "-");
+  WSContentSend_P (PSTR ("<a href='%s?period=%d&data=%d&histo=%d&height=%d&phase=%s'><div class='item size'>%s</div></a>"), D_TELEINFO_PAGE_GRAPH, period, data, histo, index, str_phase, "⬇️");
   WSContentSend_P (PSTR ("</div>\n"));      // choice
 
   // -----------------
@@ -3429,7 +3427,7 @@ void TeleinfoWebGraphPage ()
   //      Period 
   // -----------------
 
-  WSContentSend_P (PSTR ("<form method='post' action='/tic-graph?period=%d&data=%d&phase=%s'>\n"), period, data, str_phase);
+  WSContentSend_P (PSTR ("<form method='post' action='%s?period=%d&data=%d&phase=%s'>\n"), D_TELEINFO_PAGE_GRAPH, period, data, str_phase);
   WSContentSend_P (PSTR ("<div>\n"));       // line
 
   WSContentSend_P (PSTR ("<div class='choice'>\n"));
@@ -3573,7 +3571,7 @@ bool Xsns99 (uint8_t function)
       Webserver->on (FPSTR (D_TELEINFO_PAGE_GRAPH_UPD), TeleinfoWebGraphUpdate);
 
       // icons
-      Webserver->on (FPSTR (D_TELEINFO_PAGE_TIC_PNG), TeleinfoWebIconTic);
+      Webserver->on (FPSTR (D_TELEINFO_ICON_PNG), TeleinfoWebIconTic);
       break;
     case FUNC_WEB_ADD_BUTTON:
       TeleinfoWebConfigButton ();
