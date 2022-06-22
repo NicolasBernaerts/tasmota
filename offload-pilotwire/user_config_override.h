@@ -42,6 +42,9 @@
                          Redesign of pilotwire control page
     02/01/2022 - v9.0  - Complete rework to simplify states
                          Add Open Window detection
+    08/04/2022 - v9.1  - Switch from icons to emojis
+                         Add software watchdog to avoid locked loop
+    08/06/2022 - v9.2  - Add auto-rearm capability
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -87,9 +90,28 @@
 
 #define USE_IPADDRESS                         // Add fixed IP configuration page
 #define USE_TIMEZONE                          // Add support for Timezone management
+#define USE_COMMON_LOG                        // Use common log file library
 #define USE_OFFLOAD                           // Add support for MQTT maximum power offloading
 
-#define EXTENSION_VERSION "9.0"               // version
+// build
+#if defined BUILD_ESP32_4M
+#define EXTENSION_BUILD   "esp32-4m"
+#elif defined BUILD_16M14M
+#define EXTENSION_BUILD   "esp-16m14m"
+#elif defined BUILD_4M2M
+#define EXTENSION_BUILD   "esp-4m2m"
+#elif defined BUILD_2M1M
+#define EXTENSION_BUILD   "esp-2m1m"
+#elif defined BUILD_1M128K
+#define EXTENSION_BUILD   "esp-1m128k"
+#elif defined BUILD_1M64K
+#define EXTENSION_BUILD   "esp-1m64k"
+#else
+#define EXTENSION_BUILD   "esp-nofs"
+#endif
+
+// extension data
+#define EXTENSION_VERSION "9.2"               // version
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
 #ifdef USE_PILOTWIRE
 #define EXTENSION_NAME    "Pilotwire"         // name
@@ -97,8 +119,18 @@
 #define EXTENSION_NAME    "Offload"           // name
 #endif
 
-// Sonoff Basic Pilotwire Template
-#define USER_TEMPLATE "{\"NAME\":\"Sonoff Pilotwire\",\"GPIO\":[32,1,1,1312,1,0,0,0,224,288,1,0,0,0],\"FLAG\":0,\"BASE\":1}"  // [Template] Set JSON template
+// Pilotwire and Offload templates
+#undef MQTT_TOPIC
+#undef FRIENDLY_NAME
+#ifdef USE_PILOTWIRE
+#define MQTT_TOPIC    "pilotwire_%06X"
+#define FRIENDLY_NAME "Fil Pilote"
+#define USER_TEMPLATE "{\"NAME\":\"Pilotwire\",\"GPIO\":[32,1,1,1312,1,0,0,0,224,288,1,0,0,0],\"FLAG\":0,\"BASE\":1}" 
+#else
+#define MQTT_TOPIC    "offload_%06X"
+#define FRIENDLY_NAME "Offload"
+#define USER_TEMPLATE "{\"NAME\":\"Athom PG01\",\"GPIO\":[0,0,0,32,2720,2656,0,0,2624,544,224,0,0,1],\"FLAG\":0,\"BASE\":18}"
+#endif
 
 // MQTT default
 #undef MQTT_HOST
@@ -109,13 +141,10 @@
 #define MQTT_USER          ""
 #undef MQTT_PASS
 #define MQTT_PASS          ""
-#undef MQTT_TOPIC
-#define MQTT_TOPIC         "pilotwire_%06X"
 #undef MQTT_FULLTOPIC
 #define MQTT_FULLTOPIC     "%topic%/%prefix%/"
-#undef FRIENDLY_NAME
-#define FRIENDLY_NAME      "Fil Pilote"
 
+// global options
 #undef USE_ARDUINO_OTA                        // support for Arduino OTA
 #undef USE_WPS                                // support for WPS as initial wifi configuration tool
 #undef USE_SMARTCONFIG                        // support for Wifi SmartConfig as initial wifi configuration tool
@@ -149,7 +178,7 @@
 //#undef USE_SUNRISE                            // support for Sunrise and sunset tools
 
 #undef USE_UNISHOX_COMPRESSION                // Add support for string compression in Rules or Scripts
-//#undef USE_RULES                              // Disable support for rules
+#undef USE_RULES                              // Disable support for rules
 #undef USE_SCRIPT                             // Add support for script (+17k code)
 
 #undef ROTARY_V1                              // Add support for Rotary Encoder as used in MI Desk Lamp (+0k8 code)
@@ -187,8 +216,8 @@
 
 #undef USE_COUNTER                            // Enable inputs as counter (+0k8 code)
 
-#undef USE_DS18x20                            // Add support for DS18x20 sensors with id sort, single scan and read retry (+2k6 code)
-#undef USE_DHT                                // Add support for internal DHT sensor
+//#undef USE_DS18x20                            // Add support for DS18x20 sensors with id sort, single scan and read retry (+2k6 code)
+//#undef USE_DHT                                // Add support for internal DHT sensor
 
 #undef USE_I2C                                // Disable all I2C sensors and devices
 
@@ -259,22 +288,14 @@
 #undef USE_TIMEPROP                           // Add support for the timeprop feature (+9k1 code)
 #undef USE_PID                                // Add suport for the PID  feature (+11k2 code)
 
-// modules specific to pilotwire (temperature sensors)
-#ifdef USE_PILOTWIRE
-
-#define USE_DS18x20                            // Add support for DS18x20 sensors with id sort, single scan and read retry (+2k6 code)
-#define USE_DHT                                // Add support for internal DHT sensor
-
-// modules specific to offload (energy sensors)
-#else
-
+// energy sensors
+//#ifndef USE_PILOTWIRE
 #define USE_ENERGY_SENSOR                     // Enable energy sensors
 #define USE_HLW8012                           // Add support for HLW8012, BL0937 or HJL-01 Energy Monitor for Sonoff Pow and WolfBlitz
 #define USE_CSE7766                           // Add support for CSE7766 Energy Monitor for Sonoff S31 and Pow R2
 #define USE_MCP39F501                         // Add support for MCP39F501 Energy monitor as used in Shelly 2 (+3k1 code)
 #define USE_BL09XX                            // Add support for various BL09XX Energy monitor as used in Blitzwolf SHP-10 or Sonoff Dual R3 v2 (+1k6 code)
-
-#endif
+//#endif
 
 // add support to MQTT events subscription
 #ifndef SUPPORT_MQTT_EVENT
