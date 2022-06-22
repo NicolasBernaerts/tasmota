@@ -5,9 +5,15 @@ This evolution of Tasmota firmware has been enhanced to handle :
   * Power plugs with offload capacity when subscribing to MQTT meter
   * France electrical heaters **Fil Pilote** protocol management
 
-**Offload** has been tested on **Sonoff S26** and **Athom power plug**.
+**Offload** has been tested on :
+  * **Sonoff S26**
+  * **Sonoff Pow R2**
+  * **Athom power plug**.
 
-**Pilotwire** has been tested on **Sonoff Basic** (1Mb), **ESP01** (1Mb) and **Wemos D1 Mini** (4Mb).
+**Pilotwire** has been tested on :
+  * **Sonoff Basic** (1Mb)
+  * **ESP01** (1Mb)
+  * **Wemos D1 Mini** (4Mb)
 
 To enable **Pilotwire** mode on a **Sonoff Basic** you need to :
   * connect diode on the Sonoff output port
@@ -19,14 +25,15 @@ Typical diode to use is **1N4007**. Connexion should be done directly on the rel
 ![Sonoff Basic](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload-pilotwire/screen/pilotwire-diode-single.jpg)
 
 
-You'll also get a **Thermostat** mode that will allow you to pilot the heater to maintain a target temperature in the room. To activate that mode, you'll need either to :
+You'll also get a **Thermostat** mode that will allow you to pilot the heater to maintain a target temperature in the room. \\
+To activate that mode, you'll need either to :
   * connect a **local DF18B20** temperature sensor (on **GPIO03 serial RX**)
-  * declare a **MQTT remote** temperature sensor
+  * or declare a **MQTT remote** temperature sensor
 
 Pilotwire controler provides 2 more options :
   * open window detection (activated if temperature drops of 0.5°C in less than 4mn, released when temperature goes up 0.2°C)
   * movement detection (based on RCML0516 declared as switch 1, after 1 hour, decreases temperature of 0.5°C every 30mn down to target temperature)
-  * 
+
 Here is the template you can use if you are are using a Sonoff Basic.
 
 ![Template Sonoff Basic](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload-pilotwire/screen/tasmota-pilotwire-template.png) 
@@ -37,7 +44,7 @@ In thermostat mode, if you use Tasmota standard timers, you'll be able to manage
   * Timer **ON** means normal target temperature
   * Timer **OFF** means target temperature minus night dropdown
 
-This firmware is based on Tasmota **v9.1** modified to handle **Pilotwire** with :
+This firmware is based on Tasmota **v10** modified to handle **Pilotwire** with :
   * Web configuration interface
   * extension of JSON MQTT status
   * new specific MQTT commands
@@ -59,9 +66,10 @@ Pre-compiled version of Tasmota handling fil pilote is available : **tasmota.bin
 
 If you want to compile it, you need to add following files from my **tasmota/common** repository :
   * xdrv_50_filesystem_cfg_csv.ino
+  * xdrv_93_filesystem_log.ino
   * xdrv_95_timezone.ino
   * xdrv_94_ip_address.ino
-  * xdrv_97_remote_sensor.ino
+  * xsns_94_sensor.ino
 
 Complete setup guide will be available at http://www.bernaerts-nicolas.fr/iot/...
 
