@@ -9,6 +9,9 @@
     - start TCP server on port 8888 : tcp_start 8888
     - stop TCP server               : tcp_stop
 
+  From any linux or raspberry, you can retrieve the teleinfo stream with
+    # nc 192.168.x.x 8888
+
   Version history :
     04/08/2021 - v1.0   - Creation
 
@@ -33,8 +36,8 @@
 
 // TCP - MQTT commands
 enum TCPServerCommands { TCP_CMND_NONE, TCP_CMND_START, TCP_CMND_STOP };
-const char kTCPServerCommands[] PROGMEM = "tcp_" "|" "start" "|" "stop";
-void (* const TCPServerCommand[])(void) PROGMEM = { &CmndTCPStart, &CmndTCPStop };
+const char kTCPServerCommands[] PROGMEM = "tcp_" "|" "help" "|" "start" "|" "stop";
+void (* const TCPServerCommand[])(void) PROGMEM = { &CmndTCPHelp, &CmndTCPStart, &CmndTCPStop };
 
 /****************************************\
  *        Class TeleinfoTCPServer
@@ -175,6 +178,22 @@ TCPServer tcp_server;
  *                      Commands
 \***********************************************************/
 
+
+// init main status
+void TCPInit ()
+{
+  // log help command
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tcp_help to get help on tcp streaming commands"));
+}
+
+// TCP stream help
+void CmndTCPHelp ()
+{
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tcp_start xxxx = start stream on port xxxx"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tcp_stop       = stop stream"));
+  ResponseCmndDone();
+}
+
 // Start TCP server
 void CmndTCPStart (void)
 {
@@ -206,6 +225,9 @@ bool Xdrv97 (uint8_t function)
   // main callback switch
   switch (function)
   { 
+    case FUNC_INIT:
+      TCPInit ();
+      break;
     case FUNC_COMMAND:
       result = DecodeCommand (kTCPServerCommands, TCPServerCommand);
       break;

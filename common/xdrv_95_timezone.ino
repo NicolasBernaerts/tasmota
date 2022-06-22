@@ -57,13 +57,14 @@ const char D_TIMEZONE_WEEK[]   PROGMEM = "Week (0:last ... 4:fourth)";
 const char D_TIMEZONE_DAY[]    PROGMEM = "Day of week (1:sun ... 7:sat)";
 
 // timezone setiing commands
-const char kTimezoneCommands[] PROGMEM = "tz_|pub|ntp|stdo|stdm|sdtw|stdd|dsto|dstm|dstw|dstd";
-void (* const TimezoneCommand[])(void) PROGMEM = { &CmndTimezonePublish, &CmndTimezoneNtp, &CmndTimezoneStdO, &CmndTimezoneStdM, &CmndTimezoneStdW, &CmndTimezoneStdD, &CmndTimezoneDstO, &CmndTimezoneDstM, &CmndTimezoneDstW, &CmndTimezoneDstD };
+const char kTimezoneCommands[] PROGMEM = "tz_|help|pub|ntp|stdo|stdm|stdw|stdd|dsto|dstm|dstw|dstd";
+void (* const TimezoneCommand[])(void) PROGMEM = { &CmndTimezoneHelp, &CmndTimezonePublish, &CmndTimezoneNtp, &CmndTimezoneStdO, &CmndTimezoneStdM, &CmndTimezoneStdW, &CmndTimezoneStdD, &CmndTimezoneDstO, &CmndTimezoneDstM, &CmndTimezoneDstW, &CmndTimezoneDstD };
 
 // constant strings
 const char TZ_FIELDSET_START[] PROGMEM = "<p><fieldset><legend><b>&nbsp;%s %s&nbsp;</b></legend>\n";
 const char TZ_FIELDSET_STOP[]  PROGMEM = "</fieldset></p>\n";
 const char TZ_FIELD_INPUT[]    PROGMEM = "<p>%s<span style='float:right;font-size:0.7rem;'>%s</span><br><input type='number' name='%s' min='%d' max='%d' step='%d' value='%d'></p>\n";
+
 
 /**************************************************\
  *                  Variables
@@ -104,13 +105,31 @@ void TimezoneInit ()
 {
   // set switch mode
   Settings->timezone = 99;
+
+  // log help command
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tz_help to get help on timezone manager commands"));
 }
 
 /***********************************************\
  *                  Commands
 \***********************************************/
 
-// set motion detection rearm flag
+// timezone help
+void CmndTimezoneHelp ()
+{
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tz_pub  = add timezone data in telemetry JSON (ON / OFF)"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tz_ntp  = set NTP server"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tz_stdo = Standard time offset to GMT (mn)"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tz_stdm = Standard time month (1:jan ... 12:dec)"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tz_stdw = Standard time week (0:last ... 4:fourth)"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tz_stdd = Standard time day of week (1:sun ... 7:sat)"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tz_dsto = Daylight savings time offset to GMT (mn)"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tz_dstm = Daylight savings time month (1:jan ... 12:dec)"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tz_dstw = Daylight savings time week (0:last ... 4:fourth)"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tz_dstd = Daylight savings time day of week (1:sun ... 7:sat)"));
+  ResponseCmndDone();
+}
+
 void CmndTimezonePublish ()
 {
   if (XdrvMailbox.data_len > 0)
@@ -183,12 +202,6 @@ void CmndTimezoneDstD ()
 
 #ifdef USE_WEBSERVER
 
-// timezone configuration page button
-void TimezoneWebConfigButton ()
-{
-  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s %s</button></form></p>"), D_TIMEZONE_PAGE_CONFIG, D_TIMEZONE_CONFIG, D_TIMEZONE);
-}
-
 // append local time to main page
 void TimezoneWebSensor ()
 {
@@ -199,6 +212,14 @@ void TimezoneWebSensor ()
   current_time = LocalTime ();
   BreakTime (current_time, current_dst);
   WSContentSend_PD (PSTR ("<tr><div style='text-align:center;'>%02d:%02d:%02d</div></tr>\n"), current_dst.hour, current_dst.minute, current_dst.second);
+}
+
+#ifdef USE_TIMEZONE_WEB_CONFIG
+
+// timezone configuration page button
+void TimezoneWebConfigButton ()
+{
+  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s %s</button></form></p>"), D_TIMEZONE_PAGE_CONFIG, D_TIMEZONE_CONFIG, D_TIMEZONE);
 }
 
 // Timezone configuration web page
@@ -290,6 +311,8 @@ void TimezoneWebPageConfigure ()
   WSContentStop();
 }
 
+#endif      // USE_TIMEZONE_WEB_CONFIG
+
 #endif  // USE_WEBSERVER
 
 /***********************************************************\
@@ -314,15 +337,19 @@ bool Xdrv95 (uint8_t function)
       break;
 
 #ifdef USE_WEBSERVER
-    case FUNC_WEB_ADD_HANDLER:
-      Webserver->on (FPSTR (D_TIMEZONE_PAGE_CONFIG), TimezoneWebPageConfigure);
-      break;
-    case FUNC_WEB_ADD_BUTTON:
-      TimezoneWebConfigButton ();
-      break;
     case FUNC_WEB_SENSOR:
       TimezoneWebSensor ();
       break;
+
+#ifdef USE_TIMEZONE_WEB_CONFIG
+    case FUNC_WEB_ADD_BUTTON:
+      TimezoneWebConfigButton ();
+      break;
+    case FUNC_WEB_ADD_HANDLER:
+      Webserver->on (FPSTR (D_TIMEZONE_PAGE_CONFIG), TimezoneWebPageConfigure);
+      break;
+#endif        // USE_TIMEZONE_WEB_CONFIG
+
 #endif  // USE_WEBSERVER
 
   }

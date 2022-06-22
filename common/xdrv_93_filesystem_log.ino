@@ -19,6 +19,8 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifdef USE_COMMON_LOG
+
 #define XDRV_93                   93
 
 #define LOG_EVENT_QTY             10
@@ -131,7 +133,7 @@ bool LogSaveEvent (uint8_t event_type, const char* pstr_event)
   // check event type
   if (pstr_event == nullptr) return false;
   if (event_type >= LOG_EVENT_MAX) return false;
-  if ((event_type == LOG_EVENT_UPDATE) && (log_status.event_start == UINT32_MAX)) return false;
+  if ((event_type == LOG_EVENT_UPDATE) && (log_status.event_start == UINT32_MAX)) event_type = LOG_EVENT_NEW;
 
   // get current timestamp
   event_time = LocalTime ();
@@ -437,3 +439,5 @@ bool Xdrv93 (uint8_t function)
   
   return result;
 }
+
+#endif				// USE_COMMON_LOG

@@ -58,6 +58,7 @@
 #define D_PAGE_SENSOR              "rsensor"
 
 #define D_CMND_SENSOR_PREFIX       "sn_"
+#define D_CMND_SENSOR_HELP         "help"
 #define D_CMND_SENSOR_TEMP_TOPIC   "ttopic"
 #define D_CMND_SENSOR_TEMP_KEY     "tkey"
 #define D_CMND_SENSOR_TEMP_VALUE   "tval"
@@ -91,8 +92,8 @@ enum SensorSource { SENSOR_SOURCE_DSB, SENSOR_SOURCE_DHT, SENSOR_SOURCE_SWITCH, 
 const char kSensorSource[] PROGMEM = "Local|Local|Local|Remote|Undef.";                                                           // device source labels
 
 // remote sensor commands
-const char kSensorCommands[] PROGMEM = D_CMND_SENSOR_PREFIX "|" D_CMND_SENSOR_TEMP_TOPIC "|" D_CMND_SENSOR_TEMP_KEY "|" D_CMND_SENSOR_TEMP_VALUE "|" D_CMND_SENSOR_TEMP_DRIFT "|" D_CMND_SENSOR_HUMI_TOPIC "|" D_CMND_SENSOR_HUMI_KEY "|" D_CMND_SENSOR_HUMI_VALUE "|" D_CMND_SENSOR_MOVE_TOPIC "|" D_CMND_SENSOR_MOVE_KEY "|" D_CMND_SENSOR_MOVE_VALUE;
-void (* const SensorCommand[])(void) PROGMEM = { &CmndSensorTemperatureTopic, &CmndSensorTemperatureKey, &CmndSensorTemperatureValue, &CmndSensorTemperatureDrift, &CmndSensorHumidityTopic, &CmndSensorHumidityKey, &CmndSensorHumidityValue, &CmndSensorMovementTopic, &CmndSensorMovementKey, &CmndSensorMovementValue };
+const char kSensorCommands[] PROGMEM = D_CMND_SENSOR_PREFIX "|" D_CMND_SENSOR_HELP "|" D_CMND_SENSOR_TEMP_TOPIC "|" D_CMND_SENSOR_TEMP_KEY "|" D_CMND_SENSOR_TEMP_VALUE "|" D_CMND_SENSOR_TEMP_DRIFT "|" D_CMND_SENSOR_HUMI_TOPIC "|" D_CMND_SENSOR_HUMI_KEY "|" D_CMND_SENSOR_HUMI_VALUE "|" D_CMND_SENSOR_MOVE_TOPIC "|" D_CMND_SENSOR_MOVE_KEY "|" D_CMND_SENSOR_MOVE_VALUE;
+void (* const SensorCommand[])(void) PROGMEM = { &CmndSensorHelp, &CmndSensorTemperatureTopic, &CmndSensorTemperatureKey, &CmndSensorTemperatureValue, &CmndSensorTemperatureDrift, &CmndSensorHumidityTopic, &CmndSensorHumidityKey, &CmndSensorHumidityValue, &CmndSensorMovementTopic, &CmndSensorMovementKey, &CmndSensorMovementValue };
 
 // form topic style
 const char SENSOR_FIELDSET_START[] PROGMEM = "<p><fieldset><legend><b>&nbsp;%s %s&nbsp;</b></legend>\n";
@@ -161,6 +162,10 @@ void SensorInit ()
   {
     sensor_status.movement.source = SENSOR_SOURCE_SWITCH;
   }
+
+
+  // log help command
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: sn_help to get help on sensor manager commands"));
 
   // load configuration
   SensorLoadConfig ();
@@ -497,6 +502,25 @@ void SensorEverySecond ()
 /***********************************************\
  *                  Commands
 \***********************************************/
+
+// timezone help
+void CmndSensorHelp ()
+{
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: sn_ttopic  = topic of remote temperature sensor"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: sn_tkey    = key of remote temperature sensor"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: sn_tdrift  = temperature correction (in 1/10 of °C)"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: sn_tval    = value of remote temperature sensor"));
+
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: sn_htopic  = topic of remote humidity sensor"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: sn_hkey    = key of remote humidity sensor"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: sn_hval    = value of remote humidity sensor"));
+
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: sn_mtopic  = topic of remote movement sensor"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: sn_mkey    = key of remote movement sensor"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: sn_mval    = value of remote movement sensor"));
+
+  ResponseCmndDone();
+}
 
 void CmndSensorTemperatureTopic ()
 {

@@ -29,6 +29,7 @@
 #define XDRV_94                   94
 
 // commands
+#define D_CMND_IPADDRESS_HELP     "help"
 #define D_CMND_IPADDRESS_ADDR     "addr"
 #define D_CMND_IPADDRESS_GATEWAY  "gway"
 #define D_CMND_IPADDRESS_NETMASK  "nmsk"
@@ -45,8 +46,8 @@ const char D_IPADDRESS_CONFIGURE[] PROGMEM = "Configure IP";
 const char D_IPADDRESS_FIELD_INPUT[] PROGMEM = "<p>%s<br><input type='text' name='%s' value='%_I' minlength='7' maxlength='15'></p>\n";
 
 // MQTT commands : ip_pub
-const char kIPAddressCommands[]        PROGMEM = "ip_|pub";
-void (*const IPAddressCommand[])(void) PROGMEM = { &CmndIPAddressPublish };
+const char kIPAddressCommands[]        PROGMEM = "ip_|help|pub";
+void (*const IPAddressCommand[])(void) PROGMEM = { &CmndIPAddressHelp, &CmndIPAddressPublish };
 
 /**************************************************\
  *                  Variables
@@ -61,6 +62,13 @@ static struct {
 /***************************************\
  *               Commands
 \***************************************/
+
+// ip address help
+void CmndIPAddressHelp ()
+{
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ip_pub  = add ip address data in telemetry JSON (ON / OFF)"));
+  ResponseCmndDone();
+}
 
 // set motion detection rearm flag
 void CmndIPAddressPublish ()
@@ -111,6 +119,12 @@ void IPAddressShowJSON ()
 #endif // ESP32
 }
 
+// init function
+void IPAddressInit ()
+{
+  // log help command
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ip_help to get help on ip address manager commands"));
+}
 /***********************************************\
  *                    Web
 \***********************************************/
@@ -270,6 +284,9 @@ bool Xdrv94 (uint8_t function)
   // main callback switch
   switch (function)
   { 
+    case FUNC_INIT:
+      IPAddressInit ();
+      break;
     case FUNC_COMMAND:
       result = DecodeCommand (kIPAddressCommands, IPAddressCommand);
       break;
