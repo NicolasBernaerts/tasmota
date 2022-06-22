@@ -8,8 +8,12 @@
     30/05/2020 - v1.3 - Separate Intercom and Gate in JSON
     20/11/2020 - v1.4 - Tasmota 9.1 compatibility
     01/05/2021 - v1.5 - Add fixed IP and remove use of String to avoid heap fragmentation
-    20/10/2021 - v1.6 - Tasmota 10.1 compatibility, add LittleFS support
-                        Commands start with icom_
+    20/10/2021 - v1.6 - Tasmota 10.1 compatibility, commands start with icom_
+                        Add LittleFS support
+                        Add Telegram notification support
+    22/01/2022 - v1.7 - Merge xdrv and xsns to xdrv
+    02/04/2022 - v1.8 - Simplify finite state machine
+    05/05/2022 - v1.9 - Switch input to counter
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -53,17 +57,35 @@
  *     Intercom firmware configuration
 \********************************************/
 
+// extensions
 #define USE_IPADDRESS                         // Fixed IP configuration
 #define USE_TIMEZONE                          // Timezone management
+#define USE_COMMON_LOG                        // Add support for common log manager
 #define USE_INTERCOM                          // Intercom management
+#define USE_TELEGRAM                          // Telegram messages handler
+#define USE_TELEGRAM_EXTENSION                // Telegram messages extended functionalities
 
-#define EXTENSION_VERSION "1.6"               // version
+// build
+#if defined BUILD_ESP32_4M
+#define EXTENSION_BUILD   "esp32-4m"
+#elif defined BUILD_16M14M
+#define EXTENSION_BUILD   "esp-16m14m"
+#elif defined BUILD_4M2M
+#define EXTENSION_BUILD   "esp-4m2m"
+#elif defined BUILD_2M1M
+#define EXTENSION_BUILD   "esp-2m1m"
+#elif defined BUILD_1M128K
+#define EXTENSION_BUILD   "esp-1m128k"
+#elif defined BUILD_1M64K
+#define EXTENSION_BUILD   "esp-1m64k"
+#else
+#define EXTENSION_BUILD   "esp-nofs"
+#endif
+
+// extension data
+#define EXTENSION_VERSION "1.9"               // version
 #define EXTENSION_NAME "Intercom"             // name
 #define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
-
-// Telegram notification
-#define USE_TELEGRAM
-#define USE_TELEGRAM_EXTENSION
 
 // MQTT default
 #undef MQTT_HOST
@@ -86,7 +108,7 @@
 #define SERIAL_LOG_LEVEL   LOG_LEVEL_NONE
 
 // Set JSON template for Sonoff RE5V1C as default
-#define USER_TEMPLATE "{\"NAME\":\"Sonoff RE5V1C\",\"GPIO\":[17,255,255,255,255,255,0,0,21,56,0,0,0],\"FLAG\":0,\"BASE\":18}" 
+#define USER_TEMPLATE "{\"NAME\":\"Intercom RE5V1C\",\"GPIO\":[17,255,255,255,255,255,0,0,21,56,0,0,0],\"FLAG\":0,\"BASE\":18}" 
 
 #undef USE_ARDUINO_OTA                        // support for Arduino OTA
 #undef USE_WPS                                // support for WPS as initial wifi configuration tool

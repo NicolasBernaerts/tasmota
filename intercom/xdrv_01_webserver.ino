@@ -379,7 +379,7 @@ const char HTTP_END[] PROGMEM =
   "<div style='text-align:right;font-size:11px;'><hr/><a href='https://bit.ly/tasmota' target='_blank' style='color:#aaa;'>Tasmota %s " D_BY " Theo Arends</a></div>"
 
 #ifdef EXTENSION_NAME
-  "<div style='text-align:right;font-size:11px;'>" EXTENSION_NAME " " EXTENSION_VERSION " " D_BY " " EXTENSION_AUTHOR "</div>"
+  "<div style='text-align:right;font-size:11px;'>" EXTENSION_NAME " " EXTENSION_VERSION " <small>(" EXTENSION_BUILD ")</small> " D_BY " " EXTENSION_AUTHOR "</div>"
 #endif
 
   "</div>"
