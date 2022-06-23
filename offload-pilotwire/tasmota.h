@@ -375,7 +375,9 @@ enum SettingsTextIndex { SET_OTAURL,
 
 #ifndef USE_UFILESYS
                          SET_OFFLOAD_TOPIC, SET_OFFLOAD_KEY_INST, SET_OFFLOAD_KEY_MAX,		// USE_OFFLOAD
-                         SET_REMOTE_TOPIC, SET_REMOTE_KEY,				                        // USE_REMOTE_SENSOR
+                         SET_SENSOR_TEMP_TOPIC, SET_SENSOR_TEMP_KEY,	                        // USE_SENSOR
+                         SET_SENSOR_HUMI_TOPIC, SET_SENSOR_HUMI_KEY,	                        // USE_SENSOR
+                         SET_SENSOR_MOVE_TOPIC, SET_SENSOR_MOVE_KEY,	                        // USE_SENSOR
 #endif 	// USE_UFILESYS
 
                          SET_MAX };
