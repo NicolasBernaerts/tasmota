@@ -10,20 +10,29 @@
     19/11/2021 - v1.4 - Handle drift and priority between local and remote sensors
     01/03/2022 - v2.0 - Complete rewrite to handle local drift and priority between local and remote sensors
                       
-  To use the remote sensors, you need to add these callback id functions to one xdrv_ file :
-    FUNC_MQTT_SUBSCRIBE: SensorMqttSubscribe ()
-    FUNC_MQTT_DATA:      SensorMqttData ()
-  
-  If LittleFS partition is available, settings are stored in sensor.cfg
-  Otherwise, settings are stored using Settings Text :
+  If no littleFS partition is available, settings are stored using SettingsTextIndex :
     * SET_SENSOR_TEMP_TOPIC
     * SET_SENSOR_TEMP_KEY
     * SET_SENSOR_HUMI_TOPIC
     * SET_SENSOR_HUMI_KEY
     * SET_SENSOR_MOVE_TOPIC
     * SET_SENSOR_MOVE_KEY
+  These keys should be added in tasmota.h at the end of "enum SettingsTextIndex" section just before SET_MAX :
 
-  You can access values thru :
+        #ifndef USE_UFILESYS
+          SET_OFFLOAD_TOPIC, SET_OFFLOAD_KEY_INST, SET_OFFLOAD_KEY_MAX,		// USE_OFFLOAD
+          SET_SENSOR_TEMP_TOPIC, SET_SENSOR_TEMP_KEY,	                        // USE_SENSOR
+          SET_SENSOR_HUMI_TOPIC, SET_SENSOR_HUMI_KEY,	                        // USE_SENSOR
+          SET_SENSOR_MOVE_TOPIC, SET_SENSOR_MOVE_KEY,	                        // USE_SENSOR
+        #endif 	// USE_UFILESYS
+  
+  If LittleFS partition is available, settings are stored in sensor.cfg
+
+  To use the remote sensors, you need to add these function calls in any one of your xdrv_ file :
+    FUNC_MQTT_SUBSCRIBE: SensorMqttSubscribe ()
+    FUNC_MQTT_DATA:      SensorMqttData ()
+
+  You can then access values thru :
     * SensorReadTemperatureFloat
     * SensorReadHumidityFloat
     * SensorReadHumidityInt
