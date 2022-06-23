@@ -62,7 +62,7 @@ MQTT JSON result should look like that :
 
 Pilotwire protocol is described at http://www.radiateur-electrique.org/fil-pilote-radiateur.php
 
-Pre-compiled version of Tasmota handling fil pilote is available : **tasmota.bin**
+Pre-compiled version of Tasmota handling **offload** and **fil pilote is available** are available in the **bin** directory.
 
 If you want to compile it, you need to add following files from my **tasmota/common** repository :
   * xdrv_50_filesystem_cfg_csv.ino
