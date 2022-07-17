@@ -108,6 +108,8 @@
 #define USE_TIMEZONE                          // Enable Timezone management
 #define USE_TCPSERVER                         // Enable TCP server (for TIC to TCP)
 
+#undef USE_UNISHOX_COMPRESSION
+
 // build
 #if defined BUILD_ESP32_4M
 #define EXTENSION_BUILD   "esp32-4m"
