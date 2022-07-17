@@ -4,7 +4,7 @@ Teleinfo Tasmota firmware for Linky meters
 Presentation
 ------------
 
-This evolution of Tasmota firmware has been enhanced to handle France energy meters known as **Linky** using **Teleinfo** protocol.
+This evolution of **Tasmota 12.0** firmware has been enhanced to handle France energy meters known as **Linky** using **Teleinfo** protocol.
 
 This implementation has been tested on :
   * Sagem classic meter **monophase** with TIC **historique**
@@ -124,15 +124,16 @@ If you want to compile this firmware version, you just need to :
 3. place specific files from **tasmota/common** repository
 4. install **FTPClientServer** library
 
-Here are the files needed from the **tasmota/common** repository and where to place them in your project :
-* **esp32_partition_app1441k_spiffs1245.csv**
-* boards/**esp8266_16M14M.json**
-* tasmota/**xdrv_50_filesystem_cfg_csv.ino**
-* tasmota/**xdrv_93_esp32_board.ino**
-* tasmota/**xdrv_94_ip_address.ino**
-* tasmota/**xdrv_95_timezone.ino**
-* tasmota/**xdrv_96_ftp_server.ino**
-* tasmota/**xdrv_97_tcp_server.ino**
+Here is where you should place different files from this repository and from **tasmota/common** :
+* **platformio_override.ini**
+* tasmota/**user_config_override.h**
+* tasmota/tasmota_nrg_energy/**xnrg_15_teleinfo.ino**
+* tasmota/tasmota_drv_driver/**xdrv_50_filesystem_cfg_csv.ino**
+* tasmota/tasmota_drv_driver/**xdrv_93_esp32_board.ino**
+* tasmota/tasmota_drv_driver/**xdrv_94_ip_address.ino**
+* tasmota/tasmota_drv_driver/**xdrv_96_ftp_server.ino**
+* tasmota/tasmota_drv_driver/**xdrv_97_tcp_server.ino**
+* tasmota/tasmota_sns_sensor/**xsns_120_timezone.ino**
 * lib/default/**FTPClientServer** (extract content of **FTPClientServer.zip**) 
 
 If everything goes fine, you should be able to compile your own build.
