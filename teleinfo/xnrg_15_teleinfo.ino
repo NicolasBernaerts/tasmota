@@ -160,6 +160,7 @@ TasmotaSerial *teleinfo_serial = nullptr;
 #endif    // USE_UFILESYS
 
 // commands : MQTT
+#define D_CMND_TELEINFO_HELP            "help"
 #define D_CMND_TELEINFO_ENABLE          "enable"
 #define D_CMND_TELEINFO_RATE            "rate"
 #define D_CMND_TELEINFO_LOG_POLICY      "log"
@@ -244,12 +245,12 @@ const char TELEINFO_HTML_POWER[]          PROGMEM = "<text class='power' x='%d%%
 const char TELEINFO_HTML_DASH[]           PROGMEM = "<line class='dash' x1='%d%%' y1='%d%%' x2='%d%%' y2='%d%%' />\n";
 const char TELEINFO_HTML_BAR[]            PROGMEM = "<tr><div style='margin:4px;padding:0px;background-color:#ddd;border-radius:4px;'><div style='font-size:0.75rem;font-weight:bold;padding:0px;text-align:center;border:1px solid #bbb;border-radius:4px;color:#444;background-color:%s;width:%d%%;'>%d%%</div></div></tr>\n";
 
-// TIC - MQTT commands : TICenable, TICrate, TICtele, TICmeter, TICival, TICdelta, TICadj and TICtcp
-enum TeleinfoCommands { TIC_CMND_NONE, TIC_CMND_ENABLE, TIC_CMND_RATE, TIC_CMND_POLICYTIC, TIC_CMND_POLICYMETER, TIC_CMND_POLICYLOG, TIC_CMND_INTERVAL, TIC_CMND_ADJUST, TIC_CMND_NBDAILY, TIC_CMND_NBWEEKLY };
-const char kTeleinfoCommands[]            PROGMEM = "tic_" "|" D_CMND_TELEINFO_ENABLE "|" D_CMND_TELEINFO_RATE "|" D_CMND_TELEINFO_MSG_POLICY "|" D_CMND_TELEINFO_MSG_TYPE "|" D_CMND_TELEINFO_LOG_POLICY "|" D_CMND_TELEINFO_INTERVAL "|" D_CMND_TELEINFO_ADJUST "|" D_CMND_TELEINFO_ROTATE;
-void (* const TeleinfoCommand[])(void)    PROGMEM = { &CmndTeleinfoEnable, &CmndTeleinfoRate, &CmndTeleinfoMessagePolicy, &CmndTeleinfoMessageType, &CmndTeleinfoLogPolicy, &CmndTeleinfoInterval, &CmndTeleinfoAdjust, &CmndTeleinfoRotate };
+// MQTT commands : tic_help, tic_enable, tic_rate, tic_msgp, tic_msgt, tic_log, tic_ival, tic_adj, tic_rot, tic_mini, tic_daily and tic_weekly
+enum TeleinfoCommands { TIC_CMND_NONE, TIC_CMND_HELP, TIC_CMND_ENABLE, TIC_CMND_RATE, TIC_CMND_MSG_POLICY, TIC_CMND_MSG_TYPE, TIC_CMND_LOG_POLICY, TIC_CMND_INTERVAL, TIC_CMND_ADJUST, TIC_CMND_ROTATE, TIC_CMND_MINIMIZE, TIC_CMND_NBDAILY, TIC_CMND_NBWEEKLY };
+const char kTeleinfoCommands[]            PROGMEM = "tic_" "|" D_CMND_TELEINFO_HELP "|" D_CMND_TELEINFO_ENABLE "|" D_CMND_TELEINFO_RATE "|" D_CMND_TELEINFO_MSG_POLICY "|" D_CMND_TELEINFO_MSG_TYPE "|" D_CMND_TELEINFO_LOG_POLICY "|" D_CMND_TELEINFO_INTERVAL "|" D_CMND_TELEINFO_ADJUST "|" D_CMND_TELEINFO_ROTATE "|" D_CMND_TELEINFO_MINIMIZE;
+void (* const TeleinfoCommand[])(void)    PROGMEM = { &CmndTeleinfoHelp, &CmndTeleinfoEnable, &CmndTeleinfoRate, &CmndTeleinfoMessagePolicy, &CmndTeleinfoMessageType, &CmndTeleinfoLogPolicy, &CmndTeleinfoInterval, &CmndTeleinfoAdjust, &CmndTeleinfoRotate, &CmndTeleinfoMinimize };
 
-// TIC - specific etiquettes
+// Specific etiquettes
 enum TeleinfoEtiquette { TIC_NONE, TIC_ADCO, TIC_ADSC, TIC_PTEC, TIC_NGTF, TIC_EAIT, TIC_IINST, TIC_IINST1, TIC_IINST2, TIC_IINST3, TIC_ISOUSC, TIC_PS, TIC_PAPP, TIC_SINSTS, TIC_BASE, TIC_EAST, TIC_HCHC, TIC_HCHP, TIC_EJPHN, TIC_EJPHPM, TIC_BBRHCJB, TIC_BBRHPJB, TIC_BBRHCJW, TIC_BBRHPJW, TIC_BBRHCJR, TIC_BBRHPJR, TIC_ADPS, TIC_ADIR1, TIC_ADIR2, TIC_ADIR3, TIC_URMS1, TIC_URMS2, TIC_URMS3, TIC_UMOY1, TIC_UMOY2, TIC_UMOY3, TIC_IRMS1, TIC_IRMS2, TIC_IRMS3, TIC_SINSTS1, TIC_SINSTS2, TIC_SINSTS3, TIC_PTCOUR, TIC_PTCOUR1, TIC_PREF, TIC_PCOUP, TIC_LTARF, TIC_EASF01, TIC_EASF02, TIC_EASF03, TIC_EASF04, TIC_EASF05, TIC_EASF06, TIC_EASF07, TIC_EASF08, TIC_EASF09, TIC_EASF10, TIC_ADS, TIC_CONFIG, TIC_EAPS, TIC_EAS, TIC_EAPPS, TIC_PREAVIS, TIC_MAX };
 const char kTeleinfoEtiquetteName[] PROGMEM = "|ADCO|ADSC|PTEC|NGTF|EAIT|IINST|IINST1|IINST2|IINST3|ISOUSC|PS|PAPP|SINSTS|BASE|EAST|HCHC|HCHP|EJPHN|EJPHPM|BBRHCJB|BBRHPJB|BBRHCJW|BBRHPJW|BBRHCJR|BBRHPJR|ADPS|ADIR1|ADIR2|ADIR3|URMS1|URMS2|URMS3|UMOY1|UMOY2|UMOY3|IRMS1|IRMS2|IRMS3|SINSTS1|SINSTS2|SINSTS3|PTCOUR|PTCOUR1|PREF|PCOUP|LTARF|EASF01|EASF02|EASF03|EASF04|EASF05|EASF06|EASF07|EASF08|EASF09|EASF10|ADS|CONFIG|EAP_s|EA_s|EAPP_s|PREAVIS";
 
@@ -258,14 +259,14 @@ enum TeleinfoMode { TIC_MODE_UNDEFINED, TIC_MODE_HISTORIC, TIC_MODE_STANDARD, TI
 const char kTeleinfoModeName[] PROGMEM = "|Historique|Standard|PME Conso|PME Prod";
 const uint16_t ARR_TELEINFO_RATE[] = { 1200, 9600, 19200 }; 
 
-// TIC - tarifs                              [  Toutes   ] [ Creuses       Pleines   ] [ Normales   PointeMobile ] [CreusesBleu  CreusesBlanc  CreusesRouge  PleinesBleu   PleinesBlanc  PleinesRouge] [ Pointe   PointeMobile  Hiver      Pleines     Creuses    PleinesHiver CreusesHiver PleinesEte   CreusesEte   Pleines1/2S  Creuses1/2S  JuilletAout] [Pointe PleinesHiver CreusesHiver PleinesEte CreusesEte] [ Base  ]  [ Pleines    Creuses   ]
+// Tarifs                                  [  Toutes   ] [ Creuses       Pleines   ] [ Normales   PointeMobile ] [CreusesBleu  CreusesBlanc  CreusesRouge  PleinesBleu   PleinesBlanc  PleinesRouge] [ Pointe   PointeMobile  Hiver      Pleines     Creuses    PleinesHiver CreusesHiver PleinesEte   CreusesEte   Pleines1/2S  Creuses1/2S  JuilletAout] [Pointe PleinesHiver CreusesHiver PleinesEte CreusesEte] [ Base  ]  [ Pleines    Creuses   ]
 enum TeleinfoPeriod                        { TIC_HISTO_TH, TIC_HISTO_HC, TIC_HISTO_HP, TIC_HISTO_HN, TIC_HISTO_PM, TIC_HISTO_CB, TIC_HISTO_CW, TIC_HISTO_CR, TIC_HISTO_PB, TIC_HISTO_PW, TIC_HISTO_PR, TIC_STD_P, TIC_STD_PM, TIC_STD_HH, TIC_STD_HP, TIC_STD_HC, TIC_STD_HPH, TIC_STD_HCH, TIC_STD_HPE, TIC_STD_HCE, TIC_STD_HPD, TIC_STD_HCD, TIC_STD_JA, TIC_STD_1, TIC_STD_2, TIC_STD_3, TIC_STD_4, TIC_STD_5, TIC_STD_BASE, TIC_STD_HPL, TIC_STD_HCR, TIC_PERIOD_MAX };
 const int ARR_TELEINFO_PERIOD_FIRST[]    = { TIC_HISTO_TH, TIC_HISTO_HC, TIC_HISTO_HC, TIC_HISTO_HN, TIC_HISTO_HN, TIC_HISTO_CB, TIC_HISTO_CB, TIC_HISTO_CB, TIC_HISTO_CB, TIC_HISTO_CB, TIC_HISTO_CB, TIC_STD_P, TIC_STD_P,  TIC_STD_P,  TIC_STD_P,  TIC_STD_P,  TIC_STD_P,   TIC_STD_P,   TIC_STD_P,   TIC_STD_P,   TIC_STD_P,   TIC_STD_P,   TIC_STD_P,  TIC_STD_1, TIC_STD_1, TIC_STD_1, TIC_STD_1, TIC_STD_1, TIC_STD_BASE, TIC_STD_HPL, TIC_STD_HPL };
 const int ARR_TELEINFO_PERIOD_NUMBER[]   = { 1,            2,            2,            2,            2,            6,            6,            6,            6,            6,            6,            12,        12,         12,         12,         12,         12,          12,          12,          12,          12,          12,          12,         5,         5,         5,         5,         5,         1,            2,           2           };
 const char kTeleinfoPeriod[] PROGMEM     = "TH..|HC..|HP..|HN..|PM..|HCJB|HCJW|HCJR|HPJB|HPJW|HPJR|P|PM|HH|HP|HC|HPH|HCH|HPE|HCE|HPD|HCD|JA|1|2|3|4|5|BASE|HEURE PLEINE|HEURE CREUSE";
 const char kTeleinfoPeriodName[] PROGMEM = "Toutes|Creuses|Pleines|Normales|Pointe Mobile|Creuses Bleu|Creuses Blanc|Creuses Rouge|Pleines Bleu|Pleines Blanc|Pleines Rouge|Pointe|Pointe Mobile|Hiver|Pleines|Creuses|Pleines Hiver|Creuses Hiver|Pleines Ete|Creuses Ete|Pleines Demi-saison|Creuses Demi-saison|Juillet-Aout|Pointe|Pleines Hiver|Creuses Hiver|Pleines Ete|Creuses Ete|Base|Pleines|Creuses";
 
-// TIC - data diffusion policy
+// Data diffusion policy
 enum TeleinfoMessagePolicy { TELEINFO_POLICY_NEVER, TELEINFO_POLICY_MESSAGE, TELEINFO_POLICY_PERCENT, TELEINFO_POLICY_TELEMETRY, TELEINFO_POLICY_MAX };
 const char kTeleinfoMessagePolicy[] PROGMEM = "Never|Every TIC message|When Power fluctuates (± 5%)|With Telemetry only";
 enum TeleinfoMessageType { TELEINFO_TYPE_NONE, TELEINFO_TYPE_METER, TELEINFO_TYPE_TIC, TELEINFO_TYPE_BOTH, TELEINFO_TYPE_MAX };
@@ -284,8 +285,8 @@ const char kTeleinfoGraphDisplay[] PROGMEM = "VA|W|V|cosφ";                    
 enum TeleinfoHistoDisplay { TELEINFO_HISTO_VA, TELEINFO_HISTO_W, TELEINFO_HISTO_V, TELEINFO_HISTO_COSPHI, TELEINFO_HISTO_PEAK_VA, TELEINFO_HISTO_PEAK_V, TELEINFO_HISTO_MAX };  // available graph displays
 
 // graph - phase colors
-const char kTeleinfoGraphColorPhase[] PROGMEM = "#6bc4ff|#ffca74|#7a7fb3";            // blue, orange, green                                                                                                           // data display labels
-const char kTeleinfoGraphColorPeak[]  PROGMEM = "#5dade2|#d9ad67|#64d394";                                                                                                                     // data display labels
+const char kTeleinfoGraphColorPhase[] PROGMEM = "#6bc4ff|#ffca74|#23bf64";            // blue, orange, green                                                                                                           // data display labels
+const char kTeleinfoGraphColorPeak[]  PROGMEM = "#5dade2|#d9ad67|#20a457";                                                                                                                     // data display labels
 
 // week days name for graph
 const char kTeleinfoWeekDay[] PROGMEM = "Sun|Mon|Tue|Wed|Thu|Fri|Sat";                                                                                                                     // data display labels
@@ -374,8 +375,9 @@ static struct {
 
 // teleinfo : power meter
 static struct {
+  bool      enabled        = true;                  // reception enabled by default
   uint8_t   status_rx      = TIC_SERIAL_INIT;       // Teleinfo Rx initialisation status
-  uint8_t   enable_rx      = UINT8_MAX;             // pin used to enable/disable Teleinfo Rx
+//  uint8_t   enable_rx      = UINT8_MAX;             // pin used to enable/disable Teleinfo Rx
   int       interval_count = 0;                     // energy publication counter      
   long      papp           = 0;                     // current apparent power 
   long      nb_message     = 0;                     // total number of messages sent by the meter
@@ -478,6 +480,39 @@ uint16_t TeleinfoValidateBaudRate (uint16_t baud_rate)
  *                  Commands
 \**************************************************/
 
+// teleinfo help
+void CmndTeleinfoHelp ()
+{
+  uint8_t index;
+  char    str_text[32];
+
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tic_enable = enable teleinfo (ON / OFF)"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tic_rate   = set serial rate (1200, 9600, 19200)"));
+
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tic_msgp   = message publish policy :"));
+  for (index = 0; index < TELEINFO_POLICY_MAX; index++)
+  {
+    GetTextIndexed (str_text, sizeof (str_text), index, kTeleinfoMessagePolicy);
+    AddLog (LOG_LEVEL_INFO, PSTR ("HLP:   %u - %s"), index, str_text);
+  }
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tic_msgt   = message type publish policy :"));
+  for (index = 0; index < TELEINFO_TYPE_MAX; index++)
+  {
+    GetTextIndexed (str_text, sizeof (str_text), index, kTeleinfoMessageType);
+    AddLog (LOG_LEVEL_INFO, PSTR ("HLP:   %u - %s"), index, str_text);
+  }
+
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tic_ival   = ROM update interval (mn)"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tic_adj    = maximum power ajustment (%)"));
+
+#ifdef USE_UFILESYS
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tic_log    = [littlefs] log policy (0:buffered, 1:immediate)"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tic_rot    = [littlefs] force log rotate"));
+#endif        // USE_UFILESYS
+
+  ResponseCmndDone();
+}
+
 void CmndTeleinfoRate (void)
 {
   if (XdrvMailbox.data_len > 0) teleinfo_config.baud_rate = TeleinfoValidateBaudRate ((uint16_t)XdrvMailbox.payload);
@@ -517,25 +552,21 @@ void CmndTeleinfoAdjust (void)
 // Start and stop Teleinfo serial reception
 void CmndTeleinfoEnable (void)
 {
-  bool cmd_start  = false;
-  bool cmd_stop   = false;
-  bool cmd_result = false;
+  bool result;
 
   // if parameter is provided
-  if (XdrvMailbox.data_len > 0)
+  result = (XdrvMailbox.data_len > 0);
+  if (result)
   {
-    // determine command
-    cmd_start = ((strcasecmp (XdrvMailbox.data, MQTT_STATUS_ON) == 0)  || (XdrvMailbox.payload == 1));
-    cmd_stop  = ((strcasecmp (XdrvMailbox.data, MQTT_STATUS_OFF) == 0) || (XdrvMailbox.payload == 0));
+    // if serial enable
+    if ((strcasecmp (XdrvMailbox.data, MQTT_STATUS_ON) == 0)  || (XdrvMailbox.payload == 1)) result = TeleinfoEnableSerial ();
 
-    // switch ON or OFF command
-    if (cmd_start) cmd_result = TeleinfoEnableSerial ();
-    else if (cmd_stop) cmd_result = TeleinfoDisableSerial ();
+    // else if serial disabled
+    else if ((strcasecmp (XdrvMailbox.data, MQTT_STATUS_OFF) == 0) || (XdrvMailbox.payload == 0)) result = TeleinfoDisableSerial ();
   } 
 
   // send response
-  if (cmd_result) ResponseCmndDone ();
-  else ResponseCmndFailed ();
+  if (result) ResponseCmndDone (); else ResponseCmndFailed ();
 }
 
 void CmndTeleinfoRotate (void)
@@ -547,6 +578,18 @@ void CmndTeleinfoRotate (void)
   ResponseCmndDone ();
 }
 
+void CmndTeleinfoMinimize (void)
+{
+  bool minimize;
+
+  minimize = ((strcasecmp (XdrvMailbox.data, MQTT_STATUS_ON) == 0)  || (XdrvMailbox.payload == 1));
+
+  if (minimize) teleinfo_config.log_policy = TELEINFO_LOG_BUFFERED;
+  else teleinfo_config.log_policy = TELEINFO_LOG_IMMEDIATE;
+
+  ResponseCmndNumber (teleinfo_config.log_policy);
+}
+
 /*********************************************\
  *               Functions
 \*********************************************/
@@ -554,72 +597,59 @@ void CmndTeleinfoRotate (void)
 // Start serial reception
 bool TeleinfoEnableSerial ()
 {
-  bool is_enabled = false;
+  bool is_ready = (teleinfo_serial != nullptr);
 
-  // if serial port creation is possible
-  if ((TasmotaGlobal.energy_driver == XNRG_15) && PinUsed (GPIO_TELEINFO_RX) && (teleinfo_config.baud_rate > 0))
+  // if serial port is not already created
+  if (!is_ready)
   { 
- 
+    // check if environment is ok
+    is_ready = ((TasmotaGlobal.energy_driver == XNRG_15) && PinUsed (GPIO_TELEINFO_RX) && (teleinfo_config.baud_rate > 0));
+    if (is_ready)
+    {
 #ifdef ESP32
-    // create serial port
-    teleinfo_serial = new TasmotaSerial (Pin (GPIO_TELEINFO_RX), -1, 1);
+      // create serial port
+      teleinfo_serial = new TasmotaSerial (Pin (GPIO_TELEINFO_RX), -1, 1);
 
-    // initialise serial port
-    is_enabled = teleinfo_serial->begin (teleinfo_config.baud_rate, SERIAL_7E1);
+      // initialise serial port
+      is_ready = teleinfo_serial->begin (teleinfo_config.baud_rate, SERIAL_7E1);
 
 #else       // ESP8266
-    // create serial port
-    teleinfo_serial = new TasmotaSerial (Pin (GPIO_TELEINFO_RX), -1, 1);
+      // create serial port
+      teleinfo_serial = new TasmotaSerial (Pin (GPIO_TELEINFO_RX), -1, 1);
 
-    // initialise serial port
-    is_enabled = teleinfo_serial->begin (teleinfo_config.baud_rate, SERIAL_7E1);
+      // initialise serial port
+      is_ready = teleinfo_serial->begin (teleinfo_config.baud_rate, SERIAL_7E1);
 
-    // force configuration on ESP8266
-    if (teleinfo_serial->hardwareSerial ()) ClaimSerial ();
-
+      // force configuration on ESP8266
+      if (teleinfo_serial->hardwareSerial ()) ClaimSerial ();
 #endif      // ESP32 & ESP8266
 
-    // declare serial port enabled
-    if (is_enabled)
-    {
-      teleinfo_meter.status_rx = TIC_SERIAL_ACTIVE; 
-      AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Serial set to 7E1 %d bauds"), teleinfo_config.baud_rate);
-    } 
+      // log action
+      if (is_ready) AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Serial set to 7E1 %d bauds"), teleinfo_config.baud_rate);
+      else AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Serial port init failed"));
+    }
 
-    // else declare serial port initialisation failure
-    else
-    {
-      teleinfo_meter.status_rx = TIC_SERIAL_FAILED; 
-      AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Serial port init failed"));
-    } 
+    // set serial port status
+    if (is_ready) teleinfo_meter.status_rx = TIC_SERIAL_ACTIVE; 
+    else teleinfo_meter.status_rx = TIC_SERIAL_FAILED;
   }
 
-  // if needed, enable Teleinfo RX
-  if (is_enabled && (teleinfo_meter.enable_rx != UINT8_MAX))
-  {
-    // set output high
-    digitalWrite(teleinfo_meter.enable_rx, HIGH);
-    AddLog (LOG_LEVEL_INFO, PSTR("TIC: Teleinfo Rx enabled by GPIO%d"), teleinfo_meter.enable_rx);
-  }
+  // if Teleinfo En declared, enable it
+  if (is_ready && PinUsed (GPIO_TELEINFO_ENABLE)) digitalWrite(Pin (GPIO_TELEINFO_ENABLE), HIGH);
 
-  return is_enabled;
+  return is_ready;
 }
 
 // Stop serial reception
 bool TeleinfoDisableSerial ()
 {
-  bool control_rx;
+  // if teleinfo enabled, set it low
+  if (PinUsed (GPIO_TELEINFO_ENABLE)) digitalWrite(Pin (GPIO_TELEINFO_ENABLE), LOW);
 
-  // if needed, disable Teleinfo RX
-  control_rx = (teleinfo_meter.enable_rx != UINT8_MAX);
-  if (control_rx)
-  {
-    // set output low
-    digitalWrite(teleinfo_meter.enable_rx, LOW);
-    AddLog (LOG_LEVEL_INFO, PSTR("TIC: Teleinfo Rx disabled by GPIO%d"), teleinfo_meter.enable_rx);
-  }
+  // declare serial as stopped
+  teleinfo_meter.status_rx = TIC_SERIAL_STOPPED;
 
-  return control_rx;
+  return true;
 }
 
 // Load configuration from Settings or from LittleFS
@@ -1281,8 +1311,7 @@ void TeleinfoPreInit ()
   if (PinUsed (GPIO_TELEINFO_ENABLE))
   {
     // switch it off to avoid ESP32 Rx heavy load restart bug
-    teleinfo_meter.enable_rx = Pin (GPIO_TELEINFO_ENABLE);
-    pinMode (teleinfo_meter.enable_rx, OUTPUT);
+    pinMode (Pin (GPIO_TELEINFO_ENABLE), OUTPUT);
 
     // disable serial input
     TeleinfoDisableSerial ();
@@ -1365,6 +1394,9 @@ void TeleinfoInit ()
   // disable all message lines
   for (index = 0; index < TELEINFO_LINE_QTY; index ++) teleinfo_message.line[index].checksum = 0;
 
+  // log help command
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tic_help to get help on teleinfo commands"));
+
   // log default method
   AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Using default Global Counter method"));
 }
@@ -1421,7 +1453,6 @@ void TeleinfoGraphInit ()
 void TeleinfoSaveBeforeRestart ()
 {
   // stop serail reception and disable Teleinfo Rx
-  teleinfo_meter.status_rx = TIC_SERIAL_STOPPED;
   TeleinfoDisableSerial ();
 
   // update energy total (in kwh)
@@ -2488,11 +2519,11 @@ void TeleinfoWebPageConfigure ()
   // page comes from save button on configuration page
   if (Webserver->hasArg (F ("save")))
   {
-    // parameter 'sendp' : set TIC messages diffusion policy
+    // parameter 'msgp' : set TIC messages diffusion policy
     WebGetArg (D_CMND_TELEINFO_MSG_POLICY, str_text, sizeof (str_text));
     if (strlen (str_text) > 0) teleinfo_config.msg_policy = atoi (str_text);
 
-    // parameter 'sendt' : set data messages diffusion policy
+    // parameter 'msgt' : set TIC messages type diffusion policy
     WebGetArg (D_CMND_TELEINFO_MSG_TYPE, str_text, sizeof (str_text));
     if (strlen (str_text) > 0) teleinfo_config.msg_type = atoi (str_text);
 
@@ -2504,7 +2535,7 @@ void TeleinfoWebPageConfigure ()
     WebGetArg (D_CMND_TELEINFO_ADJUST, str_text, sizeof (str_text));
     if (strlen (str_text) > 0) teleinfo_config.percent_adjust = atoi (str_text);
 
-    // get current and new teleinfo rate
+    // parameter 'adjust' : set teleinfo rate
     WebGetArg (D_CMND_TELEINFO_RATE, str_text, sizeof (str_text));
     if (strlen (str_text) > 0) teleinfo_config.baud_rate = TeleinfoValidateBaudRate (atoi (str_text));
 
@@ -2837,10 +2868,10 @@ void TeleinfoWebGraphTime (int period, int histo)
 // Display graph curve
 void TeleinfoWebGraphCurve (int period, int data, int phase, int histo)
 {
-  bool is_valid, display_peak, first_point;
-  long index, position, value;
+  bool display_peak, first_point;
+  long index, value;
   long graph_left, graph_right, graph_width;  
-  long graph_delta, graph_x, graph_y, graph_last_x;
+  long graph_x, graph_y, graph_last_x;
 
   // check if peak values should be displayed
   display_peak = (period >=TELEINFO_MEMORY_PERIOD_MAX);
@@ -2858,6 +2889,7 @@ void TeleinfoWebGraphCurve (int period, int data, int phase, int histo)
     // ------------------
 
     case TELEINFO_UNIT_VA:
+    
       // if needed, display peak values
       if (display_peak)
       {
@@ -2882,7 +2914,7 @@ void TeleinfoWebGraphCurve (int period, int data, int phase, int histo)
       }
 
       // display apparent power graph
-      first_point = false;
+      first_point = true;
       WSContentSend_P ("<path class='ph%d' ", phase); 
       graph_last_x = graph_left;
       for (index = 0; index < TELEINFO_GRAPH_SAMPLE; index++)
@@ -2895,11 +2927,8 @@ void TeleinfoWebGraphCurve (int period, int data, int phase, int histo)
         if ((value != LONG_MAX) && (teleinfo_graph.pmax > 0))
         {
           // first point
-          if (!first_point)
-          {
-            first_point = true;
-            WSContentSend_P ("d='M%d %d ", graph_x, teleinfo_config.height); 
-          }
+          if (first_point) WSContentSend_P ("d='M%d %d ", graph_x, teleinfo_config.height); 
+          first_point = false;
 
           // current point
           graph_last_x = graph_x;
@@ -2908,7 +2937,6 @@ void TeleinfoWebGraphCurve (int period, int data, int phase, int histo)
         }
       }
       WSContentSend_P (PSTR("L%d %d Z'/>\n"), graph_last_x, teleinfo_config.height);
-
       break;
 
     // ------------------
@@ -2916,10 +2944,11 @@ void TeleinfoWebGraphCurve (int period, int data, int phase, int histo)
     // ------------------
 
     case TELEINFO_UNIT_W:
+
       // display active power graph
       WSContentSend_P ("<path class='ph%d' ", phase); 
       graph_last_x = graph_left;
-      first_point = false;
+      first_point = true;
       for (index = 0; index < TELEINFO_GRAPH_SAMPLE; index++)
       {
         // calculate x position
@@ -2930,11 +2959,8 @@ void TeleinfoWebGraphCurve (int period, int data, int phase, int histo)
         if ((value != LONG_MAX) && (teleinfo_graph.pmax > 0))
         {
           // first point
-          if (!first_point)
-          {
-            first_point = true;
-            WSContentSend_P ("d='M%d %d ", graph_x, teleinfo_config.height); 
-          }
+          if (first_point) WSContentSend_P ("d='M%d %d ", graph_x, teleinfo_config.height); 
+          first_point = false;
 
           // current point
           graph_last_x = graph_x;
@@ -2944,7 +2970,6 @@ void TeleinfoWebGraphCurve (int period, int data, int phase, int histo)
 
       }
       WSContentSend_P (PSTR(" L%d %d Z'/>\n"), graph_last_x, teleinfo_config.height);
-
       break;
 
     // --------------
@@ -2952,33 +2977,9 @@ void TeleinfoWebGraphCurve (int period, int data, int phase, int histo)
     // --------------
 
     case TELEINFO_UNIT_V:
-      // if needed, display curve with peak voltage
-      if (display_peak)
-      {
-        // loop to display voltage peak
-        WSContentSend_P ("<polyline class='ph%d' points='", phase); 
-        graph_last_x = graph_left;
-        for (index = 0; index < TELEINFO_GRAPH_SAMPLE; index++)
-        {
-          // calculate x position
-          graph_x = graph_left + (index * graph_width / TELEINFO_GRAPH_SAMPLE);
-
-          // if max voltage is defined, calculate and display point position as delta from min & max range
-          value = TeleinfoGetGraphData (TELEINFO_HISTO_PEAK_V, period, phase, index, true);
-          if (value != LONG_MAX)
-          {
-            graph_last_x = graph_x;
-            value   = value + TELEINFO_GRAPH_VOLTAGE_RANGE - teleinfo_graph.vmax;
-            graph_y = teleinfo_config.height - (value * teleinfo_config.height / TELEINFO_GRAPH_VOLTAGE_RANGE);
-            WSContentSend_P ("%d,%d ", graph_x, graph_y);
-          }
-        }
-        WSContentSend_P (PSTR("'/>\n"), graph_last_x, teleinfo_config.height);
-      }
 
       // display minimum voltage graph
-      WSContentSend_P ("<path class='ph%d' ", phase);
-      first_point = false;
+      WSContentSend_P ("<polyline class='ph%d' points='", phase); 
       for (index = 0; index < TELEINFO_GRAPH_SAMPLE; index++)
       {
         // calculate x position
@@ -2988,22 +2989,37 @@ void TeleinfoWebGraphCurve (int period, int data, int phase, int histo)
         value = TeleinfoGetGraphData (TELEINFO_HISTO_V, period, phase, index, true);
         if (value != LONG_MAX)
         {
-          // first point
-          if (!first_point)
-          {
-            first_point = true;
-            WSContentSend_P ("d='M%d %d ", graph_x, teleinfo_config.height); 
-          }
-
           // current point
-          graph_last_x = graph_x;
           value   = value + TELEINFO_GRAPH_VOLTAGE_RANGE - teleinfo_graph.vmax;
           graph_y = teleinfo_config.height - (value * teleinfo_config.height / TELEINFO_GRAPH_VOLTAGE_RANGE);
-          WSContentSend_P ("L%d %d ", graph_x, graph_y);
+          WSContentSend_P ("%d,%d ", graph_x, graph_y);
         }
       }
-      WSContentSend_P (PSTR(" L%d %d Z'/>\n"), graph_last_x, teleinfo_config.height);
+      WSContentSend_P (PSTR("'/>\n"));
 
+      // if needed, display curve with peak voltage
+      if (display_peak)
+      {
+        // display minimum voltage graph
+        WSContentSend_P ("<polyline class='pk%d' points='", phase); 
+
+        // loop to display voltage peak
+        for (index = 0; index < TELEINFO_GRAPH_SAMPLE; index++)
+        {
+          // calculate x position
+          graph_x = graph_left + (index * graph_width / TELEINFO_GRAPH_SAMPLE);
+
+          // if max voltage is defined, calculate and display point position as delta from min & max range
+          value = TeleinfoGetGraphData (TELEINFO_HISTO_PEAK_V, period, phase, index, true);
+          if (value != LONG_MAX)
+          {
+            value   = value + TELEINFO_GRAPH_VOLTAGE_RANGE - teleinfo_graph.vmax;
+            graph_y = teleinfo_config.height - (value * teleinfo_config.height / TELEINFO_GRAPH_VOLTAGE_RANGE);
+            WSContentSend_P ("%d,%d ", graph_x, graph_y);
+          }
+        }
+        WSContentSend_P (PSTR("'/>\n"));
+      }
       break;
     
     // --------------
@@ -3011,6 +3027,7 @@ void TeleinfoWebGraphCurve (int period, int data, int phase, int histo)
     // --------------
 
     case TELEINFO_UNIT_COSPHI:
+
       // display cos phi graph
       WSContentSend_P ("<polyline class='ph%d' points='", phase); 
       for (index = 0; index < TELEINFO_GRAPH_SAMPLE; index++)
@@ -3027,7 +3044,6 @@ void TeleinfoWebGraphCurve (int period, int data, int phase, int histo)
         }
       }
       WSContentSend_P (PSTR("'/>\n"));
-
       break;
   }
 }
