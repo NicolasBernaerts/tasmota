@@ -165,9 +165,9 @@ struct {
   uint16_t  contract_power  = 0;                          // maximum power limit before offload
   int       contract_adjust = 0;                          // adjustement of maximum power in %
   uint16_t  rearm_delay     = 0;                          // delay before automatically rearming the relay (in sec.)
-  char      str_topic[64];                                // mqtt topic to be used for meter
-  char      str_kinst[8];                                 // mqtt instant apparent power key
-  char      str_kmax[8];                                  // mqtt maximum apparent power key
+  String    str_topic;                                    // mqtt topic to be used for meter
+  String    str_kinst;                                    // mqtt instant apparent power key
+  String    str_kmax;                                     // mqtt maximum apparent power key
 } offload_config;
 
 struct {
@@ -210,9 +210,9 @@ void OffloadLoadConfig ()
   offload_config.rearm_delay   = (uint16_t)UfsCfgLoadKeyInt (D_OFFLOAD_CFG, D_CMND_OFFLOAD_REARM);
 
   // mqtt config
-  UfsCfgLoadKey (D_OFFLOAD_CFG, D_CMND_OFFLOAD_TOPIC, offload_config.str_topic, sizeof (offload_config.str_topic));
-  UfsCfgLoadKey (D_OFFLOAD_CFG, D_CMND_OFFLOAD_KINST, offload_config.str_kinst, sizeof (offload_config.str_kinst));
-  UfsCfgLoadKey (D_OFFLOAD_CFG, D_CMND_OFFLOAD_KMAX,  offload_config.str_kmax,  sizeof (offload_config.str_kmax));
+  offload_config.str_topic = UfsCfgLoadKey (D_OFFLOAD_CFG, D_CMND_OFFLOAD_TOPIC);
+  offload_config.str_kinst = UfsCfgLoadKey (D_OFFLOAD_CFG, D_CMND_OFFLOAD_KINST);
+  offload_config.str_kmax  = UfsCfgLoadKey (D_OFFLOAD_CFG, D_CMND_OFFLOAD_KMAX);
 
   // log
   AddLog (LOG_LEVEL_INFO, PSTR ("OFL: Config from LittleFS"));
@@ -230,9 +230,9 @@ void OffloadLoadConfig ()
   offload_config.rearm_delay   = (uint16_t)Settings->knx_GA_addr[5];
 
   // mqtt config
-  strlcpy (offload_config.str_topic, SettingsText (SET_OFFLOAD_TOPIC),    sizeof (offload_config.str_topic));
-  strlcpy (offload_config.str_kinst, SettingsText (SET_OFFLOAD_KEY_INST), sizeof (offload_config.str_kinst));
-  strlcpy (offload_config.str_kmax, SettingsText (SET_OFFLOAD_KEY_MAX),   sizeof (offload_config.str_kmax));
+  offload_config.str_topic = SettingsText (SET_OFFLOAD_TOPIC);
+  offload_config.str_kinst = SettingsText (SET_OFFLOAD_KEY_INST);
+  offload_config.str_kmax  = SettingsText (SET_OFFLOAD_KEY_MAX);
 
   // log
   AddLog (LOG_LEVEL_INFO, PSTR ("OFL: Config from Settings"));
@@ -261,15 +261,15 @@ void OffloadSaveConfig ()
   UfsCfgSaveKeyInt (D_OFFLOAD_CFG, D_CMND_OFFLOAD_PRIORITY, (int)offload_config.device_priority, false);
   UfsCfgSaveKeyInt (D_OFFLOAD_CFG, D_CMND_OFFLOAD_POWER,    (int)offload_config.device_power,    false);
   UfsCfgSaveKeyInt (D_OFFLOAD_CFG, D_CMND_OFFLOAD_MAX,      (int)offload_config.contract_power,  false);
-  UfsCfgSaveKeyInt (D_OFFLOAD_CFG, D_CMND_OFFLOAD_ADJUST,   offload_config.contract_adjust, false);
+  UfsCfgSaveKeyInt (D_OFFLOAD_CFG, D_CMND_OFFLOAD_ADJUST,   offload_config.contract_adjust,      false);
 
   // periodicity of power cut
   UfsCfgSaveKeyInt (D_OFFLOAD_CFG, D_CMND_OFFLOAD_REARM,  (int)offload_config.rearm_delay, false);
 
   // mqtt config
-  UfsCfgSaveKey (D_OFFLOAD_CFG, D_CMND_OFFLOAD_TOPIC, offload_config.str_topic, false);
-  UfsCfgSaveKey (D_OFFLOAD_CFG, D_CMND_OFFLOAD_KINST, offload_config.str_kinst, false);
-  UfsCfgSaveKey (D_OFFLOAD_CFG, D_CMND_OFFLOAD_KMAX,  offload_config.str_kmax,  false);
+  UfsCfgSaveKey (D_OFFLOAD_CFG, D_CMND_OFFLOAD_TOPIC, offload_config.str_topic.c_str (), false);
+  UfsCfgSaveKey (D_OFFLOAD_CFG, D_CMND_OFFLOAD_KINST, offload_config.str_kinst.c_str (), false);
+  UfsCfgSaveKey (D_OFFLOAD_CFG, D_CMND_OFFLOAD_KMAX,  offload_config.str_kmax.c_str (),  false);
 
 # else      // No LittleFS
 
@@ -284,9 +284,9 @@ void OffloadSaveConfig ()
   Settings->knx_GA_addr[5] = offload_config.rearm_delay;
 
   // mqtt config
-  SettingsUpdateText (SET_OFFLOAD_TOPIC,    offload_config.str_topic);
-  SettingsUpdateText (SET_OFFLOAD_KEY_INST, offload_config.str_kinst);
-  SettingsUpdateText (SET_OFFLOAD_KEY_MAX,  offload_config.str_kmax);
+  SettingsUpdateText (SET_OFFLOAD_TOPIC,    offload_config.str_topic.c_str ());
+  SettingsUpdateText (SET_OFFLOAD_KEY_INST, offload_config.str_kinst.c_str ());
+  SettingsUpdateText (SET_OFFLOAD_KEY_MAX,  offload_config.str_kmax.c_str ());
 
 # endif     // USE_UFILESYS
 }
@@ -550,11 +550,11 @@ void OffloadShowJSON (bool is_autonomous)
 void OffloadMqttSubscribe ()
 {
   // if subsciption topic defined
-  if (strlen (offload_config.str_topic) > 0)
+  if (offload_config.str_topic.length () > 0)
   {
     // subscribe to power meter and log
-    MqttSubscribe (offload_config.str_topic);
-    AddLog (LOG_LEVEL_INFO, PSTR ("OFL: Subscribed to %s"), offload_config.str_topic);
+    MqttSubscribe (offload_config.str_topic.c_str ());
+    AddLog (LOG_LEVEL_INFO, PSTR ("OFL: Subscribed to %s"), offload_config.str_topic.c_str ());
   }
 }
 
@@ -566,21 +566,21 @@ bool OffloadMqttData ()
   char str_value[16];
 
   // if topic is the instant house power
-  data_handled = (strcmp (offload_config.str_topic, XdrvMailbox.topic) == 0);
+  data_handled = (strcmp (offload_config.str_topic.c_str (), XdrvMailbox.topic) == 0);
   if (data_handled)
   {
     // set message timestamp
     offload_status.time_message = LocalTime ();
 
     // look for max power key
-    if (SensorGetJsonKey (XdrvMailbox.data, offload_config.str_kmax, str_value, sizeof (str_value)))
+    if (SensorGetJsonKey (XdrvMailbox.data, offload_config.str_kmax.c_str (), str_value, sizeof (str_value)))
     {
       power = atol (str_value);
       if (power > 0) offload_config.contract_power = (uint16_t)power;
     }
 
     // look for instant power key
-    if (SensorGetJsonKey (XdrvMailbox.data, offload_config.str_kinst, str_value, sizeof (str_value)))
+    if (SensorGetJsonKey (XdrvMailbox.data, offload_config.str_kinst.c_str (), str_value, sizeof (str_value)))
     {
       power = atol (str_value);
       offload_status.power_inst = (uint16_t)power;
@@ -767,9 +767,6 @@ void OffloadInit ()
   // disable fast cycle power recovery
   Settings->flag3.fast_power_cycle_disable = true;
 
-  // force pullup for single DS18B20
-  Settings->flag3.ds18x20_internal_pullup = 1;
-
   // init available devices list
   for (index = 0; index < OFFLOAD_DEVICE_MAX; index++) OffloadAddAvailableType (index);
 
@@ -867,32 +864,32 @@ void CmndOffloadAdjust ()
 
 void CmndOffloadPowerTopic ()
 {
-  if ((XdrvMailbox.data_len > 0) && (XdrvMailbox.data_len < sizeof (offload_config.str_topic)))
+  if (XdrvMailbox.data_len > 0)
   {
-    strncpy (offload_config.str_topic, XdrvMailbox.data, XdrvMailbox.data_len);
+    offload_config.str_topic = XdrvMailbox.data;
     OffloadSaveConfig ();
   }
-  ResponseCmndChar (offload_config.str_topic);
+  ResponseCmndChar (offload_config.str_topic.c_str ());
 }
 
 void CmndOffloadPowerKeyInst ()
 {
-  if ((XdrvMailbox.data_len > 0) && (XdrvMailbox.data_len < sizeof (offload_config.str_kinst)))
+  if (XdrvMailbox.data_len > 0)
   {
-    strncpy (offload_config.str_kinst, XdrvMailbox.data, XdrvMailbox.data_len);
+    offload_config.str_kinst = XdrvMailbox.data;
     OffloadSaveConfig ();
   }
-  ResponseCmndChar (offload_config.str_kinst);
+  ResponseCmndChar (offload_config.str_kinst.c_str ());
 }
 
 void CmndOffloadPowerKeyMax ()
 {
-  if ((XdrvMailbox.data_len > 0) && (XdrvMailbox.data_len < sizeof (offload_config.str_kmax)))
+  if (XdrvMailbox.data_len > 0)
   {
-    strncpy (offload_config.str_kmax, XdrvMailbox.data, XdrvMailbox.data_len);
+    offload_config.str_kmax = XdrvMailbox.data;
     OffloadSaveConfig ();
   }
-  ResponseCmndChar (offload_config.str_kmax);
+  ResponseCmndChar (offload_config.str_kmax.c_str ());
 }
 
 void CmndOffloadStage ()
@@ -969,7 +966,8 @@ void OffloadWebIconLogo ()
   {
     file = ffsp->open (str_text, "r");
     sprintf_P (str_text, PSTR("image/%s"), str_mime);
-    Webserver->streamFile (file, str_text, HTTP_GET);
+//    Webserver->streamFile (file, str_text, HTTP_GET);
+    Webserver->streamFile (file, str_text);
     file.close ();
   }
 }
@@ -998,7 +996,7 @@ void OffloadWebSensor ()
   WSContentSend_PD (PSTR ("{s}%s %s{m}%u VA{e}"), str_text, str_value, offload_config.device_power);
 
   // if house power is subscribed, display power
-  if (strlen (offload_config.str_topic) > 0)
+  if (offload_config.str_topic.length () > 0)
   {
     // calculate delay since last power message
     strcpy_P (str_text, PSTR ("..."));
@@ -1098,15 +1096,15 @@ void OffloadWebPageConfig ()
 
     // set MQTT topic according to 'topic' parameter
     WebGetArg (D_CMND_OFFLOAD_TOPIC, str_argument, sizeof (str_argument));
-    if (strlen (str_argument) > 0) strlcpy (offload_config.str_topic, str_argument, sizeof (offload_config.str_topic));
+    if (strlen (str_argument) > 0) offload_config.str_topic = str_argument;
 
     // set JSON key according to 'inst' parameter
     WebGetArg (D_CMND_OFFLOAD_KINST, str_argument, sizeof (str_argument));
-    if (strlen (str_argument) > 0) strlcpy (offload_config.str_kinst, str_argument, sizeof (offload_config.str_kinst));
+    if (strlen (str_argument) > 0) offload_config.str_kinst = str_argument;
 
     // set JSON key according to 'max' parameter
     WebGetArg (D_CMND_OFFLOAD_KMAX, str_argument, sizeof (str_argument));
-    if (strlen (str_argument) > 0) strlcpy (offload_config.str_kmax, str_argument, sizeof (offload_config.str_kmax));
+    if (strlen (str_argument) > 0) offload_config.str_kmax = str_argument;
 
     // set shut-off duration according to 'rearm' parameter
     WebGetArg (D_CMND_OFFLOAD_REARM, str_argument, sizeof (str_argument));
@@ -1179,13 +1177,13 @@ void OffloadWebPageConfig ()
   WSContentSend_P ("<hr>\n");
 
   // instant power mqtt topic
-  WSContentSend_P (OFFLOAD_INPUT_TEXT, D_OFFLOAD_TOPIC, D_CMND_OFFLOAD_PREFIX, D_CMND_OFFLOAD_TOPIC, D_CMND_OFFLOAD_TOPIC, offload_config.str_topic, "");
+  WSContentSend_P (OFFLOAD_INPUT_TEXT, D_OFFLOAD_TOPIC, D_CMND_OFFLOAD_PREFIX, D_CMND_OFFLOAD_TOPIC, D_CMND_OFFLOAD_TOPIC, offload_config.str_topic.c_str (), "");
 
   // instant power json key
-  WSContentSend_P (OFFLOAD_INPUT_TEXT, D_OFFLOAD_KEY_INST, D_CMND_OFFLOAD_PREFIX, D_CMND_OFFLOAD_KINST, D_CMND_OFFLOAD_KINST, offload_config.str_kinst, "");
+  WSContentSend_P (OFFLOAD_INPUT_TEXT, D_OFFLOAD_KEY_INST, D_CMND_OFFLOAD_PREFIX, D_CMND_OFFLOAD_KINST, D_CMND_OFFLOAD_KINST, offload_config.str_kinst.c_str (), "");
 
   // max power json key
-  WSContentSend_P (OFFLOAD_INPUT_TEXT, D_OFFLOAD_KEY_MAX, D_CMND_OFFLOAD_PREFIX, D_CMND_OFFLOAD_KMAX, D_CMND_OFFLOAD_KMAX, offload_config.str_kmax, "");
+  WSContentSend_P (OFFLOAD_INPUT_TEXT, D_OFFLOAD_KEY_MAX, D_CMND_OFFLOAD_PREFIX, D_CMND_OFFLOAD_KMAX, D_CMND_OFFLOAD_KMAX, offload_config.str_kmax.c_str (), "");
 
 
   WSContentSend_P (OFFLOAD_FIELDSET_STOP);
@@ -1233,7 +1231,7 @@ void OffloadWebPageConfig ()
 // get status update
 void OffloadWebUpdate ()
 {
-  char  str_text[16];
+  char str_text[16];
 
   // update switch status
   if (offload_status.relay_state == 1) strcpy (str_text, "true");
@@ -1244,7 +1242,8 @@ void OffloadWebUpdate ()
   else strcat (str_text, ";&nbsp;");
 
   // send result
-  Webserver->send (200, "text/plain", str_text, strlen (str_text));
+//  Webserver->send (200, "text/plain", str_text, strlen (str_text));
+  Webserver->send_P (200, "text/plain", str_text);
 }
 
 // Offloading public configuration page

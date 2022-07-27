@@ -45,6 +45,8 @@
     08/04/2022 - v9.1  - Switch from icons to emojis
                          Add software watchdog to avoid locked loop
     08/06/2022 - v9.2  - Add auto-rearm capability
+    27/07/2022 - v9.3  - Tasmota 12.0 compatibility
+                         Add HLK-LD1115H and HLK-LD1125H presence sensor support
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -92,10 +94,13 @@
 #define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_COMMON_LOG                        // Use common log file library
 #define USE_OFFLOAD                           // Add support for MQTT maximum power offloading
+#define USE_HLKLD                             // Add support for HLK-LDxxxx presence & movement sensors
+#define USE_HLKLD_WEB_CONFIG                  // Add graphical configuration for HLK-LDxxxx sensors
+#define USE_REMOTE_SENSOR                     // Add support for generic and remote sensor
 
 // build
-#if defined BUILD_ESP32_4M
-#define EXTENSION_BUILD   "esp32-4m"
+#if defined BUILD_ESP32
+#define EXTENSION_BUILD   "esp32"
 #elif defined BUILD_16M14M
 #define EXTENSION_BUILD   "esp-16m14m"
 #elif defined BUILD_4M2M
@@ -111,7 +116,7 @@
 #endif
 
 // extension data
-#define EXTENSION_VERSION "9.2"               // version
+#define EXTENSION_VERSION "9.3"               // version
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
 #ifdef USE_PILOTWIRE
 #define EXTENSION_NAME    "Pilotwire"         // name
@@ -158,6 +163,8 @@
 #undef USE_ALEXA_AVS
 #undef USE_MQTT_AWS_IOT
 #undef USE_MQTT_AWS_IOT_LIGHT
+#undef USE_AUTOCONF
+#undef USE_BERRY                              // Berry script langage
 
 #undef USE_KNX                                // KNX IP Protocol Support
 #undef USE_KNX_WEB_MENU                       // Enable KNX WEB MENU (+8.3k code, +144 mem)
