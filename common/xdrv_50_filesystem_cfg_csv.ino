@@ -11,6 +11,7 @@
     29/09/2021 - v1.1 - Add .cfg files management
     15/10/2021 - v1.2 - Add reverse CSV line navigation
     01/04/2022 - v1.3 - Add software watchdog to avoid locked loop
+    27/07/2022 - v1.4 - Use String to report strings
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -56,18 +57,19 @@ static struct {
 \*********************************************/
 
 // read key value in configuration file
-bool UfsCfgLoadKey (const char* pstr_filename, const char* pstr_key, char* pstr_value, int size) 
+String UfsCfgLoadKey (const char* pstr_filename, const char* pstr_key) 
 {
-  bool finished = false;
-  bool found = false;
-  int  length;
-  char str_line[UFS_CFG_LINE_LENGTH];
-  char* pstr_data;
-  File file;
+  bool   finished = false;
+  bool   found = false;
+  int    length;
+  char   str_line[UFS_CFG_LINE_LENGTH];
+  char   *pstr_data;
+  String str_value;
+  File   file;
 
-  // init
-  strcpy (pstr_value, "");
-
+  // validate parameters
+  if ((pstr_filename == nullptr) || (pstr_key == nullptr)) return str_value;
+  
   // if file exists
   if (ffsp->exists (pstr_filename))
   {
@@ -91,7 +93,9 @@ bool UfsCfgLoadKey (const char* pstr_filename, const char* pstr_key, char* pstr_
 
           // check current key
           found = (strcmp (str_line, pstr_key) == 0);
-          if (found) strlcpy (pstr_value, pstr_data, size);
+
+          // if found, save value
+          if (found) str_value = pstr_data;
         }
       }
       else finished = true;
@@ -101,21 +105,21 @@ bool UfsCfgLoadKey (const char* pstr_filename, const char* pstr_key, char* pstr_
     file.close ();
   }
 
-
-  return found;
+  return str_value;
 }
 
 // read integer key value in configuration file
 int UfsCfgLoadKeyInt (const char* pstr_filename, const char* pstr_key, const int default_value = INT_MAX) 
 {
-  bool found;
-  char str_value[UFS_CFG_VALUE_MAX];
-  int  result = INT_MAX;
+  int    result = default_value;
+  String str_result;
 
+  // validate parameters
+  if ((pstr_filename == nullptr) || (pstr_key == nullptr)) return result;
+  
   // open file in read only mode in littlefs filesystem
-  found = UfsCfgLoadKey (pstr_filename, pstr_key, str_value, sizeof (str_value));
-  if (found) result = atoi (str_value);
-  else result = default_value;
+  str_result = UfsCfgLoadKey (pstr_filename, pstr_key);
+  if (str_result.length () > 0) result = str_result.toInt ();
 
   return result;
 }
@@ -123,14 +127,15 @@ int UfsCfgLoadKeyInt (const char* pstr_filename, const char* pstr_key, const int
 // read float key value in configuration file
 float UfsCfgLoadKeyFloat (const char* pstr_filename, const char* pstr_key, const float default_value = NAN) 
 {
-  bool  found;
-  char  str_value[UFS_CFG_VALUE_MAX];
-  float result = NAN;
+  float  result = default_value;
+  String str_result;
 
+  // validate parameters
+  if ((pstr_filename == nullptr) || (pstr_key == nullptr)) return result;
+  
   // open file in read only mode in littlefs filesystem
-  found = UfsCfgLoadKey (pstr_filename, pstr_key, str_value, sizeof (str_value));
-  if (found) result = atof (str_value);
-  else result = default_value;
+  str_result = UfsCfgLoadKey (pstr_filename, pstr_key);
+  if (str_result.length () > 0) result = str_result.toFloat ();
 
   return result;
 }
@@ -140,6 +145,9 @@ void UfsCfgSaveKey (const char* pstr_filename, const char* pstr_key, const char*
 {
   char str_line[UFS_CFG_LINE_LENGTH];
   File file;
+  
+  // validate parameters
+  if ((pstr_filename == nullptr) || (pstr_key == nullptr) || (pstr_value == nullptr)) return;
   
   // retrieve saved settings from config.ini in littlefs filesystem
   if (create) file = ffsp->open (pstr_filename, "w");
@@ -158,6 +166,9 @@ void UfsCfgSaveKeyInt (const char* pstr_filename, const char* pstr_key, const in
 {
   char str_value[UFS_CFG_VALUE_MAX];
   
+  // validate parameters
+  if ((pstr_filename == nullptr) || (pstr_key == nullptr)) return;
+  
   // convert value to string
   itoa (value, str_value, 10);
 
@@ -169,6 +180,9 @@ void UfsCfgSaveKeyInt (const char* pstr_filename, const char* pstr_key, const in
 void UfsCfgSaveKeyFloat (const char* pstr_filename, const char* pstr_key, const float value, bool create = true) 
 {
   char str_value[UFS_CFG_VALUE_MAX];
+  
+  // validate parameters
+  if ((pstr_filename == nullptr) || (pstr_key == nullptr)) return;
   
   // convert float to string
   ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%03_f"), &value);
@@ -428,11 +442,9 @@ float UfsCsvGetColumnFloat (const int column, int action = UFS_CSV_NONE)
 void UfsCsvAppend (const char* pstr_filename, const char* pstr_line, bool keep_open = false) 
 {
   bool exists;
-  int  position;
 
   // check parameters
   if ((pstr_filename == nullptr) || (pstr_line == nullptr)) return;
-  if ((strlen (pstr_filename) == 0) || (strlen (pstr_line) == 0)) return;
 
   // if file is not already opened
   if (!ufs_csv.is_open[UFS_CSV_ACCESS_WRITE])
@@ -445,12 +457,8 @@ void UfsCsvAppend (const char* pstr_filename, const char* pstr_line, bool keep_o
   // append current line
   if (ufs_csv.is_open[UFS_CSV_ACCESS_WRITE])
   {
-    // write the string
     ufs_csv.file[UFS_CSV_ACCESS_WRITE].print (pstr_line);
-
-    // append '\n' if needed
-    position = strlen (pstr_line) - 1;
-    if (pstr_line[position] != '\n') ufs_csv.file[UFS_CSV_ACCESS_WRITE].print ("\n");
+    ufs_csv.file[UFS_CSV_ACCESS_WRITE].print ("\n");
   }
 
   // if needed, close file
@@ -505,7 +513,7 @@ uint32_t UfsCsvGetFileSizeKb (const char* pstr_filename)
   File     file;
 
   // check parameter
-  if (pstr_filename == nullptr) return 0;
+  if (pstr_filename == nullptr) return file_size;
 
   // if file exists
   if (ffsp->exists (pstr_filename))
