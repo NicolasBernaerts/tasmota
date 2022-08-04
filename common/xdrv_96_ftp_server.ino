@@ -5,6 +5,7 @@
   Copyright (C) 2021  Nicolas Bernaerts
     02/11/2021 - v1.0 - Creation 
     19/11/2021 - v1.1 - Tasmota 10 compatibility 
+    0'/08/2022 - v1.2 - Manual start thru ftp_start
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -35,9 +36,25 @@ FTPServer *ftp_server = nullptr;
 #define FTP_SERVER_LOGIN          "teleinfo"
 #define FTP_SERVER_PASSWORD       "teleinfo"
 
+// FTP - MQTT commands
+const char kFTPServerCommands[] PROGMEM = "ftp_" "|" "help" "|" "start";
+void (* const FTPServerCommand[])(void) PROGMEM = { &CmndFTPServerHelp, &CmndFTPServerStart };
 
-// Create FTP server
-void FTPServerInit ()
+/***********************************************************\
+ *                      Commands
+\***********************************************************/
+
+// FTP server help
+void CmndFTPServerHelp ()
+{
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ftp_start = start FTP server on port %u"), FTP_CTRL_PORT);
+  AddLog (LOG_LEVEL_INFO, PSTR ("     Server allows only 1 concurrent connexion"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("     Please configure your FTP client accordingly to connect"));
+  ResponseCmndDone();
+}
+
+// Start FTP server
+void CmndFTPServerStart ()
 {
   // if FTP server not created
   if (ftp_server == nullptr)
@@ -53,6 +70,20 @@ void FTPServerInit ()
       AddLog (LOG_LEVEL_INFO, PSTR ("FTP: Server started on port %u"), FTP_CTRL_PORT);
     }
   }
+
+  if (ftp_server != nullptr) ResponseCmndDone ();
+  else ResponseCmndFailed ();
+}
+
+/***********************************************************\
+ *                      Functions
+\***********************************************************/
+
+// init main status
+void FTPServerInit ()
+{
+  // log help command
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ftp_help to get help on FTP server commands"));
 }
 
 // FTP server connexion management
@@ -76,7 +107,10 @@ bool Xdrv96 (uint8_t function)
     case FUNC_INIT:
       FTPServerInit ();
       break;
-    case FUNC_LOOP:
+    case FUNC_COMMAND:
+      result = DecodeCommand (kFTPServerCommands, FTPServerCommand);
+      break;
+    case FUNC_EVERY_50_MSECOND:
       FTPServerLoop ();
       break;
   }
