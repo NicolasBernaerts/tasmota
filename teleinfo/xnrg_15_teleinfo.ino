@@ -75,6 +75,7 @@
     01/04/2022 - v9.6   - Add software watchdog feed to avoid lock
     22/04/2022 - v9.7   - Option to minimise LittleFS writes (day:every 1h and week:every 6h)
     09/06/2022 - v9.7.1 - Correction of EAIT bug
+    04/08/2022 - v9.8   - Add ESP32S2 support
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -377,7 +378,6 @@ static struct {
 static struct {
   bool      enabled        = true;                  // reception enabled by default
   uint8_t   status_rx      = TIC_SERIAL_INIT;       // Teleinfo Rx initialisation status
-//  uint8_t   enable_rx      = UINT8_MAX;             // pin used to enable/disable Teleinfo Rx
   int       interval_count = 0;                     // energy publication counter      
   long      papp           = 0;                     // current apparent power 
   long      nb_message     = 0;                     // total number of messages sent by the meter
@@ -607,17 +607,13 @@ bool TeleinfoEnableSerial ()
     if (is_ready)
     {
 #ifdef ESP32
-      // create serial port
+      // create and initialise serial port
       teleinfo_serial = new TasmotaSerial (Pin (GPIO_TELEINFO_RX), -1, 1);
-
-      // initialise serial port
       is_ready = teleinfo_serial->begin (teleinfo_config.baud_rate, SERIAL_7E1);
 
 #else       // ESP8266
-      // create serial port
+      // create and initialise serial port
       teleinfo_serial = new TasmotaSerial (Pin (GPIO_TELEINFO_RX), -1, 1);
-
-      // initialise serial port
       is_ready = teleinfo_serial->begin (teleinfo_config.baud_rate, SERIAL_7E1);
 
       // force configuration on ESP8266
@@ -808,61 +804,44 @@ void TeleinfoSplitLine (char* pstr_line, char* pstr_etiquette, int size_etiquett
 }
 
 // Display any value to a string with unit and kilo conversion with number of digits (12000, 12000 VA, 12.0 kVA, 12.00 kVA, ...)
-void TeleinfoDisplayValue (int unit_type, long value, char* pstr_result, int size_result, int kilo_digit = -1) 
+void TeleinfoDisplayValue (int unit_type, long value, char* pstr_result, int size_result, bool in_kilo) 
 {
-  int  length;
-  char str_text[16];
+  float result;
+  char  str_text[16];
 
-  // handle specific cases
-  if (kilo_digit > 3) kilo_digit = 3;
-  if (value < 1000) kilo_digit = -1;
-  if (unit_type == TELEINFO_UNIT_COSPHI) kilo_digit = 2;
+  // check parameters
+  if (pstr_result == nullptr) return;
 
-  // if strings are valid
-  if (pstr_result != nullptr)
+  // convert cos phi value
+  if (unit_type == TELEINFO_UNIT_COSPHI)
   {
-    // convert value
-    ltoa (value, pstr_result, 10);
+    result = (float)value / 100;
+    ext_snprintf_P (pstr_result, size_result, PSTR ("%2_f"), &result);
+  }
 
-    // if kilo format is asked
-    if (kilo_digit > -1)
-    {
-      // prefix 0 if needed
-      strcpy (str_text, "");
-      if (value < 10) strcpy_P (str_text, PSTR ("000"));
-      else if (value < 100) strcpy_P (str_text, PSTR ("00"));
-      else if (value < 1000) strcpy_P (str_text, PSTR ("0"));
+  // else convert values in k
+  else if (in_kilo && (value > 999))
+  {
+    result = (float)value / 1000;
+    ext_snprintf_P (pstr_result, size_result, PSTR ("%1_fk"), &result);
+  }
 
-      // append value
-      strlcat (str_text, pstr_result, sizeof (str_text));
+  // else convert value
+  else sprintf_P (pstr_result, PSTR ("%d"), value);
 
-      // generate kilo format
-      length = strlen (str_text) - 3;
-      strcpy (pstr_result, "");
-      strncat (pstr_result, str_text, length);
-      if (kilo_digit > 0)
-      {
-        strcat_P (pstr_result, PSTR ("."));
-        strncat (pstr_result, str_text + length, kilo_digit);
-      }
-    }
-
-    // append unit if specified
-    if (unit_type < TELEINFO_UNIT_MAX) 
-    {
-      // add space and k unit, else end of string
-      strlcat (pstr_result, " ", size_result);
-      if ((kilo_digit > 0) && (unit_type != TELEINFO_UNIT_COSPHI)) strlcat (pstr_result, "k", size_result);
-
-      // append unit label
-      GetTextIndexed (str_text, sizeof (str_text), unit_type, kTeleinfoGraphDisplay);
-      strlcat (pstr_result, str_text, size_result);
-    }
+  // append unit if specified
+  if (unit_type < TELEINFO_UNIT_MAX) 
+  {
+    // append unit label
+    strcpy (str_text, "");
+    GetTextIndexed (str_text, sizeof (str_text), unit_type, kTeleinfoGraphDisplay);
+    strlcat (pstr_result, " ", size_result);
+    strlcat (pstr_result, str_text, size_result);
   }
 }
 
 // Generate current counter values as a string with unit and kilo conversion
-void TeleinfoDisplayCurrentValue (int unit_type, int phase, char* pstr_result, int size_result, int kilo_digit = -1) 
+void TeleinfoDisplayCurrentValue (int unit_type, int phase, char* pstr_result, int size_result) 
 {
   long value = LONG_MAX;
 
@@ -879,12 +858,12 @@ void TeleinfoDisplayCurrentValue (int unit_type, int phase, char* pstr_result, i
       value = teleinfo_phase[phase].voltage;
       break;
     case TELEINFO_UNIT_COSPHI:
-      value = (long)teleinfo_phase[phase].cosphi * 10;
+      value = (long)teleinfo_phase[phase].cosphi;
       break;
   }
 
   // convert value for display
-  TeleinfoDisplayValue (unit_type, value, pstr_result, size_result, kilo_digit);
+  TeleinfoDisplayValue (unit_type, value, pstr_result, size_result, false);
 }
 
 /*********************************************\
@@ -1138,14 +1117,14 @@ void TeleinfoHistoSaveData (int period, uint8_t log_policy)
 \*********************************************/
 
 // Save current values to graph data
-void TeleinfoGraphSaveData (int period)
+void TeleinfoGraphSaveData (const uint8_t period)
 {
   bool histo_update;
   int  index, phase;
   long power, voltage, value;
 
   // if period out of range, return
-  if ((period < 0) || (period >= TELEINFO_PERIOD_MAX)) return;
+  if (period >= TELEINFO_PERIOD_MAX) return;
 
   // historic will be updated if period is beyond dynamic graph period
   histo_update = (period >= TELEINFO_MEMORY_PERIOD_MAX);
@@ -1350,6 +1329,11 @@ void TeleinfoInit ()
   Energy.voltage_available = true;
   Energy.current_available = true;
 
+#ifdef ESP32
+  // disable ESP32 temperature sensor
+  bitWrite (Settings->sensors[0][127 / 32], 127 % 32, 0);
+#endif    // ESP32
+
   // load configuration
   TeleinfoLoadConfig ();
 
@@ -1394,11 +1378,11 @@ void TeleinfoInit ()
   // disable all message lines
   for (index = 0; index < TELEINFO_LINE_QTY; index ++) teleinfo_message.line[index].checksum = 0;
 
-  // log help command
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tic_help to get help on teleinfo commands"));
-
   // log default method
   AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Using default Global Counter method"));
+
+  // log help command
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tic_help to get help on teleinfo commands"));
 }
 
 // Teleinfo graph data initialisation
@@ -1771,8 +1755,14 @@ void TeleinfoReceiveData ()
                 break;
               case TIC_PS:
                 strlcpy (str_text, str_donnee, sizeof (str_text));
+
+                // replace xxxk by xxx000
                 pstr_match = strchr (str_text, 'k');
-                if (pstr_match != nullptr) strcpy_P (pstr_match, PSTR ("000"));
+                if (pstr_match != nullptr) 
+                {
+                  *pstr_match = 0;
+                  strlcat (str_text, "000", sizeof (str_text));
+                }
                 value = atol (str_text);
                 is_valid = ((value > 0) && (value < LONG_MAX));
                 if (is_valid)
@@ -1793,7 +1783,11 @@ void TeleinfoReceiveData ()
               case TIC_EAPS:
                 strlcpy (str_text, str_donnee, sizeof (str_text));
                 pstr_match = strchr (str_text, 'k');
-                if (pstr_match != nullptr) strcpy_P (pstr_match, PSTR ("000"));
+                if (pstr_match != nullptr)
+                {
+                  *pstr_match = 0;
+                  strlcat (str_text, "000", sizeof (str_text));
+                }
                 counter = atoll (str_text);
                 is_valid = (counter != LONG_LONG_MAX);
                 if (is_valid) teleinfo_meter.index[0] = counter;
@@ -2291,8 +2285,8 @@ void TeleinfoPublishMeterJSON ()
 
   // METER basic data
   ResponseAppend_P (PSTR ("\"%s\":%d"),  TELEINFO_JSON_PHASE, teleinfo_contract.phase);
-  ResponseAppend_P (PSTR (",\"%s\":%d"), TELEINFO_JSON_ISUB, teleinfo_contract.isousc);
-  ResponseAppend_P (PSTR (",\"%s\":%d"), TELEINFO_JSON_PSUB, teleinfo_contract.ssousc);
+  ResponseAppend_P (PSTR (",\"%s\":%d"), TELEINFO_JSON_ISUB,  teleinfo_contract.isousc);
+  ResponseAppend_P (PSTR (",\"%s\":%d"), TELEINFO_JSON_PSUB,  teleinfo_contract.ssousc);
 
   // METER adjusted maximum power
   power_max = teleinfo_contract.ssousc * (long)teleinfo_config.percent_adjust / 100;
@@ -2738,9 +2732,9 @@ void TeleinfoWebGraphUpdate ()
   char   str_text[16];
 
   // check graph parameters
-  period = TeleinfoWebGetArgValue (D_CMND_TELEINFO_PERIOD, TELEINFO_PERIOD_LIVE,  0, TELEINFO_PERIOD_MAX - 1);
-  data   = TeleinfoWebGetArgValue (D_CMND_TELEINFO_DATA,   TELEINFO_UNIT_VA, 0, TELEINFO_UNIT_MAX - 1);
-  histo  = TeleinfoWebGetArgValue (D_CMND_TELEINFO_HISTO,  0, 0, 0);
+  period = TeleinfoWebGetArgValue (D_CMND_TELEINFO_PERIOD, TELEINFO_PERIOD_LIVE, 0, TELEINFO_PERIOD_MAX - 1);
+  data   = TeleinfoWebGetArgValue (D_CMND_TELEINFO_DATA,   TELEINFO_UNIT_VA,     0, TELEINFO_UNIT_MAX - 1);
+  histo  = TeleinfoWebGetArgValue (D_CMND_TELEINFO_HISTO,  0,                    0, 0);
 
   // start of data page
   WSContentBegin (200, CT_PLAIN);
@@ -2752,7 +2746,7 @@ void TeleinfoWebGraphUpdate ()
   // check power and power difference for each phase
   for (phase = 0; phase < teleinfo_contract.phase; phase++)
   {
-    TeleinfoDisplayCurrentValue (data, phase, str_text, sizeof (str_text), 1); 
+    TeleinfoDisplayCurrentValue (data, phase, str_text, sizeof (str_text)); 
     WSContentSend_P ("%s\n", str_text);
   }
 
@@ -3063,7 +3057,7 @@ void TeleinfoWebGraphData ()
   // check phase display argument
   strcpy (str_phase, "");
   if (Webserver->hasArg (D_CMND_TELEINFO_PHASE)) WebGetArg (D_CMND_TELEINFO_PHASE, str_phase, sizeof (str_phase));
-  for (phase = strlen (str_phase); phase < teleinfo_contract.phase; phase++) strcat_P (str_phase, PSTR ("1"));
+  while (strlen (str_phase) < teleinfo_contract.phase) strlcat (str_phase, "1", sizeof (str_phase));
 
   // start of SVG graph
   WSContentBegin (200, CT_HTML);
@@ -3152,42 +3146,26 @@ void TeleinfoWebGraphFrame ()
   // set labels according to type of data
   switch (data) 
   {
+    // apparent power
     case TELEINFO_UNIT_VA:
-      // set number of digits according to maximum power
-      if (teleinfo_graph.pmax >= 10000) nb_digit = 0;
-      else if (teleinfo_graph.pmax >= 1000) nb_digit = 1;
-
-      // set values label
       itoa (0, arr_label[0], 10);
-      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_graph.pmax / 4,     str_text, sizeof (str_text), nb_digit);
-      strcpy (arr_label[1], str_text);
-      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_graph.pmax / 2,     str_text, sizeof (str_text), nb_digit);
-      strcpy (arr_label[2], str_text);
-      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_graph.pmax * 3 / 4, str_text, sizeof (str_text), nb_digit);
-      strcpy (arr_label[3], str_text);
-      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_graph.pmax,         str_text, sizeof (str_text), nb_digit);
-      strcpy (arr_label[4], str_text);
+      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_graph.pmax / 4,     arr_label[1], sizeof (arr_label[1]), true);
+      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_graph.pmax / 2,     arr_label[2], sizeof (arr_label[2]), true);
+      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_graph.pmax * 3 / 4, arr_label[3], sizeof (arr_label[3]), true);
+      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_graph.pmax,         arr_label[4], sizeof (arr_label[4]), true);
       break;
 
+    // active power
     case TELEINFO_UNIT_W:
-      // set number of digits according to maximum power
-      if (teleinfo_graph.pmax >= 10000) nb_digit = 0;
-      else if (teleinfo_graph.pmax >= 1000) nb_digit = 1;
-
-      // set values label
       itoa (0, arr_label[0], 10);
-      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_graph.pmax / 4,     str_text, sizeof (str_text), nb_digit);
-      strcpy (arr_label[1], str_text);
-      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_graph.pmax / 2,     str_text, sizeof (str_text), nb_digit);
-      strcpy (arr_label[2], str_text);
-      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_graph.pmax * 3 / 4, str_text, sizeof (str_text), nb_digit);
-      strcpy (arr_label[3], str_text);
-      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_graph.pmax,         str_text, sizeof (str_text), nb_digit);
-      strcpy (arr_label[4], str_text);
+      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_graph.pmax / 4,     arr_label[1], sizeof (arr_label[1]), true);
+      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_graph.pmax / 2,     arr_label[2], sizeof (arr_label[2]), true);
+      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_graph.pmax * 3 / 4, arr_label[3], sizeof (arr_label[3]), true);
+      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_graph.pmax,         arr_label[4], sizeof (arr_label[4]), true);
       break;
 
+    // voltage
     case TELEINFO_UNIT_V:
-      // set values label
       itoa (teleinfo_graph.vmax - TELEINFO_GRAPH_VOLTAGE_RANGE,         arr_label[0], 10);
       itoa (teleinfo_graph.vmax - TELEINFO_GRAPH_VOLTAGE_RANGE * 3 / 4, arr_label[1], 10);
       itoa (teleinfo_graph.vmax - TELEINFO_GRAPH_VOLTAGE_RANGE / 2,     arr_label[2], 10);
@@ -3195,8 +3173,8 @@ void TeleinfoWebGraphFrame ()
       itoa (teleinfo_graph.vmax, arr_label[4], 10);
       break;
 
+    // cos phi
     case TELEINFO_UNIT_COSPHI:
-      // set values label
       strcpy_P (arr_label[0], PSTR ("0"));
       strcpy_P (arr_label[1], PSTR ("0.25"));
       strcpy_P (arr_label[2], PSTR ("0.50"));
@@ -3236,7 +3214,7 @@ void TeleinfoWebGraphFrame ()
 
   // get unit label
   strcpy (str_text, "");
-  if (nb_digit != -1) strcpy_P (str_text, PSTR ("k"));
+  if (nb_digit != -1) strcpy (str_text, "k");
   GetTextIndexed (str_unit, sizeof (str_unit), data, kTeleinfoGraphDisplay);
   strlcat (str_text, str_unit, sizeof (str_text));
 
@@ -3273,7 +3251,7 @@ void TeleinfoWebGraphPage ()
   // check phase display argument
   strcpy (str_phase, "");
   if (Webserver->hasArg (D_CMND_TELEINFO_PHASE)) WebGetArg (D_CMND_TELEINFO_PHASE, str_phase, sizeof (str_phase));
-  for (phase = strlen (str_phase); phase < teleinfo_contract.phase; phase++) strcat_P (str_phase, PSTR ("1"));
+  while (strlen (str_phase) < teleinfo_contract.phase) strlcat (str_phase, "1", sizeof (str_phase));
 
   // check unit increment
   if (Webserver->hasArg (D_CMND_TELEINFO_INCREMENT)) 
@@ -3382,7 +3360,7 @@ void TeleinfoWebGraphPage ()
   for (phase = 0; phase < teleinfo_contract.phase; phase++)
   {
     // display phase inverted link
-    strcpy (str_text, str_phase);
+    strlcpy (str_text, str_phase, sizeof (str_text));
     display = (str_text[phase] != '0');
     if (display) str_text[phase] = '0'; else str_text[phase] = '1';
     WSContentSend_P (PSTR ("<a href='%s?period=%d&data=%d&histo=%d&phase=%s'>"), D_TELEINFO_PAGE_GRAPH, period, data, histo, str_text);
@@ -3390,7 +3368,7 @@ void TeleinfoWebGraphPage ()
     // display phase data
     if (display) strcpy (str_text, ""); else strcpy_P (str_text, PSTR ("disabled"));
     WSContentSend_P (PSTR ("<div class='phase ph%d %s'>"), phase, str_text);    
-    TeleinfoDisplayCurrentValue (data, phase, str_text, sizeof (str_text), 1);
+    TeleinfoDisplayCurrentValue (data, phase, str_text, sizeof (str_text));
     WSContentSend_P (PSTR ("<span class='power' id='p%d'>%s</span>"), phase + 1, str_text);
     WSContentSend_P (PSTR ("</div></a>\n"));
   }
@@ -3567,7 +3545,7 @@ bool Xsns99 (uint8_t function)
     case FUNC_JSON_APPEND:
       TeleinfoShowJSON (true);
       break;
-    case FUNC_LOOP:
+    case FUNC_EVERY_50_MSECOND:
       if (teleinfo_meter.status_rx == TIC_SERIAL_ACTIVE) TeleinfoReceiveData ();
       break;
 

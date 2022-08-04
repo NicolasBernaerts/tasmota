@@ -63,6 +63,7 @@
     01/04/2022 - v9.6   - Add software watchdog feed to avoid lock
     22/04/2022 - v9.7   - Option to minimise LittleFS writes (day:every 1h and week:every 6h)
     09/06/2022 - v9.7.1 - Correction of EAIT bug
+    04/08/2022 - v9.8   - Add ESP32S2 support
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -111,7 +112,9 @@
 #undef USE_UNISHOX_COMPRESSION
 
 // build
-#if defined BUILD_ESP32_4M
+#if defined BUILD_ESP32S2
+#define EXTENSION_BUILD   "esp32s2"
+#elif defined BUILD_ESP32_4M
 #define EXTENSION_BUILD   "esp32-4m"
 #elif defined BUILD_16M14M
 #define EXTENSION_BUILD   "esp-16m14m"
@@ -130,7 +133,7 @@
 // extension data
 #define EXTENSION_NAME    "Teleinfo"          // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
-#define EXTENSION_VERSION "9.7.1"             // version
+#define EXTENSION_VERSION "9.8"               // version
 
 // MQTT default
 #undef MQTT_HOST
@@ -299,13 +302,14 @@
 #undef USE_MI_ESP32
 #undef USE_IBEACON
 
+#undef USE_AUTOCONF                           // Disable Esp32 autoconf feature
 #undef USE_BERRY
 
 #undef USE_DISPLAY
 #undef USE_SR04
 #undef USE_LVGL
 
-#undef USE_ADC                                  // Add support for ADC on GPIO32 to GPIO39
+#undef USE_ADC                                // Add support for ADC on GPIO32 to GPIO39
 
 #undef USE_WEBCAM
 
