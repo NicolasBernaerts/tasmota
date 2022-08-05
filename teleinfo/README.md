@@ -104,9 +104,11 @@ To stop streaming, you just need to stop the embedded TCP server thru tasmota co
 FTP server
 ----------
 
-If you are using a build with a LittleFS partition, this firmware runs a simple FTP server.
+If you are using a build with a LittleFS partition, this firmware can run a simple FTP server.
 
-Il allows you to connect automatically to retrieve daily and weekly energy logs. It is automatically started. 
+Il allows you to connect automatically to retrieve daily and weekly energy logs.
+
+It is can be started thru **ftp_start** command. 
 
 Credentials are :
   * login : **teleinfo**
