@@ -298,6 +298,8 @@
 //    ESP32 specific
 // ----------------------
 
+#undef USE_ESP32_SENSORS
+
 #undef USE_BLE_ESP32
 #undef USE_MI_ESP32
 #undef USE_IBEACON

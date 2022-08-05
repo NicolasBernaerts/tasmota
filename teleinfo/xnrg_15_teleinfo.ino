@@ -1329,11 +1329,6 @@ void TeleinfoInit ()
   Energy.voltage_available = true;
   Energy.current_available = true;
 
-#ifdef ESP32
-  // disable ESP32 temperature sensor
-  bitWrite (Settings->sensors[0][127 / 32], 127 % 32, 0);
-#endif    // ESP32
-
   // load configuration
   TeleinfoLoadConfig ();
 
