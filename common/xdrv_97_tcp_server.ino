@@ -35,7 +35,6 @@
 #define TCP_DATA_MAX              64             // buffer size
 
 // TCP - MQTT commands
-enum TCPServerCommands { TCP_CMND_NONE, TCP_CMND_START, TCP_CMND_STOP };
 const char kTCPServerCommands[] PROGMEM = "tcp_" "|" "help" "|" "start" "|" "stop";
 void (* const TCPServerCommand[])(void) PROGMEM = { &CmndTCPHelp, &CmndTCPStart, &CmndTCPStop };
 
@@ -178,19 +177,12 @@ TCPServer tcp_server;
  *                      Commands
 \***********************************************************/
 
-
-// init main status
-void TCPInit ()
-{
-  // log help command
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tcp_help to get help on tcp streaming commands"));
-}
-
 // TCP stream help
 void CmndTCPHelp ()
 {
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tcp_start xxxx = start stream on port xxxx"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tcp_stop       = stop stream"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: TCP Server commands :"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - tcp_start xxxx = start stream on port xxxx"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - tcp_stop       = stop stream"));
   ResponseCmndDone();
 }
 
@@ -212,6 +204,17 @@ void CmndTCPStop (void)
   result = tcp_server.stop ();
 
   if (result) ResponseCmndDone (); else ResponseCmndFailed ();
+}
+
+/***********************************************************\
+ *                      Functions
+\***********************************************************/
+
+// init main status
+void TCPInit ()
+{
+  // log help command
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tcp_help to get help on TCP Server commands"));
 }
 
 /***********************************************************\

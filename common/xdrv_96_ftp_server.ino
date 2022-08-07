@@ -37,8 +37,8 @@ FTPServer *ftp_server = nullptr;
 #define FTP_SERVER_PASSWORD       "teleinfo"
 
 // FTP - MQTT commands
-const char kFTPServerCommands[] PROGMEM = "ftp_" "|" "help" "|" "start";
-void (* const FTPServerCommand[])(void) PROGMEM = { &CmndFTPServerHelp, &CmndFTPServerStart };
+const char kFTPServerCommands[] PROGMEM = "ftp_" "|" "help" "|" "start" "|" "stop";
+void (* const FTPServerCommand[])(void) PROGMEM = { &CmndFTPServerHelp, &CmndFTPServerStart, &CmndFTPServerStop };
 
 /***********************************************************\
  *                      Commands
@@ -47,32 +47,43 @@ void (* const FTPServerCommand[])(void) PROGMEM = { &CmndFTPServerHelp, &CmndFTP
 // FTP server help
 void CmndFTPServerHelp ()
 {
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ftp_start = start FTP server on port %u"), FTP_CTRL_PORT);
-  AddLog (LOG_LEVEL_INFO, PSTR ("     Server allows only 1 concurrent connexion"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("     Please configure your FTP client accordingly to connect"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: FTP server commands :"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - ftp_start = start FTP server on port %u"), FTP_CTRL_PORT);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - ftp_stop  = stop FTP server"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("   Server allows only 1 concurrent connexion"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("   Please configure your FTP client accordingly to connect"));
   ResponseCmndDone();
 }
 
 // Start FTP server
 void CmndFTPServerStart ()
 {
-  // if FTP server not created
-  if (ftp_server == nullptr)
-  {
-    // create FTP server
-    AddLog (LOG_LEVEL_INFO, PSTR ("FTP: Starting server ..."));
-    ftp_server = new FTPServer (LittleFS);
+  // if FTP server not created, create it
+  if (ftp_server == nullptr) ftp_server = new FTPServer (LittleFS);
 
-    // start server with login/ pwd
-    if (ftp_server != nullptr)
-    {
-      ftp_server->begin (FTP_SERVER_LOGIN, FTP_SERVER_PASSWORD);
-      AddLog (LOG_LEVEL_INFO, PSTR ("FTP: Server started on port %u"), FTP_CTRL_PORT);
-    }
+  // if server exists, start it with login/ pwd
+  if (ftp_server != nullptr) 
+  {
+    ftp_server->begin (FTP_SERVER_LOGIN, FTP_SERVER_PASSWORD);
+    AddLog (LOG_LEVEL_INFO, PSTR ("FTP: Server started on port %u"), FTP_CTRL_PORT);
   }
 
-  if (ftp_server != nullptr) ResponseCmndDone ();
-  else ResponseCmndFailed ();
+  // answer
+  if (ftp_server != nullptr) ResponseCmndDone (); else ResponseCmndFailed ();
+}
+
+// Start FTP server
+void CmndFTPServerStop ()
+{
+  // if server exists, stop it
+  if (ftp_server != nullptr) 
+  {
+    ftp_server->stop ();
+    AddLog (LOG_LEVEL_INFO, PSTR ("FTP: Server stopped"));
+  }
+
+  // answer
+  if (ftp_server != nullptr) ResponseCmndDone (); else ResponseCmndFailed ();
 }
 
 /***********************************************************\
@@ -83,7 +94,7 @@ void CmndFTPServerStart ()
 void FTPServerInit ()
 {
   // log help command
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ftp_help to get help on FTP server commands"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ftp_help to get help on FTP Server commands"));
 }
 
 // FTP server connexion management

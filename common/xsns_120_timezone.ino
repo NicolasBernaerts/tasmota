@@ -108,7 +108,7 @@ void TimezoneInit ()
   Settings->timezone = 99;
 
   // log help command
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tz_help to get help on timezone manager commands"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tz_help to get help on Timezone commands"));
 }
 
 /***********************************************\
@@ -118,18 +118,19 @@ void TimezoneInit ()
 // timezone help
 void CmndTimezoneHelp ()
 {
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tz_pub  = add timezone data in telemetry JSON (ON / OFF)"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tz_ntp  = set NTP server"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Timezone commands :"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - tz_pub  = Add timezone data in telemetry JSON (ON/OFF)"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - tz_ntp  = Set NTP server"));
 
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tz_stdo = Standard time offset to GMT (mn)"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tz_stdm = Standard time month (1:jan ... 12:dec)"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tz_stdw = Standard time week (0:last ... 4:fourth)"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tz_stdd = Standard time day of week (1:sun ... 7:sat)"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - tz_stdo = Standard time offset to GMT (mn)"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - tz_stdm = Standard time month (1:jan ... 12:dec)"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - tz_stdw = Standard time week (0:last ... 4:fourth)"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - tz_stdd = Standard time day of week (1:sun ... 7:sat)"));
 
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tz_dsto = Daylight savings time offset to GMT (mn)"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tz_dstm = Daylight savings time month (1:jan ... 12:dec)"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tz_dstw = Daylight savings time week (0:last ... 4:fourth)"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tz_dstd = Daylight savings time day of week (1:sun ... 7:sat)"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - tz_dsto = Daylight savings time offset to GMT (mn)"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - tz_dstm = Daylight savings time month (1:jan ... 12:dec)"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - tz_dstw = Daylight savings time week (0:last ... 4:fourth)"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - tz_dstd = Daylight savings time day of week (1:sun ... 7:sat)"));
   
   ResponseCmndDone();
 }

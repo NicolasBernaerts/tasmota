@@ -66,7 +66,8 @@ static struct {
 // ip address help
 void CmndIPAddressHelp ()
 {
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ip_pub  = add ip address data in telemetry JSON (ON / OFF)"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: IP Address commands :"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - ip_pub on/off  = add ip address data in telemetry JSON"));
   ResponseCmndDone();
 }
 
@@ -123,7 +124,7 @@ void IPAddressShowJSON ()
 void IPAddressInit ()
 {
   // log help command
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ip_help to get help on ip address manager commands"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ip_help to get help on IP Address commands"));
 }
 /***********************************************\
  *                    Web
