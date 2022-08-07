@@ -486,28 +486,29 @@ void CmndTeleinfoHelp ()
   uint8_t index;
   char    str_text[32];
 
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tic_enable = enable teleinfo (ON / OFF)"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tic_rate   = set serial rate (1200, 9600, 19200)"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: TIC commands :"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - tic_enable = enable teleinfo (ON / OFF)"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - tic_rate   = set serial rate (1200, 9600, 19200)"));
 
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tic_msgp   = message publish policy :"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - tic_msgp   = message publish policy :"));
   for (index = 0; index < TELEINFO_POLICY_MAX; index++)
   {
     GetTextIndexed (str_text, sizeof (str_text), index, kTeleinfoMessagePolicy);
-    AddLog (LOG_LEVEL_INFO, PSTR ("HLP:   %u - %s"), index, str_text);
+    AddLog (LOG_LEVEL_INFO, PSTR ("   %u - %s"), index, str_text);
   }
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tic_msgt   = message type publish policy :"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - tic_msgt   = message type publish policy :"));
   for (index = 0; index < TELEINFO_TYPE_MAX; index++)
   {
     GetTextIndexed (str_text, sizeof (str_text), index, kTeleinfoMessageType);
-    AddLog (LOG_LEVEL_INFO, PSTR ("HLP:   %u - %s"), index, str_text);
+    AddLog (LOG_LEVEL_INFO, PSTR ("   %u - %s"), index, str_text);
   }
 
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tic_ival   = ROM update interval (mn)"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tic_adj    = maximum power ajustment (%)"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - tic_ival   = ROM update interval (mn)"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - tic_adj    = maximum power ajustment (%)"));
 
 #ifdef USE_UFILESYS
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tic_log    = [littlefs] log policy (0:buffered, 1:immediate)"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tic_rot    = [littlefs] force log rotate"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - tic_log    = [littlefs] log policy (0:buffered, 1:immediate)"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - tic_rot    = [littlefs] force log rotate"));
 #endif        // USE_UFILESYS
 
   ResponseCmndDone();
@@ -1377,7 +1378,7 @@ void TeleinfoInit ()
   AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Using default Global Counter method"));
 
   // log help command
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tic_help to get help on teleinfo commands"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tic_help to get help on Teleinfo TIC commands"));
 }
 
 // Teleinfo graph data initialisation
