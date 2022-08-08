@@ -206,7 +206,7 @@ void SensorInit ()
 #endif    // USE_HLKLD
 
   // log help command
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: sn_help to get help on sensor manager commands"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: sn_help to get help on Sensor commands"));
 
   // load configuration
   SensorLoadConfig ();
@@ -270,6 +270,136 @@ void SensorSaveConfig ()
   SettingsUpdateText (SET_SENSOR_MOVE_KEY,   sensor_config[SENSOR_TYPE_MOVE].key.c_str ());
 
 # endif     // USE_UFILESYS
+}
+
+/***********************************************\
+ *                  Commands
+\***********************************************/
+
+// timezone help
+void CmndSensorHelp ()
+{
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Sensor commands :"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - sn_ttopic  = topic of remote temperature sensor"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - sn_tkey    = key of remote temperature sensor"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - sn_tdrift  = temperature correction (in 1/10 of °C)"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - sn_tval    = value of remote temperature sensor"));
+
+  AddLog (LOG_LEVEL_INFO, PSTR (" - sn_htopic  = topic of remote humidity sensor"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - sn_hkey    = key of remote humidity sensor"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - sn_hval    = value of remote humidity sensor"));
+
+  AddLog (LOG_LEVEL_INFO, PSTR (" - sn_mtopic  = topic of remote movement sensor"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - sn_mkey    = key of remote movement sensor"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - sn_mval    = value of remote movement sensor"));
+
+  ResponseCmndDone();
+}
+
+void CmndSensorTemperatureTopic ()
+{
+  char str_text[64];
+
+  if (XdrvMailbox.data_len > 0)
+  {
+    strncpy (str_text, XdrvMailbox.data, min (sizeof (str_text) - 1, XdrvMailbox.data_len));
+    sensor_config[SENSOR_TYPE_TEMP].topic = str_text;
+    SensorSaveConfig ();
+  }
+  ResponseCmndChar (sensor_config[SENSOR_TYPE_TEMP].topic.c_str ());
+}
+
+void CmndSensorTemperatureKey ()
+{
+  char str_text[32];
+
+  if (XdrvMailbox.data_len > 0)
+  {
+    strncpy (str_text, XdrvMailbox.data, min (sizeof (str_text) - 1, XdrvMailbox.data_len));
+    sensor_config[SENSOR_TYPE_TEMP].key = str_text;
+    SensorSaveConfig ();
+  }
+  ResponseCmndChar (sensor_config[SENSOR_TYPE_TEMP].key.c_str ());
+}
+
+void CmndSensorTemperatureValue ()
+{
+  ResponseCmndFloat (SensorReadTemperature (), 1);
+}
+
+void CmndSensorTemperatureDrift ()
+{
+  float drift;
+
+  if (XdrvMailbox.data_len > 0)
+  {
+    drift = atof (XdrvMailbox.data) * 10;
+    Settings->temp_comp = (int8_t)drift;
+  }
+  drift = (float)Settings->temp_comp / 10;
+  ResponseCmndFloat (drift, 1);
+}
+
+void CmndSensorHumidityTopic ()
+{
+  char str_text[64];
+
+  if (XdrvMailbox.data_len > 0)
+  {
+    strncpy (str_text, XdrvMailbox.data, min (sizeof (str_text) - 1, XdrvMailbox.data_len));
+    sensor_config[SENSOR_TYPE_HUMI].topic = str_text;
+    SensorSaveConfig ();
+  }
+  ResponseCmndChar (sensor_config[SENSOR_TYPE_HUMI].topic.c_str ());
+}
+
+void CmndSensorHumidityKey ()
+{
+  char str_text[32];
+
+  if (XdrvMailbox.data_len > 0)
+  {
+    strncpy (str_text, XdrvMailbox.data, min (sizeof (str_text) - 1, XdrvMailbox.data_len));
+    sensor_config[SENSOR_TYPE_HUMI].key = str_text;
+    SensorSaveConfig ();
+  }
+  ResponseCmndChar (sensor_config[SENSOR_TYPE_HUMI].key.c_str ());
+}
+
+void CmndSensorHumidityValue ()
+{
+  ResponseCmndFloat (SensorReadHumidity (), 1);
+}
+
+void CmndSensorMovementTopic ()
+{
+  char str_text[64];
+
+  if (XdrvMailbox.data_len > 0)
+  {
+    strncpy (str_text, XdrvMailbox.data, min (sizeof (str_text) - 1, XdrvMailbox.data_len));
+    sensor_config[SENSOR_TYPE_MOVE].topic = str_text;
+    SensorSaveConfig ();
+  }
+  ResponseCmndChar (sensor_config[SENSOR_TYPE_MOVE].topic.c_str ());
+}
+
+void CmndSensorMovementKey ()
+{
+  char str_text[32];
+
+  if (XdrvMailbox.data_len > 0)
+  {
+    strncpy (str_text, XdrvMailbox.data, min (sizeof (str_text) - 1, XdrvMailbox.data_len));
+    sensor_config[SENSOR_TYPE_MOVE].key = str_text;
+    SensorSaveConfig ();
+  }
+  ResponseCmndChar (sensor_config[SENSOR_TYPE_MOVE].key.c_str ());
+}
+
+void CmndSensorMovementValue ()
+{
+  ResponseCmndNumber ((int)SensorReadMovement ());
 }
 
 /**************************************************\
@@ -527,135 +657,6 @@ bool SensorMqttData ()
   }
 
   return found;
-}
-
-/***********************************************\
- *                  Commands
-\***********************************************/
-
-// timezone help
-void CmndSensorHelp ()
-{
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: sn_ttopic  = topic of remote temperature sensor"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: sn_tkey    = key of remote temperature sensor"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: sn_tdrift  = temperature correction (in 1/10 of °C)"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: sn_tval    = value of remote temperature sensor"));
-
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: sn_htopic  = topic of remote humidity sensor"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: sn_hkey    = key of remote humidity sensor"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: sn_hval    = value of remote humidity sensor"));
-
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: sn_mtopic  = topic of remote movement sensor"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: sn_mkey    = key of remote movement sensor"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: sn_mval    = value of remote movement sensor"));
-
-  ResponseCmndDone();
-}
-
-void CmndSensorTemperatureTopic ()
-{
-  char str_text[64];
-
-  if (XdrvMailbox.data_len > 0)
-  {
-    strncpy (str_text, XdrvMailbox.data, min (sizeof (str_text) - 1, XdrvMailbox.data_len));
-    sensor_config[SENSOR_TYPE_TEMP].topic = str_text;
-    SensorSaveConfig ();
-  }
-  ResponseCmndChar (sensor_config[SENSOR_TYPE_TEMP].topic.c_str ());
-}
-
-void CmndSensorTemperatureKey ()
-{
-  char str_text[32];
-
-  if (XdrvMailbox.data_len > 0)
-  {
-    strncpy (str_text, XdrvMailbox.data, min (sizeof (str_text) - 1, XdrvMailbox.data_len));
-    sensor_config[SENSOR_TYPE_TEMP].key = str_text;
-    SensorSaveConfig ();
-  }
-  ResponseCmndChar (sensor_config[SENSOR_TYPE_TEMP].key.c_str ());
-}
-
-void CmndSensorTemperatureValue ()
-{
-  ResponseCmndFloat (SensorReadTemperature (), 1);
-}
-
-void CmndSensorTemperatureDrift ()
-{
-  float drift;
-
-  if (XdrvMailbox.data_len > 0)
-  {
-    drift = atof (XdrvMailbox.data) * 10;
-    Settings->temp_comp = (int8_t)drift;
-  }
-  drift = (float)Settings->temp_comp / 10;
-  ResponseCmndFloat (drift, 1);
-}
-
-void CmndSensorHumidityTopic ()
-{
-  char str_text[64];
-
-  if (XdrvMailbox.data_len > 0)
-  {
-    strncpy (str_text, XdrvMailbox.data, min (sizeof (str_text) - 1, XdrvMailbox.data_len));
-    sensor_config[SENSOR_TYPE_HUMI].topic = str_text;
-    SensorSaveConfig ();
-  }
-  ResponseCmndChar (sensor_config[SENSOR_TYPE_HUMI].topic.c_str ());
-}
-
-void CmndSensorHumidityKey ()
-{
-  char str_text[32];
-
-  if (XdrvMailbox.data_len > 0)
-  {
-    strncpy (str_text, XdrvMailbox.data, min (sizeof (str_text) - 1, XdrvMailbox.data_len));
-    sensor_config[SENSOR_TYPE_HUMI].key = str_text;
-    SensorSaveConfig ();
-  }
-  ResponseCmndChar (sensor_config[SENSOR_TYPE_HUMI].key.c_str ());
-}
-
-void CmndSensorHumidityValue ()
-{
-  ResponseCmndFloat (SensorReadHumidity (), 1);
-}
-
-void CmndSensorMovementTopic ()
-{
-  char str_text[64];
-
-  if (XdrvMailbox.data_len > 0)
-  {
-    strncpy (str_text, XdrvMailbox.data, min (sizeof (str_text) - 1, XdrvMailbox.data_len));
-    sensor_config[SENSOR_TYPE_MOVE].topic = str_text;
-    SensorSaveConfig ();
-  }
-  ResponseCmndChar (sensor_config[SENSOR_TYPE_MOVE].topic.c_str ());
-}
-
-void CmndSensorMovementKey ()
-{
-  char str_text[32];
-
-  if (XdrvMailbox.data_len > 0)
-  {
-    strncpy (str_text, XdrvMailbox.data, min (sizeof (str_text) - 1, XdrvMailbox.data_len));
-    sensor_config[SENSOR_TYPE_MOVE].key = str_text;
-    SensorSaveConfig ();
-  }
-  ResponseCmndChar (sensor_config[SENSOR_TYPE_MOVE].key.c_str ());
-}
-
-void CmndSensorMovementValue ()
-{
-  ResponseCmndNumber ((int)SensorReadMovement ());
 }
 
 /***********************************************\
