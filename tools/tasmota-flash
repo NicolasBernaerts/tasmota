@@ -11,61 +11,49 @@
 #                      Download ESP32 default files from Github
 #   07/11/2021, V1.4 - Handle --erase for 16Mb chips (limit erase to 4MB)
 #   31/01/2022, V1.5 - Use esptool.py to fully handle 16 Mb chips
+#   08/07/2022, V1.6 - Use .factory.bin for ESP32, drop partition management
 # ----------------------------------------------------------
 
 # default files and images
 DEVICE="ESP8266"
 
-# root of tools
-ROOT_FILES="$HOME/.local/share/esptool"
-BOOTLOADER="${ROOT_FILES}/esp32_bootloader_dout.bin"
-BOOTAPP="${ROOT_FILES}/esp32_boot_app.bin"
-PARTITION="${ROOT_FILES}/esp32_partitions.bin"
-
 # help message if no parameter
 if [ ${#} -eq 0 ];
 then
-    echo "Script to flash Tasmota devices"
-    echo "Options are :"
-    echo "  --esp                     Flash ESP8266 device (default)"
-    echo "  --esp32                   Flash ESP32 device"
-    echo "  --port <com>              Use specific COM port"
-    echo "  --baud <baud>             Use specific speed (in bauds)"
-    echo "  --noreset                 Do not reset chip (ch340 usb-serial bug fix)"
-    echo "  --erase                   Erase device before flash"
-    echo "  --flash <file.bin>        Path to image file"
-    echo "  --partition <file.csv>    Path to .csv partition file (will be converted to BIN)"
-    exit 1
+	echo "Script to flash Tasmota devices"
+	echo "Options are :"
+	echo "  --esp               Flash ESP8266 device (default)"
+	echo "  --esp32             Flash ESP32 device. For initial flash, use .factory.bin images"
+	echo "  --query             Query device specs"
+	echo "  --erase             Erase device before flash"
+	echo "  --flash <file.bin>  Path to image file"
+	echo "  --port <com>        Use specific COM port"
+	echo "  --baud <baud>       Force COM speed (in bauds)"
+	echo "  --noreset           Do not reset chip (ch340 usb-serial bug fix)"
+	exit 1
 fi
 
 # check tools availability
-command -v esptool.py >/dev/null 2>&1 || { echo "[error] Please install esptool.py"; exit 1; }
-command -v gen_esp32part.py >/dev/null 2>&1 || { echo "[error] Please install gen_esp32part.py"; exit 1; }
+command -v esptool.py >/dev/null 2>&1 || { zenity --error --text="Please install esptool.py"; exit 1; }
 
 # iterate thru parameters
 while test ${#} -gt 0
 do
-    case $1 in
-        --esp) DEVICE="ESP8266"; shift; ;;
-        --esp32) DEVICE="ESP32"; shift; ;;
-        --port) shift; PORT="$1"; shift; ;;
-        --baud) shift; BAUD="$1"; shift; ;;
-        --noreset) NORESET="ok"; shift; ;;
-        --erase) ERASE="ok"; shift; ;;
-        --flash) FLASH="ok"; shift; IMAGE="$1"; shift; ;;
-        --partition) shift; PARTITION_CSV="$1"; shift; ;;
-        *) shift; ;;
+	case $1 in
+	--esp) DEVICE="ESP8266"; shift; ;;
+	--esp32) DEVICE="ESP32"; shift; ;;
+	--query) QUERY="ok"; shift; ;;
+	--erase) QUERY="ok"; ERASE="ok"; shift; ;;
+	--flash) QUERY="ok"; FLASH="ok"; shift; IMAGE="$1"; shift; ;;
+	--port) shift; PORT="$1"; shift; ;;
+	--baud) shift; BAUD="$1"; shift; ;;
+	--noreset) NORESET="ok"; shift; ;;
+	*) shift; ;;
     esac
 done
 
 # check if files exist
-[ ! -f "${IMAGE}" ] && { echo "[error] Image file ${IMAGE} missing"; exit 1; }
-
-# prepare environment
-[ ! -d "${ROOT_FILES}" ] && mkdir --parents "${ROOT_FILES}"
-[ ! -f "${BOOTLOADER}" ] && wget -O "${BOOTLOADER}" "https://github.com/NicolasBernaerts/tasmota/blob/master/tools/esp32_bootloader_dout.bin?raw=true"
-[ ! -f "${BOOTAPP}" ] && wget -O "${BOOTAPP}" "https://github.com/NicolasBernaerts/tasmota/blob/master/tools/esp32_boot_app.bin?raw=true"
-[ ! -f "${PARTITION}" ] && wget -O "${PARTITION}" "https://github.com/NicolasBernaerts/tasmota/blob/master/tools/esp32_partitions.bin?raw=true"
+[ "${FLASH}" = "ok" -a ! -f "${IMAGE}" ] && { echo "[error] Image file ${IMAGE} missing"; exit 1; }
 
 # general options
 ARR_PARAM=( )
@@ -75,27 +63,35 @@ ARR_PARAM=( )
 
 # generate temporary files and directory
 TMP_DIR=$(mktemp -t -d "flash-XXXXXXXX")
-TMP_ERASE="${TMP_DIR}/erase.bin"
-TMP_PART="${TMP_DIR}/partition.bin"
+TMP_CHIP="${TMP_DIR}/chip.txt"
 
-# get device size
-SIZE=$(esptool.py "${ARR_PARAM[@]}" "flash_id" | grep "flash size" | cut -d':' -f2 | cut -d'M' -f1 | xargs)
-
-# check if partition conversion from CSV to BIN is needed
-if [ -f "${PARTITION_CSV}" ]
+# get device specs
+# if erase
+if [ "${QUERY}" = "ok" ]
 then
-	echo "Conversion of ${PARTITION_CSV}"
-	gen_esp32part.py "${PARTITION_CSV}" "${TMP_PART}"
-	PARTITION="${TMP_PART}"
+	# query chipset
+	esptool.py "${ARR_PARAM[@]}" "flash_id" > "${TMP_CHIP}"
+	MODEL=$(cat "${TMP_CHIP}" | grep "Chip is" | cut -d' ' -f3-)
+	SIZE=$(cat "${TMP_CHIP}" | grep "flash size:" | cut -d':' -f2 | xargs)
+	MAC=$(cat "${TMP_CHIP}" | grep "MAC:" | cut -d':' -f2- | xargs)
+
+	IS_ESP32=$(echo "${MODEL}" | grep -i "ESP32")
+	[ "${IS_ESP32}" != "" ] && DEVICE="ESP32"
+
+	# display result
+	echo ""
+	echo "----- Device -----"
+	echo "Model : ${MODEL}"
+	echo "Size  : ${SIZE}"
+	echo "MAC   : ${MAC}"
 fi
 
 # if erase
 if [ "${ERASE}" = "ok" ]
 then
 	# erase device with file filed with 0
-	echo "-----"
-	echo "Erasing device"
-	echo "Parameters : ${ARR_PARAM[@]} erase_flash"
+	echo ""
+	echo "----- Erase ${DEVICE} -----"
 	esptool.py "${ARR_PARAM[@]}" "erase_flash"
 	sleep 2
 fi
@@ -104,41 +100,15 @@ fi
 if [ "${FLASH}" = "ok" ]
 then
 	# wait for program mode
-	echo "-----"
-	echo "Flashing device"
+	echo ""
+	echo "----- Flash ${DEVICE} -----"
 
-	# ESP32 option
-	[ "${DEVICE}" = "ESP32" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "--chip" "esp32" "--before" "default_reset" "--after" "hard_reset" )
-
-	# global options
-	ARR_PARAM=( "${ARR_PARAM[@]}" "write_flash" "--flash_size" "detect" )
-
-	# ESP32
-	if [ "${DEVICE}" = "ESP32" ]
-	then
-		# flashing options
-		ARR_PARAM=( "${ARR_PARAM[@]}" "--flash_mode" "dout" "--flash_freq" "40m" )
-
-		# if device has been erased or if partition is modified, force boot, bootapp and partition flash
-		if [ "${ERASE}" = "ok" -o "${PARTITION_CSV}" != "" ]
-		then
-			ARR_PARAM=( "${ARR_PARAM[@]}" "0x1000" "${BOOTLOADER}" )
-			ARR_PARAM=( "${ARR_PARAM[@]}" "0x8000" "${PARTITION}")
-			ARR_PARAM=( "${ARR_PARAM[@]}" "0xe000" "${BOOTAPP}" )
-		fi
-
-		# set binary image
-		ARR_PARAM=( "${ARR_PARAM[@]}" "0x10000" "${IMAGE}" )
-
-	# ESP8266
-	else
-		# binary image
-		ARR_PARAM=( "${ARR_PARAM[@]}" "0x00000" "${IMAGE}" )
-	fi
+	# options
+	[ "${DEVICE}" = "ESP32" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "write_flash" "-fs" "detect" "-fm" "dout" "0x00000" ) \
+                                  || ARR_PARAM=( "${ARR_PARAM[@]}" "write_flash" "-fs" "detect" "0x00000" )
 
 	# flash image
-	echo "Parameters : ${ARR_PARAM[@]}"
-	esptool.py "${ARR_PARAM[@]}"
+	esptool.py "${ARR_PARAM[@]}" "${IMAGE}"
 fi
 
 # remove temporary directory
