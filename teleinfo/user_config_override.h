@@ -64,6 +64,7 @@
     22/04/2022 - v9.7   - Option to minimise LittleFS writes (day:every 1h and week:every 6h)
     09/06/2022 - v9.7.1 - Correction of EAIT bug
     04/08/2022 - v9.8   - Add ESP32S2 support
+    18/08/2022 - v9.9   - Force GPIO_TELEINFO_RX as digital input
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -109,8 +110,6 @@
 #define USE_TIMEZONE                          // Enable Timezone management
 #define USE_TCPSERVER                         // Enable TCP server (for TIC to TCP)
 
-#undef USE_UNISHOX_COMPRESSION
-
 // build
 #if defined BUILD_ESP32S2
 #define EXTENSION_BUILD   "esp32s2"
@@ -133,7 +132,7 @@
 // extension data
 #define EXTENSION_NAME    "Teleinfo"          // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
-#define EXTENSION_VERSION "9.8"               // version
+#define EXTENSION_VERSION "9.9"               // version
 
 // MQTT default
 #undef MQTT_HOST
@@ -182,7 +181,7 @@
 #undef USE_TIMERS_WEB                         // support for timer webpage
 #undef USE_SUNRISE                            // support for Sunrise and sunset tools
 
-//#undef USE_UNISHOX_COMPRESSION                // Add support for string compression in Rules or Scripts
+#undef USE_UNISHOX_COMPRESSION                // Add support for string compression in Rules or Scripts
 #define USE_RULES                             // Support for rules
 #undef USE_SCRIPT                             // Add support for script (+17k code)
 
@@ -243,10 +242,6 @@
 #undef USE_ENERGY_DUMMY                       // Add support for dummy Energy monitor allowing user values (+0k7 code)
 #undef USE_HLW8012                            // Add support for HLW8012, BL0937 or HJL-01 Energy Monitor for Sonoff Pow and WolfBlitz
 #undef USE_CSE7766                            // Add support for CSE7766 Energy Monitor for Sonoff S31 and Pow R2
-#undef USE_PZEM004T                           // Add support for PZEM004T Energy monitor (+2k code)
-#undef USE_PZEM_AC                            // Add support for PZEM014,016 Energy monitor (+1k1 code)
-#undef USE_PZEM_DC                            // Add support for PZEM003,017 Energy monitor (+1k1 code)
-#undef USE_MCP39F501                          // Add support for MCP39F501 Energy monitor as used in Shelly 2 (+3k1 code)
 #undef USE_SDM72                              // Add support for Eastron SDM72-Modbus energy monitor (+0k3 code)
 #undef USE_SDM120                             // Add support for Eastron SDM120-Modbus energy monitor (+1k1 code)
 #undef USE_SDM630                             // Add support for Eastron SDM630-Modbus energy monitor (+0k6 code)
@@ -259,6 +254,7 @@
 #undef USE_IEM3000                            // Add support for Schneider Electric iEM3000-Modbus series energy monitor (+0k8 code)
 
 #undef USE_IR_REMOTE                          // Send IR remote commands using library IRremoteESP8266 and ArduinoJson (+4k3 code, 0k3 mem, 48 iram)
+#undef USE_IR_REMOTE_FULL                     // complete integration of IRremoteESP8266 for Tasmota
 #undef USE_IR_SEND_NEC                        // Support IRsend NEC protocol
 #undef USE_IR_SEND_RC5                        // Support IRsend Philips RC5 protocol
 #undef USE_IR_SEND_RC6                        // Support IRsend Philips RC6 protocol

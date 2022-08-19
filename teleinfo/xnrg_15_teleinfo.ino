@@ -1290,8 +1290,8 @@ void TeleinfoPreInit ()
   // if TeleinfoEN pin defined, switch it OFF
   if (PinUsed (GPIO_TELEINFO_ENABLE))
   {
-    // switch it off to avoid ESP32 Rx heavy load restart bug
-    pinMode (Pin (GPIO_TELEINFO_ENABLE), OUTPUT);
+    // switch off GPIO_TELEINFO_ENABLE to avoid ESP32 Rx heavy load restart bug
+    pinMode (Pin (GPIO_TELEINFO_ENABLE, 0), OUTPUT);
 
     // disable serial input
     TeleinfoDisableSerial ();
@@ -1300,6 +1300,9 @@ void TeleinfoPreInit ()
   // if TeleinfoRX pin defined, set energy driver as teleinfo
   if (!TasmotaGlobal.energy_driver && PinUsed (GPIO_TELEINFO_RX))
   {
+    // set GPIO_TELEINFO_RX as digital input
+    pinMode (Pin (GPIO_TELEINFO_RX, 0), INPUT);
+
     // declare energy driver
     TasmotaGlobal.energy_driver = XNRG_15;
 
