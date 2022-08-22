@@ -132,10 +132,10 @@ Here is where you should place different files from this repository and from **t
 * tasmota/boards/**esp8266_16M14M.json**
 * tasmota/tasmota_nrg_energy/**xnrg_15_teleinfo.ino**
 * tasmota/tasmota_drv_driver/**xdrv_50_filesystem_cfg_csv.ino**
-* tasmota/tasmota_drv_driver/**xdrv_93_esp32_board.ino**
 * tasmota/tasmota_drv_driver/**xdrv_94_ip_address.ino**
 * tasmota/tasmota_drv_driver/**xdrv_96_ftp_server.ino**
 * tasmota/tasmota_drv_driver/**xdrv_97_tcp_server.ino**
+* tasmota/tasmota_drv_driver/**xdrv_98_esp32_board.ino**
 * tasmota/tasmota_sns_sensor/**xsns_120_timezone.ino**
 * lib/default/**FTPClientServer** (extract content of **FTPClientServer.zip**) 
 
