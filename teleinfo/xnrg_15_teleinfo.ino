@@ -76,6 +76,7 @@
     22/04/2022 - v9.7   - Option to minimise LittleFS writes (day:every 1h and week:every 6h)
     09/06/2022 - v9.7.1 - Correction of EAIT bug
     04/08/2022 - v9.8   - Add ESP32S2 support
+    18/08/2022 - v9.9   - Force GPIO_TELEINFO_RX as digital input
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -215,7 +216,7 @@ TasmotaSerial *teleinfo_serial = nullptr;
 #ifdef USE_UFILESYS
 
 // configuration file
-#define D_TELEINFO_CFG                  "teleinfo.cfg"
+#define D_TELEINFO_CFG                  "/teleinfo.cfg"
 
 // history files label and filename
 const char D_TELEINFO_HISTO_DAY[]         PROGMEM = "day";

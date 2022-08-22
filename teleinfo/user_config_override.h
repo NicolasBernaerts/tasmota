@@ -294,14 +294,14 @@
 //    ESP32 specific
 // ----------------------
 
-#undef USE_ESP32_SENSORS
+//#undef USE_ESP32_SENSORS
 
 #undef USE_BLE_ESP32
 #undef USE_MI_ESP32
 #undef USE_IBEACON
 
 #undef USE_AUTOCONF                           // Disable Esp32 autoconf feature
-#undef USE_BERRY
+//#undef USE_BERRY
 
 #undef USE_DISPLAY
 #undef USE_SR04
