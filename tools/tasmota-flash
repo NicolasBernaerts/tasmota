@@ -12,6 +12,7 @@
 #   07/11/2021, V1.4 - Handle --erase for 16Mb chips (limit erase to 4MB)
 #   31/01/2022, V1.5 - Use esptool.py to fully handle 16 Mb chips
 #   08/07/2022, V1.6 - Use .factory.bin for ESP32, drop partition management
+#   22/08/2022, V1.7 - Change ESP32 flash to -fm dio
 # ----------------------------------------------------------
 
 # default files and images
@@ -104,7 +105,7 @@ then
 	echo "----- Flash ${DEVICE} -----"
 
 	# options
-	[ "${DEVICE}" = "ESP32" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "write_flash" "-fs" "detect" "-fm" "dout" "0x00000" ) \
+	[ "${DEVICE}" = "ESP32" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "write_flash" "-fs" "detect" "-fm" "dio" "0x00000" ) \
                                   || ARR_PARAM=( "${ARR_PARAM[@]}" "write_flash" "-fs" "detect" "0x00000" )
 
 	# flash image
