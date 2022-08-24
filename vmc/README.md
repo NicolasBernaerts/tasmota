@@ -1,7 +1,8 @@
 Tasmota firmware modified to control VMC
 =============
 
-This evolution of Tasmota firmware has been enhanced to handle a Motor Controled Ventilator according to current humidity level.
+This evolution of Tasmota firmware is bsed on **Tasmota v12** and has been enhanced to handle a Motor Controled Ventilator according to current humidity level.
+
 In **Auto** mode, VMC is :
   * started as soon as humidity goes beyond a target value
   * stopped as soon as humidity goes below this target value.
@@ -10,8 +11,6 @@ Humidity sensor can either be :
   * a local SI7021 sensor connected to your Sonoff
   * a remote MQTT humidity sensor
   
-This firmware is based on Tasmota **v9.4** modified with extended MQTT messages.
-
 You'll get some extra Web pages on the device :
   * **/control** : page to control operating mode and with a 24h humidity/temperature graph
   * **/info.json** : Main device characteristics in JSON format
@@ -23,13 +22,26 @@ MQTT result should look like that :
     {"VMC":{"Relay":1,"Mode":3,"Label":"Automatic","Temperature":22.2,"Humidity":71.7,"Target":60,"Threshold":2},"State":{"Mode":2,"Label":"High speed"},"Humidity":{"State":nan,"Topic":"","Key":""}}
     {"VMC":{"Relay":1,"Mode":3,"Label":"Automatic","Temperature":22.2,"Humidity":71.8,"Target":60,"Threshold":2},"State":{"Mode":2,"Label":"High speed"},"Humidity":{"State":nan,"Topic":"","Key":""}}
 
-Pre-compiled version is available with **tasmota.bin**
+Compilation
+-----------
 
-If you want to compile the firmware, don't forget to uncomment following line in **my_user_config.h**
+If you want to compile this firmware version, you just need to :
+1. install official tasmota sources
+2. place or replace files from this repository
+3. place specific files from **tasmota/common** repository
 
-    #define USE_CONFIG_OVERRIDE             // Uncomment to use user_config_override.h file. See README.md
+Here is where you should place different files from this repository and from **tasmota/common** :
+* **platformio_override.ini**
+* tasmota/**user_config_override.h**
+* tasmota/tasmota_drv_driver/**xdrv_01_webserver.ino**
+* tasmota/tasmota_drv_driver/**xdrv_50_filesystem_cfg_csv.ino**
+* tasmota/tasmota_drv_driver/**xdrv_94_ip_address.ino**
+* tasmota/tasmota_drv_driver/**xdrv_98_vmc.ino**
+* tasmota/tasmota_sns_sensor/**xsns_98_vmc.ino**
+* tasmota/tasmota_sns_sensor/**xsns_120_timezone.ino**
+* tasmota/tasmota_sns_sensor/**xsns_125_generic_sensor.ino**
 
+If everything goes fine, you should be able to compile your own build.
 
-Complete setup guide is available at http://www.bernaerts-nicolas.fr/iot/...
 
   ![Main page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/vmc/tasmota-vmc-main.png) ![Control page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/vmc/tasmota-vmc-control.png)
