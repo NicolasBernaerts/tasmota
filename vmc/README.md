@@ -33,6 +33,7 @@ If you want to compile this firmware version, you just need to :
 Here is where you should place different files from this repository and from **tasmota/common** :
 * **platformio_override.ini**
 * tasmota/**user_config_override.h**
+* tasmota/include/**tasmota.h**
 * tasmota/tasmota_drv_driver/**xdrv_01_webserver.ino**
 * tasmota/tasmota_drv_driver/**xdrv_50_filesystem_cfg_csv.ino**
 * tasmota/tasmota_drv_driver/**xdrv_94_ip_address.ino**
