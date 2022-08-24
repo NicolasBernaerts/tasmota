@@ -45,4 +45,4 @@ Here is where you should place different files from this repository and from **t
 If everything goes fine, you should be able to compile your own build.
 
 
-  ![Main page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/vmc/tasmota-vmc-main.png) ![Control page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/vmc/tasmota-vmc-control.png)
+  ![Main page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/vmc/screen/tasmota-vmc-main.png) ![Control page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/vmc/screen/tasmota-vmc-control.png)
