@@ -12,6 +12,7 @@
     15/10/2021 - v1.2 - Add reverse CSV line navigation
     01/04/2022 - v1.3 - Add software watchdog to avoid locked loop
     27/07/2022 - v1.4 - Use String to report strings
+    31/08/2022 - v1.5 - Handle empty lines in CSV
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -119,6 +120,22 @@ int UfsCfgLoadKeyInt (const char* pstr_filename, const char* pstr_key, const int
   
   // open file in read only mode in littlefs filesystem
   str_result = UfsCfgLoadKey (pstr_filename, pstr_key);
+  if (str_result.length () > 0) result = (int)str_result.toInt ();
+
+  return result;
+}
+
+// read long key value in configuration file
+long UfsCfgLoadKeyLong (const char* pstr_filename, const char* pstr_key, const long default_value = LONG_MAX) 
+{
+  long   result = default_value;
+  String str_result;
+
+  // validate parameters
+  if ((pstr_filename == nullptr) || (pstr_key == nullptr)) return result;
+  
+  // open file in read only mode in littlefs filesystem
+  str_result = UfsCfgLoadKey (pstr_filename, pstr_key);
   if (str_result.length () > 0) result = str_result.toInt ();
 
   return result;
@@ -171,6 +188,21 @@ void UfsCfgSaveKeyInt (const char* pstr_filename, const char* pstr_key, const in
   
   // convert value to string
   itoa (value, str_value, 10);
+
+  // save key and value
+  UfsCfgSaveKey (pstr_filename, pstr_key, str_value, create);
+}
+
+// save key value in configuration file
+void UfsCfgSaveKeyLong (const char* pstr_filename, const char* pstr_key, const long value, bool create = true) 
+{
+  char str_value[UFS_CFG_VALUE_MAX];
+  
+  // validate parameters
+  if ((pstr_filename == nullptr) || (pstr_key == nullptr)) return;
+
+  // convert value to string
+  ltoa (value, str_value, 10);
 
   // save key and value
   UfsCfgSaveKey (pstr_filename, pstr_key, str_value, create);
@@ -237,7 +269,8 @@ int UfsCsvNextLine ()
 {
   int      index;
   size_t   length;
-  uint32_t pos_start, pos_delta;
+  uint32_t pos_start;
+  char    *pstr_start;
   char    *pstr_token;
 
   // init
@@ -248,18 +281,23 @@ int UfsCsvNextLine ()
   length = ufs_csv.file[UFS_CSV_ACCESS_READ].readBytes (ufs_csv.str_line, sizeof (ufs_csv.str_line) - 1);
   ufs_csv.str_line[length] = 0;
 
-  // align string and file position on end of line
-  pstr_token = strchr (ufs_csv.str_line, '\n');
+  // loop to skip empty lines
+  pstr_start = ufs_csv.str_line;
+  while ((*pstr_start == '\n') && (*pstr_start != 0)) pstr_start++;
+
+  // look for next end of line
+  pstr_token = strchr (pstr_start, '\n');
+
+  // if end of line found, set end of string and seek CSV to next line
   if (pstr_token != nullptr)
   {
-    pos_delta = pstr_token - ufs_csv.str_line;
-    ufs_csv.file[UFS_CSV_ACCESS_READ].seek (pos_start + pos_delta + 1);
     *pstr_token = 0;
+    ufs_csv.file[UFS_CSV_ACCESS_READ].seek (pstr_token - ufs_csv.str_line + pos_start + 1);
   } 
 
   // loop to populate array of values
   index = 0;
-  pstr_token = strtok (ufs_csv.str_line, ";");
+  pstr_token = strtok (pstr_start, ";");
   while (pstr_token != nullptr)
   {
     if (index < UFS_CSV_COLUMN_MAX) ufs_csv.pstr_value[index++] = pstr_token;
@@ -442,9 +480,11 @@ float UfsCsvGetColumnFloat (const int column, int action = UFS_CSV_NONE)
 void UfsCsvAppend (const char* pstr_filename, const char* pstr_line, bool keep_open = false) 
 {
   bool exists;
+  int  last;
 
   // check parameters
   if ((pstr_filename == nullptr) || (pstr_line == nullptr)) return;
+  if (strlen (pstr_line) == 0) return;
 
   // if file is not already opened
   if (!ufs_csv.is_open[UFS_CSV_ACCESS_WRITE])
@@ -457,8 +497,12 @@ void UfsCsvAppend (const char* pstr_filename, const char* pstr_line, bool keep_o
   // append current line
   if (ufs_csv.is_open[UFS_CSV_ACCESS_WRITE])
   {
+    // append string
     ufs_csv.file[UFS_CSV_ACCESS_WRITE].print (pstr_line);
-    ufs_csv.file[UFS_CSV_ACCESS_WRITE].print ("\n");
+
+    // if needed, add CR/LF
+    last = strlen (pstr_line) - 1;
+    if (pstr_line[last] != '\n') ufs_csv.file[UFS_CSV_ACCESS_WRITE].print ("\n");
   }
 
   // if needed, close file
