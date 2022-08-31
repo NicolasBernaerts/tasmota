@@ -5,6 +5,7 @@ Each binary has its own specificities :
   * **teleinfo-4m2m.bin** : target is ESP8266 with 4M memory. It handles a 2M LittleFS partition to store historical files.
   * **teleinfo-16m14m.bin** : target is ESP8266 with 16M memory. It handles a 14M LittleFS partition to store historical files.
   * **teleinfo32.bin** : target is ESP32 with 4M memory. It handles a 1.2M LittleFS partition to store historical files.
+  * **teleinfo32s2.bin** : target is ESP32S2 with 4M memory. It handles a 1.2M LittleFS partition to store historical files.
 
 If you want to flash these binaries, you'll need to use **esptool**.
 
@@ -19,7 +20,15 @@ Here are the command lines to flash firmware and do partitionning at the same ti
 **ESP8266 4M with 2M LittleFS**
 
     tasmota-flash --erase --flash 'teleinfo-4m2m.bin'
-    
+   
+**ESP8266 16M with 14M LittleFS**
+
+    tasmota-flash --erase --flash 'teleinfo-16m14m.bin'
+
 **ESP32 4M with 1.2M LittleFS**
 
-    tasmota-flash --esp32 --flash 'teleinfo32.bin' --partition 'esp32_partition_app1441k_spiffs1245.csv'
+    tasmota-flash --esp32 --flash 'teleinfo32.factory.bin'
+
+**ESP32S2 4M with 1.2M LittleFS**
+
+    tasmota-flash --esp32 --flash 'teleinfo32s2.factory.bin'
