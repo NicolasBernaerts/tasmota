@@ -40,7 +40,7 @@
     02/11/2020 - v5.4   - Tasmota 9.0 compatibility
     09/11/2020 - v6.0   - Handle ESP32 ethernet devices with board selection
     11/11/2020 - v6.1   - Add data.json page
-    20/11/2020 - v6.2   - Correct checksum bug
+    20/11/2020 - v6.2   - Checksum bug
     29/12/2020 - v6.3   - Strengthen message error control
     25/02/2021 - v7.0   - Prepare compatibility with TIC standard
     01/03/2021 - v7.0.1 - Add power status bar
@@ -75,8 +75,11 @@
     01/04/2022 - v9.6   - Add software watchdog feed to avoid lock
     22/04/2022 - v9.7   - Option to minimise LittleFS writes (day:every 1h and week:every 6h)
     09/06/2022 - v9.7.1 - Correction of EAIT bug
-    04/08/2022 - v9.8   - Add ESP32S2 support
+    04/08/2022 - v9.8   - Based on Tasmota 12
+                          Add ESP32S2 support
+                          Remove FTP server auto start
     18/08/2022 - v9.9   - Force GPIO_TELEINFO_RX as digital input
+    31/08/2022 - v9.9.1 - Bug littlefs config and graph data recording
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -350,16 +353,16 @@ struct tic_line {
   char checksum;
 };
 static struct {
-  bool     overload   = false;                      // overload has been detected
-  bool     received   = false;                      // one full message has been received
-  bool     percent    = false;                      // power has changed of more than 1% on one phase
-  bool     send_msg   = false;                      // flag to ask to send TIC JSON
-  bool     send_tic   = false;                      // flag to ask to send TIC JSON
-  bool     send_meter = false;                      // flag to ask to send Meter JSON
-  int      line_index = 0;                          // index of current received message line
-  int      line_max   = 0;                          // max number of lines in a message
-  int      length     = INT_MAX;                    // length of message     
-  uint32_t timestamp  = UINT32_MAX;                 // timestamp of message (ms)
+  bool     overload      = false;                   // overload has been detected
+  bool     received      = false;                   // one full message has been received
+  bool     percent       = false;                   // power has changed of more than 1% on one phase
+  bool     publish_msg   = false;                   // flag to ask to publish data
+  bool     publish_tic   = false;                   // flag to ask to publish TIC JSON
+  bool     publish_meter = false;                   // flag to ask to publish Meter JSON
+  int      line_index    = 0;                       // index of current received message line
+  int      line_max      = 0;                       // max number of lines in a message
+  int      length        = INT_MAX;                 // length of message     
+  uint32_t timestamp     = UINT32_MAX;              // timestamp of message (ms)
   tic_line line[TELEINFO_LINE_QTY];                 // array of message lines
 } teleinfo_message;
 
@@ -2162,16 +2165,16 @@ void TeleinfoReceiveData ()
 void TeleinfoEvery250ms ()
 {
   // if message should be sent, check which type to send
-  if (teleinfo_message.send_msg)
+  if (teleinfo_message.publish_msg)
   {
-    teleinfo_message.send_meter = ((teleinfo_config.msg_type == TELEINFO_TYPE_BOTH) || (teleinfo_config.msg_type == TELEINFO_TYPE_METER));
-    teleinfo_message.send_tic = ((teleinfo_config.msg_type == TELEINFO_TYPE_BOTH) || (teleinfo_config.msg_type == TELEINFO_TYPE_TIC));
-    teleinfo_message.send_msg = false;
+    teleinfo_message.publish_meter = ((teleinfo_config.msg_type == TELEINFO_TYPE_BOTH) || (teleinfo_config.msg_type == TELEINFO_TYPE_METER));
+    teleinfo_message.publish_tic = ((teleinfo_config.msg_type == TELEINFO_TYPE_BOTH) || (teleinfo_config.msg_type == TELEINFO_TYPE_TIC));
+    teleinfo_message.publish_msg = false;
   }
 
   // if needed, publish meter or TIC JSON
-  if (teleinfo_message.send_meter) TeleinfoPublishMeterJSON ();
-  else if (teleinfo_message.send_tic) TeleinfoPublishTicJSON ();
+  if (teleinfo_message.publish_meter) TeleinfoPublishMeterJSON ();
+  else if (teleinfo_message.publish_tic) TeleinfoPublishTicJSON ();
 }
 
 // Calculate if some JSON should be published (called every second)
@@ -2236,14 +2239,16 @@ void TeleinfoEverySecond ()
     teleinfo_period[period].counter = teleinfo_period[period].counter % ARR_TELEINFO_PERIOD_WINDOW[period];
   }
 
-  // check if message should be published
-  if (teleinfo_message.overload && (teleinfo_config.msg_policy != TELEINFO_POLICY_NEVER))   teleinfo_message.send_msg = true;
-  if (teleinfo_message.received && (teleinfo_config.msg_policy == TELEINFO_POLICY_MESSAGE)) teleinfo_message.send_msg = true;
-  if (teleinfo_message.percent  && (teleinfo_config.msg_policy == TELEINFO_POLICY_PERCENT)) teleinfo_message.send_msg = true;
-  
-  // reset message flags
+  // check if message should be published for overload
+  if (teleinfo_message.overload && (teleinfo_config.msg_policy != TELEINFO_POLICY_NEVER))   teleinfo_message.publish_msg = true;
   teleinfo_message.overload = false;
+
+  // check if message should be published after message was received
+  if (teleinfo_message.received && (teleinfo_config.msg_policy == TELEINFO_POLICY_MESSAGE)) teleinfo_message.publish_msg = true;
   teleinfo_message.received = false;
+
+  // check if message should be published after percentage chnage
+  if (teleinfo_message.percent  && (teleinfo_config.msg_policy == TELEINFO_POLICY_PERCENT)) teleinfo_message.publish_msg = true;
   teleinfo_message.percent  = false;
 }
 
@@ -2269,7 +2274,7 @@ void TeleinfoPublishTicJSON ()
   MqttPublishTeleSensor ();
 
   // TIC has been published
-  teleinfo_message.send_tic = false;
+  teleinfo_message.publish_tic = false;
 }
 
 // Generate JSON with Meter informations
@@ -2331,14 +2336,14 @@ void TeleinfoPublishMeterJSON ()
   MqttPublishTeleSensor ();
 
   // Meter has been published
-  teleinfo_message.send_meter = false;
+  teleinfo_message.publish_meter = false;
 }
 
 // Show JSON status (for MQTT)
 void TeleinfoShowJSON (bool append)
 {
   // if telemetry call, check for JSON update according to update policy
-  if (append && (teleinfo_config.msg_policy != TELEINFO_POLICY_NEVER)) teleinfo_message.send_msg = true;
+  if (append && (teleinfo_config.msg_policy == TELEINFO_POLICY_TELEMETRY)) teleinfo_message.publish_msg = true;
 }
 
 /*********************************************\
@@ -2554,7 +2559,7 @@ void TeleinfoWebPageConfigure ()
     TeleinfoSaveConfig ();
 
     // ask for meter update
-    teleinfo_message.send_msg = true;
+    teleinfo_message.publish_msg = true;
   }
 
   // beginning of form
@@ -3543,7 +3548,7 @@ bool Xsns99 (uint8_t function)
       TeleinfoEverySecond ();
       break;
     case FUNC_JSON_APPEND:
-      TeleinfoShowJSON (true);
+      if (teleinfo_meter.status_rx == TIC_SERIAL_ACTIVE) TeleinfoShowJSON (true);
       break;
     case FUNC_EVERY_50_MSECOND:
       if (teleinfo_meter.status_rx == TIC_SERIAL_ACTIVE) TeleinfoReceiveData ();

@@ -27,7 +27,7 @@
     02/11/2020 - v5.4   - Tasmota 9.0 compatibility
     09/11/2020 - v6.0   - Handle ESP32 ethernet devices with board selection
     11/11/2020 - v6.1   - Add data.json page
-    20/11/2020 - v6.2   - Correct checksum bug
+    20/11/2020 - v6.2   - Checksum bug
     29/12/2020 - v6.3   - Strengthen message error control
     20/02/2021 - v6.4   - Add sub-totals (HCHP, HCHC, ...) to JSON
     25/02/2021 - v7.0   - Prepare compatibility with TIC standard
@@ -63,8 +63,11 @@
     01/04/2022 - v9.6   - Add software watchdog feed to avoid lock
     22/04/2022 - v9.7   - Option to minimise LittleFS writes (day:every 1h and week:every 6h)
     09/06/2022 - v9.7.1 - Correction of EAIT bug
-    04/08/2022 - v9.8   - Add ESP32S2 support
+    04/08/2022 - v9.8   - Based on Tasmota 12
+                          Add ESP32S2 support
+                          Remove FTP server auto start
     18/08/2022 - v9.9   - Force GPIO_TELEINFO_RX as digital input
+    31/08/2022 - v9.9.1 - Bug littlefs config and graph data recording
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -108,13 +111,14 @@
 #define USE_TELEINFO                          // Enable Teleinfo
 #define USE_IPADDRESS                         // Add fixed IP configuration page
 #define USE_TIMEZONE                          // Enable Timezone management
+#define USE_TIMEZONE_WEB_CONFIG               // Enable timezone web configuration page
 #define USE_TCPSERVER                         // Enable TCP server (for TIC to TCP)
 
 // build
 #if defined BUILD_ESP32S2
 #define EXTENSION_BUILD   "esp32s2"
 #elif defined BUILD_ESP32_4M
-#define EXTENSION_BUILD   "esp32-4m"
+#define EXTENSION_BUILD   "esp32-4m1.3m"
 #elif defined BUILD_16M14M
 #define EXTENSION_BUILD   "esp-16m14m"
 #elif defined BUILD_4M2M
@@ -132,7 +136,7 @@
 // extension data
 #define EXTENSION_NAME    "Teleinfo"          // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
-#define EXTENSION_VERSION "9.9"               // version
+#define EXTENSION_VERSION "9.9.1"             // version
 
 // MQTT default
 #undef MQTT_HOST
