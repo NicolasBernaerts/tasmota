@@ -13,9 +13,9 @@ Configuration
 
 Input devices should be configured as followed :
 
-  - Counter1 = Light On sensor
+  - Counter1 = Light switch ON sensor
   - Counter2 = Movement detection sensor
-  - Counter3 = Button to force On/Off
+  - Counter3 = Push Button to switch ON/OFF
 
 Settings are stored using weighting scale parameters :
 
