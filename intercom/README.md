@@ -22,15 +22,19 @@ Input devices should be configured as followed :
   - Relay  1  : connected to external relay in charge of opening the door
 
 You should setup counter debounce as follow to be on the safe side :
+
     # CounterDebounce 1000
     # CounterDebounceHigh 50
     # CounterDebounceLow 50
+
 You may have to adjust settings according to your ring
 
 To enable Telegram notification in case of door opening, run these commands once in console :
+
     # tmtoken yourtelegramtoken
     # tmchatid yourtelegramchatid
     # tmstate 1
+
 When door opens, you'll receive a Telegram notification "DeviceName : Intercom Opened"
 
 If LittleFS is enabled, settings are stored in /intercom.cfg
