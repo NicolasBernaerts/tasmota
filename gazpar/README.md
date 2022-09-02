@@ -19,6 +19,23 @@ It also provides :
 
 Pre-compiled versions are available in the [**binary**](https://github.com/NicolasBernaerts/tasmota/tree/master/gazpar/binary) folder.
 
+Configuration
+-------------
+
+Gazpar impulse connector should be declared as Counter 1
+
+To be on the safe side and to avoid false trigger, set :
+  - CounterDebounce 150
+  - CounterDebounceHigh 50
+  - CounterDebounceLow 50
+
+If LittleFS partition is available, config is stored in /gazpar.cfg
+If no partition is available, settings are stored using **Settings** parameters :
+  - Settings->weight_max = Coefficient de conversion from m3 to kWh (x100). This coefficient is available from https://www.grdf.fr/particuliers/coefficient-conversion-commune
+  - Settings->weight_item        = Counter at start of current year
+  - Settings->weight_reference   = Counter at start of current month
+  - Settings->weight_calibration = Counter at start of current day
+
 Compilation
 -----------
 
