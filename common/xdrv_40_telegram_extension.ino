@@ -26,6 +26,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef FIRMWARE_SAFEBOOT
 #ifdef USE_TELEGRAM
 #ifdef USE_TELEGRAM_EXTENSION
 
@@ -187,5 +188,7 @@ long TelegramReplyMessage (const char* pstr_message, long message_id, const char
   return reply_id;
 }
 
-#endif // USE_TELEGRAM_EXTENSION
-#endif // USE_TELEGRAM
+#endif     // USE_TELEGRAM_EXTENSION
+#endif     // USE_TELEGRAM
+#endif     // FIRMWARE_SAFEBOOT
+

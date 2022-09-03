@@ -9,7 +9,6 @@
     22/04/2021 - v1.4 - Switch to a full Drv (without Sns) 
     11/07/2021 - v1.5 - Tasmota 9.5 compatibility 
     07/05/2022 - v1.6 - Add command to enable JSON publishing 
-    01/07/2022 - v1.7 - Switched to sensor 
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -27,6 +26,7 @@
  *                Timezone
 \*************************************************/
 
+#ifndef FIRMWARE_SAFEBOOT
 #ifdef USE_TIMEZONE
 
 #define XSNS_120                  120
@@ -362,4 +362,6 @@ bool Xsns120 (uint8_t function)
   return result;
 }
 
-#endif // USE_TIMEZONE
+#endif      // USE_TIMEZONE
+#endif      // FIRMWARE_SAFEBOOT
+

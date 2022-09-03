@@ -23,6 +23,7 @@
  *                FTP Server
 \*************************************************/
 
+#ifndef FIRMWARE_SAFEBOOT
 #ifdef USE_UFILESYS
 #ifdef USE_FTPSERVER
 
@@ -131,3 +132,5 @@ bool Xdrv96 (uint8_t function)
 
 #endif    // USE_FTPSERVER
 #endif    // USE_UFILESYS
+#endif    // FIRMWARE_SAFEBOOT
+

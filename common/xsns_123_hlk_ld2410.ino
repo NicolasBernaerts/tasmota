@@ -1,14 +1,14 @@
 /*
-  xsns_124_hlkld11.ino - Driver for Presence and Movement sensor HLK-LD11xx
+  xsns_124_hlkld2410.ino - Driver for Presence and Movement sensor HLK-LD2410
 
   Copyright (C) 2022  Nicolas Bernaerts
 
   Connexions :
-    * GPIO1 (Tx) should be declared as Serial Tx and connected to HLK-LDxx Rx
-    * GPIO3 (Rx) should be declared as Serial Rx and connected to HLK-LDxx Tx
+    * GPIO1 (Tx) should be declared as Serial Tx and connected to HLK-LD2410 Rx
+    * GPIO3 (Rx) should be declared as Serial Rx and connected to HLK-LD2410 Tx
 
   Version history :
-    22/06/2022 - v1.0   - Creation
+    28/06/2022 - v1.0   - Creation
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -23,7 +23,7 @@
 */
 
 #ifndef FIRMWARE_SAFEBOOT
-#ifdef USE_HLKLD11
+#ifdef USE_HLKLD2410
 
 #include <TasmotaSerial.h>
 
@@ -32,57 +32,103 @@
 \*************************************************/
 
 // declare teleinfo energy driver and sensor
-#define XSNS_124                   124
+#define XSNS_123                   123
 
 // constant
-#define HLKLD_DEFAULT_TIMEOUT      5      // inactivity after 5 sec
+#define HLKLD2410_DEFAULT_TIMEOUT      5      // inactivity after 5 sec
 #define HLKLD_SENSOR_MAX           2      // sensor for mov & occ
 #define HLKLD_RANGE_MAX            3      // maximum of 3 ranges for each sensor
+#define HLKLD2410_QUEUE_MAX            9      // maximum of 3 ranges for each sensor
+
+#define HLKLD2410_CMND_QUEUE_MAX   4      // maximum command queue
+#define HLKLD2410_MSG_SIZE_MAX     64     // maximum message size
+#define HLKLD2410_CMND_SIZE_MAX    32     // maximum message size
 
 // web pages
-#define D_HLKLD_PAGE_CONFIG       "ld-conf"
-#define D_HLKLD_PAGE_CONFIG_UPD   "ld-upd"
+//#define D_HLKLD_PAGE_CONFIG       "ld-conf"
+//#define D_HLKLD_PAGE_CONFIG_UPD   "ld-upd"
 
 // strings
-const char D_HLKLD_NAME[]        PROGMEM = "HLK-LD";
-const char D_HLKLD_CONFIGURE[]   PROGMEM = "Configure";
+const char D_HLKLD2410_NAME[]        PROGMEM = "LD2410";
+//const char D_HLKLD_CONFIGURE[]   PROGMEM = "Configure";
 
 
 // type of message
-enum HLKLDDataType   { HLKLD_DATA_OCC, HLKLD_DATA_MOV, HLKLD_DATA_ANY };                        // sensor types
-const char HLKLDDataLabel[] PROGMEM = "occ|mov|any";                                            // sensor types description
-const char HLKLDDataIcon[] PROGMEM = "🧍|🏃|👋";                                                 // sensor types icon
+enum HLKLD2410DataMode   { HLKLD2410_MODE_STANDARD, HLKLD2410_MODE_ENGINEERING, HLKLD2410_MODE_MAX };               // sensor receive message type
+enum HLKLD2410RecvStatus { HLKLD2410_MSG_UNDEFINED, HLKLD2410_MSG_NONE, HLKLD2410_MSG_CMND_START, HLKLD2410_MSG_CMND_BODY, HLKLD2410_MSG_CMND_STOP, HLKLD2410_MSG_DATA_START, HLKLD2410_MSG_DATA_BODY, HLKLD2410_MSG_DATA_STOP, HLKLD2410_MSG_MAX };               // sensor receive message type
+
+enum HLKLD2410DistType   { HLKLD2410_TYPE_OCC, HLKLD2410_TYPE_MOV, HLKLD2410_TYPE_ANY, HLKLD2410_TYPE_BOTH, HLKLD2410_TYPE_NONE };       // type of distance
+const char HLKLD2410DataLabel[] PROGMEM = "occ|mov|any|both";                                            // sensor types description
+const char HLKLD2410DataIcon[] PROGMEM = "🧍|🏃|👋|👋";                                              // sensor types icon
 
 // type of received lines
-enum HLKLDLineType  { HLKLD_LINE_OCC, HLKLD_LINE_MOV, HLKLD_LINE_CONFIG, HLKLD_LINE_MAX };      // received line types
+//enum HLKLDLineType  { HLKLD_LINE_OCC, HLKLD_LINE_MOV, HLKLD_LINE_CONFIG, HLKLD_LINE_MAX };      // received line types
 
 // mov and occ parameters available
-enum HLKLDParam  { HLKLD_PARAM_TH1, HLKLD_PARAM_TH2, HLKLD_PARAM_TH3, HLKLD_PARAM_MTH1_MOV, HLKLD_PARAM_MTH2_MOV, HLKLD_PARAM_MTH3_MOV, HLKLD_PARAM_MTH1_OCC, HLKLD_PARAM_MTH2_OCC, HLKLD_PARAM_MTH3_OCC, HLKLD_PARAM_MAX };         // device configuration modes
-const char HLKLDParamLabel[] PROGMEM = "th1|th2|th3|mth1_mov|mth2_mov|mth3_mov|mth1_occ|mth2_occ|mth3_occ";                                                  // device mode labels
+//enum HLKLDParam  { HLKLD_PARAM_TH1, HLKLD_PARAM_TH2, HLKLD_PARAM_TH3, HLKLD_PARAM_MTH1_MOV, HLKLD_PARAM_MTH2_MOV, HLKLD_PARAM_MTH3_MOV, HLKLD_PARAM_MTH1_OCC, HLKLD_PARAM_MTH2_OCC, HLKLD_PARAM_MTH3_OCC, HLKLD_PARAM_MAX };         // device configuration modes
+//const char HLKLDParamLabel[] PROGMEM = "th1|th2|th3|mth1_mov|mth2_mov|mth3_mov|mth1_occ|mth2_occ|mth3_occ";                                                  // device mode labels
 
 // known models
-enum HLKLDModel { HLKLD_MODEL_1115H, HLKLD_MODEL_1125H, HLKLD_MODEL_MAX };              // device reference index
-const char HLKLDModelName[] PROGMEM = "LD1115H-24G|LD1125H-24G|Unknown";              // device reference name
-const char HLKLDModelSignature[] PROGMEM = "th1 th2 th3 ind_min ind_max mov_sn occ_sn dtime|test_mode rmax mth1_mov mth2_mov mth3_mov mth1_occ mth2_occ mth3_occ eff_th accu_num|";                                                  // device mode labels
-const char HLKLDModelDefault[]   PROGMEM = "th1=120;th2=250;dtime=5;mov_sn=3;occ_sn=5;get_all|test_mode=0;rmax=6;mth1_mov=60;mth2_mov=30;mth3_mov=20;mth1_occ=60;mth2_occ=30;mth3_occ=20;get_all|";                                                  // device mode labels
+//enum HLKLDModel { HLKLD_MODEL_1115H, HLKLD_MODEL_1125H, HLKLD_MODEL_MAX };              // device reference index
+//const char HLKLDModelName[] PROGMEM = "LD1115H-24G|LD1125H-24G|Unknown";              // device reference name
+//const char HLKLDModelSignature[] PROGMEM = "th1 th2 th3 ind_min ind_max mov_sn occ_sn dtime|test_mode rmax mth1_mov mth2_mov mth3_mov mth1_occ mth2_occ mth3_occ eff_th accu_num|";                                                  // device mode labels
+//const char HLKLDModelDefault[]   PROGMEM = "th1=120;th2=250;dtime=5;mov_sn=3;occ_sn=5;get_all|test_mode=0;rmax=6;mth1_mov=60;mth2_mov=30;mth3_mov=20;mth1_occ=60;mth2_occ=30;mth3_occ=20;get_all|";                                                  // device mode labels
+
+// ----------------
+// binary commands
+// ----------------
+
+enum HLKLD2410ConfigCommand { HLKLD2410_CMND_ENABLE, HLKLD2410_CMND_DISABLE, HLKLD2410_CMND_READ_PARAM, HLKLD2410_CMND_SET_DISTANCE, HLKLD2410_CMND_SET_SENSITIVITY, HLKLD2410_CMND_OPEN_ENGINEER, HLKLD2410_CMND_CLOSE_ENGINEER, HLKLD2410_CMND_FIRMWARE, HLKLD2410_CMND_MAX };       // list of available commands
+uint8_t hlkld2410_cmnd_enable[]          PROGMEM = { 0xfd, 0xfc, 0xfb, 0xfa, 0x04, 0x00, 0xff, 0x00, 0x01, 0x00, 0x04, 0x03, 0x02, 0x01, 0x00 };
+uint8_t hlkld2410_cmnd_disable[]         PROGMEM = { 0xfd, 0xfc, 0xfb, 0xfa, 0x02, 0x00, 0xfe, 0x00, 0x04, 0x03, 0x02, 0x01, 0x00 };
+
+uint8_t hlkld2410_cmnd_read_param[]      PROGMEM = { 0xfd, 0xfc, 0xfb, 0xfa, 0x02, 0x00, 0x61, 0x00, 0x04, 0x03, 0x02, 0x01, 0x00 };
+uint8_t hlkld2410_cmnd_set_distance[]    PROGMEM = { 0xfd, 0xfc, 0xfb, 0xfa, 0x14, 0x00, 0x60, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x01, 0x00, 0x08, 0x00, 0x00, 0x00, 0x02, 0x00, 0x05, 0x00, 0x00, 0x00, 0x04, 0x03, 0x02, 0x01, 0x00 };
+uint8_t hlkld2410_cmnd_set_sensitivity[] PROGMEM = { 0xfd, 0xfc, 0xfb, 0xfa, 0x14, 0x00, 0x64, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x28, 0x00, 0x00, 0x00, 0x02, 0x00, 0x28, 0x00, 0x00, 0x00, 0x04, 0x03, 0x02, 0x01, 0x00 };
+
+uint8_t hlkld2410_cmnd_open_engineer[]   PROGMEM = { 0xfd, 0xfc, 0xfb, 0xfa, 0x02, 0x00, 0x62, 0x00, 0x04, 0x03, 0x02, 0x01, 0x00 };
+uint8_t hlkld2410_cmnd_close_engineer[]  PROGMEM = { 0xfd, 0xfc, 0xfb, 0xfa, 0x02, 0x00, 0x63, 0x00, 0x04, 0x03, 0x02, 0x01, 0x00 };
+
+uint8_t hlkld2410_cmnd_firmware[]        PROGMEM = { 0xfd, 0xfc, 0xfb, 0xfa, 0x02, 0x00, 0xa0, 0x00, 0x04, 0x03, 0x02, 0x01, 0x00 };
+
 
 // MQTT commands : ld_help and ld_send
-const char kHLKLDCommands[]         PROGMEM = "ld_|help|cmnd|conf|def";
-void (* const HLKLDCommand[])(void) PROGMEM = { &CmndHLKLDHelp, &CmndHLKLDCommand, &CmndHLKLDConfig, &CmndHLKLDDefault };
+const char kHLKLD2410Commands[]         PROGMEM = "ld_|help|hex|firm";
+void (* const HLKLD2410Command[])(void) PROGMEM = { &CmndHLKLD2410Help, &CmndHLKLD2410HexCustom, &CmndHLKLD2410Firmware };
 
 /****************************************\
  *                 Data
 \****************************************/
 
-// HLK-LD sensor general status
+// HLK-LD2410 sensor command
+struct hlkld2410_cmnd {
+  uint8_t type;                   // command type
+  uint8_t param[3];               // parameters
+};
 static struct {
-  bool     get_all = false;                       // flag to update current config
-  char     str_buffer[32];                        // buffer of received data
-  String   str_command;                           // list of next commands to send (separated by ;)
-  String   str_config;                            // returned configuration (param1=value1,param2=value2,...)
-  String   str_signature;                         // device signature
+  uint8_t  next   = 0;            // index of next command in queue
+  uint8_t  number = 0;            // number of pending commands
+  uint32_t time   = 0;            // time of last command
+  struct  hlkld2410_cmnd queue[HLKLD2410_CMND_QUEUE_MAX];     // movement and presence sensor data
+} hlkld2410_command; 
+
+// HLK-LD sensor general status
+struct hlkld2410_sensor {
+  uint8_t  power;           // sensor power (0..100)
+  uint16_t dist;            // object distance (cm)
+  uint32_t time;            // last detection time (s)
+};
+static struct {
   TasmotaSerial *pserial = nullptr;               // pointer to serial port
-} hlkld_status; 
+
+  struct  hlkld2410_sensor occ;                   // presence sensor data
+  struct  hlkld2410_sensor mov;                   // movement sensor data
+
+  uint8_t  recv_state = HLKLD2410_MSG_UNDEFINED;  // current state of received message
+  uint8_t  recv_size = 0;                         // size of currently received message
+  uint8_t  recv_delimiter[4];                     // last 4 octets received (to check delimiter)
+  uint8_t  recv_buffer[HLKLD2410_MSG_SIZE_MAX];   // body of currently received message
+} hlkld2410_status; 
 
 // HLK-LD sensor range data
 struct hlkld_range {
@@ -96,126 +142,263 @@ struct hlkld_range {
   float    dist_last;                             // actual distance detection
 };
 
-// HLK-LD sensor device data
-static struct {
-  uint8_t  model   = HLKLD_MODEL_MAX;                                 // device model
-  uint16_t timeout = HLKLD_DEFAULT_TIMEOUT;                           // default timeout
-  uint32_t index   = UINT32_MAX;                                      // virtual switch index
-  struct   hlkld_range sensor[HLKLD_SENSOR_MAX][HLKLD_RANGE_MAX];     // movement and presence sensor data
-} hlkld_device;
+
 
 /**************************************************\
  *                  Commands
 \**************************************************/
 
 // hlk-ld sensor help
-void CmndHLKLDHelp ()
+void CmndHLKLD2410Help ()
 {
-  char str_signature[128];
-
-  // get signature
-  if (hlkld_device.model == HLKLD_MODEL_MAX) strlcpy (str_signature, hlkld_status.str_signature.c_str (), sizeof (str_signature));
-  else GetTextIndexed (str_signature, sizeof (str_signature), hlkld_device.model, HLKLDModelSignature);
-
   // help on command
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: HLK-LD11xx sensor commands :"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - ld_conf = get last configuration from sensor"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - ld_def  = set all default parameters to sensor"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - ld_cmnd = send command to sensor"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("      get_all, save or parameter=value"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("      parameter can be : %s"), str_signature);
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ld_hex  = send hexadecimal command to the sensor"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ld_firm = print sensor firmware"));
 
-  ResponseCmndDone();
+  ResponseCmndDone ();
 }
 
-void CmndHLKLDCommand (void)
+void CmndHLKLD2410HexCustom (void)
 {
-  // if data is valid, add command
-  if (XdrvMailbox.data_len > 0)
-  {
-    // add new command to the queue
-    HLKLDAddCommand (XdrvMailbox.data, false);
+  int     length;
+  uint8_t hex_command[HLKLD2410_CMND_SIZE_MAX];
 
-    // command done
-    ResponseCmndDone();
-  }
+  // generation of hex command
+  length = HLKLD2410String2Hex (XdrvMailbox.data, hex_command, sizeof (hex_command));
 
-  // else command failed
+  // send command
+  if (HLKLD2410SendCommand (hex_command, length)) ResponseCmndDone ();
   else ResponseCmndFailed();
 }
 
-void CmndHLKLDConfig (void)
+void CmndHLKLD2410Firmware (void)
 {
-  ResponseCmndChar (hlkld_status.str_config.c_str ());
-}
-
-void CmndHLKLDDefault (void)
-{
-  char str_default[64];
-
-  // if data is valid, add command
-  if (hlkld_device.model != HLKLD_MODEL_MAX)
-  {
-    // get default command
-    GetTextIndexed (str_default, sizeof (str_default), hlkld_device.model, HLKLDModelDefault);
-    HLKLDAddCommand (str_default, true);
-
-    // command done
-    ResponseCmndDone();
-  }
-
-  // else command failed
-  else ResponseCmndFailed();
+  ResponseCmndChar (hlkld2410_device.str_firmware.c_str ());
 }
 
 /**************************************************\
  *                  Functions
 \**************************************************/
 
+// convert hexadecimal array to string
+String HLKLD2410Hex2String (const uint8_t* phex_array, const int size_array)
+{
+  int    index;
+  char   str_hex[4];
+  String str_result;
+
+  for (index = 0; index < size_array; index ++)
+  {
+      sprintf (str_hex, "%02X", phex_array[index]);
+      if (index > 0) str_result += " ";
+      str_result += str_hex;
+  }
+
+  return str_result;
+}
+
+// convert string to hexadecimal array
+int HLKLD2410String2Hex (const char* pstr_value, uint8_t *phex_array, const int size_array)
+{
+  int  idx_value, idx_array, value, length;
+  char str_byte[4];
+
+  // check parameter
+  if ((pstr_value == nullptr) || (phex_array == nullptr)) return 0;
+
+  // init
+  idx_value = 0;
+  idx_array = 0;
+  length = strlen (pstr_value);
+  strcpy (str_byte, "00");
+
+  // loop to populate hex array
+  while (idx_value < length - 1)
+  {
+    // populate conversion string
+    str_byte[0] = pstr_value[idx_value];
+    str_byte[1] = pstr_value[idx_value + 1];
+
+    // if space is left, convert hex string to byte 
+    if (idx_array < size_array)
+    {
+      sscanf (str_byte, "%2x", &value);
+      phex_array[idx_array++] = (uint8_t)value;
+    }
+
+    // increment input string counter
+    idx_value += 2;
+  }
+
+  return idx_array;
+}
+
+bool HLKLD2410AppendCommand (const uint8_t command, const uint8_t param1, const uint8_t param2, const uint8_t param3 )
+{
+  uint8_t index;
+
+  // check parameters
+  if (command >= HLKLD2410_CMND_MAX) return false;
+  if (hlkld2410_command.number == HLKLD2410_CMND_QUEUE_MAX) return false;
+
+  // calculate index
+  index = (hlkld2410_command.next + hlkld2410_command.number) % HLKLD2410_CMND_QUEUE_MAX;
+
+  // append command
+  hlkld2410_command.queue[index].type = command;
+  hlkld2410_command.queue[index].param[0] = param1;
+  hlkld2410_command.queue[index].param[1] = param2;
+  hlkld2410_command.queue[index].param[2] = param3;
+
+  // increase counter
+  hlkld2410_command.number++;
+}
+
+
+enum HLKLD2410ConfigCommand { , HLKLD2410_CMND_SET_DISTANCE, HLKLD2410_CMND_SET_SENSITIVITY, , , HLKLD2410_CMND_FIRMWARE, HLKLD2410_CMND_MAX };       // list of available commands
+uint8_t hlkld2410_cmnd_read_param[]      PROGMEM = { 0xfd, 0xfc, 0xfb, 0xfa, 0x02, 0x00, 0x61, 0x00, 0x04, 0x03, 0x02, 0x01, 0x00 };
+uint8_t hlkld2410_cmnd_set_distance[]    PROGMEM = { 0xfd, 0xfc, 0xfb, 0xfa, 0x14, 0x00, 0x60, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x01, 0x00, 0x08, 0x00, 0x00, 0x00, 0x02, 0x00, 0x05, 0x00, 0x00, 0x00, 0x04, 0x03, 0x02, 0x01, 0x00 };
+uint8_t hlkld2410_cmnd_set_sensitivity[] PROGMEM = { 0xfd, 0xfc, 0xfb, 0xfa, 0x14, 0x00, 0x64, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x28, 0x00, 0x00, 0x00, 0x02, 0x00, 0x28, 0x00, 0x00, 0x00, 0x04, 0x03, 0x02, 0x01, 0x00 };
+
+uint8_t []   PROGMEM = { 0xfd, 0xfc, 0xfb, 0xfa, 0x02, 0x00, 0x62, 0x00, 0x04, 0x03, 0x02, 0x01, 0x00 };
+uint8_t []  PROGMEM = { 0xfd, 0xfc, 0xfb, 0xfa, 0x02, 0x00, 0x63, 0x00, 0x04, 0x03, 0x02, 0x01, 0x00 };
+
+uint8_t hlkld2410_cmnd_firmware[]        PROGMEM = { 0xfd, 0xfc, 0xfb, 0xfa, 0x02, 0x00, 0xa0, 0x00, 0x04, 0x03, 0x02, 0x01, 0x00 };
+
+
+bool HLKLD2410ExecutePendingCommand ()
+{
+  uint8_t index;
+
+  // check parameters
+  if (hlkld2410_command.number == 0) return false;
+
+  // execute command
+  index = hlkld2410_command.next;
+  switch (hlkld2410_command.queue[index].type)
+  {
+    case HLKLD2410_CMND_ENABLE:
+      HLKLD2410SendHexCommand (hlkld2410_cmnd_enable, sizeof(hlkld2410_cmnd_enable));
+      break;
+
+    case HLKLD2410_CMND_DISABLE:
+      HLKLD2410SendHexCommand (hlkld2410_cmnd_disable, sizeof(hlkld2410_cmnd_disable));
+      break;
+
+    case HLKLD2410_CMND_READ_PARAM:
+      HLKLD2410SendHexCommand (hlkld2410_cmnd_read_param, sizeof(hlkld2410_cmnd_read_param));
+      break;
+
+    case HLKLD2410_CMND_OPEN_ENGINEER:
+      HLKLD2410SendHexCommand (hlkld2410_cmnd_open_engineer, sizeof(hlkld2410_cmnd_open_engineer));
+      break;
+
+    case HLKLD2410_CMND_CLOSE_ENGINEER:
+      HLKLD2410SendHexCommand (hlkld2410_cmnd_close_engineer, sizeof(hlkld2410_cmnd_close_engineer));
+      break;
+  }
+
+  // update counters
+  hlkld2410_command.time = millis ();
+  hlkld2410_command.first = (index + 1) % HLKLD2410_CMND_QUEUE_MAX;
+  hlkld2410_command.number--;
+}
+
+bool HLKLD2410SendHexCommand (uint8_t *phex_array, const int size_array)
+{
+  String str_log;
+
+  // check environment and parameters
+  if (hlkld2410_status.pserial == nullptr) return false;
+  if ((phex_array == nullptr) || (size_array < 1)) return false;
+
+  // send command
+  hlkld2410_status.pserial->write (phex_array, size_array);
+
+  // command : log
+  str_log = HLKLD2410Hex2String (phex_array, size_array);
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLK: send = %s"), str_log.c_str ());
+
+  return true;
+}
+
+void HLKLD2410ConfifDistance (const uint8_t motion_max_gate, const uint8_t static_max_gate, const uint8_t detection_timeout)
+{
+  uint8_t arr_command[HLKLD2410_CMND_SIZE_MAX];
+
+  // copy command structure
+  memcpy (arr_command, hlkld2410_cmnd_set_distance, sizeof(hlkld2410_cmnd_set_distance));
+
+  // update gate and sensitivities
+  arr_command[11] = motion_max_gate;
+  arr_command[17] = static_max_gate;
+  arr_command[25] = detection_timeout;
+  
+  // send commands
+  HLKLD2410SendCommand (hlkld2410_cmnd_enable, sizeof(hlkld2410_cmnd_enable));
+  HLKLD2410SendCommand (arr_command, sizeof(hlkld2410_cmnd_set_distance));
+  HLKLD2410SendCommand (hlkld2410_cmnd_disable, sizeof(hlkld2410_cmnd_disable));
+}
+
+void HLKLD2410ConfigSensitivity (const uint8_t gate, const uint8_t motion_sensitivity, const uint8_t static_sensitivity)
+{
+  uint8_t arr_command[HLKLD2410_CMND_SIZE_MAX];
+
+  // copy command structure
+  memcpy (arr_command, hlkld2410_cmnd_set_sensitivity, sizeof(hlkld2410_cmnd_set_sensitivity));
+
+  // update gate and sensitivities
+  arr_command[11] = gate;
+  arr_command[17] = motion_sensitivity;
+  arr_command[25] = static_sensitivity;
+  
+  // send commands
+  HLKLD2410SendCommand (hlkld2410_cmnd_enable, sizeof(hlkld2410_cmnd_enable));
+  HLKLD2410SendCommand (arr_command, sizeof(hlkld2410_cmnd_set_sensitivity));
+  HLKLD2410SendCommand (hlkld2410_cmnd_disable, sizeof(hlkld2410_cmnd_disable));
+}
+
 // driver initialisation
-bool HLKLDInitDevice (uint32_t index, uint32_t timeout = HLKLD_DEFAULT_TIMEOUT)
+bool HLKLD2410InitDevice ()
 {
   bool done;
 
-  // set timeout and switch index
-  hlkld_device.timeout = timeout;
-  hlkld_device.index   = index;
-
   // check if already initialised
-  done = (hlkld_status.pserial != nullptr);
+  done = (hlkld2410_status.pserial != nullptr);
 
   // if ports are selected, init sensor state
   if (!done && PinUsed (GPIO_TXD) && PinUsed (GPIO_RXD))
   {
 #ifdef ESP32
     // create serial port
-    hlkld_status.pserial = new TasmotaSerial (Pin (GPIO_RXD), Pin (GPIO_TXD), 1);
+    hlkld2410_status.pserial = new TasmotaSerial (Pin (GPIO_RXD), Pin (GPIO_TXD), 1);
 
     // initialise serial port
-    done = hlkld_status.pserial->begin (115200, SERIAL_8N1);
+    done = hlkld2410_status.pserial->begin (256000, SERIAL_8N1);
 
 #else       // ESP8266
     // create serial port
-    hlkld_status.pserial = new TasmotaSerial (Pin (GPIO_RXD), Pin (GPIO_TXD), 1);
+    hlkld2410_status.pserial = new TasmotaSerial (Pin (GPIO_RXD), Pin (GPIO_TXD), 1);
 
     // initialise serial port
-    done = hlkld_status.pserial->begin (115200, SERIAL_8N1);
+    done = hlkld2410_status.pserial->begin (256000, SERIAL_8N1);
 
     // force hardware configuration on ESP8266
-    if (hlkld_status.pserial->hardwareSerial ()) ClaimSerial ();
+    if (hlkld2410_status.pserial->hardwareSerial ()) ClaimSerial ();
 #endif      // ESP32 & ESP8266
 
     // flush data
-    if (done) hlkld_status.pserial->flush ();
+    if (done) hlkld2410_status.pserial->flush ();
   }
 
   // init device
-  if (done) AddLog (LOG_LEVEL_INFO, PSTR ("HLK: %s sensor init succesfull"), D_HLKLD_NAME);
-  else AddLog (LOG_LEVEL_INFO, PSTR ("HLK: %s sensor init failed"), D_HLKLD_NAME);
+  if (done) AddLog (LOG_LEVEL_INFO, PSTR ("HLK: %s sensor init succesfull"), D_HLKLD2410_NAME);
+  else AddLog (LOG_LEVEL_INFO, PSTR ("HLK: %s sensor init failed"), D_HLKLD2410_NAME);
 
   return done;
 }
 
+/*
 void HLKLDSetSensorType (const uint8_t type)
 {
   char str_sensor[32];
@@ -364,132 +547,76 @@ struct hlkld_range* HLKLDGetLastActiveSensor ()
 
   return psensor;
 }
+*/
 
-bool HLKLDSetDeviceConfig (const char* pstr_key, const char* pstr_value)
+void HLKLD2410RunNextCommand ()
 {
-  struct hlkld_range *prange = nullptr;
+  uint8_t index = UINT8_MAX;
 
-
-  // search for sensor range according to the key and update if found
-  prange = HLKLDGetRangeFromKey (pstr_key);
-  if (prange != nullptr)
+  // get command from current queue
+  if (hlkld2410_command.queue_index < hlkld2410_command.queue_number)
   {
-    prange->power_ref = atol (pstr_value);
-    prange->power_min = LONG_MAX;
-  }
+    // update queue
+    index = hlkld2410_command.queue_index;
+    hlkld2410_command.queue_index++;
 
-  // else if HLK_1115H
-  else if (hlkld_device.model == HLKLD_MODEL_1115H)
-  {
-    // if key deals with timeout, update it
-    if (strstr (pstr_key, "dtime") != nullptr) 
+    // if current command index is valid
+    if (index < HLKLD2410_CMND_QUEUE_MAX)
     {
-      hlkld_device.timeout = (uint16_t)atoi (pstr_value);
-      if (hlkld_device.timeout >= 1000) hlkld_device.timeout /= 1000;
+      // send command according to command type
+      switch (hlkld2410_command.queue[index].type)
+      {
+        case HLKLD2410_CMND_ENABLE:
+          hlkld2410_status.pserial->write (hlkld2410_cmnd_enable, sizeof (hlkld2410_cmnd_enable));
+          break;
+
+        case HLKLD2410_CMND_DISABLE:
+          hlkld2410_status.pserial->write (hlkld2410_cmnd_disable, sizeof (hlkld2410_cmnd_disable));
+          break;
+
+        case HLKLD2410_CMND_FIRMWARE:
+          hlkld2410_status.pserial->write (hlkld2410_cmnd_firmware, sizeof (hlkld2410_cmnd_firmware));
+          break;
+      }
     }
   }
-
-  return (prange != nullptr);
 }
 
-void HLKLDSetPowerAndDistance (const uint8_t sensor, const uint8_t range, long power, const float distance)
+void HLKLD2410AddCommand (const uint8_t command, const uint32_t param1, const uint32_t param2, const uint32_t param3)
 {
   // check parameters
-  if (sensor >= HLKLD_DATA_ANY) return;
-  if (range  >= HLKLD_RANGE_MAX) return;
+  if (command >= HLKLD2410_CMND_MAX) return;
 
-  // if power not provided, set it equal to reference power
-  if (power == LONG_MAX) power = hlkld_device.sensor[sensor][range].power_ref;
+  // set enable, command and disable
+  hlkld2410_command.queue[0].type = HLKLD2410_CMND_ENABLE;
+  hlkld2410_command.queue[1].type = command;
+  hlkld2410_command.queue[1].param1 = param1;
+  hlkld2410_command.queue[1].param2 = param2;
+  hlkld2410_command.queue[1].param3 = param3;
+  hlkld2410_command.queue[2].type = HLKLD2410_CMND_DISABLE;
 
-  // set distance
-  hlkld_device.sensor[sensor][range].dist_last = distance;
-
-  // set power
-  hlkld_device.sensor[sensor][range].power_last = power;
-
-  // update minimum power
-  if (hlkld_device.sensor[sensor][range].power_min > power) hlkld_device.sensor[sensor][range].power_min = power;
-
-  // set timestamp
-  hlkld_device.sensor[sensor][range].time = LocalTime ();
-
-  // log update data
-  AddLog (LOG_LEVEL_DEBUG, PSTR ("HLK: sensor %u, range %u, power %d"), sensor, range, power);
-} 
-
-void HLKLDAddCommand (const char* pstr_command, const bool flush)
-{
-  // check parameter
-  if (pstr_command == nullptr) return;
-
-  // if needed, flushed commands queue
-  if (flush) hlkld_status.str_command = "";
-
-  // append command to the pipe
-  if (hlkld_status.str_command.length () > 0) hlkld_status.str_command += ";";
-  hlkld_status.str_command += pstr_command;
-
-  // if needed, add get_all
-  if (!flush && (strstr (pstr_command, "get_all") == nullptr)) hlkld_status.str_command += ";get_all";
+  // reset command queue
+  hlkld2410_command.queue_index  = 0;
+  hlkld2410_command.queue_number = 3;
 }
 
-bool HLKLDGetCommand (char* pstr_command, size_t size_command)
-{
-  bool result;
-  int  index;
-
-  // check if at least one command in the pipe
-  result = (hlkld_status.str_command.length () > 0);
-  if (result)
-  {
-    // get first command in the list (separated by ;)
-    index = hlkld_status.str_command.indexOf (';');
-
-    // if ; detected, get command before ; and remove it from the list
-    if (index != -1)
-    {
-      strlcpy (pstr_command, hlkld_status.str_command.substring (0, index).c_str (), size_command);
-      hlkld_status.str_command = hlkld_status.str_command.substring (index + 1);
-    }
-
-    // else get command and empty list
-    else
-    {
-      strlcpy (pstr_command, hlkld_status.str_command.c_str (), size_command);
-      hlkld_status.str_command = "";
-    }
-
-    // if command is get_all, reset configuration and signature
-    hlkld_status.get_all = (strstr (pstr_command, "get_all") != nullptr);
-    if (hlkld_status.get_all) hlkld_status.str_config = "";
-    if (hlkld_status.get_all && (hlkld_device.model == HLKLD_MODEL_MAX)) hlkld_status.str_signature = "";
-  }
-
-  return result;
-}
-
-uint32_t HLKLDGetDelay (const uint8_t type)
+uint32_t HLKLD2410GetDelay (const uint8_t type)
 {
   uint8_t  index;
   uint32_t time  = 0;
   uint32_t delay = UINT32_MAX;
 
   // check latest reading time
-  if ((type == HLKLD_DATA_OCC) || (type == HLKLD_DATA_ANY)) 
-    for (index = 0; index < HLKLD_RANGE_MAX; index ++) 
-      time = max (time, hlkld_device.sensor[HLKLD_DATA_OCC][index].time);
-      
-  if ((type == HLKLD_DATA_MOV) || (type == HLKLD_DATA_ANY))
-    for (index = 0; index < HLKLD_RANGE_MAX; index ++) 
-      time = max (time, hlkld_device.sensor[HLKLD_DATA_MOV][index].time);
+  if ((type == HLKLD2410_TYPE_OCC) || (type == HLKLD2410_TYPE_ANY)) time = max (time, hlkld2410_status.time_occ);
+  if ((type == HLKLD2410_TYPE_MOV) || (type == HLKLD2410_TYPE_ANY)) time = max (time, hlkld2410_status.time_mov);
 
   // if time is valid
   if (time > 0) delay = LocalTime () - time;
-  
+
   return delay;
 }
 
-void HLKLDGetDelayText (const uint8_t type, char* pstr_result, size_t size_result)
+void HLKLD2410GetDelayText (const uint8_t type, char* pstr_result, size_t size_result)
 {
   uint32_t delay = UINT32_MAX;
 
@@ -498,23 +625,21 @@ void HLKLDGetDelayText (const uint8_t type, char* pstr_result, size_t size_resul
   if (size_result < 12) return;
 
   // get delay
-  delay = HLKLDGetDelay (type);
+  delay = HLKLD2410GetDelay (type);
 
   // set unit according to value
   if (delay == UINT32_MAX) strcpy (pstr_result, "---");
   else if (delay >= 172800) sprintf (pstr_result, "%u days", delay / 86400);
   else if (delay >= 86400) sprintf (pstr_result, "1 day");
-  else if (delay >= 7200) sprintf (pstr_result, "%u hours", delay / 3600);
-  else if (delay >= 3600) sprintf (pstr_result, "1 hour");
-  else if (delay >= 120) sprintf (pstr_result, "%u minutes", delay / 60);
-  else if (delay >= 60) sprintf (pstr_result, "1 minute");
-  else if (delay > 1) sprintf (pstr_result, "%u seconds", delay);
-  else if (delay > 0) sprintf (pstr_result, "1 second");
+  else if (delay >= 3600) sprintf (pstr_result, "%u hr", delay / 3600);
+  else if (delay >= 60) sprintf (pstr_result, "%u mn", delay / 60);
+  else if (delay > 0) sprintf (pstr_result, "%u sec", delay);
   else strcpy (pstr_result, "now");
   
   return;
 }
 
+/*
 bool HLKLDGetDetectionStatus (uint8_t type = HLKLD_DATA_ANY, uint32_t timeout = UINT32_MAX)
 {
   uint32_t delay;
@@ -531,16 +656,29 @@ bool HLKLDGetDetectionStatus (uint8_t type = HLKLD_DATA_ANY, uint32_t timeout = 
   if (delay == UINT32_MAX) return false;
   else return (delay <= timeout);
 }
+*/
 
 /*********************************************\
  *                   Callback
 \*********************************************/
 
 // driver initialisation
-void HLKLDInit ()
+void HLKLD2410Init ()
 {
-  uint8_t sensor, range;
+  uint8_t index, sensor, range;
 
+AddLog (LOG_LEVEL_INFO, PSTR ("HLK: Init serial port"));
+
+  // init sensor
+  HLKLD2410InitDevice ();
+
+  // init command delimiter
+  for (index = 0; index < 4; index ++) hlkld2410_status.recv_delimiter[index] = 0xFF;
+
+  // add firmware reading command
+
+  
+/*
   // init device range arrays
   for (sensor = 0; sensor < HLKLD_SENSOR_MAX; sensor++)
     for (range = 0; range < HLKLD_RANGE_MAX; range++)
@@ -560,15 +698,16 @@ void HLKLDInit ()
   HLKLDAddCommand (" ;get_all", true);
 
   // log help command
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ld_help to get help on HLK-LD11xx commands"), D_HLKLD_NAME);
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ld_help to get help on %s sensor driver"), D_HLKLD_NAME);
+  */
 }
 
 // loop every second
-void HLKLDEverySecond ()
+void HLKLD2410EverySecond ()
 {
   int  index = -1;
   char str_command[32];
-
+/*
   // check sensor presence
   if (hlkld_status.pserial == nullptr) return;
 
@@ -585,13 +724,103 @@ void HLKLDEverySecond ()
 
   // if needed, update virtual switch status
   if (hlkld_device.index < MAX_SWITCHES) Switch.virtual_state[hlkld_device.index] = HLKLDGetDetectionStatus (HLKLD_DATA_ANY);
+*/
+}
+
+void HLKLD2410LogMessage (const bool is_command)
+{
+  uint8_t index;
+  char    str_hex[4];
+  char    str_type[8];
+  String  str_log;
+
+  // loop to generate string
+  for (index = 0; index < hlkld2410_status.recv_size; index ++)
+  {
+    sprintf(str_hex, "%02X", hlkld2410_status.recv_buffer[index]);
+    if (index > 0) str_log += " ";
+    str_log += str_hex;
+  }
+
+  // log message
+  if (is_command) strcpy (str_type, "recv"); else strcpy (str_type, "data"); 
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLK: %s = %s"), str_type, str_log.c_str ());
+}
+
+void HLKLD2410HandleMessageCommand ()
+{
+  // log reveived command
+  HLKLD2410LogMessage (true);
+
+  // init message buffer
+  hlkld2410_status.recv_size = 0;
+}
+
+void HLKLD2410HandleMessageData ()
+{
+  uint8_t  dist_type;
+  uint8_t  recv_mode;
+  uint16_t recv_data;
+  uint32_t time_now = LocalTime ();
+
+  // calculate message size
+  recv_data = hlkld2410_status.recv_buffer[4] + 256 * hlkld2410_status.recv_buffer[5];
+
+  // detect standard or engineering mode
+  if (hlkld2410_status.recv_buffer[6] == 0x01) recv_mode = HLKLD2410_MODE_ENGINEERING;
+  else if (hlkld2410_status.recv_buffer[6] == 0x02) recv_mode = HLKLD2410_MODE_STANDARD;
+  else recv_mode = HLKLD2410_MODE_MAX;
+
+  // get distance type
+  if (hlkld2410_status.recv_buffer[8] == 0x01) dist_type = HLKLD2410_TYPE_MOV;
+  else if (hlkld2410_status.recv_buffer[8] == 0x02) dist_type = HLKLD2410_TYPE_OCC;
+  else if (hlkld2410_status.recv_buffer[8] == 0x03) dist_type = HLKLD2410_TYPE_BOTH;
+  else dist_type = HLKLD2410_TYPE_NONE;
+
+  // get MOV distance and power
+  if ((dist_type == HLKLD2410_TYPE_MOV) || (dist_type == HLKLD2410_TYPE_BOTH))
+  {
+    hlkld2410_status.mov.dist  = hlkld2410_status.recv_buffer[9] + 256 * hlkld2410_status.recv_buffer[10];
+    hlkld2410_status.mov.power = hlkld2410_status.recv_buffer[11];
+    hlkld2410_status.mov.time  = time_now;
+  }
+
+  // get OCC distance and power
+    if ((dist_type == HLKLD2410_TYPE_OCC) || (dist_type == HLKLD2410_TYPE_BOTH))
+  {
+    hlkld2410_status.occ.dist  = hlkld2410_status.recv_buffer[12] + 256 * hlkld2410_status.recv_buffer[13];
+    hlkld2410_status.occ.power = hlkld2410_status.recv_buffer[14];
+    hlkld2410_status.occ.time  = time_now;
+  }
+  
+  // if web debug ctive, log message
+  if (Settings->weblog_level > 2) HLKLD2410LogMessage (false);
+
+  // init message buffer
+  hlkld2410_status.recv_size = 0;
+}
+
+uint8_t HLKLD2410CheckMessageState ()
+{
+  uint8_t result;
+
+  // check command start
+  if ((hlkld2410_status.recv_delimiter[0] == 0xFD) && (hlkld2410_status.recv_delimiter[1] == 0xFC) && (hlkld2410_status.recv_delimiter[2] == 0xFB) && (hlkld2410_status.recv_delimiter[3] == 0xFA)) result = HLKLD2410_MSG_CMND_START;
+  else if ((hlkld2410_status.recv_delimiter[0] == 0x04) && (hlkld2410_status.recv_delimiter[1] == 0x03) && (hlkld2410_status.recv_delimiter[2] == 0x02) && (hlkld2410_status.recv_delimiter[3] == 0x01)) result = HLKLD2410_MSG_CMND_STOP;
+  else if ((hlkld2410_status.recv_delimiter[0] == 0xF4) && (hlkld2410_status.recv_delimiter[1] == 0xF3) && (hlkld2410_status.recv_delimiter[2] == 0xF2) && (hlkld2410_status.recv_delimiter[3] == 0xF1)) result = HLKLD2410_MSG_DATA_START;
+  else if ((hlkld2410_status.recv_delimiter[0] == 0xF8) && (hlkld2410_status.recv_delimiter[1] == 0xF7) && (hlkld2410_status.recv_delimiter[2] == 0xF6) && (hlkld2410_status.recv_delimiter[3] == 0xF5)) result = HLKLD2410_MSG_DATA_STOP;
+  else result = hlkld2410_status.recv_state;
+
+  return result;
 }
 
 // Handling of received data
-void HLKLDReceiveData ()
+void HLKLD2410ReceiveData ()
 {
-  uint8_t  type;
-  int      index;
+  uint8_t  msg_state;
+  uint8_t  index;
+  uint8_t  recv_data;
+  uint8_t  msg_part;
   long     power;
   float    distance;
   char     *pstr_tag;
@@ -600,117 +829,59 @@ void HLKLDReceiveData ()
   char     str_key[128];
 
   // check sensor presence
-  if (hlkld_status.pserial == nullptr) return;
-
-  // init buffer and set receive loop timeout to 40ms
-  strcpy (str_recv, " ");
+  if (hlkld2410_status.pserial == nullptr) return;
 
   // run serial receive loop
-  while (hlkld_status.pserial->available ()) 
+  while (hlkld2410_status.pserial->available ()) 
   {
-    // handle received character
-    str_recv[0] = (char)hlkld_status.pserial->read (); 
-    switch (str_recv[0])
+    // update received message delimiter
+    for (index = 1; index < 4; index ++) hlkld2410_status.recv_delimiter[index - 1] = hlkld2410_status.recv_delimiter[index];
+    hlkld2410_status.recv_delimiter[3] = (uint8_t)hlkld2410_status.pserial->read ();
+
+    // append received value
+    if (hlkld2410_status.recv_size < HLKLD2410_MSG_SIZE_MAX) hlkld2410_status.recv_buffer[hlkld2410_status.recv_size++] = hlkld2410_status.recv_delimiter[3];
+
+    // check current message state
+    msg_state = HLKLD2410CheckMessageState ();
+    switch (msg_state)
     {
-      // CR is ignored
-      case 0x0D:
-        break;
-          
-      // LF needs line analysis
-      case 0x0A:
-        //log received data
-        AddLog (LOG_LEVEL_DEBUG, PSTR ("HLK: %s"), hlkld_status.str_buffer);
-
-        // determine line type
-        type  = HLKLD_LINE_MAX;
-        if (strstr (hlkld_status.str_buffer, "occ,") == hlkld_status.str_buffer) type = HLKLD_LINE_OCC;
-        else if (strstr (hlkld_status.str_buffer, "mov,") == hlkld_status.str_buffer) type = HLKLD_LINE_MOV;
-        else if (strstr (hlkld_status.str_buffer, " is ") != nullptr) type = HLKLD_LINE_CONFIG;
-
-        // handle according to line type
-        switch (type)
-        {
-          // handle parameter line
-          case HLKLD_LINE_CONFIG:
-            pstr_tag = strstr (hlkld_status.str_buffer, " ");
-            if (pstr_tag != nullptr)
-            {
-              // extract key and value
-              *pstr_tag = 0;
-              strlcpy (str_key,   hlkld_status.str_buffer, sizeof (str_key));
-              strlcpy (str_value, pstr_tag + 4, sizeof (str_value));
-            
-              // if we are dealing with get_all result
-              if (hlkld_status.get_all)
-              {
-                // add to parameters
-                if (hlkld_status.str_config.length () > 0) hlkld_status.str_config += ",";
-                hlkld_status.str_config += str_key;
-                hlkld_status.str_config += "=";
-                hlkld_status.str_config += str_value;
-
-                // if model unknown, check signature
-                if (hlkld_device.model == HLKLD_MODEL_MAX)
-                {
-                  // append key to signature
-                  if (hlkld_status.str_signature.length () > 0) hlkld_status.str_signature += " ";
-                  hlkld_status.str_signature += str_key;
-
-                  // check current signature
-                  index = GetCommandCode (str_key, sizeof (str_key), hlkld_status.str_signature.c_str (), HLKLDModelSignature);
-                  if (index != -1) HLKLDSetSensorType ((uint8_t) index);
-                }
-              }
-
-              // else update power trigger values
-              else HLKLDSetDeviceConfig (str_key, str_value);
-            }
-          break;
-
-          // handle presence (occ) or movement (mov) line
-          case HLKLD_LINE_OCC:
-          case HLKLD_LINE_MOV:
-            // init
-            distance = NAN;
-            power    = LONG_MAX;
-
-            // if dis= available, get distance
-            pstr_tag = strstr (hlkld_status.str_buffer, "dis=");
-            if (pstr_tag != nullptr) distance = atof (pstr_tag + 4);
-
-            // if str= available, get power
-            pstr_tag = strstr (hlkld_status.str_buffer, "str=");
-            if (pstr_tag != nullptr) power = atol (pstr_tag + 4);
-
-            // if distance and power not available, get last value with space separation
-            pstr_tag = nullptr;
-            if (isnan (distance) && (power == LONG_MAX)) pstr_tag = strrchr (hlkld_status.str_buffer, ' ');
-            if (pstr_tag != nullptr) power = atol (pstr_tag + 1);
-
-            // set current value
-            HLKLDSetPowerFromDistance (type, distance, power);
-            break;
-        }
-
-        // empty reception buffer
-        strcpy (hlkld_status.str_buffer, "");
+      // new command starts
+      case HLKLD2410_MSG_CMND_START:
+        for (index = 0; index < 4; index ++) hlkld2410_status.recv_buffer[index] = hlkld2410_status.recv_delimiter[index];
+        hlkld2410_status.recv_size = 4;
+        hlkld2410_status.recv_state = HLKLD2410_MSG_CMND_BODY;
         break;
 
-      // default : add current caracter to buffer
-      default:
-        strlcat (hlkld_status.str_buffer, str_recv, sizeof (hlkld_status.str_buffer));
+      // new sensor data starts
+      case HLKLD2410_MSG_DATA_START:
+        for (index = 0; index < 4; index ++) hlkld2410_status.recv_buffer[index] = hlkld2410_status.recv_delimiter[index];
+        hlkld2410_status.recv_size = 4;
+        hlkld2410_status.recv_state = HLKLD2410_MSG_DATA_BODY;
+        break;
+
+      // command stops
+      case HLKLD2410_MSG_CMND_STOP:
+        HLKLD2410HandleMessageCommand ();
+        hlkld2410_status.recv_state = HLKLD2410_MSG_NONE;
+        break;
+
+      // sensor data stops
+      case HLKLD2410_MSG_DATA_STOP:
+        HLKLD2410HandleMessageData ();
+        hlkld2410_status.recv_state = HLKLD2410_MSG_NONE;
         break;
     }
   }
 }
 
 // Show JSON status (for MQTT)
-void HLKLDShowJSON (bool append)
+void HLKLD2410ShowJSON (bool append)
 {
   uint32_t delay;
   char     str_text[32];
   String   str_config;
 
+/*
   // check sensor presence
   if (hlkld_status.pserial == nullptr) return;
 
@@ -774,6 +945,7 @@ void HLKLDShowJSON (bool append)
     ResponseAppend_P (PSTR ("}"));
     MqttPublishTeleSensor ();
   } 
+*/
 }
 
 /*********************************************\
@@ -783,11 +955,20 @@ void HLKLDShowJSON (bool append)
 #ifdef USE_WEBSERVER
 
 // Append HLK-LD11xx sensor data to main page
-void HLKLDWebSensor ()
+void HLKLD2410WebSensor ()
 {
-  char str_text[32];
+  char str_delay[32];
   char str_icon[8];
 
+  GetTextIndexed (str_icon, sizeof (str_icon), HLKLD2410_TYPE_OCC, HLKLD2410DataIcon);
+  HLKLD2410GetDelayText (HLKLD2410_TYPE_OCC, str_delay, sizeof (str_delay));
+  WSContentSend_PD (PSTR ("{s}%s %s <i>(%s)</i>{m}%u <i>(%u cm)</i>{e}\n"), D_HLKLD2410_NAME, str_icon, str_delay, hlkld2410_status.occ.power, hlkld2410_status.occ.dist);
+
+  GetTextIndexed (str_icon, sizeof (str_icon), HLKLD2410_TYPE_MOV, HLKLD2410DataIcon);
+  HLKLD2410GetDelayText (HLKLD2410_TYPE_MOV, str_delay, sizeof (str_delay));
+  WSContentSend_PD (PSTR ("{s}%s %s <i>(%s)</i>{m}%u <i>(%u cm)</i>{e}\n"), D_HLKLD2410_NAME, str_icon, str_delay, hlkld2410_status.mov.power, hlkld2410_status.mov.dist);
+
+/*
   // check sensor presence
   if (hlkld_status.pserial == nullptr) return;
 
@@ -804,8 +985,10 @@ void HLKLDWebSensor ()
   GetTextIndexed (str_icon, sizeof (str_icon), HLKLD_DATA_MOV, HLKLDDataIcon);
   HLKLDGetDelayText (HLKLD_DATA_MOV, str_text, sizeof (str_text));
   WSContentSend_P (PSTR ("%s %s{e}"), str_icon, str_text);
+  */
 }
 
+/*
 #ifdef USE_HLKLD11_WEB_CONFIG
 
 void HLKLDWebConfigButton ()
@@ -1091,6 +1274,7 @@ void HLKLDWebPageConfigUpdate ()
 }
 
 #endif  // USE_HLKLD11_WEB_CONFIG
+*/
 
 #endif  // USE_WEBSERVER
 
@@ -1099,7 +1283,7 @@ void HLKLDWebPageConfigUpdate ()
 \***************************************/
 
 // Teleinfo sensor
-bool Xsns124 (uint8_t function)
+bool Xsns123 (uint8_t function)
 {
   bool result = false;
 
@@ -1107,27 +1291,27 @@ bool Xsns124 (uint8_t function)
   switch (function) 
   {
     case FUNC_INIT:
-      HLKLDInit ();
-      HLKLDInitDevice (0, HLKLD_DEFAULT_TIMEOUT);
+      HLKLD2410Init ();
       break;
     case FUNC_COMMAND:
-      result = DecodeCommand (kHLKLDCommands, HLKLDCommand);
+      result = DecodeCommand (kHLKLD2410Commands, HLKLD2410Command);
       break;
     case FUNC_EVERY_SECOND:
-      HLKLDEverySecond ();
+      HLKLD2410EverySecond ();
       break;
     case FUNC_JSON_APPEND:
-      HLKLDShowJSON (true);
+      HLKLD2410ShowJSON (true);
       break;
     case FUNC_EVERY_100_MSECOND:
-      HLKLDReceiveData ();
+      HLKLD2410ReceiveData ();
       break;
 
 #ifdef USE_WEBSERVER
     case FUNC_WEB_SENSOR:
-      HLKLDWebSensor ();
+      HLKLD2410WebSensor ();
       break;
 
+/*
 #ifdef USE_HLKLD11_WEB_CONFIG
     case FUNC_WEB_ADD_BUTTON:
       HLKLDWebConfigButton ();
@@ -1136,7 +1320,8 @@ bool Xsns124 (uint8_t function)
       Webserver->on ("/" D_HLKLD_PAGE_CONFIG, HLKLDWebPageConfigure);
       Webserver->on ("/" D_HLKLD_PAGE_CONFIG_UPD, HLKLDWebPageConfigUpdate);
       break;
-#endif  // USE_HLKLD11_WEB_CONFIG
+#endif  // USE_HLKLD24_WEB_CONFIG
+*/
 
 #endif  // USE_WEBSERVER
 
@@ -1145,6 +1330,6 @@ bool Xsns124 (uint8_t function)
   return result;
 }
 
-#endif      // USE_HLKLD11
-#endif      // FIRMWARE_SAFEBOOT
+#endif     // USE_HLKLD24
+#endif     // FIRMWARE_SAFEBOOT
 

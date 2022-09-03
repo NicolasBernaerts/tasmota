@@ -7,6 +7,7 @@
     02/05/2021 - v1.2 - Add Ethernet adapter status (ESP32) 
     22/06/2021 - v1.3 - Change in wifi activation/desactivation 
     07/05/2022 - v1.4 - Add command to enable JSON publishing 
+    14/08/2022 - v1.5 - Simplification, slim down of JSON 
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -24,16 +25,10 @@
  *                IP Address
 \*************************************************/
 
+#ifndef FIRMWARE_SAFEBOOT
 #ifdef USE_IPADDRESS
 
 #define XDRV_94                   94
-
-// commands
-#define D_CMND_IPADDRESS_HELP     "help"
-#define D_CMND_IPADDRESS_ADDR     "addr"
-#define D_CMND_IPADDRESS_GATEWAY  "gway"
-#define D_CMND_IPADDRESS_NETMASK  "nmsk"
-#define D_CMND_IPADDRESS_DNS      "dns"
 
 // web URL
 const char D_IPADDRESS_PAGE_CONFIG[] PROGMEM = "/ip";
@@ -45,87 +40,84 @@ const char D_IPADDRESS_CONFIGURE[] PROGMEM = "Configure IP";
 // constant strings
 const char D_IPADDRESS_FIELD_INPUT[] PROGMEM = "<p>%s<br><input type='text' name='%s' value='%_I' minlength='7' maxlength='15'></p>\n";
 
-// MQTT commands : ip_pub
-const char kIPAddressCommands[]        PROGMEM = "ip_|help|pub";
-void (*const IPAddressCommand[])(void) PROGMEM = { &CmndIPAddressHelp, &CmndIPAddressPublish };
-
-/**************************************************\
- *                  Variables
-\**************************************************/
-
-// variables
-static struct {
-  bool     publish_json = false;
-  uint32_t address;
-} ipaddress;
-
-/***************************************\
- *               Commands
-\***************************************/
-
-// ip address help
-void CmndIPAddressHelp ()
-{
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: IP Address commands :"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - ip_pub on/off  = add ip address data in telemetry JSON"));
-  ResponseCmndDone();
-}
-
-// set motion detection rearm flag
-void CmndIPAddressPublish ()
-{
-  if (XdrvMailbox.data_len > 0)
-  {
-    // update flag
-    if (strcasecmp (XdrvMailbox.data, "OFF") == 0) ipaddress.publish_json = false;
-    else if (strcasecmp (XdrvMailbox.data, "ON") == 0) ipaddress.publish_json = true;
-    else ipaddress.publish_json = (XdrvMailbox.payload > 0);
-  }
-  ResponseCmndNumber (ipaddress.publish_json);
-}
+// IP address source
+enum IPAddressSource { IP_SOURCE_NONE, IP_SOURCE_WIFI, IP_SOURCE_ETHERNET };
+const char kIPAddressSources[] PROGMEM = "None|Wifi|Eth";
 
 /**************************************************\
  *                  Functions
 \**************************************************/
 
-// Get IP connexion status
-bool IPAddressIsConnected ()
+// get active network adapter
+uint8_t IPAddressGetSource ()
 {
-  bool is_connected;
-
-  // wifi
-  is_connected = ((uint32_t)WiFi.localIP () > 0);
-
-#ifdef ESP32
 #ifdef USE_ETHERNET
   // ethernet
-  is_connected |= ((uint32_t)ETH.localIP () > 0);
+  if ((uint32_t)ETH.localIP () > 0) return IP_SOURCE_ETHERNET;
+  else
 #endif // USE_ETHERNET
-#endif // ESP32
 
-return is_connected;
+  // wifi
+  if ((uint32_t)WiFi.localIP () > 0) return IP_SOURCE_WIFI;
+
+  else return IP_SOURCE_NONE;
+}
+
+// get literal IP address
+String IPAddressGetIP ()
+{
+  uint8_t source = IPAddressGetSource ();
+  String  str_result = "0.0.0.0";
+
+#ifdef USE_ETHERNET
+  // ethernet
+  if (source == IP_SOURCE_ETHERNET) str_result = ETH.localIP ().toString ();
+  else
+#endif // USE_ETHERNET
+
+  // wifi
+  if (source == IP_SOURCE_WIFI) str_result = WiFi.localIP ().toString ();
+
+  return str_result;
+}
+
+// save IP address in setup
+bool IPAddressUpdateSetup (const uint8_t index, const char* pstr_address)
+{
+  bool     updated;
+  uint32_t value;
+
+  if (pstr_address == nullptr) return false;
+  if (index > 3) return false;
+
+  ParseIPv4 (&value, pstr_address);
+  updated = (value != Settings->ipv4_address[index]);
+  if (updated) Settings->ipv4_address[index] = value;
+  
+  return updated;
 }
 
 // Show JSON status (for MQTT)
 void IPAddressShowJSON ()
 {
-  // append Wifi data
-  if (WiFi.getMode() != WIFI_OFF) ResponseAppend_P (PSTR (",\"Wifi\":{\"IP\":\"%s\",\"MAC\":\"%s\",\"Host\":\"%s\",\"SSID\":\"%s\",\"Qty\":\"%d\"}"), WiFi.localIP ().toString ().c_str (), WiFi.macAddress ().c_str (), TasmotaGlobal.hostname, SettingsText (SET_STASSID1 + Settings->sta_active), WifiGetRssiAsQuality (WiFi.RSSI ()));
+  char str_adapter[16];
 
-#ifdef ESP32
+  // IP address
+  ResponseAppend_P (PSTR (",\"IP\":\"%s\""), IPAddressGetIP ().c_str ());
+
+  // network adapter
+  GetTextIndexed (str_adapter, sizeof (str_adapter), IPAddressGetSource (), kIPAddressSources);
+  ResponseAppend_P (PSTR (",\"Net\":\"%s\""), str_adapter);
+
+  // wifi MAC
+  if (WiFi.getMode() != WIFI_OFF) ResponseAppend_P (PSTR (",\"Wifi-MAC\":\"%s\""), WiFi.macAddress ().c_str ());
+
 #ifdef USE_ETHERNET
-  // if Ethernet adapter declared, append Ethenet data
-  if (Settings->flag4.network_ethernet == 1) ResponseAppend_P (PSTR (",\"Eth\":{\"IP\":\"%s\",\"MAC\":\"%s\",\"Host\":\"%s\"}"), EthernetLocalIP ().toString ().c_str (), EthernetMacAddress ().c_str (), EthernetHostname ());
+  // ethenet MAC
+  if (Settings->flag4.network_ethernet == 1) ResponseAppend_P (PSTR (",\"Eth-MAC\":\"%s\""), EthernetMacAddress ().c_str ());
 #endif // USE_ETHERNET
-#endif // ESP32
 }
 
-// init function
-void IPAddressInit ()
-{
-  // log help command
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ip_help to get help on IP Address commands"));
-}
 /***********************************************\
  *                    Web
 \***********************************************/
@@ -141,55 +133,31 @@ void IPAddressWebConfigButton ()
 // IP address configuration web page
 void IPAddressWebPageConfigure ()
 {
-  bool     updated = false;
-  uint32_t value;
-  char     str_argument[32];
+  bool updated = false;
+  char str_argument[32];
 
   // if access not allowed, close
   if (!HttpCheckPriviledgedAccess()) return;
 
-  // page comes from save button on configuration page
-  if (Webserver->hasArg ("save"))
-  {
-    // device ip address
-    WebGetArg (D_CMND_IPADDRESS_ADDR, str_argument, sizeof (str_argument));
-    if (strlen (str_argument) > 0)
-    {
-      ParseIPv4 (&value, str_argument);
-      updated |= (value != Settings->ipv4_address[0]);
-      Settings->ipv4_address[0] = value;
-    }
+  // device ip address
+  WebGetArg ("ip0", str_argument, sizeof (str_argument));
+  if (strlen (str_argument) > 0) updated |= IPAddressUpdateSetup (0, str_argument);
 
-    // gateway
-    WebGetArg (D_CMND_IPADDRESS_GATEWAY, str_argument, sizeof (str_argument));
-    if (strlen (str_argument) > 0)
-    {
-      ParseIPv4 (&value, str_argument);
-      updated |= (value != Settings->ipv4_address[1]);
-      Settings->ipv4_address[1] = value;
-    }
+  // gateway
+  WebGetArg ("ip1", str_argument, sizeof (str_argument));
+  if (strlen (str_argument) > 0) updated |= IPAddressUpdateSetup (1, str_argument);
 
-    // net mask
-    WebGetArg (D_CMND_IPADDRESS_NETMASK, str_argument, sizeof (str_argument));
-    if (strlen (str_argument) > 0)
-    {
-      ParseIPv4 (&value, str_argument);
-      updated |= (value != Settings->ipv4_address[2]);
-      Settings->ipv4_address[2] = value;
-    }
 
-    // gateway
-    WebGetArg (D_CMND_IPADDRESS_DNS, str_argument, sizeof (str_argument));
-    if (strlen (str_argument) > 0)
-    {
-      ParseIPv4 (&value, str_argument);
-      updated |= (value != Settings->ipv4_address[3]);
-      Settings->ipv4_address[3] = value;
-    }
+  // net mask
+  WebGetArg ("ip2", str_argument, sizeof (str_argument));
+  if (strlen (str_argument) > 0) updated |= IPAddressUpdateSetup (2, str_argument);
 
-    // if data have been updated, restart
-    if (updated) WebRestart (1);
-  }
+  // gateway
+  WebGetArg ("ip3", str_argument, sizeof (str_argument));
+  if (strlen (str_argument) > 0) updated |= IPAddressUpdateSetup (3, str_argument);
+
+  // if data have been updated, restart
+  if (updated) WebRestart (1);
 
   // beginning of form
   WSContentStart_P (D_IPADDRESS_CONFIGURE);
@@ -200,10 +168,10 @@ void IPAddressWebPageConfigure ()
   // ---------------------
   WSContentSend_P (PSTR ("<p><fieldset><legend><b>&nbsp;🔗 IP&nbsp;</b></legend>\n"));
 
-  WSContentSend_P (D_IPADDRESS_FIELD_INPUT, PSTR ("Address <small>(0.0.0.0 for DHCP)</small>"), PSTR (D_CMND_IPADDRESS_ADDR),    Settings->ipv4_address[0]);
-  WSContentSend_P (D_IPADDRESS_FIELD_INPUT, PSTR ("Gateway"), PSTR (D_CMND_IPADDRESS_GATEWAY), Settings->ipv4_address[1]);
-  WSContentSend_P (D_IPADDRESS_FIELD_INPUT, PSTR ("Netmask"), PSTR (D_CMND_IPADDRESS_NETMASK), Settings->ipv4_address[2]);
-  WSContentSend_P (D_IPADDRESS_FIELD_INPUT, PSTR ("DNS"),     PSTR (D_CMND_IPADDRESS_DNS),     Settings->ipv4_address[3]);
+  WSContentSend_P (D_IPADDRESS_FIELD_INPUT, PSTR ("Address <small>(0.0.0.0 for DHCP)</small>"), PSTR ("ip0"), Settings->ipv4_address[0]);
+  WSContentSend_P (D_IPADDRESS_FIELD_INPUT, PSTR ("Gateway"),                                   PSTR ("ip1"), Settings->ipv4_address[1]);
+  WSContentSend_P (D_IPADDRESS_FIELD_INPUT, PSTR ("Netmask"),                                   PSTR ("ip2"), Settings->ipv4_address[2]);
+  WSContentSend_P (D_IPADDRESS_FIELD_INPUT, PSTR ("DNS"),                                       PSTR ("ip3"), Settings->ipv4_address[3]);
 
   WSContentSend_P (PSTR ("</fieldset></p><br>\n"));
 
@@ -235,28 +203,27 @@ void IPAddressWebPageJSON ()
   WSContentSend_P ( PSTR (",\"Friendly Name\":\"%s\""), SettingsText (SET_DEVICENAME));
 
 #ifdef EXTENSION_NAME
-  // "Ext-type":"type","Ext-version":"version","Ext-author":"author"}
+  // "Extension type":"type","Extension version":"version","Extension author":"author"}
   WSContentSend_P ( PSTR (",\"Extension Type\":\"%s\""), EXTENSION_NAME);
   WSContentSend_P ( PSTR (",\"Extension Version\":\"%s\""), EXTENSION_VERSION);
-  WSContentSend_P ( PSTR (",\"Extension Aauthor\":\"%s\""), EXTENSION_AUTHOR);
+  WSContentSend_P ( PSTR (",\"Extension Author\":\"%s\""), EXTENSION_AUTHOR);
 #endif
 
   // "MQTT":{"Host":"host","Port":"port","Topic":"topic"}
   WSContentSend_P ( PSTR (",\"MQTT Host\":\"%s\""), SettingsText (SET_MQTT_HOST));
-  WSContentSend_P ( PSTR (",\"MQTT Pport\":\"%d\""), Settings->mqtt_port);
+  WSContentSend_P ( PSTR (",\"MQTT Port\":\"%d\""), Settings->mqtt_port);
   WSContentSend_P ( PSTR (",\"MQTT Full Topic\":\"%s\""), GetTopic_P (stopic, CMND, TasmotaGlobal.mqtt_topic, ""));
 
-  // "Wifi":{"IP":"xx.xx.xx.xx","MAC":"xx:xx:xx:xx:xx:xx:xx","Host":"hostname","SSID":"ssid,"Quality":"70"}
+  // "Wifi IP":"xx.xx.xx.xx","Wifi MAC":"xx:xx:xx:xx:xx:xx:xx","Wifi Host":"hostname","Wifi SSID":"ssid,"Wifi Quality":"70"}
   WSContentSend_P ( PSTR (",\"Wifi IP\":\"%s\""), WiFi.localIP ().toString ().c_str ());
-  WSContentSend_P ( PSTR (",\"Wifi Mac\":\"%s\""), WiFi.macAddress ().c_str ());
+  WSContentSend_P ( PSTR (",\"Wifi MAC\":\"%s\""), WiFi.macAddress ().c_str ());
   WSContentSend_P ( PSTR (",\"Wifi Host\":\"%s\""), TasmotaGlobal.hostname);
-  WSContentSend_P ( PSTR (",\"Wifi Ssid\":\"%s\""), SettingsText (SET_STASSID1 + Settings->sta_active));
+  WSContentSend_P ( PSTR (",\"Wifi SSID\":\"%s\""), SettingsText (SET_STASSID1 + Settings->sta_active));
   WSContentSend_P ( PSTR (",\"Wifi Quality\":\"%d\""), WifiGetRssiAsQuality (WiFi.RSSI ()));
 
-#ifdef ESP32
 #ifdef USE_ETHERNET
 
-  // "Ethernet":{"IP":"xx.xx.xx.xx","MAC":"xx:xx:xx:xx:xx:xx:xx","Host":"hostname"}
+  // "Eth IP":"xx.xx.xx.xx","Eth MAC":"xx:xx:xx:xx:xx:xx:xx","Eth Host":"hostname"}
   if (Settings->flag4.network_ethernet == 1)
   {
     WSContentSend_P (PSTR (",\"Eth IP\":\"%s\""), EthernetLocalIP ().toString ().c_str ());
@@ -265,7 +232,6 @@ void IPAddressWebPageJSON ()
   }
 
 #endif // USE_ETHERNET
-#endif // ESP32
 
   // end of page
   WSContentSend_P ( PSTR ("}"));
@@ -285,14 +251,8 @@ bool Xdrv94 (uint8_t function)
   // main callback switch
   switch (function)
   { 
-    case FUNC_INIT:
-      IPAddressInit ();
-      break;
-    case FUNC_COMMAND:
-      result = DecodeCommand (kIPAddressCommands, IPAddressCommand);
-      break;
     case FUNC_JSON_APPEND:
-      if (ipaddress.publish_json) IPAddressShowJSON ();
+      IPAddressShowJSON ();
       break;
 
 #ifdef USE_WEBSERVER
@@ -310,4 +270,5 @@ bool Xdrv94 (uint8_t function)
   return result;
 }
 
-#endif // USE_IPADDRESS
+#endif    // USE_IPADDRESS
+#endif    // FIRMWARE_SAFEBOOT

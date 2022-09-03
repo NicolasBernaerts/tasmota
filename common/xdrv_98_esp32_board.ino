@@ -21,6 +21,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef FIRMWARE_SAFEBOOT
 #ifdef ESP32
 #ifdef USE_ETHERNET
 
@@ -241,6 +242,8 @@ bool Xdrv98 (uint8_t function)
   return false;
 }
 
-#endif   // USE_ETHERNET
-#endif   // ESP32
+#endif     // USE_ETHERNET
+#endif     // ESP32
+#endif     // FIRMWARE_SAFEBOOT
+
 

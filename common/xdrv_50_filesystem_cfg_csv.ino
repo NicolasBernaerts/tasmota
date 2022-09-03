@@ -26,6 +26,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef FIRMWARE_SAFEBOOT
 #ifdef USE_UFILESYS
 
 // partition constant
@@ -633,3 +634,4 @@ void UfsCsvCleanupFileSystem (uint32_t size_minimum)
 }
 
 #endif    // USE_UFILESYS
+#endif    // FIRMWARE_SAFEBOOT
