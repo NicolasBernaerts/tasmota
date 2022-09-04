@@ -2,6 +2,13 @@
   xdrv_96_ftp_server.ino - Simple FTP server
   Heavily based on FTPClientSevrer from dplasa (https://github.com/dplasa/FTPClientServer)
   
+  This FTP micro FTP server only accepts 1 concurrent connexion.
+  Make sure ton configure your FTP client according to that limit or your connexion will fail.
+   
+  Default is
+    - login    : ftp
+    - password : password 
+ 
   Copyright (C) 2021  Nicolas Bernaerts
     02/11/2021 - v1.0 - Creation 
     19/11/2021 - v1.1 - Tasmota 10 compatibility 
@@ -34,8 +41,13 @@
 FTPServer *ftp_server = nullptr;
 
 // commands : MQTT
-#define FTP_SERVER_LOGIN          "teleinfo"
-#define FTP_SERVER_PASSWORD       "teleinfo"
+#ifndef FTP_SERVER_LOGIN
+#define FTP_SERVER_LOGIN          "ftp"
+#endif
+
+#ifndef FTP_SERVER_PASSWORD
+#define FTP_SERVER_PASSWORD       "password"
+#endif
 
 // FTP - MQTT commands
 const char kFTPServerCommands[] PROGMEM = "ftp_" "|" "help" "|" "start" "|" "stop";
