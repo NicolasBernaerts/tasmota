@@ -1,0 +1,20 @@
+_tasmota_flash_commands()
+{
+	tasmota-flash | grep '\-\-' | cut -d' ' -f3
+}
+
+_tasmota_flash()
+{
+	cur=${COMP_WORDS[COMP_CWORD]}
+	prev=${COMP_WORDS[COMP_CWORD-1]}
+	COMPREPLY=()
+	if [[ "$cur" == "" ]] ; then
+		options=$(_tasmota_flash_commands)
+	elif [[ "$cur" == -* ]] ; then
+		options=$(_tasmota_flash_commands)
+	fi
+
+	COMPREPLY=( $( compgen -W "$options" -- ${cur} ) )
+}
+
+complete -F _tasmota_flash tasmota-flash
