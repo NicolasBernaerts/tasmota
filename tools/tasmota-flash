@@ -22,8 +22,8 @@ DEVICE="ESP8266"
 if [ ${#} -eq 0 ];
 then
 	echo "Script to flash Tasmota devices"
+	echo "Default device is ESP8266. You should provide the .bin image"
 	echo "Options are :"
-	echo "  --esp               Flash ESP8266 device (default)"
 	echo "  --esp32             Flash ESP32 device. For initial flash, use .factory.bin images"
 	echo "  --query             Query device specs"
 	echo "  --erase             Erase device before flash"
@@ -41,7 +41,6 @@ command -v esptool.py >/dev/null 2>&1 || { zenity --error --text="Please install
 while test ${#} -gt 0
 do
 	case $1 in
-	--esp) DEVICE="ESP8266"; shift; ;;
 	--esp32) DEVICE="ESP32"; shift; ;;
 	--query) QUERY="ok"; shift; ;;
 	--erase) QUERY="ok"; ERASE="ok"; shift; ;;
