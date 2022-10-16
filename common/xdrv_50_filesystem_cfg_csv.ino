@@ -13,6 +13,7 @@
     01/04/2022 - v1.3 - Add software watchdog to avoid locked loop
     27/07/2022 - v1.4 - Use String to report strings
     31/08/2022 - v1.5 - Handle empty lines in CSV
+    29/09/2022 - v1.6 - Rework of CSV files handling
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -33,7 +34,7 @@
 #define UFS_PARTITION_MIN_KB            25                  // minimum free space in USF partition (kb)
 
 // configuration file constant
-#define UFS_CFG_LINE_LENGTH             64                  // maximum size of a configuration line
+#define UFS_CFG_LINE_LENGTH             128                 // maximum size of a configuration line
 #define UFS_CFG_VALUE_MAX               16                  // maximum size of a numerical value (int or float)
 
 // CSV file constant
@@ -43,16 +44,6 @@
 // action when reading a CSV line
 enum UfsCsvAccessType { UFS_CSV_ACCESS_READ, UFS_CSV_ACCESS_WRITE, UFS_CSV_ACCESS_MAX };
 enum UfsCsvLineAction { UFS_CSV_NONE, UFS_CSV_NEXT, UFS_CSV_PREVIOUS };
-
-// CSV file management structure
-static struct {
-  File  file[UFS_CSV_ACCESS_MAX];                           // file object
-  bool  is_open[UFS_CSV_ACCESS_MAX] = { false, false };     // flag if file is opened for reading
-  bool  has_header[UFS_CSV_ACCESS_MAX] = { false, false };  // flag if file is opened for reading
-  int   nb_column = 0;                                      // number of columns in last line
-  char  str_line[UFS_CSV_LINE_LENGTH];                      // last read line
-  char* pstr_value[UFS_CSV_COLUMN_MAX];                     // array of values in last line
-} ufs_csv;
 
 /*********************************************\
  *            Configuration files
@@ -111,13 +102,10 @@ String UfsCfgLoadKey (const char* pstr_filename, const char* pstr_key)
 }
 
 // read integer key value in configuration file
-int UfsCfgLoadKeyInt (const char* pstr_filename, const char* pstr_key, const int default_value = INT_MAX) 
+int UfsCfgLoadKeyInt (const char* pstr_filename, const char* pstr_key, const int default_value) 
 {
   int    result = default_value;
   String str_result;
-
-  // validate parameters
-  if ((pstr_filename == nullptr) || (pstr_key == nullptr)) return result;
   
   // open file in read only mode in littlefs filesystem
   str_result = UfsCfgLoadKey (pstr_filename, pstr_key);
@@ -127,13 +115,10 @@ int UfsCfgLoadKeyInt (const char* pstr_filename, const char* pstr_key, const int
 }
 
 // read long key value in configuration file
-long UfsCfgLoadKeyLong (const char* pstr_filename, const char* pstr_key, const long default_value = LONG_MAX) 
+long UfsCfgLoadKeyLong (const char* pstr_filename, const char* pstr_key, const long default_value) 
 {
   long   result = default_value;
   String str_result;
-
-  // validate parameters
-  if ((pstr_filename == nullptr) || (pstr_key == nullptr)) return result;
   
   // open file in read only mode in littlefs filesystem
   str_result = UfsCfgLoadKey (pstr_filename, pstr_key);
@@ -143,14 +128,11 @@ long UfsCfgLoadKeyLong (const char* pstr_filename, const char* pstr_key, const l
 }
 
 // read float key value in configuration file
-float UfsCfgLoadKeyFloat (const char* pstr_filename, const char* pstr_key, const float default_value = NAN) 
+float UfsCfgLoadKeyFloat (const char* pstr_filename, const char* pstr_key, const float default_value) 
 {
   float  result = default_value;
   String str_result;
 
-  // validate parameters
-  if ((pstr_filename == nullptr) || (pstr_key == nullptr)) return result;
-  
   // open file in read only mode in littlefs filesystem
   str_result = UfsCfgLoadKey (pstr_filename, pstr_key);
   if (str_result.length () > 0) result = str_result.toFloat ();
@@ -159,7 +141,7 @@ float UfsCfgLoadKeyFloat (const char* pstr_filename, const char* pstr_key, const
 }
 
 // save key value in configuration file
-void UfsCfgSaveKey (const char* pstr_filename, const char* pstr_key, const char* pstr_value, bool create = true) 
+void UfsCfgSaveKey (const char* pstr_filename, const char* pstr_key, const char* pstr_value, bool create) 
 {
   char str_line[UFS_CFG_LINE_LENGTH];
   File file;
@@ -167,9 +149,9 @@ void UfsCfgSaveKey (const char* pstr_filename, const char* pstr_key, const char*
   // validate parameters
   if ((pstr_filename == nullptr) || (pstr_key == nullptr) || (pstr_value == nullptr)) return;
   
-  // retrieve saved settings from config.ini in littlefs filesystem
+  // open file in creation or append mode
   if (create) file = ffsp->open (pstr_filename, "w");
-  else file = ffsp->open (pstr_filename, "a");
+    else file = ffsp->open (pstr_filename, "a");
 
   // write key=value
   sprintf (str_line, "%s=%s\n", pstr_key, pstr_value);
@@ -180,47 +162,32 @@ void UfsCfgSaveKey (const char* pstr_filename, const char* pstr_key, const char*
 }
 
 // save key value in configuration file
-void UfsCfgSaveKeyInt (const char* pstr_filename, const char* pstr_key, const int value, bool create = true) 
+void UfsCfgSaveKeyInt (const char* pstr_filename, const char* pstr_key, const int value, bool create) 
 {
   char str_value[UFS_CFG_VALUE_MAX];
   
-  // validate parameters
-  if ((pstr_filename == nullptr) || (pstr_key == nullptr)) return;
-  
-  // convert value to string
+  // convert value to string and save key = value
   itoa (value, str_value, 10);
-
-  // save key and value
   UfsCfgSaveKey (pstr_filename, pstr_key, str_value, create);
 }
 
 // save key value in configuration file
-void UfsCfgSaveKeyLong (const char* pstr_filename, const char* pstr_key, const long value, bool create = true) 
+void UfsCfgSaveKeyLong (const char* pstr_filename, const char* pstr_key, const long value, bool create) 
 {
   char str_value[UFS_CFG_VALUE_MAX];
   
-  // validate parameters
-  if ((pstr_filename == nullptr) || (pstr_key == nullptr)) return;
-
-  // convert value to string
+  // convert value to string and save key = value
   ltoa (value, str_value, 10);
-
-  // save key and value
   UfsCfgSaveKey (pstr_filename, pstr_key, str_value, create);
 }
 
 // save key value in configuration file
-void UfsCfgSaveKeyFloat (const char* pstr_filename, const char* pstr_key, const float value, bool create = true) 
+void UfsCfgSaveKeyFloat (const char* pstr_filename, const char* pstr_key, const float value, bool create) 
 {
   char str_value[UFS_CFG_VALUE_MAX];
   
-  // validate parameters
-  if ((pstr_filename == nullptr) || (pstr_key == nullptr)) return;
-  
-  // convert float to string
+  // convert value to string and save key = value
   ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%03_f"), &value);
-
-  // save key and value
   UfsCfgSaveKey (pstr_filename, pstr_key, str_value, create);
 }
 
@@ -228,296 +195,176 @@ void UfsCfgSaveKeyFloat (const char* pstr_filename, const char* pstr_key, const 
  *                 CSV files
 \*********************************************/
 
-bool UfsCsvSeekToStart ()
+bool UfsSeekToStart (File &file)
 {
-  // if file is opened
-  if (ufs_csv.is_open[UFS_CSV_ACCESS_READ])
-  {
-    // set to start of file
-    ufs_csv.file[UFS_CSV_ACCESS_READ].seek (0);
+  bool done;
 
-    // if asked, skip header
-    if (ufs_csv.has_header[UFS_CSV_ACCESS_READ]) UfsCsvNextLine ();
+  // set to start of file
+  done = file.seek (0);
 
-    // read first data lined
-    UfsCsvNextLine ();
-  }
-
-  return ufs_csv.is_open[UFS_CSV_ACCESS_READ];
+  return done;
 }
 
-int UfsCsvSeekToEnd ()
+bool UfsSeekToEnd (File &file)
 {
-  int      index = -1;
-  uint32_t pos_end;
+  bool done;
 
-  // if file is opened
-  if (ufs_csv.is_open[UFS_CSV_ACCESS_READ])
-  {
-    // set to start of file
-    pos_end = ufs_csv.file[UFS_CSV_ACCESS_READ].size () - 1;
-    ufs_csv.file[UFS_CSV_ACCESS_READ].seek (pos_end);
+  // get file size and seek to last byte
+  done = file.seek (file.size () - 1);
 
-    // read last line
-    index = UfsCsvPreviousLine ();
-  }
-
-  return index;
+  return done;
 }
 
-// read next line and return number of columns in the line
-int UfsCsvNextLine ()
+// extract specific column from given line (first column is 1)
+// return size of column string
+size_t UfsExtractCsvColumn (char* pstr_line, const char separator, int column, char* pstr_value, const size_t size_value, const bool till_end_of_line)
 {
-  int      index;
-  size_t   length;
+  bool  search = true;
+  int   index  = 0;
+  char *pstr_start = pstr_line;
+  char *pstr_stop  = nullptr;
+
+  // check parameter
+  if ((pstr_line  == nullptr) || (pstr_value == nullptr)) return 0;
+
+  // loop to find column
+  strcpy (pstr_value, "");
+  while (search)
+  {
+    // if seperator found
+    if (*pstr_line == separator)
+    {
+      // increase to next column and check if target column is reached
+      index ++;
+      if (index == column) 
+      {
+        // if value should be all next column
+        if (till_end_of_line) strcpy (pstr_value, pstr_start);
+
+        // else value is column content
+        else
+        {
+          strncpy (pstr_value, pstr_start, pstr_line - pstr_start);
+          pstr_value[pstr_line - pstr_start] = 0;
+        }
+      }
+
+      // update start caracter to next column
+      else pstr_start = pstr_line + 1;
+    }
+
+    // else if end of line reached, fill content is target column was reached
+    else if ((*pstr_line == 0) && (index == column - 1)) strcpy (pstr_value, pstr_start);
+
+    // check if loop should be stopped
+    if ((index == column) || (*pstr_line == 0)) search = false;
+
+    pstr_line++;
+  }
+
+  return strlen (pstr_value);
+}
+
+// read next line, skipping empty lines, and return number of caracters in the line
+size_t UfsReadNextLine (File &file, char* pstr_line, const size_t size_line)
+{
+  size_t   index;
+  size_t   length = 0;
   uint32_t pos_start;
   char    *pstr_start;
   char    *pstr_token;
 
+  // check parameter
+  if (pstr_line == nullptr) return 0;
+
   // init
-  ufs_csv.nb_column = 0;
+  strcpy (pstr_line, "");
 
   // read next line
-  pos_start = ufs_csv.file[UFS_CSV_ACCESS_READ].position ();
-  length = ufs_csv.file[UFS_CSV_ACCESS_READ].readBytes (ufs_csv.str_line, sizeof (ufs_csv.str_line) - 1);
-  ufs_csv.str_line[length] = 0;
+  pos_start = file.position ();
+  length = file.readBytes (pstr_line, size_line - 1);
+  pstr_line[length] = 0;
 
   // loop to skip empty lines
-  pstr_start = ufs_csv.str_line;
+  pstr_start = pstr_line;
   while ((*pstr_start == '\n') && (*pstr_start != 0)) pstr_start++;
 
-  // look for next end of line
+  // if next end of line found
   pstr_token = strchr (pstr_start, '\n');
-
-  // if end of line found, set end of string and seek CSV to next line
   if (pstr_token != nullptr)
   {
+    // set end of string
     *pstr_token = 0;
-    ufs_csv.file[UFS_CSV_ACCESS_READ].seek (pstr_token - ufs_csv.str_line + pos_start + 1);
+
+    // seek file to beginning of next line
+    file.seek (pstr_token - pstr_line + pos_start + 1);
   } 
 
-  // loop to populate array of values
-  index = 0;
-  pstr_token = strtok (pstr_start, ";");
-  while (pstr_token != nullptr)
-  {
-    if (index < UFS_CSV_COLUMN_MAX) ufs_csv.pstr_value[index++] = pstr_token;
-    pstr_token = strtok (nullptr, ";");
-  }
-  ufs_csv.nb_column = index;
+  // if needed, remove \n from empty lines
+  length = strlen (pstr_start);
+  if (pstr_start > pstr_line) for (index = 0; index <= length; index ++) pstr_line[index] = pstr_start[index];
 
-  return index;
+  return length;
 }
 
-// read previous line and return true if line exists
-int UfsCsvPreviousLine ()
+// read previous line and return number of caracters in the line
+size_t UfsReadPreviousLine (File &file, char* pstr_line, const size_t size_line)
 {
-  int      index = -1;
   uint8_t  current_car;
   uint32_t pos_search;
-  uint32_t pos_start = UINT32_MAX;
-  uint32_t pos_stop  = UINT32_MAX;
-  size_t   length;
-  char    *pstr_token;
-  char     str_buffer[UFS_CSV_LINE_LENGTH];
+  uint32_t pos_start = 0;
+  uint32_t pos_stop  = 0;
+  size_t   length = 0;
+
+  // check parameter
+  if (pstr_line == nullptr) return 0;
 
   // init
-  ufs_csv.nb_column = 0;
-  strcpy (str_buffer, "");
-  current_car = '\n';
-
-  // get current file position
-  pos_search = ufs_csv.file[UFS_CSV_ACCESS_READ].position ();
-
-  // loop to avoid empty lines
-  while ((current_car == '\n') && (pos_search > 0))
-  {
-    current_car = (uint8_t)ufs_csv.file[UFS_CSV_ACCESS_READ].read ();
-
-    if (current_car != '\n') pos_stop = pos_search;
-    if (pos_search > 0) pos_search--;
-    ufs_csv.file[UFS_CSV_ACCESS_READ].seek (pos_search);
-  }
-
-  // loop to read previous line
-  while ((current_car != '\n') && (pos_search > 0))
-  {
-    current_car = ufs_csv.file[UFS_CSV_ACCESS_READ].read ();
-
-    if (current_car != '\n')
-    {
-      if (pos_search > 0) pos_search--;
-      ufs_csv.file[UFS_CSV_ACCESS_READ].seek (pos_search);
-    }
-    pos_start = pos_search;
-  }
-
-  // get complete line
-  if (pos_stop > pos_start)
-  {
-    // read current line
-    length = ufs_csv.file[UFS_CSV_ACCESS_READ].readBytes (ufs_csv.str_line, pos_stop - pos_start + 1);
-    ufs_csv.str_line[length] = 0;
-
-    // position to caracter before line
-    if (pos_start > 0) pos_start--;
-    ufs_csv.file[UFS_CSV_ACCESS_READ].seek (pos_start);
-
-    // if line is the header and it should be skipped
-    if (ufs_csv.has_header[UFS_CSV_ACCESS_READ] && (pos_start == 0)) return -1;
-
-    // loop to populate array of values
-    index = 0;
-    pstr_token = strtok (ufs_csv.str_line, ";");
-    while (pstr_token != nullptr)
-    {
-      if (index < UFS_CSV_COLUMN_MAX) ufs_csv.pstr_value[index++] = pstr_token;
-      pstr_token = strtok (nullptr, ";");
-    }
-    ufs_csv.nb_column = index;
-  }
-
-  return index;
-}
-
-bool UfsCsvOpen (const char* pstr_filename, bool has_header)
-{
-  bool result = false;
-
-  // close file if already opened
-  UfsCsvClose (UFS_CSV_ACCESS_READ);
-  
-  // check parameter
-  if (pstr_filename != nullptr) result = ffsp->exists (pstr_filename);
+  pstr_line[0] = 0;
 
   // if file exists
-  if (result)
+  if (file.available ())
   {
-    // open file in read mode
-    ufs_csv.is_open[UFS_CSV_ACCESS_READ]    = true;
-    ufs_csv.has_header[UFS_CSV_ACCESS_READ] = has_header;
-    ufs_csv.file[UFS_CSV_ACCESS_READ]       = ffsp->open (pstr_filename, "r");
+    // loop to avoid empty lines
+    pos_search = file.position ();
+    if (pos_search > 0) do
+    {
+      pos_search--;
+      file.seek (pos_search);
+      current_car = (uint8_t)file.read ();
+      if (current_car != '\n') pos_stop = pos_search + 1;
+    }
+    while ((current_car == '\n') && (pos_search > 0));
 
-    // if asked, skip header
-    if (has_header) UfsCsvNextLine ();
+    // loop to read previous line
+    pos_search++;
+    if (pos_search > 0) do
+    {
+      pos_search--;
+      file.seek (pos_search);
+      current_car = (uint8_t)file.read ();
+      if (current_car != '\n') pos_start = pos_search;
+    }
+    while ((current_car != '\n') && (pos_search > 0));
 
-    // read first data lined
-    UfsCsvNextLine ();
+    // get complete line
+    if (pos_stop > pos_start)
+    {
+      if (current_car == '\n') pos_search++;
+      file.seek (pos_search);
+      length = file.readBytes (pstr_line, pos_stop - pos_start);
+      pstr_line[length] = 0;
+      file.seek (pos_search);
+    }
   }
 
-  return ufs_csv.is_open[UFS_CSV_ACCESS_READ];
-}
-
-void UfsCsvClose (int access_type)
-{
-  if (ufs_csv.is_open[access_type])
-  {
-    // close current file
-    ufs_csv.file[access_type].close ();
-
-    // init file caracteristics
-    ufs_csv.is_open[access_type] = false;
-    if (access_type == UFS_CSV_ACCESS_READ) ufs_csv.nb_column = 0;
-  }
-}
-
-// read value from a column in current line
-//  column : column where to read data
-//  action : can change current line before or after reading
-int UfsCsvGetColumnInt (const int column, int action = UFS_CSV_NONE)
-{
-  int result = INT_MAX;
-
-  if (ufs_csv.is_open[UFS_CSV_ACCESS_READ])
-  {
-    // if needed, load previous or next line
-    if (action == UFS_CSV_PREVIOUS) UfsCsvPreviousLine ();
-    else if (action == UFS_CSV_NEXT) UfsCsvNextLine ();
-
-    // if ok, extract data
-    if (column < ufs_csv.nb_column) result = atoi (ufs_csv.pstr_value[column]);
-  }
-
-  return result;
-}
-
-// read value from a column in current line
-long UfsCsvGetColumnLong (const int column, int action = UFS_CSV_NONE)
-{
-  long result = LONG_MAX;
-
-  if (ufs_csv.is_open[UFS_CSV_ACCESS_READ])
-  {
-    // if needed, load previous or next line
-    if (action == UFS_CSV_PREVIOUS) UfsCsvPreviousLine ();
-    else if (action == UFS_CSV_NEXT) UfsCsvNextLine ();
-
-    // if ok, extract data
-    if (column < ufs_csv.nb_column) result = atol (ufs_csv.pstr_value[column]);
-  }
-
-  return result;
-}
-
-// read value from a column in current line
-float UfsCsvGetColumnFloat (const int column, int action = UFS_CSV_NONE)
-{
-  float result = NAN;
-
-  if (ufs_csv.is_open[UFS_CSV_ACCESS_READ])
-  {
-    // if needed, load previous or next line
-    if (action == UFS_CSV_PREVIOUS) UfsCsvPreviousLine ();
-    else if (action == UFS_CSV_NEXT) UfsCsvNextLine ();
-
-    // if ok, extract data
-    if (column < ufs_csv.nb_column) result = atof (ufs_csv.pstr_value[column]);
-  }
-
-  return result;
-}
-
-// add a line to a CSV file
-void UfsCsvAppend (const char* pstr_filename, const char* pstr_line, bool keep_open = false) 
-{
-  bool exists;
-  int  last;
-
-  // check parameters
-  if ((pstr_filename == nullptr) || (pstr_line == nullptr)) return;
-  if (strlen (pstr_line) == 0) return;
-
-  // if file is not already opened
-  if (!ufs_csv.is_open[UFS_CSV_ACCESS_WRITE])
-  {
-    // check if file already exists and open in append mode
-    ufs_csv.file[UFS_CSV_ACCESS_WRITE] = ffsp->open (pstr_filename, "a");
-    ufs_csv.is_open[UFS_CSV_ACCESS_WRITE] = true;
-  }
-
-  // append current line
-  if (ufs_csv.is_open[UFS_CSV_ACCESS_WRITE])
-  {
-    // append string
-    ufs_csv.file[UFS_CSV_ACCESS_WRITE].print (pstr_line);
-
-    // if needed, add CR/LF
-    last = strlen (pstr_line) - 1;
-    if (pstr_line[last] != '\n') ufs_csv.file[UFS_CSV_ACCESS_WRITE].print ("\n");
-  }
-
-  // if needed, close file
-  if (ufs_csv.is_open[UFS_CSV_ACCESS_WRITE] && !keep_open)
-  {
-    ufs_csv.file[UFS_CSV_ACCESS_WRITE].close ();
-    ufs_csv.is_open[UFS_CSV_ACCESS_WRITE] = false;
-  }
+  return length;
 }
 
 // rotate files according to file naming convention
-//  file-2.csv -> file-3.csv
-//  file-1.csv -> file-2.csv
-void UfsCsvFileRotate (const char* pstr_filename, const int index_min, const int index_max) 
+//   file-2.csv -> file-3.csv
+//   file-1.csv -> file-2.csv
+void UfsFileRotate (const char* pstr_filename, const int index_min, const int index_max) 
 {
   int  index;
   char str_original[UFS_FILENAME_SIZE];
@@ -552,7 +399,7 @@ void UfsCsvFileRotate (const char* pstr_filename, const int index_min, const int
   }
 }
 
-uint32_t UfsCsvGetFileSizeKb (const char* pstr_filename)
+uint32_t UfsGetFileSizeKb (const char* pstr_filename)
 {
   uint32_t file_size = 0;
   File     file;
@@ -573,9 +420,8 @@ uint32_t UfsCsvGetFileSizeKb (const char* pstr_filename)
 }
 
 // cleanup filesystem from oldest CSV files according to free size left (in Kb)
-void UfsCsvCleanupFileSystem (uint32_t size_minimum) 
+void UfsCleanupFileSystem (uint32_t size_minimum, const char* pstr_extension) 
 {
-  bool     is_candidate;
   bool     removal_done = true;
   uint32_t size_available;
   time_t   file_time;
@@ -602,12 +448,7 @@ void UfsCsvCleanupFileSystem (uint32_t size_minimum)
       if (!current_file) break;
 
       // check if file is candidate for removal
-      is_candidate  = (strstr (current_file.name (), ".csv") != nullptr);
-      is_candidate |= (strstr (current_file.name (), ".CSV") != nullptr);
-      is_candidate &= (current_file.getLastWrite () < file_time);
-
-      // if candidate, save file name
-      if (is_candidate)
+      if ((strstr (current_file.name (), pstr_extension) != nullptr) && (current_file.getLastWrite () < file_time))
       {
         strcpy (str_filename, "/");
         strlcat (str_filename, current_file.name (), sizeof (str_filename));
