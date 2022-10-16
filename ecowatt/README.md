@@ -49,7 +49,9 @@ This certificate should be named ***ecowatt.pem*** and uploaded to the root of t
 To declare the MQTT topic where to publish Ecowatt data, run following console command :
 
     # eco_topic your/topic/for/ecowatt
-    
+
+## Restart ##
+
 Once you've setup these 3 data, restart your Tasmota module.
 
 Your Ecowatt MQTT server should be up and running.
