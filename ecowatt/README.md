@@ -72,7 +72,7 @@ Here is where you should place different files from this repository and from **t
 * tasmota/tasmota_drv_driver/**xdrv_94_ip_address.ino**
 * tasmota/tasmota_sns_sensor/**xsns_120_timezone.ino**
 * tasmota/tasmota_sns_sensor/**xsns_121_ecowatt-server.ino**
-* lib/default/ArduinoJson (extract content of **ArduinoJson.zip**)
+* lib/default/**ArduinoJson** (extract content of **ArduinoJson.zip**)
 
 You can also retrieve latest ArduinoJson library thru git :
 
