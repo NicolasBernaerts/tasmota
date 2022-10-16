@@ -1,4 +1,4 @@
-# Ecowatt Tasmota firmware #
+# Ecowatt server Tasmota firmware #
 
 ## Presentation ##
 
