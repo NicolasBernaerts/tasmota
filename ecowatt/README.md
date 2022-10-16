@@ -1,8 +1,6 @@
-Ecowatt Tasmota firmware
-=============
+# Ecowatt Tasmota firmware #
 
-Presentation
-------------
+## Presentation ##
 
 This evolution of **Tasmota 12** firmware allows to colect France RTE **Ecowatt** signals and to publish them thru MQTT.
 
@@ -12,20 +10,28 @@ This firmware will connect every hour to RTE API and collect Ecowatt signals.
 
 Result will be published as an MQTT message :
 
-    {"Time":"xxxxxxxx","Ecowatt":{"slot":16,"now":2,"next":1,"day0":{"0":2,"1":1,...,"23":1},"day1":{"0":1,"1":1,...,"23":2},...}}
+    {"Time":"2022-10-10T23:51:09","Ecowatt":{"dval":2,"hour":14,"now":1,"next":2,
+      "day0":{"jour":"2022-10-06","dval":1,"0":1,"1":1,"2":1,"3":1,"4":1,"5":1,"6":1,...,"23":1},
+      "day1":{"jour":"2022-10-07","dval":2,"0":1,"1":1,"2":2,"3":1,"4":1,"5":1,"6":1,...,"23":1},
+      "day2":{"jour":"2022-10-08","dval":3,"0":1,"1":1,"2":1,"3":1,"4":1,"5":3,"6":1,...,"23":1},
+      "day3":{"jour":"2022-10-09","dval":2,"0":1,"1":1,"2":1,"3":2,"4":1,"5":1,"6":1,...,"23":1}}}
  
 Pre-compiled versions are available in the [**binary**](https://github.com/NicolasBernaerts/tasmota/tree/master/ecowatt/binary) folder.
 
-Configuration
--------------
+## Configuration ##
 
 This **Ecowatt** firmware needs :
   * a Base64 private key provided by RTE when you create you account on https://data.rte-france.com/
   * the PEM root certificate authority from https://data.rte-france.com/
+  * a topic where to publish Ecowatt data
+
+### Private Key ###
 
 You can declare your private Base64 key thru this console command :
 
     # eco_key your-base64-private-key
+
+### Root CA ###
 
 To declare the root CA of https://data.rte-france.com/, you can collect it from the site itself :
   * go on the home page
@@ -35,10 +41,18 @@ To declare the root CA of https://data.rte-france.com/, you can collect it from 
   * on the new page, select **Global Sign** tab
   * click to download **PEM(cert)**
 You can also download it from this repository  :-)
+
 This certificate should be named **ecowatt.pem** and uploaded to the root of the LittleFS partition.
 
-Compilation
------------
+### MQTT Topic ### 
+
+To declare the MQTT topic where to publish Ecowatt data, run following console command :
+
+    # eco_topic your/topic/for/ecowatt
+    
+Once you've setup these 3 data, your Ecowatt MQTT server should be up and running.
+
+## Compilation ##
 
 If you want to compile this firmware version, you just need to :
 1. install official tasmota sources
