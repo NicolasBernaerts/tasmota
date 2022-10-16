@@ -45,8 +45,9 @@
     08/04/2022 - v9.1  - Switch from icons to emojis
                          Add software watchdog to avoid locked loop
     08/06/2022 - v9.2  - Add auto-rearm capability
-    27/07/2022 - v9.3  - Tasmota 12.0 compatibility
+    27/07/2022 - v9.3  - Tasmota 12 compatibility
                          Add HLK-LD1115H and HLK-LD1125H presence sensor support
+    16/10/2022 - v10.0 - Add Ecowatt signal management
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -94,13 +95,16 @@
 #define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_COMMON_LOG                        // Use common log file library
 #define USE_OFFLOAD                           // Add support for MQTT maximum power offloading
-#define USE_HLKLD                             // Add support for HLK-LDxxxx presence & movement sensors
-#define USE_HLKLD_WEB_CONFIG                  // Add graphical configuration for HLK-LDxxxx sensors
-#define USE_REMOTE_SENSOR                     // Add support for generic and remote sensor
+//#define USE_HLKLD2410                         // Add support for HLK-LD2410 presence & movement sensors
+#define USE_HLKLD11                           // Add support for HLK-LD11xx presence & movement sensors
+#define USE_HLKLD11_WEB_CONFIG                // Add graphical configuration for HLK-LD11xx sensors
+#define USE_GENERIC_SENSOR                    // Add support for generic sensor management
+#define USE_ECOWATT_CLIENT                    // Add support for ecowatt client module
+//#define USE_PRESENCE_FORECAST                 // Add support for a presence forecast module
 
 // build
 #if defined BUILD_ESP32
-#define EXTENSION_BUILD   "esp32"
+#define EXTENSION_BUILD   "esp32-4m1.3m"
 #elif defined BUILD_16M14M
 #define EXTENSION_BUILD   "esp-16m14m"
 #elif defined BUILD_4M2M
@@ -116,7 +120,7 @@
 #endif
 
 // extension data
-#define EXTENSION_VERSION "9.3"               // version
+#define EXTENSION_VERSION "10.0"              // version
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
 #ifdef USE_PILOTWIRE
 #define EXTENSION_NAME    "Pilotwire"         // name
@@ -148,6 +152,10 @@
 #define MQTT_PASS          ""
 #undef MQTT_FULLTOPIC
 #define MQTT_FULLTOPIC     "%topic%/%prefix%/"
+
+// disable serial log (as serial movement detector may be used)
+#undef SERIAL_LOG_LEVEL 
+#define SERIAL_LOG_LEVEL   LOG_LEVEL_NONE
 
 // global options
 #undef USE_ARDUINO_OTA                        // support for Arduino OTA
@@ -181,8 +189,8 @@
 #undef MQTT_HOST_DISCOVERY                    // Find MQTT host server (overrides MQTT_HOST if found)
 
 //#undef USE_TIMERS                             // support for up to 16 timers
-//#undef USE_TIMERS_WEB                         // support for timer webpage
-//#undef USE_SUNRISE                            // support for Sunrise and sunset tools
+#define USE_TIMERS_WEB                         // support for timer webpage
+#define USE_SUNRISE                            // support for Sunrise and sunset tools
 
 #undef USE_UNISHOX_COMPRESSION                // Add support for string compression in Rules or Scripts
 #undef USE_RULES                              // Disable support for rules
@@ -223,8 +231,8 @@
 
 #undef USE_COUNTER                            // Enable inputs as counter (+0k8 code)
 
-//#undef USE_DS18x20                            // Add support for DS18x20 sensors with id sort, single scan and read retry (+2k6 code)
-//#undef USE_DHT                                // Add support for internal DHT sensor
+#define USE_DS18x20                            // Add support for DS18x20 sensors with id sort, single scan and read retry (+2k6 code)
+#define USE_DHT                                // Add support for internal DHT sensor
 
 #undef USE_I2C                                // Disable all I2C sensors and devices
 
@@ -244,10 +252,6 @@
 #undef USE_ENERGY_DUMMY                       // Add support for dummy Energy monitor allowing user values (+0k7 code)
 #undef USE_HLW8012                            // Add support for HLW8012, BL0937 or HJL-01 Energy Monitor for Sonoff Pow and WolfBlitz
 #undef USE_CSE7766                            // Add support for CSE7766 Energy Monitor for Sonoff S31 and Pow R2
-#undef USE_PZEM004T                           // Add support for PZEM004T Energy monitor (+2k code)
-#undef USE_PZEM_AC                            // Add support for PZEM014,016 Energy monitor (+1k1 code)
-#undef USE_PZEM_DC                            // Add support for PZEM003,017 Energy monitor (+1k1 code)
-#undef USE_MCP39F501                          // Add support for MCP39F501 Energy monitor as used in Shelly 2 (+3k1 code)
 #undef USE_SDM72                              // Add support for Eastron SDM72-Modbus energy monitor (+0k3 code)
 #undef USE_SDM120                             // Add support for Eastron SDM120-Modbus energy monitor (+1k1 code)
 #undef USE_SDM630                             // Add support for Eastron SDM630-Modbus energy monitor (+0k6 code)
@@ -260,6 +264,7 @@
 #undef USE_IEM3000                            // Add support for Schneider Electric iEM3000-Modbus series energy monitor (+0k8 code)
 
 #undef USE_IR_REMOTE                          // Send IR remote commands using library IRremoteESP8266 and ArduinoJson (+4k3 code, 0k3 mem, 48 iram)
+#undef USE_IR_REMOTE_FULL
 #undef USE_IR_SEND_NEC                        // Support IRsend NEC protocol
 #undef USE_IR_SEND_RC5                        // Support IRsend Philips RC5 protocol
 #undef USE_IR_SEND_RC6                        // Support IRsend Philips RC6 protocol
@@ -296,18 +301,55 @@
 #undef USE_PID                                // Add suport for the PID  feature (+11k2 code)
 
 // energy sensors
-//#ifndef USE_PILOTWIRE
 #define USE_ENERGY_SENSOR                     // Enable energy sensors
 #define USE_HLW8012                           // Add support for HLW8012, BL0937 or HJL-01 Energy Monitor for Sonoff Pow and WolfBlitz
 #define USE_CSE7766                           // Add support for CSE7766 Energy Monitor for Sonoff S31 and Pow R2
 #define USE_MCP39F501                         // Add support for MCP39F501 Energy monitor as used in Shelly 2 (+3k1 code)
 #define USE_BL09XX                            // Add support for various BL09XX Energy monitor as used in Blitzwolf SHP-10 or Sonoff Dual R3 v2 (+1k6 code)
-//#endif
 
 // add support to MQTT events subscription
 #ifndef SUPPORT_MQTT_EVENT
 #define SUPPORT_MQTT_EVENT
 #endif
+
+// ----------------------
+//    ESP32 specific
+// ----------------------
+
+#ifdef ESP32
+
+//#undef USE_ESP32_SENSORS
+
+#define USE_TLS                               // for safeboot
+
+#undef USE_BLE_ESP32
+#undef USE_MI_ESP32
+#undef USE_IBEACON
+
+#undef USE_AUTOCONF                           // Disable Esp32 autoconf feature
+#define USE_BERRY
+
+#undef USE_DISPLAY
+#undef USE_SR04
+#undef USE_LVGL
+
+#undef USE_ADC                                // Add support for ADC on GPIO32 to GPIO39
+
+#undef USE_WEBCAM
+
+#undef USE_M5STACK_CORE2
+#undef USE_I2S_AUDIO
+#undef USE_TTGO_WATCH
+
+#undef USE_ALECTO_V2
+#undef USE_RF_SENSOR
+#undef USE_HX711
+#undef USE_MAX31855
+
+#undef USE_MHZ19
+#undef USE_SENSEAIR   
+
+#endif  // ESP32
 
 #endif  // _USER_CONFIG_OVERRIDE_H_
 
