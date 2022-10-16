@@ -4,7 +4,7 @@
 
 This evolution of **Tasmota 12** firmware allows to colect France RTE **Ecowatt** signals and to publish them thru MQTT.
 
-It is compatible with **ESP32** only as SSL connexions are using too much memory for ESP8266.
+It is compatible with **ESP32** and **ESP32S2** only as SSL connexions are using too much memory for ESP8266.
 
 This firmware will connect every hour to RTE API and collect Ecowatt signals.
 
