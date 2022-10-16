@@ -43,6 +43,7 @@ static struct {
   uint16_t file_index    = UINT16_MAX;                  // last record file index
   uint32_t file_position = UINT32_MAX;                  // last record file position
   uint32_t event_start   = UINT32_MAX;                  // last record timestamp
+  String   str_filename;                                // filename of logs (may include %u for file index)
   String   str_title;                                   // history page title
   String   str_header;                                  // history table header
 } log_status;
@@ -67,9 +68,15 @@ struct {
 \********************************************/
 
 // set log file split unit
-void LogFileSetUnit (uint8_t unit) 
+void LogFileSetFilename (const char *pstr_filename, uint8_t unit) 
 {
-  if (unit < UFS_LOG_PERIOD_MAX) log_status.file_unit = unit;
+  // check parameters
+  if (pstr_filename == nullptr) return;
+  if (unit >= UFS_LOG_PERIOD_MAX) return;
+
+  // set filename and unit type
+  log_status.str_filename = pstr_filename;
+  log_status.file_unit = unit;
 }
 
 // set title, header and number of columns to display
@@ -98,11 +105,11 @@ void LogHistoSetDateColumn (bool start_date, bool start_time, bool stop_date, bo
 // determine log filename according to index
 void LogFileGetNameFromIndex (char* pstr_filename, size_t size_filename, uint16_t index) 
 {
-  char str_period[8];
+  // check parameters
+  if (pstr_filename == nullptr) return;
 
   // generate log file name according to unit period
-  GetTextIndexed (str_period, sizeof (str_period), log_status.file_unit, kLogPeriod);
-  sprintf_P (pstr_filename, PSTR ("/%s-%u.log") , str_period, index);
+  sprintf (pstr_filename, log_status.str_filename.c_str (), index);
 }
 
 // determine log filename
@@ -110,6 +117,9 @@ void LogFileGetName (char* pstr_filename, size_t size_filename)
 {
   uint16_t index;
   TIME_T   time_dst;
+
+  // check parameters
+  if (pstr_filename == nullptr) return;
 
   // get period current index
   BreakTime (LocalTime (), time_dst);
@@ -166,7 +176,9 @@ bool LogSaveEvent (uint8_t event_type, const char* pstr_event)
 
   // if new event save file position, else seek to previous event position for update
   if (event_type == LOG_EVENT_NEW) log_status.file_position = file.position ();
-  else file.seek(log_status.file_position);
+  
+  // seek to file position
+  file.seek (log_status.file_position);
 
   // write and close file
   file.print (str_line);
@@ -191,11 +203,18 @@ bool LogSaveEvent (uint8_t event_type, const char* pstr_event)
 // Log initialisation
 void LogInit ()
 {
-  int index;
+  uint8_t index;
 
-#ifndef USE_UFILESYS
   // init available event list
   for (index = 0; index < LOG_EVENT_QTY; index++) log_event.start[index] = UINT32_MAX;
+
+#ifdef USE_UFILESYS
+
+  // set default log filename
+//  if (log_status.str_filename.length () == 0) log_status.str_filename = "period-%u.log";
+
+#else
+
 #endif  // USE_UFILESYS
 }
 
@@ -346,53 +365,61 @@ void LogWebPageHistory ()
   LogWebDisplayHeader ();
 
 #ifdef USE_UFILESYS
-
-  char str_filename[UFS_FILENAME_SIZE];
+  size_t size_line, size_data;
+  char   str_line[LOG_LINE_MAX];
+  char   str_value[LOG_LINE_MAX];
+  char   str_filename[UFS_FILENAME_SIZE];
+  File   file;
 
   // read current log file, without header
   LogFileGetName (str_filename, sizeof (str_filename));
-  if (UfsCsvOpen (str_filename, false))
+  if (ffsp->exists (str_filename))
   {
-    // go to end of file
-    UfsCsvSeekToEnd ();
+    // open file in read only mode in littlefs filesystem and go to end of file
+    file = ffsp->open (str_filename, "r");
+    UfsSeekToEnd (file);
 
-    // loop thru lines as long has there are some data
-    while (ufs_csv.nb_column > 2)
+    // read line in reverse order
+    do
     {
-      // if start time is defined
-      event_ok = (strlen (ufs_csv.pstr_value[0]) > 0);
-      if (event_ok)
+      // read previous line
+      size_line = UfsReadPreviousLine (file, str_line, sizeof (str_line));
+      if (size_line > 0)
       {
-        // calculate start time
-        log_event.start[0] = (uint32_t)atoll (ufs_csv.pstr_value[0]);
-        event_ok = (event_time != log_event.start[0]);
-      }
+        // read start time in 1st column
+        size_data = UfsExtractCsvColumn (str_line, ';', 1, str_value, sizeof (str_value), false);
 
-      // if event is valid
-      if (event_ok)
-      {
-        // calculate start time and event duration
-        event_time = log_event.start[0];
-        if (strlen (ufs_csv.pstr_value[1]) > 0) log_event.duration[0] = (uint32_t)atoll (ufs_csv.pstr_value[1]);
-
-        // loop to recreate data line
-        log_event.str_desc[0] = "";
-        for (index = 2; index < ufs_csv.nb_column; index++) 
+        // if start time is defined
+        event_ok = (size_data > 0);
+        if (event_ok)
         {
-          if (log_event.str_desc[0].length () > 0) log_event.str_desc[0] += ";";
-          log_event.str_desc[0] += ufs_csv.pstr_value[index];
+          // calculate start time
+          log_event.start[0] = (uint32_t)atoll (str_value);
+          event_ok = (event_time != log_event.start[0]);
         }
 
-        // displzy first memory event
-        event_displayed |= LogWebDisplayEvent (0);
-      }
+        // if event is valid
+        if (event_ok)
+        {
+          // calculate start time and event duration
+          event_time = log_event.start[0];
 
-      // go to previous line
-      UfsCsvPreviousLine ();        
-    }
+          // read event duration in 2nd column
+          size_data = UfsExtractCsvColumn (str_line, ';', 2, str_value, sizeof (str_value), false);
+          if (size_data > 0) log_event.duration[0] = (uint32_t)atoll (str_value);
+
+          // read other data from 3rd column
+          size_data = UfsExtractCsvColumn (str_line, ';', 3, str_value, sizeof (str_value), true);
+          log_event.str_desc[0] = str_value;
+
+          // display first memory event
+          event_displayed |= LogWebDisplayEvent (0);
+        }
+      }
+    } while (size_line > 0);
 
     // close file
-    UfsCsvClose (UFS_CSV_ACCESS_READ);
+    file.close ();
   }
 
 #else       // No LittleFS

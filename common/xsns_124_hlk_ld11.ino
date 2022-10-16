@@ -49,9 +49,9 @@ const char D_HLKLD_CONFIGURE[]   PROGMEM = "Configure";
 
 
 // type of message
-enum HLKLDDataType   { HLKLD_DATA_OCC, HLKLD_DATA_MOV, HLKLD_DATA_ANY };                        // sensor types
-const char HLKLDDataLabel[] PROGMEM = "occ|mov|any";                                            // sensor types description
-const char HLKLDDataIcon[] PROGMEM = "🧍|🏃|👋";                                                 // sensor types icon
+enum HLKLDDataType { HLKLD_DATA_OCC, HLKLD_DATA_MOV, HLKLD_DATA_ANY, HLKLD_DATA_MAX };          // sensor types
+const char HLKLDDataLabel[] PROGMEM = "occ|mov|any|";                                           // sensor types description
+const char HLKLDDataIcon[] PROGMEM = "🧍|🏃|👋|";                                               // sensor types icon
 
 // type of received lines
 enum HLKLDLineType  { HLKLD_LINE_OCC, HLKLD_LINE_MOV, HLKLD_LINE_CONFIG, HLKLD_LINE_MAX };      // received line types
@@ -62,7 +62,7 @@ const char HLKLDParamLabel[] PROGMEM = "th1|th2|th3|mth1_mov|mth2_mov|mth3_mov|m
 
 // known models
 enum HLKLDModel { HLKLD_MODEL_1115H, HLKLD_MODEL_1125H, HLKLD_MODEL_MAX };              // device reference index
-const char HLKLDModelName[] PROGMEM = "LD1115H-24G|LD1125H-24G|Unknown";              // device reference name
+const char HLKLDModelName[] PROGMEM = "LD1115H|LD1125H|Unknown";                        // device reference name
 const char HLKLDModelSignature[] PROGMEM = "th1 th2 th3 ind_min ind_max mov_sn occ_sn dtime|test_mode rmax mth1_mov mth2_mov mth3_mov mth1_occ mth2_occ mth3_occ eff_th accu_num|";                                                  // device mode labels
 const char HLKLDModelDefault[]   PROGMEM = "th1=120;th2=250;dtime=5;mov_sn=3;occ_sn=5;get_all|test_mode=0;rmax=6;mth1_mov=60;mth2_mov=30;mth3_mov=20;mth1_occ=60;mth2_occ=30;mth3_occ=20;get_all|";                                                  // device mode labels
 
@@ -76,7 +76,8 @@ void (* const HLKLDCommand[])(void) PROGMEM = { &CmndHLKLDHelp, &CmndHLKLDComman
 
 // HLK-LD sensor general status
 static struct {
-  bool     get_all = false;                       // flag to update current config
+  bool     get_all     = false;                   // flag to update current config
+  bool     display_all = false;                   // display presence and movement or global status
   char     str_buffer[32];                        // buffer of received data
   String   str_command;                           // list of next commands to send (separated by ;)
   String   str_config;                            // returned configuration (param1=value1,param2=value2,...)
@@ -504,23 +505,20 @@ void HLKLDGetDelayText (const uint8_t type, char* pstr_result, size_t size_resul
   if (delay == UINT32_MAX) strcpy (pstr_result, "---");
   else if (delay >= 172800) sprintf (pstr_result, "%u days", delay / 86400);
   else if (delay >= 86400) sprintf (pstr_result, "1 day");
-  else if (delay >= 7200) sprintf (pstr_result, "%u hours", delay / 3600);
-  else if (delay >= 3600) sprintf (pstr_result, "1 hour");
-  else if (delay >= 120) sprintf (pstr_result, "%u minutes", delay / 60);
-  else if (delay >= 60) sprintf (pstr_result, "1 minute");
-  else if (delay > 1) sprintf (pstr_result, "%u seconds", delay);
-  else if (delay > 0) sprintf (pstr_result, "1 second");
+  else if (delay >= 3600) sprintf (pstr_result, "%u hr", delay / 3600);
+  else if (delay >= 60) sprintf (pstr_result, "%u mn", delay / 60);
+  else if (delay > 0) sprintf (pstr_result, "%u sec", delay);
   else strcpy (pstr_result, "now");
   
   return;
 }
 
-bool HLKLDGetDetectionStatus (uint8_t type = HLKLD_DATA_ANY, uint32_t timeout = UINT32_MAX)
+bool HLKLDGetDetectionStatus (uint8_t type, uint32_t timeout)
 {
   uint32_t delay;
 
   // check parameters
-  if (type > HLKLD_DATA_ANY) return false;
+  if (type >= HLKLD_DATA_MAX) return false;
 
   // if no timeout given, use default one
   if (timeout == UINT32_MAX) timeout = hlkld_device.timeout;
@@ -584,7 +582,7 @@ void HLKLDEverySecond ()
   }
 
   // if needed, update virtual switch status
-  if (hlkld_device.index < MAX_SWITCHES) Switch.virtual_state[hlkld_device.index] = HLKLDGetDetectionStatus (HLKLD_DATA_ANY);
+  if (hlkld_device.index < MAX_SWITCHES) Switch.virtual_state[hlkld_device.index] = HLKLDGetDetectionStatus (HLKLD_DATA_ANY, UINT32_MAX);
 }
 
 // Handling of received data
@@ -731,13 +729,13 @@ void HLKLDShowJSON (bool append)
   ResponseAppend_P (PSTR ("\"timeout\":%u"), hlkld_device.timeout);
 
   // presence (occ)
-  ResponseAppend_P (PSTR (",\"occ\":%d"), HLKLDGetDetectionStatus (HLKLD_DATA_OCC));
+  ResponseAppend_P (PSTR (",\"occ\":%d"), HLKLDGetDetectionStatus (HLKLD_DATA_OCC, UINT32_MAX));
 
   // movement (mov)
-  ResponseAppend_P (PSTR (",\"mov\":%d"), HLKLDGetDetectionStatus (HLKLD_DATA_MOV));
+  ResponseAppend_P (PSTR (",\"mov\":%d"), HLKLDGetDetectionStatus (HLKLD_DATA_MOV, UINT32_MAX));
 
   // presence or movement (any)
-  ResponseAppend_P (PSTR (",\"any\":%d"), HLKLDGetDetectionStatus (HLKLD_DATA_ANY));
+  ResponseAppend_P (PSTR (",\"any\":%d"), HLKLDGetDetectionStatus (HLKLD_DATA_ANY, UINT32_MAX));
 
   // last detection in human reading format
   HLKLDGetDelayText (HLKLD_DATA_ANY, str_text, sizeof (str_text));
@@ -785,24 +783,29 @@ void HLKLDShowJSON (bool append)
 // Append HLK-LD11xx sensor data to main page
 void HLKLDWebSensor ()
 {
-  char str_text[32];
-  char str_icon[8];
+  uint8_t info_type;
+  char    str_icon[8];
+  char    str_text[32];
 
   // check sensor presence
   if (hlkld_status.pserial == nullptr) return;
 
   // model name
   GetTextIndexed (str_text, sizeof (str_text), hlkld_device.model, HLKLDModelName);
-  WSContentSend_P (PSTR ("{s}%s{m}"), str_text);
+  WSContentSend_P (PSTR ("{s}%s Detector{m}"), str_text);
 
-  // occ
-  GetTextIndexed (str_icon, sizeof (str_icon), HLKLD_DATA_OCC, HLKLDDataIcon);
-  HLKLDGetDelayText (HLKLD_DATA_OCC, str_text, sizeof (str_text));
-  WSContentSend_P (PSTR ("%s %s<br>"), str_icon, str_text);
+  // if full display, display occ
+  if (hlkld_status.display_all)
+  {
+    GetTextIndexed (str_icon, sizeof (str_icon), HLKLD_DATA_OCC, HLKLDDataIcon);
+    HLKLDGetDelayText (HLKLD_DATA_OCC, str_text, sizeof (str_text));
+    WSContentSend_P (PSTR ("%s %s<br>"), str_icon, str_text);
+  }
 
-  // mov
-  GetTextIndexed (str_icon, sizeof (str_icon), HLKLD_DATA_MOV, HLKLDDataIcon);
-  HLKLDGetDelayText (HLKLD_DATA_MOV, str_text, sizeof (str_text));
+  // display mov or global status
+  if (hlkld_status.display_all) info_type = HLKLD_DATA_MOV; else info_type = HLKLD_DATA_ANY;
+  GetTextIndexed (str_icon, sizeof (str_icon), info_type, HLKLDDataIcon);
+  HLKLDGetDelayText (info_type, str_text, sizeof (str_text));
   WSContentSend_P (PSTR ("%s %s{e}"), str_icon, str_text);
 }
 
@@ -1108,7 +1111,7 @@ bool Xsns124 (uint8_t function)
   {
     case FUNC_INIT:
       HLKLDInit ();
-      HLKLDInitDevice (0, HLKLD_DEFAULT_TIMEOUT);
+//      HLKLDInitDevice (0, HLKLD_DEFAULT_TIMEOUT);
       break;
     case FUNC_COMMAND:
       result = DecodeCommand (kHLKLDCommands, HLKLDCommand);
@@ -1147,4 +1150,3 @@ bool Xsns124 (uint8_t function)
 
 #endif      // USE_HLKLD11
 #endif      // FIRMWARE_SAFEBOOT
-
