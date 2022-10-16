@@ -75,7 +75,7 @@
 #undef MQTT_FULLTOPIC
 #define MQTT_FULLTOPIC     "%topic%/%prefix%/"
 #undef FRIENDLY_NAME
-#define FRIENDLY_NAME      "Teleinfo"
+#define FRIENDLY_NAME      "Ecowatt"
 
 // disable serial log
 #undef SERIAL_LOG_LEVEL 

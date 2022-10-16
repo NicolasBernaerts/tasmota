@@ -4,7 +4,15 @@
   This module connects to french RTE EcoWatt server to retrieve electricity production forecast.
   It publishes status of current slot and next 2 slots on the MQTT stream under
   
-    {"Time":"2022-10-10T23:51:09","Ecowatt":{"now":1,"day0":{"0":1,"1":1,"2":1,"3":1,"4":1,"5":1,"6":1,...,"23":1},"day1":{"0":1,"1":1,"...
+    {"Time":"2022-10-10T23:51:09","Ecowatt":{"dval":2,"hour":14,"now":1,"next":2,
+      "day0":{"jour":"2022-10-06","dval":1,"0":1,"1":1,"2":1,"3":1,"4":1,"5":1,"6":1,...,"23":1},
+      "day1":{"jour":"2022-10-07","dval":2,"0":1,"1":1,"2":2,"3":1,"4":1,"5":1,"6":1,...,"23":1},
+      "day2":{"jour":"2022-10-08","dval":3,"0":1,"1":1,"2":1,"3":1,"4":1,"5":3,"6":1,...,"23":1},
+      "day3":{"jour":"2022-10-09","dval":2,"0":1,"1":1,"2":1,"3":2,"4":1,"5":1,"6":1,...,"23":1}}}
+
+  RTE root certification authority should be placed under /ecowatt.pem for the server to work
+
+  See https://github.com/NicolasBernaerts/tasmota/tree/master/ecowatt for instructions
   
   Copyright (C) 2022  Nicolas Bernaerts
     06/10/2022 - v1.0 - Creation 
@@ -21,9 +29,9 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-/****************************************************\
- *        EcoWatt electricity production forecast
-\****************************************************/
+/**********************************************************\
+ *       France EcoWatt electricity signal management
+\**********************************************************/
 
 #ifndef FIRMWARE_SAFEBOOT
 #ifdef ESP32
@@ -38,7 +46,7 @@
 #define ECOWATT_STARTUP_DELAY      10         // ecowatt reading starts 10 seconds after startup
 #define ECOWATT_UPDATE_SIGNAL      3600       // update ecowatt signals every hour
 #define ECOWATT_UPDATE_RETRY       900        // retry after 15mn in case of error during signals reading
-#define ECOWATT_UPDATE_JSON        600        // publish JSON every 10 mn
+#define ECOWATT_UPDATE_JSON        900        // publish JSON every 15 mn
 #define ECOWATT_SLOT_PER_DAY       24         // maximum number of 1h slots per day
 #define ECOWATT_HTTPS_TIMEOUT      2000       // reception is considered over after 2sec without anything received
 
@@ -67,9 +75,8 @@ enum EcowattHttpsStream { ECOWATT_HTTPS_NONE, ECOWATT_HTTPS_START_TOKEN, ECOWATT
 enum EcowattDays { ECOWATT_DAY_TODAY, ECOWATT_DAY_TOMORROW, ECOWATT_DAY_DAYAFTER, ECOWATT_DAY_DAYAFTER2, ECOWATT_DAY_MAX };
 
 // Ecowatt states
-enum EcowattStates { ECOWATT_STATE_NONE, ECOWATT_STATE_NORMAL, ECOWATT_STATE_WARNING, ECOWATT_STATE_POWERCUT, ECOWATT_STATE_MAX };
-const char kEcowattStateName[] PROGMEM = "|Normal|Risque|Coupure";
-const char kEcowattStateColor[] PROGMEM = "|#02f0c6|#f2790f|#e63946";
+enum EcowattLevels { ECOWATT_LEVEL_NONE, ECOWATT_LEVEL_NORMAL, ECOWATT_LEVEL_WARNING, ECOWATT_LEVEL_POWERCUT, ECOWATT_LEVEL_MAX };
+const char kEcowattLevelColor[] PROGMEM = "|#00AF00|#FFAF00|#CF0000";
 
 /***********************************************************\
  *                        Data
@@ -95,9 +102,9 @@ static struct {
 
 // Ecowatt status
 struct ecowatt_day {
-  uint8_t status;                                   // day global status
-  char str_date[12];                                // slot date (aaaa-mm-dd)
-  uint8_t arr_slot[ECOWATT_SLOT_PER_DAY];           // hourly slots
+  uint8_t dvalue;                                   // day global status
+  char    str_jour[12];                             // slot date (aaaa-mm-dd)
+  uint8_t arr_hvalue[ECOWATT_SLOT_PER_DAY];         // hourly slots
 };
 static struct {
   uint8_t  hour = UINT8_MAX;                        // slots for today and tomorrow
@@ -113,10 +120,10 @@ static struct {
 // Ecowatt server help
 void CmndEcowattHelp ()
 {
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Ecowatt local server commands :"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Ecowatt server commands :"));
   AddLog (LOG_LEVEL_INFO, PSTR (" - eco_key     = set RTE base64 private key"));
   AddLog (LOG_LEVEL_INFO, PSTR (" - eco_update  = force ecowatt data update from RTE server"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - eco_publish = ask to publish data"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - eco_publish = publish current ecowatt data thru MQTT"));
   AddLog (LOG_LEVEL_INFO, PSTR (" Slot values can be :"));
   AddLog (LOG_LEVEL_INFO, PSTR ("  1 = Situation normale"));
   AddLog (LOG_LEVEL_INFO, PSTR ("  2 = Risque de coupures"));
@@ -277,9 +284,6 @@ bool EcowattHttpsStartSignals ()
 {
   bool is_ok;
   int  http_code;
-  
-  // init signals data
-  ecowatt_status.time_update = LocalTime ();
 
   // set headers
   ecowatt_https.client.useHTTP10 (true);
@@ -306,7 +310,6 @@ bool EcowattHttpsStartSignals ()
 bool EcowattHttpsEndSignals ()
 {
   uint8_t  index, slot, value;
-  uint32_t time_now;
   TIME_T   time_dst;
   String   str_day;
   DynamicJsonDocument json_result(8192);
@@ -326,24 +329,23 @@ bool EcowattHttpsEndSignals ()
     str_day = str_day.substring (0, 10);
 
     // get global status and date
-    ecowatt_status.arr_day[index].status = json_result["signals"][index]["dvalue"];
-    strncpy (ecowatt_status.arr_day[index].str_date, json_result["signals"][index]["jour"], 10);
-    ecowatt_status.arr_day[index].str_date[10] = 0;
+    ecowatt_status.arr_day[index].dvalue = json_result["signals"][index]["dvalue"];
+    strncpy (ecowatt_status.arr_day[index].str_jour, json_result["signals"][index]["jour"], 10);
+    ecowatt_status.arr_day[index].str_jour[10] = 0;
 
     // loop to populate the slots
     for (slot = 0; slot < ECOWATT_SLOT_PER_DAY; slot ++)
     {
       value = json_result["signals"][index]["values"][slot]["hvalue"];
-      if ((value == ECOWATT_STATE_NONE) || (value >= ECOWATT_STATE_MAX)) value = ECOWATT_STATE_NORMAL;
-      ecowatt_status.arr_day[index].arr_slot[slot] = value;
+      if ((value == ECOWATT_LEVEL_NONE) || (value >= ECOWATT_LEVEL_MAX)) value = ECOWATT_LEVEL_NORMAL;
+      ecowatt_status.arr_day[index].arr_hvalue[slot] = value;
     }
 
     // log
-    AddLog (LOG_LEVEL_INFO, PSTR ("ECO: Signals - Slot %u is %s, status is %u"), index, str_day.c_str (), ecowatt_status.arr_day[index].status);
+    AddLog (LOG_LEVEL_INFO, PSTR ("ECO: Signals - Slot %u is %s, status is %u"), index, str_day.c_str (), ecowatt_status.arr_day[index].dvalue);
   }
 
-  // set next update time
-  ecowatt_status.time_update = time_now + ECOWATT_UPDATE_SIGNAL;
+  AddLog (LOG_LEVEL_INFO, PSTR ("ECO: Signals - Update finished"));
 
   // reset reception string
   ecowatt_https.str_recv = "";
@@ -430,6 +432,7 @@ void EcowattHandleUpdateProcess ()
         // else retry in 5mn
         else
         {
+          // set next retry
           ecowatt_https.step = ECOWATT_HTTPS_NONE;
           ecowatt_status.time_update = time_now + ECOWATT_UPDATE_RETRY;
         }
@@ -450,6 +453,7 @@ void EcowattHandleUpdateProcess ()
       // else retry in 5mn
       else
       {
+        // set next retry
         ecowatt_https.step = ECOWATT_HTTPS_NONE;
         ecowatt_status.time_update = time_now + ECOWATT_UPDATE_RETRY;
       }
@@ -462,6 +466,7 @@ void EcowattHandleUpdateProcess ()
       // else retry in 15mn
       else
       {
+        // set next retry
         ecowatt_https.step = ECOWATT_HTTPS_NONE;
         ecowatt_status.time_update = time_now + ECOWATT_UPDATE_RETRY;
       }
@@ -476,8 +481,9 @@ void EcowattHandleUpdateProcess ()
       // if data reception is ok
       if (EcowattHttpsEndSignals ())
       {
-        // end of update process
+        // set next update time
         ecowatt_https.step = ECOWATT_HTTPS_NONE;
+        ecowatt_status.time_update = time_now + ECOWATT_UPDATE_SIGNAL;
 
         // ask for JSON update
         ecowatt_status.time_json = time_now;
@@ -494,7 +500,6 @@ void EcowattHandleUpdateProcess ()
 }
 
 // publish Ecowatt JSON thru MQTT
-// format is  {"Time":"xxxxxxxx","Ecowatt":{"slot":16,"now":2,"next":1,"day0":{"0":2,"1":1,...,"23":1},"day1":{"0":1,"1":1,...,"23":2},...}}
 void EcowattPublishJson ()
 {
   uint8_t  index, slot;
@@ -512,28 +517,25 @@ void EcowattPublishJson ()
   // Start Ecowatt section
   Response_P (PSTR ("{\"Time\":\"%s\",\"Ecowatt\":{"), GetDateAndTime (DT_LOCAL).c_str ());
 
-  // publish slot index
-  ResponseAppend_P (PSTR ("\"slot\":%u"), slot_hour);
+  // publish day global status
+  ResponseAppend_P (PSTR ("\"dval\":%u"), ecowatt_status.arr_day[slot_day].dvalue);
+
+  // publish hour slot index
+  ResponseAppend_P (PSTR (",\"hour\":%u"), slot_hour);
 
   // publish current slot
-  ResponseAppend_P (PSTR (",\"now\":%u"), ecowatt_status.arr_day[slot_day].arr_slot[slot_hour]);
+  ResponseAppend_P (PSTR (",\"now\":%u"), ecowatt_status.arr_day[slot_day].arr_hvalue[slot_hour]);
 
   // publish next slot
   if (slot_hour == 23) { slot_hour = 0; slot_day++; }
     else slot_hour++;
-  ResponseAppend_P (PSTR (",\"next\":%u"), ecowatt_status.arr_day[slot_day].arr_slot[slot_hour]);
+  ResponseAppend_P (PSTR (",\"next\":%u"), ecowatt_status.arr_day[slot_day].arr_hvalue[slot_hour]);
 
   // loop thru number of slots to publish
   for (index = 0; index < ECOWATT_DAY_MAX; index ++)
   {
-    ResponseAppend_P (PSTR (",\"day%u\":{"), index);
-
-    for (slot = 0; slot < ECOWATT_SLOT_PER_DAY; slot ++)
-    {
-      if (slot > 0) ResponseAppend_P (PSTR (","));
-      ResponseAppend_P (PSTR ("\"%u\":%u"), slot, ecowatt_status.arr_day[index].arr_slot[slot]);
-    }
-
+    ResponseAppend_P (PSTR (",\"day%u\":{\"jour\":\"%s\",\"dval\":%u"), index, ecowatt_status.arr_day[index].str_jour, ecowatt_status.arr_day[index].dvalue);
+    for (slot = 0; slot < ECOWATT_SLOT_PER_DAY; slot ++) ResponseAppend_P (PSTR (",\"%u\":%u"), slot, ecowatt_status.arr_day[index].arr_hvalue[slot]);
     ResponseAppend_P (PSTR ("}"));
   }
 
@@ -559,11 +561,16 @@ void EcowattInit ()
 
   // initialisation of slot array
   for (index = 0; index < ECOWATT_DAY_MAX; index ++)
-    for (slot = 0; slot < ECOWATT_SLOT_PER_DAY; slot ++)
-      ecowatt_status.arr_day[index].arr_slot[slot] = ECOWATT_STATE_NORMAL;
+  {
+    // init date
+    strcpy (ecowatt_status.arr_day[index].str_jour, "");
+
+    // slot initialisation to normal state
+    for (slot = 0; slot < ECOWATT_SLOT_PER_DAY; slot ++) ecowatt_status.arr_day[index].arr_hvalue[slot] = ECOWATT_LEVEL_NORMAL;
+  }
 
   // log help command
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: eco_help to get help on Ecowatt production forecast commands"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: eco_help to get help on Ecowatt module"));
 }
 
 // called every second
@@ -585,11 +592,8 @@ void EcowattEverySecond ()
   ecowatt_status.hour = dst_now.hour;
 
   // update ecowatt signal if needed
-  if ((ecowatt_status.time_update == UINT32_MAX) || (ecowatt_status.time_update < time_now))
-  {
-    // if reception is not actually running, start it
-    if (ecowatt_https.step == ECOWATT_HTTPS_NONE) ecowatt_https.step = ECOWATT_HTTPS_START_TOKEN;
-  }
+  if (ecowatt_status.time_update == UINT32_MAX) ecowatt_status.time_update = time_now;
+  else if ((ecowatt_status.time_update < time_now) && (ecowatt_https.step == ECOWATT_HTTPS_NONE)) ecowatt_https.step = ECOWATT_HTTPS_START_TOKEN;
 
   // if needed, publish JSON
   if (update_json) EcowattPublishJson ();
@@ -600,13 +604,28 @@ void EcowattMidnigth ()
 {
   uint8_t index, slot;
 
-  // shift of one day
+  // shift day's data
   for (index = 0; index < ECOWATT_DAY_MAX; index ++)
-    for (slot = 0; slot < ECOWATT_SLOT_PER_DAY; slot ++)
+  {
+    // init date, global status and slots for day+3
+    if (index == ECOWATT_DAY_DAYAFTER2)
     {
-      if (index == ECOWATT_DAY_DAYAFTER2) ecowatt_status.arr_day[index].arr_slot[slot] = ECOWATT_STATE_NORMAL;
-      else ecowatt_status.arr_day[index].arr_slot[slot] = ecowatt_status.arr_day[index + 1].arr_slot[slot];
+      strcpy (ecowatt_status.arr_day[index].str_jour, "");
+      ecowatt_status.arr_day[index].dvalue = ECOWATT_LEVEL_NORMAL;
+      for (slot = 0; slot < ECOWATT_SLOT_PER_DAY; slot ++) ecowatt_status.arr_day[index].arr_hvalue[slot] = ECOWATT_LEVEL_NORMAL;
     }
+
+    // shift date, global status and slots for day, day+1 and day+2
+    else
+    {
+      strcpy (ecowatt_status.arr_day[index].str_jour, ecowatt_status.arr_day[index + 1].str_jour);
+      ecowatt_status.arr_day[index].dvalue = ecowatt_status.arr_day[index + 1].dvalue;
+      for (slot = 0; slot < ECOWATT_SLOT_PER_DAY; slot ++) ecowatt_status.arr_day[index].arr_hvalue[slot] = ecowatt_status.arr_day[index + 1].arr_hvalue[slot];
+    }
+  }
+
+  // publish data change
+  EcowattPublishJson ();
 }
 
 /***********************************************\
@@ -621,6 +640,7 @@ void EcowattWebSensor ()
   uint8_t  index, slot;
   uint32_t time_now, time_next;
   char     str_color[12];
+  char     str_select[48];
 
   // display next update
   time_now = LocalTime ();
@@ -649,12 +669,15 @@ void EcowattWebSensor ()
     for (slot = 0; slot < ECOWATT_SLOT_PER_DAY; slot ++)
     {
       // get segment color
-      GetTextIndexed (str_color, sizeof (str_color), ecowatt_status.arr_day[index].arr_slot[slot], kEcowattStateColor);
+      GetTextIndexed (str_color, sizeof (str_color), ecowatt_status.arr_day[index].arr_hvalue[slot], kEcowattLevelColor);
       
+      // check if segment is the current slot
+      if ((index == ECOWATT_DAY_TODAY) && (slot == ecowatt_status.hour)) strcpy (str_select, "outline:4px solid white;outline-offset:-8px;"); else strcpy (str_select, "");
+
       // display segment
-      if (slot == 0) WSContentSend_P (PSTR ("<div style='width:100%%;margin-right:1px;border-radius:2px;background-color:%s;border-top-left-radius:6px;border-bottom-left-radius:6px;'></div>\n"), str_color);
-      else if (slot == ECOWATT_SLOT_PER_DAY - 1) WSContentSend_P (PSTR ("<div style='width:100%%;margin-right:1px;border-radius:2px;background-color:%s;border-top-right-radius:6px;border-bottom-right-radius:6px;'></div>\n"), str_color);
-      else WSContentSend_P (PSTR ("<div style='width:100%%;margin-right:1px;border-radius:2px;background-color:%s;'></div>\n"), str_color);
+      if (slot == 0) WSContentSend_P (PSTR ("<div style='width:100%%;margin-right:1px;border-radius:2px;background-color:%s;border-top-left-radius:6px;border-bottom-left-radius:6px;%s'></div>\n"), str_color, str_select);
+      else if (slot == ECOWATT_SLOT_PER_DAY - 1) WSContentSend_P (PSTR ("<div style='width:100%%;margin-right:1px;border-radius:2px;background-color:%s;border-top-right-radius:6px;border-bottom-right-radius:6px;%s'></div>\n"), str_color, str_select);
+      else WSContentSend_P (PSTR ("<div style='width:100%%;margin-right:1px;border-radius:2px;background-color:%s;%s'></div>\n"), str_color, str_select);
     }
     WSContentSend_P (PSTR ("</div>\n"));
   }
