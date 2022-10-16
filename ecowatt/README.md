@@ -50,7 +50,10 @@ To declare the MQTT topic where to publish Ecowatt data, run following console c
 
     # eco_topic your/topic/for/ecowatt
     
-Once you've setup these 3 data, your Ecowatt MQTT server should be up and running.
+Once you've setup these 3 data, restart your Tasmota module.
+
+Your Ecowatt MQTT server should be up and running.
+
 
 ## Compilation ##
 
