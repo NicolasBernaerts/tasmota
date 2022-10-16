@@ -42,7 +42,7 @@ To declare the root CA of https://data.rte-france.com/, you can collect it from 
   * click to download **PEM(cert)**
 You can also download it from this repository  :-)
 
-This certificate should be named **ecowatt.pem** and uploaded to the root of the LittleFS partition.
+This certificate should be named ***ecowatt.pem*** and uploaded to the root of the LittleFS partition.
 
 ### MQTT Topic ### 
 
