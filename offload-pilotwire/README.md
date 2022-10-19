@@ -1,10 +1,8 @@
-Tasmota with Offload & Pilotwire (Fil Pilote) management
-=============
+# Offload & Pilotwire Tasmota firmware #
 
-This firmware is based on Tasmota **v12**, enhanced to handle :
+These firmware are based on Tasmota **v12**. It has been enhanced to handle :
 * **Offload** capacity based on a MQTT subscription to a general Meter
-* **Pilotwire** to manage France electrical heaters using **Fil Pilote** protocol management
-* **Ecowatt** signal from France RTE authority
+* **Pilotwire** to manage France electrical heaters using **Fil Pilote** protocol
 
 This firmare provides :
   * Web configuration interface
@@ -15,6 +13,27 @@ This firmare provides :
   * **/control** public page to control the device
   * **/histo** public page to get offloading history
   * **/info.json** to get device main caracteristics
+
+## Offload ##
+
+**Offload** firmware provides an offload capability based on the device consumption, your actual global consumption and your contact level.
+
+If global power exceed your contract level, device is offloaded as long as your global consumption has not drop enougth.
+
+It has been tested on **Sonoff S26**, **Sonoff Pow R2**, **Athom power plug** and various **ESP32** boards.
+
+### Configuration ###
+
+You need to configure usual tasmota stuff, plus the **Offload** section.
+
+Here, you need to configure :
+  * The topic where your energy meter data are published
+  * The key where to read your contract maximum power (VA)
+  * The key xhere to read your global instant power (VA)
+  * The power of device controled by your Tasmota
+  * Priority of the device in case off offloading (several devices may offload the one after the other)
+  
+After next restart, offload mecanism will start.
 
 Pilotwire
 ---------
@@ -30,6 +49,8 @@ To enable **Pilotwire** mode you need to :
   * connect a temperature sensor
   * Flash firmware
   * setup configuration
+
+* **Ecowatt** signal from France RTE authority
 
 Typical diode to use is **1N4007**. Connexion should be done directly on the relay output :
 
@@ -60,16 +81,6 @@ Here is the template you can use if you are are using a Sonoff Basic.
 
 ![Template Sonoff Basic](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload-pilotwire/screen/tasmota-pilotwire-template.png) 
 
-Offload
--------
-
-**Offload** has been tested on :
-  * **Sonoff S26**
-  * **Sonoff Pow R2**
-  * **Athom power plug**
-  * **ESP32** boards
-  
-You can also declare a **MQTT remote power meter** to handle **automatic offload** when global power is to high according to your energy contract.
 
 MQTT
 ----
