@@ -53,7 +53,7 @@ To declare the MQTT topic where to publish Ecowatt data, run following console c
     
 You can replace *ecowatt/tele/SENSOR* by any other topic you want.
 
-## 4- Restart ##
+### 4- Restart ###
 
 Once you've setup these 3 data, restart your Tasmota module.
 
