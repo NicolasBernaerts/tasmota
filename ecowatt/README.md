@@ -64,7 +64,7 @@ If you want to compile this firmware version, you just need to :
 2. place or replace files from this repository
 3. place specific files from **tasmota/common** repository
 
-Here is where you should place different files from this repository and from **tasmota/common** :
+Here is where you should place different files from this repository and from [**tasmota/common**](https://github.com/NicolasBernaerts/tasmota/tree/master/common) :
 * **platformio_override.ini**
 * tasmota/**user_config_override.h**
 * tasmota/tasmota_drv_driver/**xdrv_01_9_webserver.ino**
