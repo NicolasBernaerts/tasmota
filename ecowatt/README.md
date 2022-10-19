@@ -40,9 +40,10 @@ To declare the root CA of https://data.rte-france.com/, you can collect it from 
   * on the page, select **display the certificate**
   * on the new page, select **Global Sign** tab
   * click to download **PEM(cert)**
-You can also download it from this repository  :-)
-
+  
 This certificate should be named ***ecowatt.pem*** and uploaded to the root of the LittleFS partition.
+
+To ease the process, the certificate has been uploaded to this repository. 
 
 ### MQTT Topic ### 
 
@@ -55,7 +56,6 @@ To declare the MQTT topic where to publish Ecowatt data, run following console c
 Once you've setup these 3 data, restart your Tasmota module.
 
 Your Ecowatt MQTT server should be up and running.
-
 
 ## Compilation ##
 
