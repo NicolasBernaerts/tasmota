@@ -47,10 +47,11 @@ Pilotwire firmware allows to handle an electrical heater using the **fil pilote*
 
 It manages :
   * **thermostat** according to any temperature sensor (local or remote)
-  * **presence detection* to lower thermostat in case of vacancy
+  * **presence detection** to lower thermostat in case of vacancy
   * **opened window detection** to cut power when window is opened
-  * **ecowatt** signal action to lower thermostat in case of risk of power cut
   * **night mode** to lower temperature at night
+  * **offload** mnagement
+  * **ecowatt** signal action to lower thermostat in case of risk of power cut
 
 **Pilotwire** has been tested on **Sonoff Basic** (1Mb), **ESP01** (1Mb), **Wemos D1 Mini** (4Mb) and **ESP32** (4Mb).
 
