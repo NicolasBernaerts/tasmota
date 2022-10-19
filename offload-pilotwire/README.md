@@ -35,65 +35,81 @@ Here, you need to configure :
   
 After next restart, offload mecanism will start.
 
-Pilotwire
----------
+### MQTT ###
 
-**Pilotwire** has been tested on :
-  * **Sonoff Basic** (1Mb)
-  * **ESP01** (1Mb)
-  * **Wemos D1 Mini** (4Mb)
-  * **ESP32** (4Mb)
+Offload MQTT JSON result should look like that :
 
-To enable **Pilotwire** mode you need to :
-  * connect diode between the Sonoff output **Line** and the heater **fil pilote**
+    23:59:26.476 MQT: chambre2nd/tele/STATE = {"Time":"2022-01-19T23:59:26","Offload":{"State":0,"Stage":0,"Device":1500},"TempUnit":"C"}}
+
+## Pilotwire ##
+
+Pilotwire firmware allows to handle an electrical heater using the **fil pilote** french protocol.
+
+It manages :
+  * **thermostat** according to any temperature sensor (local or remote)
+  * **presence detection* to lower thermostat in case of vacancy
+  * **opened window detection** to cut power when window is opened
+  * **ecowatt** signal action to lower thermostat in case of risk of power cut
+  * **night mode** to lower temperature at night
+
+**Pilotwire** has been tested on **Sonoff Basic** (1Mb), **ESP01** (1Mb), **Wemos D1 Mini** (4Mb) and **ESP32** (4Mb).
+
+Pilotwire protocol is described at http://www.radiateur-electrique.org/fil-pilote-radiateur.php
+
+### Hardware setup ###
+
+You first need to connect a diode between your relay output and the heater's *fil pilote*
   * connect a temperature sensor
   * Flash firmware
-  * setup configuration
-
-* **Ecowatt** signal from France RTE authority
+  * setup the device
 
 Typical diode to use is **1N4007**. Connexion should be done directly on the relay output :
 
 ![Sonoff Basic](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload-pilotwire/screen/pilotwire-diode-single.jpg)
 
-You'll also get a **Confort** mode that will allow you to pilot the heater to maintain a target temperature in the room. \\
-To activate that mode, you'll need either to :
-  * connect a **local DF18B20** temperature sensor (on **GPIO03 serial RX**)
-  * or declare a **MQTT remote** temperature sensor
+Next you need to connect a temperature sensor to your device. Typically, you can connect a **DF18B20** temperature sensor on **GPIO03 serial RX**.
 
-If you use Tasmota standard timers, you'll be able to manage 2 different target temperatures :
-  * Timer **ON** targets **normal temperature**
-  * Timer **OFF** targets **night temperature**
+### Configuration ###
 
-Pilotwire controler provides 2 more options :
-  * **open window detection** : if temperature drops 0.5°C in less than 4mn heater is switched off, it is switched back on when temperature increase 0.2°C
-  * **movement detection** : based on detector declared as switch 7, decreases temperature 0.5°C every 30mn after first inactivity hour, down to **vacancy temperature**
+First you need to configure normal Tasmota stuff and **Offload** section.
 
-Pilotwire controler can also handle **Ecowatt** MQTT signal to protect energy network.
-It need to have a [**Ecowatt server**](https://github.com/NicolasBernaerts/tasmota/tree/master/ecowatt) running on the same MQTT server.
-It then allows to handle Ecowatt signals :
-  * in case of level 2, a specific target temperature will be applied
-  * in case of level 3, another specific target temperature will be applied
+Then, you may configure **Sensor** section. It allows you to declare topic and key of remote sensors you want to use (temperature & presence detection).
 
-Pilotwire protocol is described at http://www.radiateur-electrique.org/fil-pilote-radiateur.php
+Then you need to configure **Pilotwire** section. It allows :
+  * to select pilotwire protocol or direct plug management
+  * to select pilotwire options (open window detection, movement detection and Ecowatt signal)
+  * to configure target temperature for different cases
+
+Finally you may configure the **Ecowatt** topic you want to subscribe to. This is done in console mode :
+
+     # eco_topic ecowatt/tele/SENSOR
+
+You can adjust topic to your environment.
+
+It then allows to adjust target temperature according to Ecowatt signals level 2 (low risk of power cut) and level 3 (high risk of power cut).
+
+**Night mode** is configure thru standard Tasmota **timers** :
+  * Timer **ON** switch to **comfort** temperature
+  * Timer **OFF** switches to **night mode** temperature
+
+**open window** detection principle is simple : if temperature drops 0.5°C in less than 4mn heater is switched off, it is switched back on when temperature increase 0.2°C
+
+**presence** detection decreases temperature to **Eco** level after a certain time of vacancy and to **No frost** level after longer vacancy.
 
 Here is the template you can use if you are are using a Sonoff Basic.
 
 ![Template Sonoff Basic](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload-pilotwire/screen/tasmota-pilotwire-template.png) 
 
 
-MQTT
-----
+### MQTT ###
 
-MQTT JSON result should look like that :
+Pilotwire MQTT JSON result should look like that :
 
-    23:59:26.476 MQT: chambre2nd/tele/STATE = {"Time":"2022-01-19T23:59:26","Uptime":"0T23:10:12","UptimeSec":83412,"Heap":23,"SleepMode":"Dynamic","Sleep":50,"LoadAvg":19,"MqttCount":5,"POWER":"OFF","Wifi":{"AP":1,"SSId":"xxxxxxx-yyyyyyy","BSSId":"30:23:03:xx:xx:xx","Channel":1,"Mode":"11n","RSSI":54,"Signal":-73,"LinkCount":1,"Downtime":"0T00:00:05"}}
-    23:59:26.484 MQT: chambre2nd/tele/SENSOR = {"Time":"2022-01-19T23:59:26","DS18B20":{"Id":"030E97943560","Temperature":16.9},"Pilotwire":{"Mode":2,"Status":2,"Heating":1,"Temperature":16.9,"Target":17.0,"Detect":128,"Window":0},"Offload":{"State":0,"Stage":0,"Device":1500},"TempUnit":"C"}
+    23:59:26.476 MQT: chambre2nd/tele/STATE = {"Time":"2022-01-19T23:59:26","Pilotwire":{"Mode":2,"Status":2,"Heating":1,"Temperature":16.9,"Target":17.0,"Detect":128,"Window":0},"Offload":{"State":0,"Stage":0,"Device":1500},"TempUnit":"C"}}
+
+## Compilation ##
 
 Pre-compiled version of Tasmota handling **offload** and **fil pilote** are available in the **bin** directory.
-
-Compilation
------------
 
 If you want to compile this firmware version, you just need to :
 1. install official tasmota sources
