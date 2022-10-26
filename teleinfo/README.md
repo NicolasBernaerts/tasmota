@@ -182,4 +182,4 @@ Finaly, in **Configure Teleinfo** you need to select your Teleinfo adapter baud 
  
 
 ![Board page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-board.png)
-![LittleFS page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-littlefs.png)
+
