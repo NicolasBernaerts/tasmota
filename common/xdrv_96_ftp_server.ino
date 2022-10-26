@@ -12,7 +12,8 @@
   Copyright (C) 2021  Nicolas Bernaerts
     02/11/2021 - v1.0 - Creation 
     19/11/2021 - v1.1 - Tasmota 10 compatibility 
-    0'/08/2022 - v1.2 - Manual start thru ftp_start
+    04/08/2022 - v1.2 - Manual start thru ftp_start
+    16/09/2022 - v1.3 - Add ftp_status
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -38,8 +39,6 @@
 
 #include <FTPServer.h>
 
-FTPServer *ftp_server = nullptr;
-
 // commands : MQTT
 #ifndef FTP_SERVER_LOGIN
 #define FTP_SERVER_LOGIN          "ftp"
@@ -50,8 +49,11 @@ FTPServer *ftp_server = nullptr;
 #endif
 
 // FTP - MQTT commands
-const char kFTPServerCommands[] PROGMEM = "ftp_" "|" "help" "|" "start" "|" "stop";
-void (* const FTPServerCommand[])(void) PROGMEM = { &CmndFTPServerHelp, &CmndFTPServerStart, &CmndFTPServerStop };
+const char kFTPServerCommands[] PROGMEM = "ftp_" "|" "help" "|" "start" "|" "stop" "|" "status";
+void (* const FTPServerCommand[])(void) PROGMEM = { &CmndFTPServerHelp, &CmndFTPServerStart, &CmndFTPServerStop, &CmndFTPServerStatus };
+
+// FTP server instance
+FTPServer *ftp_server = nullptr;
 
 /***********************************************************\
  *                      Commands
@@ -61,42 +63,64 @@ void (* const FTPServerCommand[])(void) PROGMEM = { &CmndFTPServerHelp, &CmndFTP
 void CmndFTPServerHelp ()
 {
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: FTP server commands :"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - ftp_status = status (running port or 0 if not running)"));
   AddLog (LOG_LEVEL_INFO, PSTR (" - ftp_start = start FTP server on port %u"), FTP_CTRL_PORT);
   AddLog (LOG_LEVEL_INFO, PSTR (" - ftp_stop  = stop FTP server"));
   AddLog (LOG_LEVEL_INFO, PSTR ("   Server allows only 1 concurrent connexion"));
   AddLog (LOG_LEVEL_INFO, PSTR ("   Please configure your FTP client accordingly to connect"));
-  ResponseCmndDone();
+  ResponseCmndDone ();
 }
 
 // Start FTP server
 void CmndFTPServerStart ()
 {
-  // if FTP server not created, create it
-  if (ftp_server == nullptr) ftp_server = new FTPServer (LittleFS);
+  bool done = false;
 
-  // if server exists, start it with login/ pwd
-  if (ftp_server != nullptr) 
+  // if FTP server not created, create it
+  if (ftp_server == nullptr)
   {
-    ftp_server->begin (FTP_SERVER_LOGIN, FTP_SERVER_PASSWORD);
-    AddLog (LOG_LEVEL_INFO, PSTR ("FTP: Server started on port %u"), FTP_CTRL_PORT);
+    // create server
+    ftp_server = new FTPServer (LittleFS);
+
+    // if server created, start it with login/ pwd
+    if (ftp_server != nullptr) 
+    {
+      ftp_server->begin (FTP_SERVER_LOGIN, FTP_SERVER_PASSWORD);
+      done = true;
+      AddLog (LOG_LEVEL_INFO, PSTR ("FTP: Server started on port %u"), FTP_CTRL_PORT);
+    }
   }
 
   // answer
-  if (ftp_server != nullptr) ResponseCmndDone (); else ResponseCmndFailed ();
+  if (done) ResponseCmndDone ();
+    else ResponseCmndFailed ();
 }
 
 // Start FTP server
 void CmndFTPServerStop ()
 {
+  bool done = false;
+
   // if server exists, stop it
   if (ftp_server != nullptr) 
   {
     ftp_server->stop ();
+    delete (ftp_server);
+    ftp_server = nullptr;
+    done = true;
     AddLog (LOG_LEVEL_INFO, PSTR ("FTP: Server stopped"));
   }
 
   // answer
-  if (ftp_server != nullptr) ResponseCmndDone (); else ResponseCmndFailed ();
+  if (done) ResponseCmndDone ();
+    else ResponseCmndFailed ();
+}
+
+// Status of FTP server
+void CmndFTPServerStatus ()
+{
+  if (ftp_server != nullptr) ResponseCmndNumber (FTP_CTRL_PORT);
+    else ResponseCmndNumber (0);
 }
 
 /***********************************************************\
@@ -108,13 +132,6 @@ void FTPServerInit ()
 {
   // log help command
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ftp_help to get help on FTP Server commands"));
-}
-
-// FTP server connexion management
-void FTPServerLoop ()
-{
-  // if FTP server not created
-  if (ftp_server != nullptr) ftp_server->handleFTP ();
 }
 
 /***********************************************************\
@@ -135,7 +152,7 @@ bool Xdrv96 (uint8_t function)
       result = DecodeCommand (kFTPServerCommands, FTPServerCommand);
       break;
     case FUNC_EVERY_50_MSECOND:
-      FTPServerLoop ();
+      if (ftp_server != nullptr) ftp_server->handleFTP ();
       break;
   }
   

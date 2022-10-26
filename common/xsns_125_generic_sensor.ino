@@ -62,6 +62,8 @@
 
 #define XSNS_125                      125
 
+#include <ArduinoJson.h>
+
 #define SENSOR_TIMEOUT_TEMPERATURE    30            // temperature default validity (in sec.)
 #define SENSOR_TIMEOUT_HUMIDITY       30            // humidity default validity (in sec.)
 #define SENSOR_TIMEOUT_PRESENCE       30            // presence default validity (in sec.)
@@ -697,45 +699,54 @@ void SensorEverySecond ()
 // Show JSON status (for MQTT)
 void SensorShowJSON (bool is_autonomous)
 {
+  bool temperature, humidity, presence;
   bool first = true;
   char str_value[8];
 
-  // add , in append mode
-  if (is_autonomous) Response_P (PSTR ("{")); else ResponseAppend_P (PSTR (","));
+  // check if sensors are available
+  temperature = (sensor_status.type[SENSOR_TYPE_TEMP].source != SENSOR_SOURCE_MAX);
+  humidity    = (sensor_status.type[SENSOR_TYPE_HUMI].source != SENSOR_SOURCE_MAX);
+  presence    = (sensor_status.type[SENSOR_TYPE_PRES].source != SENSOR_SOURCE_MAX);
 
-
-  // temperature
-  if (sensor_status.type[SENSOR_TYPE_TEMP].source != SENSOR_SOURCE_MAX)
+  // if at least one sensor is available
+  if (temperature || humidity || presence)
   {
-    ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%01_f"), &sensor_status.type[SENSOR_TYPE_TEMP].value);
-    ResponseAppend_P (PSTR ("\"temp\":%s"), str_value);
-    first = false;
+    // add , in append mode
+    if (is_autonomous) Response_P (PSTR ("{")); else ResponseAppend_P (PSTR (","));
+
+    // temperature
+    if (temperature)
+    {
+      ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%01_f"), &sensor_status.type[SENSOR_TYPE_TEMP].value);
+      ResponseAppend_P (PSTR ("\"temp\":%s"), str_value);
+      first = false;
+    }
+
+    // humidity
+    if (humidity)
+    {
+      ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%00_f"), &sensor_status.type[SENSOR_TYPE_HUMI].value);
+      if (!first) ResponseAppend_P (PSTR (","));
+      ResponseAppend_P (PSTR ("\"humi\":%s"), str_value);
+      first = false;
+    }
+
+    // presence
+    if (presence)
+    {
+      ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%00_f"), &sensor_status.type[SENSOR_TYPE_HUMI].value);
+      if (!first) ResponseAppend_P (PSTR (","));
+      ResponseAppend_P (PSTR ("\"pres\":%s"), str_value);
+    }
+
+    // publish it if message is autonomous
+    if (is_autonomous)
+    {
+      // publish message
+      ResponseAppend_P (PSTR ("}"));
+      MqttPublishTeleSensor ();
+    } 
   }
-
-  // humidity
-  if (sensor_status.type[SENSOR_TYPE_HUMI].source != SENSOR_SOURCE_MAX)
-  {
-    ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%00_f"), &sensor_status.type[SENSOR_TYPE_HUMI].value);
-    if (!first) ResponseAppend_P (PSTR (","));
-    ResponseAppend_P (PSTR ("\"humi\":%s"), str_value);
-    first = false;
-  }
-
-  // presence
-  if (sensor_status.type[SENSOR_TYPE_PRES].source != SENSOR_SOURCE_MAX)
-  {
-    ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%00_f"), &sensor_status.type[SENSOR_TYPE_HUMI].value);
-    if (!first) ResponseAppend_P (PSTR (","));
-    ResponseAppend_P (PSTR ("\"pres\":%s"), str_value);
-  }
-
-  // publish it if message is autonomous
-  if (is_autonomous)
-  {
-    // publish message
-    ResponseAppend_P (PSTR ("}"));
-    MqttPublishTeleSensor ();
-  } 
 }
 
 // check and update MQTT power subsciption after disconnexion
@@ -777,7 +788,7 @@ bool SensorGetJsonKey (const char* pstr_json, const char* pstr_key, char* pstr_v
   if (!pstr_json || !pstr_key || !pstr_value) return false;
   strcpy (pstr_value, "");
 
-  // look for temperature key
+  // look for provided key
   sprintf_P (str_text, PSTR ("\"%s\""), pstr_key);
   pstr_position = strstr (pstr_json, str_text);
 
@@ -805,20 +816,20 @@ bool SensorGetJsonKey (const char* pstr_json, const char* pstr_key, char* pstr_v
 // read received MQTT data to retrieve sensor value
 bool SensorMqttData ()
 {
-  bool     found = false;
-  uint32_t time_now;
-  char     str_value[32];
-
-  // read current time
-  time_now = LocalTime ();
+  bool is_topic, is_key;
+  bool is_found = false;
+  char str_value[32];
 
   // if dealing with temperature topic
-  if (sensor_config[SENSOR_TYPE_TEMP].topic == XdrvMailbox.topic)
+  is_topic = (sensor_config[SENSOR_TYPE_TEMP].topic == XdrvMailbox.topic);
+  if (is_topic)
   {
     // look for temperature key
-    if (SensorGetJsonKey (XdrvMailbox.data, sensor_config[SENSOR_TYPE_TEMP].key.c_str (), str_value, sizeof (str_value)))
+    is_key = SensorGetJsonKey (XdrvMailbox.data, sensor_config[SENSOR_TYPE_TEMP].key.c_str (), str_value, sizeof (str_value));
+    if (is_key)
     {
       // if needed, set remote source for temperature
+      is_found = true;
       if (sensor_status.type[SENSOR_TYPE_TEMP].source == SENSOR_SOURCE_MAX) sensor_status.type[SENSOR_TYPE_TEMP].source = SENSOR_SOURCE_REMOTE;
 
       // save remote value
@@ -827,17 +838,19 @@ bool SensorMqttData ()
 
       // log
       AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Remote %s °C"), str_value);
-      found = true;
     }
   }
 
   // if dealing with humidity topic
-  if (sensor_config[SENSOR_TYPE_HUMI].topic == XdrvMailbox.topic)
+  is_topic = (sensor_config[SENSOR_TYPE_HUMI].topic == XdrvMailbox.topic);
+  if (is_topic)
   {
     // look for humidity key
-    if (SensorGetJsonKey (XdrvMailbox.data, sensor_config[SENSOR_TYPE_HUMI].key.c_str (), str_value, sizeof (str_value)))
+    is_key = SensorGetJsonKey (XdrvMailbox.data, sensor_config[SENSOR_TYPE_HUMI].key.c_str (), str_value, sizeof (str_value));
+    if (is_key)
     {
       // if needed, set remote source for humidity
+      is_found = true;
       if (sensor_status.type[SENSOR_TYPE_HUMI].source == SENSOR_SOURCE_MAX) sensor_status.type[SENSOR_TYPE_HUMI].source = SENSOR_SOURCE_REMOTE;
 
       // save remote value
@@ -846,17 +859,19 @@ bool SensorMqttData ()
 
       // log
       AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Remote humidity is %s %%"), str_value);
-      found = true;
     }
   }
 
   // if dealing with movement topic
-  if (sensor_config[SENSOR_TYPE_PRES].topic == XdrvMailbox.topic)
+  is_topic = (sensor_config[SENSOR_TYPE_PRES].topic == XdrvMailbox.topic);
+  if (is_topic)
   {
     // look for movement key
-    if (SensorGetJsonKey (XdrvMailbox.data, sensor_config[SENSOR_TYPE_PRES].key.c_str (), str_value, sizeof (str_value)))
+    is_key = SensorGetJsonKey (XdrvMailbox.data, sensor_config[SENSOR_TYPE_PRES].key.c_str (), str_value, sizeof (str_value));
+    if (is_key)
     {
       // if needed, set remote source for movement
+      is_found = true;
       if (sensor_status.type[SENSOR_TYPE_PRES].source == SENSOR_SOURCE_MAX) sensor_status.type[SENSOR_TYPE_PRES].source = SENSOR_SOURCE_REMOTE;
 
       // convert off, OFF, on, ON and values to 0 or 1
@@ -871,11 +886,10 @@ bool SensorMqttData ()
 
       // log
       AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Remote movement is %s"), str_value);
-      found = true;
     }
   }
 
-  return found;
+  return is_found;
 }
 
 /***********************************************\

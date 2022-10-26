@@ -203,18 +203,11 @@ bool EcowattMqttData ()
   char    str_value[4];
   DynamicJsonDocument json_result(2048);
 
-  // if topic is the right one and JSON stream exists
+  // check for topic and Ecowatt section
   is_ecowatt = (strcmp (ecowatt_config.str_topic.c_str (), XdrvMailbox.topic) == 0);
-
-  // check if stream contains Ecowatt section
   if (is_ecowatt) is_ecowatt = (strstr (XdrvMailbox.data, "\"Ecowatt\":{") != nullptr);
-
-  // if Ecowatt section is present
   if (is_ecowatt)
   {
-    // log
-    AddLog (LOG_LEVEL_INFO, PSTR ("ECO: Received %s"), XdrvMailbox.topic);
-
     // extract token from JSON
     deserializeJson (json_result, XdrvMailbox.data);
 
@@ -228,18 +221,21 @@ bool EcowattMqttData ()
     {
       // get day string for current day
       sprintf (str_day, "day%u", index);
-      ecowatt_status.arr_day[index].str_jour = json_result["ecowatt"][str_day]["jour"].as<String> ();
-      ecowatt_status.arr_day[index].dvalue   = json_result["ecowatt"][str_day]["dval"];
+      ecowatt_status.arr_day[index].str_jour = json_result["Ecowatt"][str_day]["jour"].as<String> ();
+      ecowatt_status.arr_day[index].dvalue   = json_result["Ecowatt"][str_day]["dval"];
 
       // loop to populate the slots
       for (slot = 0; slot < ECOWATT_SLOT_PER_DAY; slot ++)
       {
         sprintf (str_value, "%u", slot);
-        value = json_result["ecowatt"][str_day][str_value];
+        value = json_result["Ecowatt"][str_day][str_value];
         if ((value == ECOWATT_LEVEL_NONE) || (value >= ECOWATT_LEVEL_MAX)) value = ECOWATT_LEVEL_NORMAL;
         ecowatt_status.arr_day[index].arr_hvalue[slot] = value;
       }
     }
+
+    // log
+    AddLog (LOG_LEVEL_INFO, PSTR ("ECO: Received %s"), XdrvMailbox.topic);
   }
 
   return is_ecowatt;
@@ -258,8 +254,14 @@ void EcowattWebSensor ()
   char    str_color[12];
   char    str_select[48];
 
-  // if ecowatt signal has been received
-  if (ecowatt_status.hour != UINT8_MAX)
+  // if topic is missing
+  if (ecowatt_config.str_topic.length () == 0) WSContentSend_PD (PSTR ("{s}Ecowatt{m}Please configure topic{e}"));
+
+  // else if ecowatt signal has never been received
+  else if (ecowatt_status.hour == UINT8_MAX) WSContentSend_PD (PSTR ("{s}Ecowatt{m}Waiting for 1st signal{e}"));
+
+  // else, display today ecowatt chart
+  else
   {
     // start of graph
     WSContentSend_P (PSTR ("<tr>\n"));
