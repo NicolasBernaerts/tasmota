@@ -68,6 +68,8 @@
                           Remove FTP server auto start
     18/08/2022 - v9.9   - Force GPIO_TELEINFO_RX as digital input
     31/08/2022 - v9.9.1 - Bug littlefs config and graph data recording
+    01/09/2022 - v9.9.2 - Add Tempo and Production mode (thanks to Sébastien)
+    08/09/2022 - v9.9.3 - Correct publication synchronised with teleperiod
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -114,6 +116,10 @@
 #define USE_TIMEZONE_WEB_CONFIG               // Enable timezone web configuration page
 #define USE_TCPSERVER                         // Enable TCP server (for TIC to TCP)
 
+// FTP server login and password
+#define FTP_SERVER_LOGIN          "teleinfo"
+#define FTP_SERVER_PASSWORD       "teleinfo"
+
 // build
 #if defined BUILD_ESP32S2
 #define EXTENSION_BUILD   "esp32s2"
@@ -136,7 +142,7 @@
 // extension data
 #define EXTENSION_NAME    "Teleinfo"          // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
-#define EXTENSION_VERSION "9.9.1"             // version
+#define EXTENSION_VERSION "9.9.3"             // version
 
 // MQTT default
 #undef MQTT_HOST
@@ -185,9 +191,13 @@
 #undef USE_TIMERS_WEB                         // support for timer webpage
 #undef USE_SUNRISE                            // support for Sunrise and sunset tools
 
-#undef USE_UNISHOX_COMPRESSION                // Add support for string compression in Rules or Scripts
-#define USE_RULES                             // Support for rules
+//#undef USE_UNISHOX_COMPRESSION                // Add support for string compression in Rules or Scripts
+
 #undef USE_SCRIPT                             // Add support for script (+17k code)
+
+#define USE_RULES                             // Support for rules
+  #define USE_EXPRESSION                      // Add support for expression evaluation in rules (+3k2 code, +64 bytes mem)  
+    #define SUPPORT_IF_STATEMENT              // Add support for IF statement in rules (+4k2 code, -332 bytes mem)  
 
 #undef ROTARY_V1                              // Add support for Rotary Encoder as used in MI Desk Lamp (+0k8 code)
 #undef USE_SONOFF_RF                          // Add support for Sonoff Rf Bridge (+3k2 code)
@@ -294,18 +304,25 @@
 #undef USE_TIMEPROP                           // Add support for the timeprop feature (+9k1 code)
 #undef USE_PID                                // Add suport for the PID  feature (+11k2 code)
 
+#define USE_TLS                               // for safeboot and BearSSL
+
 // ----------------------
 //    ESP32 specific
 // ----------------------
 
+
+#ifdef ESP32
+
 //#undef USE_ESP32_SENSORS
+
+//#define USE_TLS                               // for safeboot and BearSSL
 
 #undef USE_BLE_ESP32
 #undef USE_MI_ESP32
 #undef USE_IBEACON
 
 #undef USE_AUTOCONF                           // Disable Esp32 autoconf feature
-//#undef USE_BERRY
+#define USE_BERRY
 
 #undef USE_DISPLAY
 #undef USE_SR04
@@ -326,5 +343,7 @@
 
 #undef USE_MHZ19
 #undef USE_SENSEAIR   
+
+#endif  // ESP32
 
 #endif  // _USER_CONFIG_OVERRIDE_H_
