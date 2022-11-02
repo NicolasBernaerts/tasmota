@@ -824,12 +824,15 @@ bool SensorMqttData ()
   is_topic = (sensor_config[SENSOR_TYPE_TEMP].topic == XdrvMailbox.topic);
   if (is_topic)
   {
+    // log
+    is_found = true;
+    AddLog (LOG_LEVEL_DEBUG, PSTR ("SEN: Received %s"), XdrvMailbox.topic);
+
     // look for temperature key
     is_key = SensorGetJsonKey (XdrvMailbox.data, sensor_config[SENSOR_TYPE_TEMP].key.c_str (), str_value, sizeof (str_value));
     if (is_key)
     {
       // if needed, set remote source for temperature
-      is_found = true;
       if (sensor_status.type[SENSOR_TYPE_TEMP].source == SENSOR_SOURCE_MAX) sensor_status.type[SENSOR_TYPE_TEMP].source = SENSOR_SOURCE_REMOTE;
 
       // save remote value
@@ -837,6 +840,7 @@ bool SensorMqttData ()
       sensor_status.type[SENSOR_TYPE_TEMP].value = atof (str_value);
 
       // log
+      is_found = true;
       AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Remote %s °C"), str_value);
     }
   }
@@ -845,12 +849,15 @@ bool SensorMqttData ()
   is_topic = (sensor_config[SENSOR_TYPE_HUMI].topic == XdrvMailbox.topic);
   if (is_topic)
   {
+    // log
+    is_found = true;
+    AddLog (LOG_LEVEL_DEBUG, PSTR ("SEN: Received %s"), XdrvMailbox.topic);
+
     // look for humidity key
     is_key = SensorGetJsonKey (XdrvMailbox.data, sensor_config[SENSOR_TYPE_HUMI].key.c_str (), str_value, sizeof (str_value));
     if (is_key)
     {
       // if needed, set remote source for humidity
-      is_found = true;
       if (sensor_status.type[SENSOR_TYPE_HUMI].source == SENSOR_SOURCE_MAX) sensor_status.type[SENSOR_TYPE_HUMI].source = SENSOR_SOURCE_REMOTE;
 
       // save remote value
@@ -866,12 +873,15 @@ bool SensorMqttData ()
   is_topic = (sensor_config[SENSOR_TYPE_PRES].topic == XdrvMailbox.topic);
   if (is_topic)
   {
+    // log
+    is_found = true;
+    AddLog (LOG_LEVEL_DEBUG, PSTR ("SEN: Received %s"), XdrvMailbox.topic);
+
     // look for movement key
     is_key = SensorGetJsonKey (XdrvMailbox.data, sensor_config[SENSOR_TYPE_PRES].key.c_str (), str_value, sizeof (str_value));
     if (is_key)
     {
       // if needed, set remote source for movement
-      is_found = true;
       if (sensor_status.type[SENSOR_TYPE_PRES].source == SENSOR_SOURCE_MAX) sensor_status.type[SENSOR_TYPE_PRES].source = SENSOR_SOURCE_REMOTE;
 
       // convert off, OFF, on, ON and values to 0 or 1

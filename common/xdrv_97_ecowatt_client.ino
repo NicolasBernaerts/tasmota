@@ -205,37 +205,43 @@ bool EcowattMqttData ()
 
   // check for topic and Ecowatt section
   is_ecowatt = (strcmp (ecowatt_config.str_topic.c_str (), XdrvMailbox.topic) == 0);
-  if (is_ecowatt) is_ecowatt = (strstr (XdrvMailbox.data, "\"Ecowatt\":{") != nullptr);
-  if (is_ecowatt)
+  if (is_ecowatt) 
   {
-    // extract token from JSON
-    deserializeJson (json_result, XdrvMailbox.data);
-
-    // get current and next slot
-    ecowatt_status.hour = json_result["Ecowatt"]["hour"];
-    ecowatt_status.now  = json_result["Ecowatt"]["now"];
-    ecowatt_status.next = json_result["Ecowatt"]["next"];
-
-    // loop thru all 4 days to get their data
-    for (index = 0; index < ECOWATT_DAY_MAX; index ++)
-    {
-      // get day string for current day
-      sprintf (str_day, "day%u", index);
-      ecowatt_status.arr_day[index].str_jour = json_result["Ecowatt"][str_day]["jour"].as<String> ();
-      ecowatt_status.arr_day[index].dvalue   = json_result["Ecowatt"][str_day]["dval"];
-
-      // loop to populate the slots
-      for (slot = 0; slot < ECOWATT_SLOT_PER_DAY; slot ++)
-      {
-        sprintf (str_value, "%u", slot);
-        value = json_result["Ecowatt"][str_day][str_value];
-        if ((value == ECOWATT_LEVEL_NONE) || (value >= ECOWATT_LEVEL_MAX)) value = ECOWATT_LEVEL_NORMAL;
-        ecowatt_status.arr_day[index].arr_hvalue[slot] = value;
-      }
-    }
-
     // log
-    AddLog (LOG_LEVEL_INFO, PSTR ("ECO: Received %s"), XdrvMailbox.topic);
+    AddLog (LOG_LEVEL_DEBUG, PSTR ("ECO: Received %s"), XdrvMailbox.topic);
+
+    // if section Ecowatt is present
+    if (strstr (XdrvMailbox.data, "\"Ecowatt\":{") != nullptr)
+    {
+      // extract token from JSON
+      deserializeJson (json_result, XdrvMailbox.data);
+
+      // get current and next slot
+      ecowatt_status.hour = json_result["Ecowatt"]["hour"];
+      ecowatt_status.now  = json_result["Ecowatt"]["now"];
+      ecowatt_status.next = json_result["Ecowatt"]["next"];
+
+      // loop thru all 4 days to get their data
+      for (index = 0; index < ECOWATT_DAY_MAX; index ++)
+      {
+        // get day string for current day
+        sprintf (str_day, "day%u", index);
+        ecowatt_status.arr_day[index].str_jour = json_result["Ecowatt"][str_day]["jour"].as<String> ();
+        ecowatt_status.arr_day[index].dvalue   = json_result["Ecowatt"][str_day]["dval"];
+
+        // loop to populate the slots
+        for (slot = 0; slot < ECOWATT_SLOT_PER_DAY; slot ++)
+        {
+          sprintf (str_value, "%u", slot);
+          value = json_result["Ecowatt"][str_day][str_value];
+          if ((value == ECOWATT_LEVEL_NONE) || (value >= ECOWATT_LEVEL_MAX)) value = ECOWATT_LEVEL_NORMAL;
+          ecowatt_status.arr_day[index].arr_hvalue[slot] = value;
+        }
+      }
+
+      // log
+      AddLog (LOG_LEVEL_INFO, PSTR ("ECO: Now is %u, next is %u"), ecowatt_status.now, ecowatt_status.next);
+    }
   }
 
   return is_ecowatt;
