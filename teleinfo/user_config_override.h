@@ -70,6 +70,7 @@
     31/08/2022 - v9.9.1 - Bug littlefs config and graph data recording
     01/09/2022 - v9.9.2 - Add Tempo and Production mode (thanks to Sébastien)
     08/09/2022 - v9.9.3 - Correct publication synchronised with teleperiod
+    26/10/2022 - v10.0  - Add monthly and yearly bar graph
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -142,7 +143,7 @@
 // extension data
 #define EXTENSION_NAME    "Teleinfo"          // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
-#define EXTENSION_VERSION "9.9.3"             // version
+#define EXTENSION_VERSION "10.0"              // version
 
 // MQTT default
 #undef MQTT_HOST

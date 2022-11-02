@@ -82,6 +82,7 @@
     31/08/2022 - v9.9.1 - Bug littlefs config and graph data recording
     01/09/2022 - v9.9.2 - Add Tempo and Production mode (thanks to Sébastien)
     08/09/2022 - v9.9.3 - Correct publication synchronised with teleperiod
+    26/10/2022 - v10.0  - Add monthly and yearly bar graph
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -95,7 +96,6 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef FIRMWARE_SAFEBOOT
 #ifdef USE_ENERGY_SENSOR
 #ifdef USE_TELEINFO
 
@@ -120,6 +120,7 @@ TasmotaSerial *teleinfo_serial = nullptr;
 
 // teleinfo constant
 #define TELEINFO_VOLTAGE                230       // default voltage provided
+#define TELEINFO_VOLTAGE_MAXIMUM        300       // maximum voltage for value to be acceptable
 #define TELEINFO_VOLTAGE_MINIMUM        100       // minimum voltage for value to be acceptable
 #define TELEINFO_VOLTAGE_REF            200       // voltage reference for max power calculation
 #define TELEINFO_VOLTAGE_LOW            220       // minimum acceptable voltage
@@ -140,11 +141,11 @@ TasmotaSerial *teleinfo_serial = nullptr;
 #define TELEINFO_GRAPH_STEP             200       // graph height mofification step
 #define TELEINFO_GRAPH_PERCENT_START    5         // start position of graph window
 #define TELEINFO_GRAPH_PERCENT_STOP     95        // stop position of graph window
-#define TELEINFO_GRAPH_POWER_MAX        3000      // maximum power
-#define TELEINFO_GRAPH_VOLTAGE_MIN      200       // minimum voltage
-#define TELEINFO_GRAPH_VOLTAGE_MAX      250       // maximum voltage
-#define TELEINFO_GRAPH_VOLTAGE_RANGE    40        // graph voltage range
-#define TELEINFO_GRAPH_VOLTAGE_STEP     10        // voltage increment/decrement step
+#define TELEINFO_GRAPH_MAX_VA           3000      // default power maximum consumption in graph
+#define TELEINFO_GRAPH_MAX_WH_MONTH     20000     // default max monthly active power consumption in year graph
+#define TELEINFO_GRAPH_MAX_WH_DAY       2000      // default max daily active power consumption in year graph
+#define TELEINFO_GRAPH_MAX_V            250       // default voltage maximum in graph
+#define TELEINFO_GRAPH_INC_VOLTAGE      10        // voltage increment/decrement step
 
 // string size
 #define TELEINFO_CONTRACTID_MAX         16        // max length of TIC contract ID
@@ -159,13 +160,6 @@ TasmotaSerial *teleinfo_serial = nullptr;
 #else       // ESP8266
   #define TELEINFO_DATA_MAX             32        // maximum size of a TIC donnee
 #endif      // ESP32 & ESP8266
-
-// LITTLEFS specificities
-#ifdef USE_UFILESYS
-  #define TELEINFO_MEMORY_PERIOD_MAX    1         // memory graph for LIVE only
-#else
-  #define TELEINFO_MEMORY_PERIOD_MAX    3         // memory graph for LIVE, DAY and WEEK
-#endif    // USE_UFILESYS
 
 // commands : MQTT
 #define D_CMND_TELEINFO_HELP            "help"
@@ -188,10 +182,15 @@ TasmotaSerial *teleinfo_serial = nullptr;
 #define D_CMND_TELEINFO_PHASE           "phase"
 #define D_CMND_TELEINFO_PERIOD          "period"
 #define D_CMND_TELEINFO_HISTO           "histo"
+#define D_CMND_TELEINFO_MONTH           "month"
 #define D_CMND_TELEINFO_HEIGHT          "height"
 #define D_CMND_TELEINFO_DATA            "data"
 #define D_CMND_TELEINFO_INCREMENT       "incr"
 #define D_CMND_TELEINFO_DECREMENT       "decr"
+#define D_CMND_TELEINFO_MAX_V           "maxv"
+#define D_CMND_TELEINFO_MAX_VA          "maxva"
+#define D_CMND_TELEINFO_MAX_WH_DAY      "maxwhd"
+#define D_CMND_TELEINFO_MAX_WH_MONTH    "maxwhm"
 
 // JSON TIC extensions
 #define TELEINFO_JSON_TIC               "TIC"
@@ -229,6 +228,7 @@ const char D_TELEINFO_HISTO_DAY[]         PROGMEM = "day";
 const char D_TELEINFO_HISTO_WEEK[]        PROGMEM = "week";
 const char D_TELEINFO_HISTO_FILE_DAY[]    PROGMEM = "/teleinfo-day-%u.csv";
 const char D_TELEINFO_HISTO_FILE_WEEK[]   PROGMEM = "/teleinfo-week-%02u.csv";
+const char D_TELEINFO_HISTO_FILE_YEAR[]   PROGMEM = "/teleinfo-year-%04d.csv";
 
 #endif    // USE_UFILESYS
 
@@ -248,7 +248,7 @@ const char TELEINFO_INPUT_RADIO[]         PROGMEM = "<p><input type='radio' name
 const char TELEINFO_INPUT_CHECKBOX[]      PROGMEM = "<p><input type='checkbox' name='%s' %s>%s</p>\n";
 const char TELEINFO_INPUT_NUMBER[]        PROGMEM = "<p>%s<br><input type='number' name='%s' min='%d' max='%d' step='1' value='%d'></p>\n";
 const char TELEINFO_FIELD_START[]         PROGMEM = "<p><fieldset><legend><b>&nbsp;%s %s&nbsp;</b></legend>\n";
-const char TELEINFO_FIELD_STOP[]          PROGMEM = "</fieldset></p>\n<br>\n";
+const char TELEINFO_FIELD_STOP[]          PROGMEM = "</fieldset></p>\n";
 const char TELEINFO_HTML_POWER[]          PROGMEM = "<text class='power' x='%d%%' y='%d%%'>%s</text>\n";
 const char TELEINFO_HTML_DASH[]           PROGMEM = "<line class='dash' x1='%d%%' y1='%d%%' x2='%d%%' y2='%d%%' />\n";
 const char TELEINFO_HTML_BAR[]            PROGMEM = "<tr><div style='margin:4px;padding:0px;background-color:#ddd;border-radius:4px;'><div style='font-size:0.75rem;font-weight:bold;padding:0px;text-align:center;border:1px solid #bbb;border-radius:4px;color:#444;background-color:%s;width:%d%%;'>%d%%</div></div></tr>\n";
@@ -259,8 +259,8 @@ const char kTeleinfoCommands[]            PROGMEM = "tic_" "|" D_CMND_TELEINFO_H
 void (* const TeleinfoCommand[])(void)    PROGMEM = { &CmndTeleinfoHelp, &CmndTeleinfoEnable, &CmndTeleinfoRate, &CmndTeleinfoMessagePolicy, &CmndTeleinfoMessageType, &CmndTeleinfoLogPolicy, &CmndTeleinfoInterval, &CmndTeleinfoAdjust, &CmndTeleinfoRotate, &CmndTeleinfoMinimize };
 
 // Specific etiquettes
-enum TeleinfoEtiquette { TIC_NONE, TIC_ADCO, TIC_ADSC, TIC_PTEC, TIC_NGTF, TIC_EAIT, TIC_IINST, TIC_IINST1, TIC_IINST2, TIC_IINST3, TIC_ISOUSC, TIC_PS, TIC_PAPP, TIC_SINSTS, TIC_SINSTI, TIC_BASE, TIC_EAST, TIC_HCHC, TIC_HCHP, TIC_EJPHN, TIC_EJPHPM, TIC_BBRHCJB, TIC_BBRHPJB, TIC_BBRHCJW, TIC_BBRHPJW, TIC_BBRHCJR, TIC_BBRHPJR, TIC_ADPS, TIC_ADIR1, TIC_ADIR2, TIC_ADIR3, TIC_URMS1, TIC_URMS2, TIC_URMS3, TIC_UMOY1, TIC_UMOY2, TIC_UMOY3, TIC_IRMS1, TIC_IRMS2, TIC_IRMS3, TIC_SINSTS1, TIC_SINSTS2, TIC_SINSTS3, TIC_PTCOUR, TIC_PTCOUR1, TIC_PREF, TIC_PCOUP, TIC_LTARF, TIC_EASF01, TIC_EASF02, TIC_EASF03, TIC_EASF04, TIC_EASF05, TIC_EASF06, TIC_EASF07, TIC_EASF08, TIC_EASF09, TIC_EASF10, TIC_ADS, TIC_CONFIG, TIC_EAPS, TIC_EAS, TIC_EAPPS, TIC_PREAVIS, TIC_MAX };
-const char kTeleinfoEtiquetteName[] PROGMEM = "|ADCO|ADSC|PTEC|NGTF|EAIT|IINST|IINST1|IINST2|IINST3|ISOUSC|PS|PAPP|SINSTS|SINSTI|BASE|EAST|HCHC|HCHP|EJPHN|EJPHPM|BBRHCJB|BBRHPJB|BBRHCJW|BBRHPJW|BBRHCJR|BBRHPJR|ADPS|ADIR1|ADIR2|ADIR3|URMS1|URMS2|URMS3|UMOY1|UMOY2|UMOY3|IRMS1|IRMS2|IRMS3|SINSTS1|SINSTS2|SINSTS3|PTCOUR|PTCOUR1|PREF|PCOUP|LTARF|EASF01|EASF02|EASF03|EASF04|EASF05|EASF06|EASF07|EASF08|EASF09|EASF10|ADS|CONFIG|EAP_s|EA_s|EAPP_s|PREAVIS";
+enum TeleinfoEtiquette { TIC_NONE, TIC_ADCO, TIC_ADSC, TIC_PTEC, TIC_NGTF, TIC_EAIT, TIC_IINST, TIC_IINST1, TIC_IINST2, TIC_IINST3, TIC_ISOUSC, TIC_PS, TIC_PAPP, TIC_SINSTS, TIC_SINSTI, TIC_BASE, TIC_EAST, TIC_HCHC, TIC_HCHP, TIC_EJPHN, TIC_EJPHPM, TIC_BBRHCJB, TIC_BBRHPJB, TIC_BBRHCJW, TIC_BBRHPJW, TIC_BBRHCJR, TIC_BBRHPJR, TIC_ADPS, TIC_ADIR1, TIC_ADIR2, TIC_ADIR3, TIC_URMS1, TIC_URMS2, TIC_URMS3, TIC_UMOY1, TIC_UMOY2, TIC_UMOY3, TIC_IRMS1, TIC_IRMS2, TIC_IRMS3, TIC_SINSTS1, TIC_SINSTS2, TIC_SINSTS3, TIC_PTCOUR, TIC_PTCOUR1, TIC_PTCOUR2, TIC_PREF, TIC_PCOUP, TIC_LTARF, TIC_EASF01, TIC_EASF02, TIC_EASF03, TIC_EASF04, TIC_EASF05, TIC_EASF06, TIC_EASF07, TIC_EASF08, TIC_EASF09, TIC_EASF10, TIC_ADS, TIC_CONFIG, TIC_EAPS, TIC_EAS, TIC_EAPPS, TIC_PREAVIS, TIC_MAX };
+const char kTeleinfoEtiquetteName[] PROGMEM = "|ADCO|ADSC|PTEC|NGTF|EAIT|IINST|IINST1|IINST2|IINST3|ISOUSC|PS|PAPP|SINSTS|SINSTI|BASE|EAST|HCHC|HCHP|EJPHN|EJPHPM|BBRHCJB|BBRHPJB|BBRHCJW|BBRHPJW|BBRHCJR|BBRHPJR|ADPS|ADIR1|ADIR2|ADIR3|URMS1|URMS2|URMS3|UMOY1|UMOY2|UMOY3|IRMS1|IRMS2|IRMS3|SINSTS1|SINSTS2|SINSTS3|PTCOUR|PTCOUR1|PTCOUR2|PREF|PCOUP|LTARF|EASF01|EASF02|EASF03|EASF04|EASF05|EASF06|EASF07|EASF08|EASF09|EASF10|ADS|CONFIG|EAP_s|EA_s|EAPP_s|PREAVIS";
 
 // TIC - modes and rates
 enum TeleinfoType { TIC_TYPE_UNDEFINED, TIC_TYPE_CONSO, TIC_TYPE_PROD, TIC_TYPE_MAX };
@@ -283,23 +283,23 @@ enum TeleinfoMessageType { TELEINFO_MSG_NONE, TELEINFO_MSG_METER, TELEINFO_MSG_T
 const char kTeleinfoMessageType[] PROGMEM = "None|METER only|TIC only|METER and TIC";
 
 // graph - periods
-enum TeleinfoGraphPeriod { TELEINFO_PERIOD_LIVE, TELEINFO_PERIOD_DAY, TELEINFO_PERIOD_WEEK, TELEINFO_PERIOD_MAX };                           // available graph periods
-const char kTeleinfoGraphPeriod[] PROGMEM = "Live|Day|Week";                                                                                 // period labels
-const char kTeleinfoFilePrefix[]  PROGMEM = "|day|week";                                                                                     // historisation file prefix
-const long ARR_TELEINFO_PERIOD_WINDOW[] = { 3600 / TELEINFO_GRAPH_SAMPLE, 86400 / TELEINFO_GRAPH_SAMPLE, 604800 / TELEINFO_GRAPH_SAMPLE };   // time window between samples (sec.)
-const long ARR_TELEINFO_PERIOD_FLUSH[]  = { 1, 3600, 21600 };                                                                                // max time between log flush (sec.)
+enum TeleinfoGraphArray { TELEINFO_ARRAY_LIVE, TELEINFO_ARRAY_MAX };                                                                                  // available memory arrays
+enum TeleinfoGraphPeriod { TELEINFO_PERIOD_LIVE, TELEINFO_PERIOD_DAY, TELEINFO_PERIOD_WEEK, TELEINFO_PERIOD_YEAR, TELEINFO_PERIOD_MAX };              // available graph periods
+const char kTeleinfoGraphPeriod[] PROGMEM = "Live|Day|Week|Year";                                                                                     // period labels
+const long ARR_TELEINFO_PERIOD_WINDOW[] = { 3600 / TELEINFO_GRAPH_SAMPLE, 86400 / TELEINFO_GRAPH_SAMPLE, 604800 / TELEINFO_GRAPH_SAMPLE };            // time window between samples (sec.)
+const long ARR_TELEINFO_PERIOD_FLUSH[]  = { 1, 3600, 21600 };                                                                                         // max time between log flush (sec.)
 
 // graph - display
-enum TeleinfoGraphDisplay { TELEINFO_UNIT_VA, TELEINFO_UNIT_W, TELEINFO_UNIT_V, TELEINFO_UNIT_COSPHI, TELEINFO_UNIT_MAX };                                                      // available graph displays
-const char kTeleinfoGraphDisplay[] PROGMEM = "VA|W|V|cosφ";                                                                                                                     // data display labels
-enum TeleinfoHistoDisplay { TELEINFO_HISTO_VA, TELEINFO_HISTO_W, TELEINFO_HISTO_V, TELEINFO_HISTO_COSPHI, TELEINFO_HISTO_PEAK_VA, TELEINFO_HISTO_PEAK_V, TELEINFO_HISTO_MAX };  // available graph displays
+enum TeleinfoGraphDisplay { TELEINFO_UNIT_VA, TELEINFO_UNIT_W, TELEINFO_UNIT_V, TELEINFO_UNIT_COSPHI, TELEINFO_UNIT_PEAK_VA, TELEINFO_UNIT_PEAK_V, TELEINFO_UNIT_WH, TELEINFO_UNIT_MAX };       // available graph units
+const char kTeleinfoGraphDisplay[] PROGMEM = "VA|W|V|cosφ|VA|V|Wh";                                                                                                                             // units labels
 
 // graph - phase colors
-const char kTeleinfoGraphColorPhase[] PROGMEM = "#6bc4ff|#ffca74|#23bf64";            // blue, orange, green                                                                                                           // data display labels
-const char kTeleinfoGraphColorPeak[]  PROGMEM = "#5dade2|#d9ad67|#20a457";                                                                                                                     // data display labels
+const char kTeleinfoGraphColorPhase[] PROGMEM = "#6bc4ff|#ffca74|#23bf64";                            // phase colors (blue, orange, green)
+const char kTeleinfoGraphColorPeak[]  PROGMEM = "#5dade2|#d9ad67|#20a457";                            // peak colors (blue, orange, green)
 
 // week days name for graph
-const char kTeleinfoWeekDay[] PROGMEM = "Sun|Mon|Tue|Wed|Thu|Fri|Sat";                                                                                                                     // data display labels
+const char kTeleinfoWeekDay[] PROGMEM = "Lun|Mar|Mer|Jeu|Ven|Sam|Dim";                                // day display labels
+const char kTeleinfoYearMonth[] PROGMEM = "Tous|Jan|Fev|Mar|Avr|Mai|Jun|Jui|Aou|Sep|Oct|Nov|Dec";     // month display labels
 
 // power calculation modes
 enum TeleinfoPowerCalculationMethod { TIC_METHOD_GLOBAL_COUNTER, TIC_METHOD_INCREMENT };
@@ -317,16 +317,20 @@ enum TeleinfoLogPolicy { TELEINFO_LOG_BUFFERED, TELEINFO_LOG_IMMEDIATE, TELEINFO
 
 // teleinfo : configuration
 static struct {
-  uint16_t baud_rate   = 1200;                      // meter transmission rate (bauds)
-  int  log_policy      = TELEINFO_LOG_BUFFERED;     // log writing policy
-  int  msg_policy      = TELEINFO_POLICY_TELEMETRY; // publishing policy for data
-  int  msg_type        = TELEINFO_MSG_METER;        // type of data to publish (METER and/or TIC)
-  int  update_interval = 720;                       // update interval
-  int  calc_delta      = 1;                         // minimum delta for power calculation
-  int  percent_adjust  = 100;                       // percentage adjustment to maximum contract power
-  int  nb_daily        = TELEINFO_HISTO_DAY_MAX;    // number of daily historisation files
-  int  nb_weekly       = TELEINFO_HISTO_WEEK_MAX;   // number of weekly historisation files
-  int  height          = TELEINFO_GRAPH_HEIGHT;     // graph height in pixels
+  uint16_t baud_rate       = 1200;                          // meter transmission rate (bauds)
+  int      log_policy      = TELEINFO_LOG_BUFFERED;         // log writing policy
+  int      msg_policy      = TELEINFO_POLICY_TELEMETRY;     // publishing policy for data
+  int      msg_type        = TELEINFO_MSG_METER;            // type of data to publish (METER and/or TIC)
+  int      update_interval = 720;                           // update interval
+  int      calc_delta      = 1;                             // minimum delta for power calculation
+  int      percent_adjust  = 100;                           // percentage adjustment to maximum contract power
+  uint8_t  nb_daily        = TELEINFO_HISTO_DAY_MAX;        // number of daily historisation files
+  uint8_t  nb_weekly       = TELEINFO_HISTO_WEEK_MAX;       // number of weekly historisation files
+  int      height          = TELEINFO_GRAPH_HEIGHT;         // graph height in pixels
+  long     max_va          = TELEINFO_GRAPH_MAX_VA;         // maximum graph value for power
+  int      max_v           = TELEINFO_GRAPH_MAX_V;          // maximum graph value for voltage
+  long     max_wh_day      = TELEINFO_GRAPH_MAX_WH_DAY;     // maximum daily graph value for monthly active power total
+  long     max_wh_month    = TELEINFO_GRAPH_MAX_WH_MONTH;   // maximum monthly graph value for yearly active power total
 } teleinfo_config;
 
 // power calculation structure
@@ -373,7 +377,7 @@ static struct {
 
 // teleinfo : contract data
 static struct {
-  int     phase      = 1;                           // number of phases
+  uint8_t phase      = 1;                           // number of phases
   uint8_t mode       = TIC_MODE_UNDEFINED;          // meter mode (historic, standard)
   uint8_t type       = TIC_TYPE_CONSO;              // meter running type (conso or prod)
   int     period     = -1;                          // current tarif period
@@ -395,7 +399,7 @@ static struct {
   long      nb_update      = 0;                     // number of cosphi calculation updates
   long long nb_line        = 0;                     // total number of received lines
   long long nb_error       = 0;                     // total number of checksum errors
-  long long total_wh       = 0;                     // total of all indexes of active power
+  long long total_wh       = 0;                     // total of all indexes of active powerhisto
   long long index[TELEINFO_INDEX_MAX];              // array of indexes of different tarif periods
 } teleinfo_meter;
 
@@ -413,10 +417,9 @@ static tic_phase teleinfo_phase[ENERGY_MAX_PHASES];
 
 // teleinfo : calculation periods data
 struct tic_period {
-  bool updated;                                     // flag to ask for graph update
-  int  index;                                       // current array index per refresh period
-  int  line_idx;                                    // line index in storage file
-  long counter;                                     // counter in seconds of current refresh period
+  bool     updated;                                 // flag to ask for graph update
+  int      index;                                   // current array index per refresh period (day of year for yearly period)
+  long     counter;                                 // counter in seconds of current refresh period (10k*year + 100*month + day_of_month for yearly period)
 
   // --- arrays for current refresh period (per phase) ---
   long  papp_peak[ENERGY_MAX_PHASES];               // peak apparent power during refresh period
@@ -444,19 +447,16 @@ struct tic_graph {
   uint8_t arr_cosphi[ENERGY_MAX_PHASES][TELEINFO_GRAPH_SAMPLE];   // array of cos phi
 };
 static struct {
-  long left;
-  long right;
-  long width;
-
-  long pmax = TELEINFO_GRAPH_POWER_MAX;             // graph maximum power
-  long vmax = TELEINFO_GRAPH_VOLTAGE_MAX;           // graph maximum voltage
+  long left;                                        // left position of the curve
+  long right;                                       // right position of the curve
+  long width;                                       // width of the curve (in pixels)
   long papp_peak[ENERGY_MAX_PHASES];                // peak apparent power to save
   long volt_low[ENERGY_MAX_PHASES];                 // voltage to save
   long volt_peak[ENERGY_MAX_PHASES];                // voltage to save
   long papp[ENERGY_MAX_PHASES];                     // apparent power to save
   long pact[ENERGY_MAX_PHASES];                     // active power to save
   int  cosphi[ENERGY_MAX_PHASES];                   // cosphi to save
-  tic_graph data[TELEINFO_MEMORY_PERIOD_MAX];       // grpah display value per period
+  tic_graph data[TELEINFO_ARRAY_MAX];               // grpah display value per period
 } teleinfo_graph;
 
 /****************************************\
@@ -484,7 +484,8 @@ uint16_t TeleinfoValidateBaudRate (uint16_t baud_rate)
   int  index;
 
   // check if rate is within allowed rates, else set to 1200
-  for (index = 0; index < nitems (ARR_TELEINFO_RATE); index ++) if (baud_rate == ARR_TELEINFO_RATE[index]) is_conform = true;
+  for (index = 0; index < nitems (ARR_TELEINFO_RATE); index ++) 
+    if (baud_rate == ARR_TELEINFO_RATE[index]) is_conform = true;
   if (!is_conform) baud_rate = 1200;
   
   return baud_rate;
@@ -707,7 +708,12 @@ void TeleinfoLoadConfig ()
   teleinfo_config.percent_adjust  = UfsCfgLoadKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_ADJUST,     100);
   teleinfo_config.nb_daily        = UfsCfgLoadKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_NBDAILY,    TELEINFO_DAILY_DEFAULT);
   teleinfo_config.nb_weekly       = UfsCfgLoadKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_NBWEEKLY,   TELEINFO_WEEKLY_DEFAULT);
-  teleinfo_config.height          = UfsCfgLoadKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_HEIGHT,     TELEINFO_GRAPH_HEIGHT);
+
+  teleinfo_config.height          = UfsCfgLoadKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_HEIGHT,       TELEINFO_GRAPH_HEIGHT);
+  teleinfo_config.max_va          = UfsCfgLoadKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_MAX_VA,       TELEINFO_GRAPH_MAX_VA);
+  teleinfo_config.max_v           = UfsCfgLoadKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_MAX_V,        TELEINFO_GRAPH_MAX_V);
+  teleinfo_config.max_wh_day      = UfsCfgLoadKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_MAX_WH_DAY,   TELEINFO_GRAPH_MAX_WH_DAY);
+  teleinfo_config.max_wh_month    = UfsCfgLoadKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_MAX_WH_MONTH, TELEINFO_GRAPH_MAX_WH_MONTH);
 
   // log
   AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Config loaded from LittleFS"));
@@ -720,6 +726,12 @@ void TeleinfoLoadConfig ()
   teleinfo_config.msg_type        = (int)Settings->weight_calibration;
   teleinfo_config.update_interval = (int)Settings->weight_item;
   teleinfo_config.percent_adjust  = (int)Settings->weight_change;
+
+  teleinfo_config.height       = TELEINFO_GRAPH_HEIGHT;
+  teleinfo_config.max_va       = TELEINFO_GRAPH_MAX_VA;
+  teleinfo_config.max_v        = TELEINFO_GRAPH_MAX_V;
+  teleinfo_config.max_wh_day   = TELEINFO_GRAPH_MAX_WH_DAY;
+  teleinfo_config.max_wh_month = TELEINFO_GRAPH_MAX_WH_MONTH;
 
   // log
   AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Config loaded from flash memory"));
@@ -748,7 +760,12 @@ void TeleinfoSaveConfig ()
   UfsCfgSaveKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_ADJUST,     teleinfo_config.percent_adjust,  false);
   UfsCfgSaveKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_NBDAILY,    teleinfo_config.nb_daily,        false);
   UfsCfgSaveKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_NBWEEKLY,   teleinfo_config.nb_weekly,       false);
-  UfsCfgSaveKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_HEIGHT,     teleinfo_config.height,          false);
+
+  UfsCfgSaveKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_HEIGHT,       teleinfo_config.height,       false);
+  UfsCfgSaveKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_MAX_VA,       teleinfo_config.max_va,       false);
+  UfsCfgSaveKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_MAX_V,        teleinfo_config.max_v,        false);
+  UfsCfgSaveKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_MAX_WH_DAY,   teleinfo_config.max_wh_day,   false);
+  UfsCfgSaveKeyInt (D_TELEINFO_CFG, D_CMND_TELEINFO_MAX_WH_MONTH, teleinfo_config.max_wh_month, false);
 
 # else
 
@@ -824,7 +841,10 @@ void TeleinfoUpdateVoltage (const char* str_value, const uint8_t phase, const bo
 
   // calculate and update
   value = atol (str_value);
-  if ((value > 0) && (value < LONG_MAX))
+  if (value > TELEINFO_VOLTAGE_MAXIMUM) value = LONG_MAX;
+
+  // if value is valid
+  if ((value > 0) && (value != LONG_MAX))
   {
     // rms voltage
     if (is_rms)
@@ -834,7 +854,7 @@ void TeleinfoUpdateVoltage (const char* str_value, const uint8_t phase, const bo
     }
 
     // average voltage
-    else if (!teleinfo_phase[1].volt_set) teleinfo_phase[phase].voltage = value;
+    else if (!teleinfo_phase[phase].volt_set) teleinfo_phase[phase].voltage = value;
   }
 }
 
@@ -848,7 +868,7 @@ void TeleinfoUpdateCurrent (const char* str_value, const uint8_t phase)
 
   // calculate and update
   value = atol (str_value);
-  if ((value >= 0) && (value < LONG_MAX)) teleinfo_phase[phase].current = value; 
+  if ((value >= 0) && (value != LONG_MAX)) teleinfo_phase[phase].current = value; 
 }
 
 void TeleinfoUpdateApparentPower (const char* str_value)
@@ -856,7 +876,7 @@ void TeleinfoUpdateApparentPower (const char* str_value)
   long value;
 
   value = atol (str_value);
-  if ((value >= 0) && (value < LONG_MAX)) teleinfo_meter.papp = value;
+  if ((value >= 0) && (value != LONG_MAX)) teleinfo_meter.papp = value;
 }
 
 // Split line into etiquette and donnee
@@ -907,7 +927,7 @@ void TeleinfoSplitLine (char* pstr_line, char* pstr_etiquette, int size_etiquett
 }
 
 // Display any value to a string with unit and kilo conversion with number of digits (12000, 12000 VA, 12.0 kVA, 12.00 kVA, ...)
-void TeleinfoDisplayValue (int unit_type, long value, char* pstr_result, int size_result, bool in_kilo) 
+void TeleinfoDisplayValue (const int unit_type, const long value, char* pstr_result, const int size_result, bool in_kilo) 
 {
   float result;
   char  str_text[16];
@@ -920,6 +940,13 @@ void TeleinfoDisplayValue (int unit_type, long value, char* pstr_result, int siz
   {
     result = (float)value / 100;
     ext_snprintf_P (pstr_result, size_result, PSTR ("%2_f"), &result);
+  }
+
+  // else convert values in M
+  else if (in_kilo && (value > 999999))
+  {
+    result = (float)value / 1000000;
+    ext_snprintf_P (pstr_result, size_result, PSTR ("%1_fM"), &result);
   }
 
   // else convert values in k
@@ -944,7 +971,7 @@ void TeleinfoDisplayValue (int unit_type, long value, char* pstr_result, int siz
 }
 
 // Generate current counter values as a string with unit and kilo conversion
-void TeleinfoDisplayCurrentValue (int unit_type, int phase, char* pstr_result, int size_result) 
+void TeleinfoDisplayCurrentValue (const int unit_type, const int phase, char* pstr_result, const int size_result) 
 {
   long value = LONG_MAX;
 
@@ -998,15 +1025,15 @@ void lltoa (long long value, char *pstr_result, size_t size_result)
 }
 
 // Get historisation period start time
-uint32_t TeleinfoHistoGetStartTime (int period, int histo)
+uint32_t TeleinfoHistoGetStartTime (const uint8_t period, const uint8_t histo)
 {
   uint32_t start_time, delta_time;
   TIME_T   start_dst;
 
   // start date
   start_time = LocalTime ();
-  if (period == TELEINFO_PERIOD_DAY) start_time -= histo * 86400;
-  else if (period == TELEINFO_PERIOD_WEEK) start_time -= histo * 604800;
+  if (period == TELEINFO_PERIOD_DAY) start_time -= 86400 * (uint32_t)histo;
+  else if (period == TELEINFO_PERIOD_WEEK) start_time -= 604800 * (uint32_t)histo;
 
   // set to beginning of current day
   BreakTime (start_time, start_dst);
@@ -1030,7 +1057,7 @@ uint32_t TeleinfoHistoGetStartTime (int period, int histo)
 // Get historisation period literal date
 bool TeleinfoHistoGetDate (int period, int histo, char* pstr_text)
 {
-  uint32_t calc_time;
+  uint32_t calc_time, year;
   TIME_T   start_dst, stop_dst;
 
   // init
@@ -1043,32 +1070,42 @@ bool TeleinfoHistoGetDate (int period, int histo, char* pstr_text)
   // generate time label for day graph
   if (period == TELEINFO_PERIOD_DAY) sprintf_P (pstr_text, PSTR ("%02u/%02u"), start_dst.day_of_month, start_dst.month);
 
-  // generate time label for day graph
+  // generate time label for week graph
   else if (period == TELEINFO_PERIOD_WEEK)
   {
+    BreakTime (calc_time + 518400, stop_dst);        // end time
+    sprintf_P (pstr_text, PSTR ("%02u-%02u/%02u"), start_dst.day_of_month, stop_dst.day_of_month, stop_dst.month);
+  }
+
+  // generate time label for year graph
+  else if (period == TELEINFO_PERIOD_YEAR)
+  {
     // end date
-    calc_time += 518400;
-    BreakTime (calc_time, stop_dst);
-    sprintf_P (pstr_text, PSTR ("%02u/%02u - %02u/%02u"), start_dst.day_of_month, start_dst.month, stop_dst.day_of_month, stop_dst.month);
+    year = 1970 + start_dst.year - histo;
+    sprintf_P (pstr_text, PSTR ("%04u"), year);
   }
 
   return (strlen (pstr_text) > 0);
 }
 
 // Get historisation filename
-bool TeleinfoHistoGetFilename (int period, int histo, char* pstr_filename)
+bool TeleinfoHistoGetFilename (const uint8_t period, const uint8_t histo, char* pstr_filename)
 {
-  bool exists = false;
-  char str_period[16];
+  bool   exists = false;
+  TIME_T time_dst;
 
   // check parameters
   if (pstr_filename == nullptr) return false;
 
-  // get file prefix according to period
-  GetTextIndexed (str_period, sizeof (str_period), period, kTeleinfoFilePrefix);
-
-  // generate filename
-  sprintf_P (pstr_filename, PSTR ("/%s-%d.csv"), str_period, histo);
+  // generate filename according to period
+  strcpy (pstr_filename, "");
+  if (period == TELEINFO_PERIOD_DAY) sprintf_P (pstr_filename, D_TELEINFO_HISTO_FILE_DAY, histo);
+  else if (period == TELEINFO_PERIOD_WEEK) sprintf_P (pstr_filename, D_TELEINFO_HISTO_FILE_WEEK, histo);
+  else if (period == TELEINFO_PERIOD_YEAR) 
+  {
+    BreakTime (LocalTime (), time_dst);
+    sprintf_P (pstr_filename, D_TELEINFO_HISTO_FILE_YEAR, 1970 + time_dst.year - histo);
+  }
 
   // if filename defined, check existence
   if (strlen (pstr_filename) > 0) exists = ffsp->exists (pstr_filename);
@@ -1077,47 +1114,56 @@ bool TeleinfoHistoGetFilename (int period, int histo, char* pstr_filename)
 }
 
 // Flush log data to littlefs
-void TeleinfoHistoFlushData (int period)
+void TeleinfoFlushHistoData (const uint8_t period)
 {
-  int  phase, index;
-  char str_value[32];
-  char str_line[TELEINFO_HISTO_LINE_LENGTH];
-  File file;
+  uint8_t phase, index;
+  char    str_value[32];
+  String  str_header;
+  File    file;
+
+  // validate parameters
+  if (period >= TELEINFO_PERIOD_MAX) return;
+  if ((teleinfo_contract.period < 0) || (teleinfo_contract.period >= TIC_PERIOD_MAX)) return;
 
   // if buffer is filled, save buffer to log
   if (teleinfo_log[period].str_buffer.length () > 0)
   {
-    // if file already exists, open in append mode
-    if (ffsp->exists (teleinfo_log[period].str_filename.c_str ())) file = ffsp->open (teleinfo_log[period].str_filename.c_str (), "a");
-
-    // else, create file and append header
-    else
+    // if file doesn't exist, create it and append header
+    if (!ffsp->exists (teleinfo_log[period].str_filename.c_str ()))
     {
       // create file
       file = ffsp->open (teleinfo_log[period].str_filename.c_str (), "w");
 
-      // generate header
-      strcpy_P (str_line, PSTR ("Idx;Date;Time"));
-      for (phase = 0; phase < teleinfo_contract.phase; phase++)
+      // generate header for files other than yearly periods
+      if (period != TELEINFO_PERIOD_YEAR)
       {
-        sprintf_P (str_value, PSTR (";VA%d;W%d;V%d;C%d;pVA%d;pV%d"), phase + 1, phase + 1, phase + 1, phase + 1, phase + 1, phase + 1);
-        strlcat (str_line, str_value, sizeof (str_line));
+        str_header = "Idx;Date;Time";
+        for (phase = 0; phase < teleinfo_contract.phase; phase++)
+        {
+          sprintf_P (str_value, PSTR (";VA%d;W%d;V%d;C%d;pVA%d;pV%d"), phase + 1, phase + 1, phase + 1, phase + 1, phase + 1, phase + 1);
+          str_header += str_value;
+        }
+
+        // append contract period and totals
+        str_header += ";Period";
+        for (index = ARR_TELEINFO_PERIOD_FIRST[teleinfo_contract.period]; index < ARR_TELEINFO_PERIOD_FIRST[teleinfo_contract.period] + teleinfo_contract.nb_indexes; index++)
+        {
+          GetTextIndexed (str_value, sizeof (str_value), index, kTeleinfoPeriod);
+          str_header += ";";
+          str_header += str_value;
+        }
       }
 
-      // append contract period and totals
-      strcpy_P (str_value, PSTR (";Period"));
-      strlcat (str_line, str_value, sizeof (str_line));
-      for (index = ARR_TELEINFO_PERIOD_FIRST[teleinfo_contract.period]; index < ARR_TELEINFO_PERIOD_FIRST[teleinfo_contract.period] + teleinfo_contract.nb_indexes; index++)
-      {
-        GetTextIndexed (str_value, sizeof (str_value), index, kTeleinfoPeriod);
-        strlcat (str_line, ";", sizeof (str_line));
-        strlcat (str_line, str_value, sizeof (str_line));
-      }
-      strlcat (str_line, "\n", sizeof (str_line));
-
+      // else generate header for yearly records
+      else str_header = "Idx;Month;Day;Total;Delta";
+ 
       // write header
-      file.print (str_line);
+      str_header += "\n";
+      file.print (str_header.c_str ());
     }
+
+    // else, file exists, open in append mode
+    else file = ffsp->open (teleinfo_log[period].str_filename.c_str (), "a");
 
     // write data in buffer and empty buffer
     file.print (teleinfo_log[period].str_buffer.c_str ());
@@ -1128,80 +1174,159 @@ void TeleinfoHistoFlushData (int period)
   }
 
   // set next flush time
-  teleinfo_log[period].time_flush = millis () + 1000 * ARR_TELEINFO_PERIOD_FLUSH[period];
+  teleinfo_log[period].time_flush = LocalTime () + ARR_TELEINFO_PERIOD_FLUSH[period];
 }
 
 // Save historisation data
-void TeleinfoHistoSaveData (int period, uint8_t log_policy)
+void TeleinfoSaveHistoData (const uint8_t period, const uint8_t log_policy)
 {
-  int    phase, index, line;
-  TIME_T now_dst;
-  char   str_filename[UFS_FILENAME_SIZE];
-  char   str_line[TELEINFO_HISTO_LINE_LENGTH];
-  char   str_value[32];
+  uint8_t  phase;
+  long     year, month, remain;
+  uint32_t start_time, current_time, day_of_week, index;
+  TIME_T   time_dst;
+  char     str_value[32];
+  char     str_filename[UFS_FILENAME_SIZE];
 
   // check boundaries
-  if ((period != TELEINFO_PERIOD_DAY) && (period != TELEINFO_PERIOD_WEEK)) return;
+  if ((period == TELEINFO_PERIOD_LIVE) || (period >= TELEINFO_PERIOD_MAX)) return;
 
   // extract current time data
-  BreakTime (LocalTime (), now_dst);
+  current_time = LocalTime ();
+  BreakTime (current_time, time_dst);
 
-  // set target is weekly records
-  if (period == TELEINFO_PERIOD_WEEK)
+  // if saving daily record
+  if (period == TELEINFO_PERIOD_DAY)
   {
-    sprintf_P (str_filename, D_TELEINFO_HISTO_FILE_WEEK, 0);
-    line = (((now_dst.day_of_week + 5) % 7) * 86400 + now_dst.hour * 3600 + now_dst.minute * 60) / ARR_TELEINFO_PERIOD_WINDOW[period];
-  }
-
-  // else target is daily records
-  else if (period == TELEINFO_PERIOD_DAY)
-  {
+    // set current weekly file name
     sprintf_P (str_filename, D_TELEINFO_HISTO_FILE_DAY, 0);
-    line = (now_dst.hour * 3600 + now_dst.minute * 60) / ARR_TELEINFO_PERIOD_WINDOW[period];
+
+    // calculate index of daily line
+    index = (time_dst.hour * 3600 + time_dst.minute * 60) * TELEINFO_GRAPH_SAMPLE / 86400;
   }
 
-  else return;
-
-  // if log file name has changed
-  if (teleinfo_log[period].str_filename != str_filename)
+  // else if saving weekly record
+  else if (period == TELEINFO_PERIOD_WEEK)
   {
-    // flush data to previous file
-    TeleinfoHistoFlushData (period);
+    // set current weekly file name
+    sprintf_P (str_filename, D_TELEINFO_HISTO_FILE_WEEK, 0);
 
-    // set new log filename
-    teleinfo_log[period].str_filename = str_filename;
+    // calculate start of current week
+    time_dst.second = 1;
+    time_dst.minute = 0;
+    time_dst.hour   = 0;  
+    if (time_dst.day_of_week == 1) day_of_week = 8; else day_of_week = time_dst.day_of_week;
+    start_time = MakeTime (time_dst) - 86400 * (day_of_week - 2);
+
+    // calculate index of weekly line
+    index = (current_time - start_time) * TELEINFO_GRAPH_SAMPLE / 604800;
+    if (index >= TELEINFO_GRAPH_SAMPLE) index = TELEINFO_GRAPH_SAMPLE - 1;
   }
 
-  // calculate line index (previous line + 1 or calculated line index if difference is more than one index)
-  if (abs (line - teleinfo_period[period].line_idx) > 1) teleinfo_period[period].line_idx = line;
-
-  // generate line  : index and date
-  sprintf_P (str_line, PSTR ("%d;%02u/%02u;%02u:%02u"), teleinfo_period[period].line_idx++, now_dst.day_of_month, now_dst.month, now_dst.hour, now_dst.minute);
-
-  // generate line  : phase data
-  for (phase = 0; phase < teleinfo_contract.phase; phase++)
+  // else if saving yearly record
+  else if (period == TELEINFO_PERIOD_YEAR)
   {
-    sprintf_P (str_value, PSTR (";%d;%d;%d;%d;%d;%d"), teleinfo_graph.papp[phase], teleinfo_graph.pact[phase], teleinfo_graph.volt_low[phase], teleinfo_graph.cosphi[phase], teleinfo_graph.papp_peak[phase], teleinfo_graph.volt_peak[phase]);
-    strlcat (str_line, str_value, sizeof (str_line));
+        // calculate moyth and day of month
+    remain = teleinfo_period[period].counter % 10000;
+    year   = (teleinfo_period[period].counter - remain) / 10000;
+
+    // set current weekly file name
+    sprintf_P (str_filename, D_TELEINFO_HISTO_FILE_YEAR, year);
+
+    // index is day of year
+    index = teleinfo_period[period].index;
   }
 
-  // generate line  : totals
-  GetTextIndexed (str_value, sizeof (str_value), teleinfo_contract.period, kTeleinfoPeriod);
-  strlcat (str_line, ";", sizeof (str_line));
-  strlcat (str_line, str_value, sizeof (str_line));
-  for (index = 0; index < teleinfo_contract.nb_indexes; index++)
+  // if log file name has changed, flush data of previous file
+  if ((teleinfo_log[period].str_filename != "") && (teleinfo_log[period].str_filename != str_filename)) TeleinfoFlushHistoData (period);
+
+  // set new log filename
+  teleinfo_log[period].str_filename = str_filename;
+
+  // if not saving yearly record
+  if (period != TELEINFO_PERIOD_YEAR)
   {
-    lltoa (teleinfo_meter.index[index], str_value, sizeof (str_value)); 
-    strlcat (str_line, ";", sizeof (str_line));
-    strlcat (str_line, str_value, sizeof (str_line));
-  }
-  strlcat (str_line, "\n", sizeof (str_line));
+    // line : index and date
+    teleinfo_log[period].str_buffer += index;
+    sprintf_P (str_value, PSTR (";%02u/%02u;%02u:%02u"), time_dst.day_of_month, time_dst.month, time_dst.hour, time_dst.minute);
+    teleinfo_log[period].str_buffer += str_value;
 
-  // add line to the buffer
-  teleinfo_log[period].str_buffer += str_line;
+    // line : phase data
+    for (phase = 0; phase < teleinfo_contract.phase; phase++)
+    {
+      // apparent power
+      teleinfo_log[period].str_buffer += ";";
+      if (teleinfo_graph.papp[phase] != LONG_MAX) teleinfo_log[period].str_buffer += teleinfo_graph.papp[phase];
+
+      // active power
+      teleinfo_log[period].str_buffer += ";";
+      if (teleinfo_graph.pact[phase] != LONG_MAX) teleinfo_log[period].str_buffer += teleinfo_graph.pact[phase];
+
+      // lower voltage
+      teleinfo_log[period].str_buffer += ";";
+      teleinfo_log[period].str_buffer += teleinfo_graph.volt_low[phase];
+
+      // cos phi
+      teleinfo_log[period].str_buffer += ";";
+      teleinfo_log[period].str_buffer += teleinfo_graph.cosphi[phase];
+
+      // peak apparent power
+      teleinfo_log[period].str_buffer += ";";
+      if (teleinfo_graph.papp_peak[phase] != LONG_MAX) teleinfo_log[period].str_buffer += teleinfo_graph.papp_peak[phase];
+
+      // peak voltage
+      teleinfo_log[period].str_buffer += ";";
+      teleinfo_log[period].str_buffer += teleinfo_graph.volt_peak[phase];
+    }
+
+    // line : totals
+    GetTextIndexed (str_value, sizeof (str_value), teleinfo_contract.period, kTeleinfoPeriod);
+    teleinfo_log[period].str_buffer += ";";
+    teleinfo_log[period].str_buffer += str_value;
+    for (index = 0; index < teleinfo_contract.nb_indexes; index++)
+    {
+      lltoa (teleinfo_meter.index[index], str_value, sizeof (str_value)); 
+      teleinfo_log[period].str_buffer += ";";
+      teleinfo_log[period].str_buffer += str_value;
+    }
+
+    // line : end
+    teleinfo_log[period].str_buffer += "\n";
+  }
+
+  // if not saving yearly record
+  else if (period == TELEINFO_PERIOD_YEAR)
+  {
+    // calculate moyth and day of month
+    remain = teleinfo_period[period].counter % 100;
+    month  = ((teleinfo_period[period].counter - remain) / 100) % 100;
+
+    // line : day of year
+    teleinfo_log[period].str_buffer += index;
+
+    // line : month
+    teleinfo_log[period].str_buffer += ";";
+    teleinfo_log[period].str_buffer += month;
+
+    // line : day of month
+    teleinfo_log[period].str_buffer += ";";
+    teleinfo_log[period].str_buffer += remain;
+
+    // line : total wh
+    sprintf (str_value, "%d", teleinfo_period[period].pact_sum[1]);
+    teleinfo_log[period].str_buffer += ";";
+    teleinfo_log[period].str_buffer += str_value;
+
+    // line : monthly wh
+    sprintf (str_value, "%d", teleinfo_period[period].pact_sum[0]);
+    teleinfo_log[period].str_buffer += ";";
+    teleinfo_log[period].str_buffer += str_value;
+
+    // line : end
+    teleinfo_log[period].str_buffer += "\n";
+  }
 
   // if log should be saved now
-  if ((log_policy == TELEINFO_LOG_IMMEDIATE) || (teleinfo_log[period].str_buffer.length () > TELEINFO_HISTO_BUFFER_MAX)) TeleinfoHistoFlushData (period);
+  if ((log_policy == TELEINFO_LOG_IMMEDIATE) || (period == TELEINFO_PERIOD_YEAR) || (teleinfo_log[period].str_buffer.length () > TELEINFO_HISTO_BUFFER_MAX)) TeleinfoFlushHistoData (period);
 }
 
 #endif    // USE_UFILESYS
@@ -1211,111 +1336,124 @@ void TeleinfoHistoSaveData (int period, uint8_t log_policy)
 \*********************************************/
 
 // Save current values to graph data
-void TeleinfoGraphSaveData (const uint8_t period)
+void TeleinfoSavePeriodData (const uint8_t period)
 {
-  bool histo_update;
-  int  index, phase;
-  long power, voltage, value;
+  uint8_t phase;
+  long    power;
 
   // if period out of range, return
   if (period >= TELEINFO_PERIOD_MAX) return;
 
-  // historic will be updated if period is beyond dynamic graph period
-  histo_update = (period >= TELEINFO_MEMORY_PERIOD_MAX);
+  // if period other than yearly, loop thru phases
+  if (period < TELEINFO_PERIOD_YEAR)
+    for (phase = 0; phase < teleinfo_contract.phase; phase++)
+    {
+      //   Apparent power
+      // -----------------
 
-  // set indexed graph values with current values
-  index = teleinfo_period[period].index;
+      // save average and peak value over the period
+      power = LONG_MAX;
+      if (teleinfo_contract.ssousc > 0) power = (long)(teleinfo_period[period].papp_sum[phase] / ARR_TELEINFO_PERIOD_WINDOW[period]);
+      teleinfo_graph.papp[phase] = power;
+      teleinfo_graph.papp_peak[phase] = teleinfo_period[period].papp_peak[phase];
+
+      // reset period data
+      teleinfo_period[period].papp_sum[phase]  = 0;
+      teleinfo_period[period].papp_peak[phase] = 0;
+
+      //   Active power
+      // -----------------
+
+      // save average value over the period
+      power = LONG_MAX;
+      if (teleinfo_contract.ssousc > 0) power = (long)(teleinfo_period[period].pact_sum[phase] / ARR_TELEINFO_PERIOD_WINDOW[period]);
+      if (power > teleinfo_graph.papp[phase]) power = teleinfo_graph.papp[phase];
+      teleinfo_graph.pact[phase] = power;
+
+      // reset period data
+      teleinfo_period[period].pact_sum[phase] = 0;
+
+      //   Voltage
+      // -----------
+
+      // save graph current value
+      teleinfo_graph.volt_low[phase]  = teleinfo_period[period].volt_low[phase];
+      teleinfo_graph.volt_peak[phase] = teleinfo_period[period].volt_peak[phase];
+
+      // reset period data
+      teleinfo_period[period].volt_low[phase]  = LONG_MAX;
+      teleinfo_period[period].volt_peak[phase] = 0;
+
+      //   CosPhi
+      // -----------
+
+      // save average value over the period
+      teleinfo_graph.cosphi[phase] = (int)(teleinfo_period[period].cosphi_sum[phase] / ARR_TELEINFO_PERIOD_WINDOW[period]);
+
+      // reset period _
+      teleinfo_period[period].cosphi_sum[phase] = 0;
+    }
+
+  // else if period is yearly
+  else if (period == TELEINFO_PERIOD_YEAR)
+  {
+    // calculate total increase since last month
+    teleinfo_period[period].pact_sum[0] = teleinfo_meter.total_wh - teleinfo_period[period].pact_sum[1];
+
+    // update new start total
+    teleinfo_period[period].pact_sum[1] = teleinfo_meter.total_wh;
+  }
+
+  // save to memory array
+  TeleinfoSaveMemoryData (period);
+
+#ifdef USE_UFILESYS
+  // save to historisation file
+  TeleinfoSaveHistoData (period, teleinfo_config.log_policy);
+#endif    // USE_UFILESYS
+
+  // data updated for period
+  teleinfo_period[period].updated = true;
+}
+
+// Save current values to graph data
+void TeleinfoSaveMemoryData (const uint8_t period)
+{
+  uint8_t  phase;
+  uint16_t data_index, cell_index;
+  long     value;
+
+  // check parameters
+  if (period != TELEINFO_PERIOD_LIVE) return;
+
+  // set array index and current index of cell in memory array
+  data_index = TELEINFO_ARRAY_LIVE;
+  cell_index = teleinfo_period[period].index;
+
+  // loop thru phases
   for (phase = 0; phase < teleinfo_contract.phase; phase++)
   {
-    //   Apparent power
-    // -----------------
-    power = LONG_MAX;
+    // apparent power
     value = UINT8_MAX;
+    if (teleinfo_contract.ssousc > 0) value = teleinfo_graph.papp[phase] * 200 / teleinfo_contract.ssousc;
+    teleinfo_graph.data[data_index].arr_papp[phase][cell_index] = (uint8_t)value;
 
-    // save average and peak value over the period
-    if (teleinfo_contract.ssousc > 0) power = (long)(teleinfo_period[period].papp_sum[phase] / ARR_TELEINFO_PERIOD_WINDOW[period]);
-    teleinfo_graph.papp[phase] = power;
-    teleinfo_graph.papp_peak[phase] = teleinfo_period[period].papp_peak[phase];
-
-    // if needed, save dynmic memory graph data
-    if (period < TELEINFO_MEMORY_PERIOD_MAX)
-    {
-      // calculate percentage of power according to contract (200 = 100% of contract power)
-      if (teleinfo_contract.ssousc > 0) value = power * 200 / teleinfo_contract.ssousc;
-      teleinfo_graph.data[period].arr_papp[phase][index] = (uint8_t)value;
-    }
-
-    // if power not defined, no historic graph saving 
-    histo_update &= (power != LONG_MAX);
-
-    // reset period data
-    teleinfo_period[period].papp_peak[phase] = 0;
-    teleinfo_period[period].papp_sum[phase]  = 0;
-
-    //   Active power
-    // -----------------
-    power = LONG_MAX;
+    // active power
     value = UINT8_MAX;
+    if (teleinfo_contract.ssousc > 0) value = teleinfo_graph.pact[phase] * 200 / teleinfo_contract.ssousc;
+    teleinfo_graph.data[data_index].arr_pact[phase][cell_index] = (uint8_t)value;
 
-    // save average value over the period
-    if (teleinfo_contract.ssousc > 0) power = (long)(teleinfo_period[period].pact_sum[phase] / ARR_TELEINFO_PERIOD_WINDOW[period]);
-    if (power > teleinfo_graph.papp[phase]) power = teleinfo_graph.papp[phase];
-    teleinfo_graph.pact[phase] = power;
+    // voltage
+    value = 128 + teleinfo_graph.volt_low[phase] - TELEINFO_VOLTAGE;
+    teleinfo_graph.data[data_index].arr_volt[phase][cell_index] = (uint8_t)value;
 
-    // if needed, save dynmic memory graph data
-    if (period < TELEINFO_MEMORY_PERIOD_MAX)
-    {
-      // calculate percentage of power according to contract (200 = 100% of contract power)
-      if (teleinfo_contract.ssousc > 0) value = power * 200 / teleinfo_contract.ssousc;
-      teleinfo_graph.data[period].arr_pact[phase][index] = (uint8_t)value;
-    }
-
-    // if power not defined, no historic graph saving 
-    histo_update &= (power != LONG_MAX);
-
-    // reset period data
-    teleinfo_period[period].pact_sum[phase] = 0;
-
-    //   Voltage
-    // -----------
-
-    // save graph current value
-    teleinfo_graph.volt_low[phase]  = teleinfo_period[period].volt_low[phase];
-    teleinfo_graph.volt_peak[phase] = teleinfo_period[period].volt_peak[phase];
-
-    // if needed, save dynmic memory graph data
-    if (period < TELEINFO_MEMORY_PERIOD_MAX)
-    {
-      value = 128 + teleinfo_graph.volt_low[phase] - TELEINFO_VOLTAGE;
-      teleinfo_graph.data[period].arr_volt[phase][index] = (uint8_t)value;
-    }
-
-    // reset period data
-    teleinfo_period[period].volt_low[phase]  = LONG_MAX;
-    teleinfo_period[period].volt_peak[phase] = 0;
-
-    //   CosPhi
-    // -----------
-
-    // save average value over the period
-    teleinfo_graph.cosphi[phase] = (int)(teleinfo_period[period].cosphi_sum[phase] / ARR_TELEINFO_PERIOD_WINDOW[period]);
-
-    // if needed, save dynamic memory graph data
-    if (period < TELEINFO_MEMORY_PERIOD_MAX) teleinfo_graph.data[period].arr_cosphi[phase][index] = (uint8_t)teleinfo_graph.cosphi[phase];
-
-    // reset period _
-    teleinfo_period[period].cosphi_sum[phase] = 0;
+    // cos phi
+    teleinfo_graph.data[data_index].arr_cosphi[phase][cell_index] = (uint8_t)teleinfo_graph.cosphi[phase];
   }
 
   // increase data index in the graph and set update flag
-  teleinfo_period[period].index++;
-  teleinfo_period[period].index   = teleinfo_period[period].index % TELEINFO_GRAPH_SAMPLE;
-  teleinfo_period[period].updated = true;
-
-#ifdef USE_UFILESYS
-  // if needed, save data to history file
-  if (ufs_type && histo_update) TeleinfoHistoSaveData (period, teleinfo_config.log_policy);
-#endif    // USE_UFILESYS
+  cell_index++;
+  teleinfo_period[period].index = cell_index % TELEINFO_GRAPH_SAMPLE;
 }
 
 /*********************************************\
@@ -1427,7 +1565,7 @@ void TeleinfoInit ()
 // Teleinfo graph data initialisation
 void TeleinfoGraphInit ()
 {
-  int index, phase, period;
+  uint32_t period, phase, index;
 
   // initialise period data
   for (period = 0; period < TELEINFO_PERIOD_MAX; period++)
@@ -1435,7 +1573,6 @@ void TeleinfoGraphInit ()
     // init counter
     teleinfo_period[period].index    = 0;
     teleinfo_period[period].counter  = 0;
-    teleinfo_period[period].line_idx = 0;
 
     // loop thru phase
     for (phase = 0; phase < ENERGY_MAX_PHASES; phase++)
@@ -1454,7 +1591,7 @@ void TeleinfoGraphInit ()
   }
 
   // initialise graph data
-  for (period = 0; period < TELEINFO_MEMORY_PERIOD_MAX; period++)
+  for (period = 0; period < TELEINFO_ARRAY_MAX; period++)
   {
     // loop thru phase
     for (phase = 0; phase < ENERGY_MAX_PHASES; phase++)
@@ -1482,8 +1619,8 @@ void TeleinfoSaveBeforeRestart ()
 
 #ifdef USE_UFILESYS
   // flush logs
-  TeleinfoHistoFlushData ( TELEINFO_PERIOD_DAY);
-  TeleinfoHistoFlushData ( TELEINFO_PERIOD_WEEK);
+  TeleinfoFlushHistoData ( TELEINFO_PERIOD_DAY);
+  TeleinfoFlushHistoData ( TELEINFO_PERIOD_WEEK);
 #endif      // USE_UFILESYS
 }
 
@@ -1499,8 +1636,8 @@ void TeleinfoRotateLogs ()
   AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Rotate log files"));
 
   // flush logs
-  TeleinfoHistoFlushData ( TELEINFO_PERIOD_DAY);
-  TeleinfoHistoFlushData ( TELEINFO_PERIOD_WEEK);
+  TeleinfoFlushHistoData ( TELEINFO_PERIOD_DAY);
+  TeleinfoFlushHistoData ( TELEINFO_PERIOD_WEEK);
 
   // calculate minimum file size from lastest daily file
   sprintf_P (str_filename, D_TELEINFO_HISTO_FILE_DAY, 0);
@@ -1522,7 +1659,8 @@ void TeleinfoRotateLogs ()
 void TeleinfoReceiveData ()
 {
   bool      overload, tcp_send, is_valid;
-  int       index, phase, period;
+  uint8_t   phase;
+  int       period, index;
   long      value, total_current, increment;
   long long counter, counter_wh, delta_wh;
   uint32_t  timeout, timestamp, message_ms;
@@ -1670,6 +1808,7 @@ void TeleinfoReceiveData ()
               case TIC_LTARF:
               case TIC_PTCOUR:
               case TIC_PTCOUR1:
+              case TIC_PTCOUR2:
                 period = GetCommandCode (str_text, sizeof (str_text), str_donnee, kTeleinfoPeriod);
                 if ((period >= 0) && (period < TIC_PERIOD_MAX)) teleinfo_contract.period = period;
                 break;
@@ -1739,11 +1878,11 @@ void TeleinfoReceiveData ()
                 TeleinfoUpdateVoltage (str_donnee, 1, false);
                 break;
               case TIC_URMS3:
-                TeleinfoUpdateVoltage (str_donnee, 1, true);
+                TeleinfoUpdateVoltage (str_donnee, 2, true);
                 teleinfo_contract.phase = 3; 
                 break;
               case TIC_UMOY3:
-                TeleinfoUpdateVoltage (str_donnee, 1, false);
+                TeleinfoUpdateVoltage (str_donnee, 2, false);
                 teleinfo_contract.phase = 3; 
                 break;
 
@@ -1756,7 +1895,7 @@ void TeleinfoReceiveData ()
                   // update max current and power
                   teleinfo_contract.isousc = value;
                   teleinfo_contract.ssousc = value * TELEINFO_VOLTAGE_REF;
-                  teleinfo_graph.pmax = teleinfo_contract.ssousc;
+                  teleinfo_config.max_va   = teleinfo_contract.ssousc;
                 }
                 break;
 
@@ -1774,7 +1913,7 @@ void TeleinfoReceiveData ()
                     // update max current and power
                     teleinfo_contract.isousc = value / TELEINFO_VOLTAGE_REF;
                     teleinfo_contract.ssousc = value;
-                    teleinfo_graph.pmax      = value;
+                    teleinfo_config.max_va   = value;
                   }                   
                 }
                 break;
@@ -1797,7 +1936,7 @@ void TeleinfoReceiveData ()
                     // update max current and power
                     teleinfo_contract.isousc = value / TELEINFO_VOLTAGE_REF;
                     teleinfo_contract.ssousc = value;
-                    teleinfo_graph.pmax      = value;
+                    teleinfo_config.max_va   = value;
                   }                   
                 }
                 break;
@@ -2176,15 +2315,20 @@ void TeleinfoEvery250ms ()
   }
 
   // if needed, publish meter or TIC JSON
-  if (teleinfo_message.publish_meter) TeleinfoPublishJSONMeter ();
-  else if (teleinfo_message.publish_tic) TeleinfoPublishJSONTic ();
+  if (teleinfo_message.publish_meter) TeleinfoPublishJsonMeter ();
+  else if (teleinfo_message.publish_tic) TeleinfoPublishJsonTic ();
 }
 
 // Calculate if some JSON should be published (called every second)
 void TeleinfoEverySecond ()
 {
-  int      period, phase;
-  uint32_t time_now = millis ();
+  uint8_t  period, phase;
+  uint32_t time_now;
+  TIME_T   time_dst;
+
+  // current time
+  time_now = LocalTime ();
+  BreakTime (time_now, time_dst);
 
   // increment update interval counter
   teleinfo_meter.interval_count++;
@@ -2197,11 +2341,11 @@ void TeleinfoEverySecond ()
     AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Total counter updated to %u Wh"), teleinfo_meter.total_wh);
   }
 
-  // loop thru the periods and the phases, to update apparent power to the max on the period
-  for (period = 0; period < TELEINFO_PERIOD_MAX; period++)
+  // loop thru the periods and the phases, to update all values over the period
+  for (period = 0; period < TELEINFO_PERIOD_YEAR; period++)
   {
     // if needed, set initial log flush time
-    if (teleinfo_log[period].time_flush == UINT32_MAX) teleinfo_log[period].time_flush = time_now + 1000 * ARR_TELEINFO_PERIOD_FLUSH[period];
+    if (teleinfo_log[period].time_flush == UINT32_MAX) teleinfo_log[period].time_flush = time_now + ARR_TELEINFO_PERIOD_FLUSH[period];
 
     // loop thru phases to update max value
     for (phase = 0; phase < teleinfo_contract.phase; phase++)
@@ -2229,13 +2373,25 @@ void TeleinfoEverySecond ()
     // increment graph period counter and update graph data if needed
     teleinfo_period[period].counter ++;
     teleinfo_period[period].counter = teleinfo_period[period].counter % ARR_TELEINFO_PERIOD_WINDOW[period];
-    if (teleinfo_period[period].counter == 0) TeleinfoGraphSaveData (period);
-  
-#ifdef USE_UFILESYS
-    // if max buffer time reached, flush to littlefs
-    if (TimeReached (teleinfo_log[period].time_flush)) TeleinfoHistoFlushData (period);
-#endif    // USE_UFILESYS
-}
+    if (teleinfo_period[period].counter == 0) TeleinfoSavePeriodData (period);
+  }
+
+  // specific yearly period : first time init
+  period = TELEINFO_PERIOD_YEAR;
+  if ((teleinfo_period[period].pact_sum[1] == 0) && (teleinfo_meter.total_wh != 0)) teleinfo_period[period].pact_sum[1] = teleinfo_meter.total_wh;
+  if (teleinfo_period[period].index   == 0) teleinfo_period[period].index   = time_dst.day_of_year;
+  if (teleinfo_period[period].counter == 0) teleinfo_period[period].counter = 10000 * (1970 + time_dst.year) + 100 * time_dst.month + time_dst.day_of_month;
+
+  // specific yearly period : update at day change
+  if (time_dst.day_of_year != (uint16_t)teleinfo_period[period].index)
+  {
+    // save last day data
+    TeleinfoSavePeriodData (period);
+
+    // update period index
+    teleinfo_period[period].index   = time_dst.day_of_year;
+    teleinfo_period[period].counter = 100 * time_dst.month + time_dst.day_of_month;
+  }
 
   // check if message should be published for overload
   if (teleinfo_message.overload && (teleinfo_config.msg_policy != TELEINFO_POLICY_NEVER))   teleinfo_message.publish_msg = true;
@@ -2251,7 +2407,7 @@ void TeleinfoEverySecond ()
 }
 
 // Generate JSON with TIC informations
-void TeleinfoPublishJSONTic ()
+void TeleinfoPublishJsonTic ()
 {
   int index;
 
@@ -2276,9 +2432,10 @@ void TeleinfoPublishJSONTic ()
 }
 
 // Generate JSON with Meter informations
-void TeleinfoPublishJSONMeter ()
+void TeleinfoPublishJsonMeter ()
 {
-  int   phase, value;
+  uint8_t phase;
+  int   value;
   long  power_max, power_app, power_act;
   float current;
   char  str_text[16];
@@ -2287,7 +2444,7 @@ void TeleinfoPublishJSONMeter ()
   Response_P (PSTR ("{\"%s\":\"%s\",\"%s\":{"), D_JSON_TIME, GetDateAndTime (DT_LOCAL).c_str (), TELEINFO_JSON_METER);
 
   // METER basic data
-  ResponseAppend_P (PSTR ("\"%s\":%d"),  TELEINFO_JSON_PHASE, teleinfo_contract.phase);
+  ResponseAppend_P (PSTR ("\"%s\":%u"),  TELEINFO_JSON_PHASE, teleinfo_contract.phase);
   ResponseAppend_P (PSTR (",\"%s\":%d"), TELEINFO_JSON_ISUB,  teleinfo_contract.isousc);
   ResponseAppend_P (PSTR (",\"%s\":%d"), TELEINFO_JSON_PSUB,  teleinfo_contract.ssousc);
 
@@ -2374,10 +2531,10 @@ int TeleinfoWebGetArgValue (const char* pstr_argument, int value_default, int va
 void TeleinfoWebMainButton ()
 {
   // Teleinfo message page button
-  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), D_TELEINFO_PAGE_TIC, D_TELEINFO_MESSAGE);
+  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), D_TELEINFO_PAGE_TIC, "TIC Message");
 
   // Teleinfo graph page button
-  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), D_TELEINFO_PAGE_GRAPH, D_TELEINFO_GRAPH);
+  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), D_TELEINFO_PAGE_GRAPH, "TIC Graph");
 }
 
 // Append Teleinfo configuration button to configuration page
@@ -2390,7 +2547,8 @@ void TeleinfoWebConfigButton ()
 // Append Teleinfo state to main page
 void TeleinfoWebSensor ()
 {
-  int  index, phase, period;
+  uint8_t  phase, period;
+  int  index;
   long percentage;
   char str_text[32];
   char str_header[64];
@@ -2437,7 +2595,7 @@ void TeleinfoWebSensor ()
 
         // number of phases
         strcpy_P (str_text, PSTR ("<br>"));
-        if (teleinfo_contract.phase > 1) sprintf_P (str_text, PSTR ("<br>%d x "), teleinfo_contract.phase);
+        if (teleinfo_contract.phase > 1) sprintf_P (str_text, PSTR ("<br>%u x "), teleinfo_contract.phase);
         strlcat (str_data, str_text, sizeof (str_data));
 
         // power
@@ -2537,7 +2695,7 @@ void TeleinfoWebPageConfigure ()
 
 #ifdef USE_UFILESYS
 
-    // parameter 'nbday' : set number of daily historisation files
+    // parameter 'mini' : set param to minimize writing on log files
     WebGetArg (D_CMND_TELEINFO_MINIMIZE, str_text, sizeof (str_text));
     if (strlen (str_text) > 0) teleinfo_config.log_policy = TELEINFO_LOG_BUFFERED;
       else teleinfo_config.log_policy = TELEINFO_LOG_IMMEDIATE;
@@ -2549,6 +2707,22 @@ void TeleinfoWebPageConfigure ()
     // parameter 'nbweek' : set number of weekly historisation files
     WebGetArg (D_CMND_TELEINFO_NBWEEKLY, str_text, sizeof (str_text));
     if (strlen (str_text) > 0) teleinfo_config.nb_weekly = max (atoi (str_text), 1);
+
+    // parameter 'maxv' : set graph maximum instant voltage value
+    WebGetArg (D_CMND_TELEINFO_MAX_V, str_text, sizeof (str_text));
+    if (strlen (str_text) > 0) teleinfo_config.max_v = atoi (str_text);
+
+    // parameter 'maxva' : set graph maximum instant power value
+    WebGetArg (D_CMND_TELEINFO_MAX_VA, str_text, sizeof (str_text));
+    if (strlen (str_text) > 0) teleinfo_config.max_va = atol (str_text);
+
+    // parameter 'maxwhd' : set graph maximum daily watt hour total
+    WebGetArg (D_CMND_TELEINFO_MAX_WH_DAY, str_text, sizeof (str_text));
+    if (strlen (str_text) > 0) teleinfo_config.max_wh_day = atol (str_text);
+
+    // parameter 'maxwhm' : set graph maximum monthly watt hour total
+    WebGetArg (D_CMND_TELEINFO_MAX_WH_MONTH, str_text, sizeof (str_text));
+    if (strlen (str_text) > 0) teleinfo_config.max_wh_month = atol (str_text);
 
 #endif    // USE_UFILESYS
 
@@ -2609,6 +2783,14 @@ void TeleinfoWebPageConfigure ()
   WSContentSend_P (TELEINFO_INPUT_CHECKBOX, D_CMND_TELEINFO_MINIMIZE, str_select, PSTR ("Minimize write on filesystem"));
   WSContentSend_P (TELEINFO_INPUT_NUMBER, PSTR ("Number of daily files"), D_CMND_TELEINFO_NBDAILY, 1, 365, teleinfo_config.nb_daily);
   WSContentSend_P (TELEINFO_INPUT_NUMBER, PSTR ("Number of weekly files"), D_CMND_TELEINFO_NBWEEKLY, 0, 52, teleinfo_config.nb_weekly);
+  WSContentSend_P (TELEINFO_FIELD_STOP);
+
+  // teleinfo maximum graph limit
+  WSContentSend_P (TELEINFO_FIELD_START,  "📊", PSTR ("Graph maximum"));
+  WSContentSend_P (TELEINFO_INPUT_NUMBER, PSTR ("Voltage Instant"), D_CMND_TELEINFO_MAX_V, TELEINFO_VOLTAGE, TELEINFO_VOLTAGE_MAXIMUM, teleinfo_config.max_v);
+  WSContentSend_P (TELEINFO_INPUT_NUMBER, PSTR ("Power Instant"), D_CMND_TELEINFO_MAX_VA, 0, 250000, teleinfo_config.max_va);
+  WSContentSend_P (TELEINFO_INPUT_NUMBER, PSTR ("Wh Daily"), D_CMND_TELEINFO_MAX_WH_DAY, 0, 1000000, teleinfo_config.max_wh_day);
+  WSContentSend_P (TELEINFO_INPUT_NUMBER, PSTR ("Wh Monthly"), D_CMND_TELEINFO_MAX_WH_MONTH, 0, 30000000, teleinfo_config.max_wh_month);
   WSContentSend_P (TELEINFO_FIELD_STOP);
 
 #endif    // USE_UFILESYS
@@ -2729,17 +2911,20 @@ void TeleinfoWebPageTic ()
 // Get status update
 void TeleinfoWebGraphUpdate ()
 {
-  int    phase, update;
-  int    period, data, histo;
-  char   str_text[16];
+  uint8_t phase, period, data, histo;
+  char    str_text[16];
 
   // check graph parameters
-  period = TeleinfoWebGetArgValue (D_CMND_TELEINFO_PERIOD, TELEINFO_PERIOD_LIVE, 0, TELEINFO_PERIOD_MAX - 1);
-  data   = TeleinfoWebGetArgValue (D_CMND_TELEINFO_DATA,   TELEINFO_UNIT_VA,     0, TELEINFO_UNIT_MAX - 1);
-  histo  = TeleinfoWebGetArgValue (D_CMND_TELEINFO_HISTO,  0,                    0, 0);
+  period = (uint8_t)TeleinfoWebGetArgValue (D_CMND_TELEINFO_PERIOD, TELEINFO_PERIOD_LIVE, 0, TELEINFO_PERIOD_MAX - 1);
+  data   = (uint8_t)TeleinfoWebGetArgValue (D_CMND_TELEINFO_DATA,   TELEINFO_UNIT_VA,     0, TELEINFO_UNIT_MAX -1);
+  histo  = (uint8_t)TeleinfoWebGetArgValue (D_CMND_TELEINFO_HISTO,  0,                    0, 0);
+
+  // if data is Wh, display instant W
+  if (data == TELEINFO_UNIT_WH) data = TELEINFO_UNIT_W;
 
   // start of data page
   WSContentBegin (200, CT_PLAIN);
+
 
   // chech for graph update (no updata if past historic file)
   if (histo > 0) teleinfo_period[period].updated = false;
@@ -2760,24 +2945,15 @@ void TeleinfoWebGraphUpdate ()
 }
 
 // Display graph frame and time marks
-void TeleinfoWebGraphTime (int period, int histo)
+void TeleinfoWebGraphTime (const uint8_t period, const uint8_t histo)
 {
-  int  index;
-  long graph_left, graph_right, graph_width;  
-  long unit_width, shift_unit, shift_width;  
-  long graph_x;  
+  uint32_t index;
+  uint32_t graph_left, graph_right, graph_width;  
+  uint32_t unit_width, shift_unit, shift_width;  
+  uint32_t graph_x;  
   uint32_t current_time;
   TIME_T   time_dst;
   char     str_text[8];
-
-  // extract time data
-  current_time = LocalTime ();
-
-#ifdef USE_UFILESYS
-  if (period >= TELEINFO_MEMORY_PERIOD_MAX) current_time = TeleinfoHistoGetStartTime (period, histo);
-#endif    // USE_UFILESYS
-
-  BreakTime (current_time, time_dst);
 
   // boundaries of SVG graph
   graph_left  = TELEINFO_GRAPH_PERCENT_START * TELEINFO_GRAPH_WIDTH / 100;
@@ -2788,6 +2964,10 @@ void TeleinfoWebGraphTime (int period, int histo)
   switch (period) 
   {
     case TELEINFO_PERIOD_LIVE:
+      // extract time data
+      current_time = LocalTime ();
+      BreakTime (current_time, time_dst);
+
       // calculate horizontal shift
       unit_width  = graph_width / 6;
       shift_unit  = time_dst.minute % 10;
@@ -2805,178 +2985,101 @@ void TeleinfoWebGraphTime (int period, int histo)
 
         // display separation line and time
         graph_x = graph_left + shift_width + (index * unit_width);
-        WSContentSend_P (PSTR ("<line class='time' x1='%d' y1='%d%%' x2='%d' y2='%d%%' />\n"), graph_x, 49, graph_x, 51);
-        WSContentSend_P (PSTR ("<text class='time' x='%d' y='%d%%'>%02dh%02d</text>\n"), graph_x - 25, 55, time_dst.hour, time_dst.minute);
+        WSContentSend_P (PSTR ("<line class='time' x1='%d' y1='%d%%' x2='%d' y2='%d%%' />\n"), graph_x, 1, graph_x, 99);
+        WSContentSend_P (PSTR ("<text class='time' x='%d' y='%d%%'>%02dh%02d</text>\n"), graph_x - 25, 99, time_dst.hour, time_dst.minute);
       }
       break;
 
     case TELEINFO_PERIOD_DAY:
-      // calculate horizontal shift
+      // calculate separator width
       unit_width  = graph_width / 6;
-      shift_unit  = time_dst.hour % 4;
-      shift_width = unit_width - (unit_width * shift_unit / 4) - (unit_width * time_dst.minute / 240);
-
-      // calculate first time displayed by substracting (5 * 4h + shift) to current time
-      current_time -= 72000;
-      current_time -= (shift_unit * 3600); 
 
       // display 4 hours separation lines with hour
-      for (index = 0; index < 6; index++)
+      for (index = 1; index < 6; index++)
       {
-        // convert back to date and increase time of 4h
-        BreakTime (current_time, time_dst);
-        current_time += 14400;
-
         // display separation line and time
-        graph_x = graph_left + shift_width + (index * unit_width);
-        WSContentSend_P (PSTR ("<line class='time' x1='%d' y1='%d%%' x2='%d' y2='%d%%' />\n"), graph_x, 49, graph_x, 51);
-        WSContentSend_P (PSTR ("<text class='time' x='%d' y='%d%%'>%02dh</text>\n"), graph_x - 15, 55, time_dst.hour);
+        graph_x = graph_left + (index * unit_width);
+        WSContentSend_P (PSTR ("<line class='time' x1='%d' y1='%d%%' x2='%d' y2='%d%%' />\n"), graph_x, 1, graph_x, 99);
+        WSContentSend_P (PSTR ("<text class='time' x='%d' y='%d%%'>%02dh</text>\n"), graph_x - 15, 99, index * 4);
       }
       break;
 
     case TELEINFO_PERIOD_WEEK:
-      // calculate horizontal shift
+      // calculate separator width
       unit_width = graph_width / 7;
-      shift_width = unit_width - (unit_width * time_dst.hour / 24) - (unit_width * time_dst.minute / 1440);
 
       // display day lines with day name
-      time_dst.day_of_week --;
       for (index = 0; index < 7; index++)
       {
-        // calculate next week day
-        time_dst.day_of_week ++;
-        time_dst.day_of_week = time_dst.day_of_week % 7;
-
-        // display month separation line and week day (first days or current day after 6pm)
-        graph_x = graph_left + shift_width + (index * unit_width);
-        WSContentSend_P (PSTR ("<line class='time' x1='%d' y1='%d%%' x2='%d' y2='%d%%' />\n"), graph_x, 49, graph_x, 51);
-        if ((index < 6) || (time_dst.hour >= 18))
-        {
-          GetTextIndexed (str_text, sizeof (str_text), time_dst.day_of_week, kTeleinfoWeekDay);
-          WSContentSend_P (PSTR ("<text class='time' x='%d' y='%d%%'>%s</text>\n"), graph_x + 50, 53, str_text);
-        }
+        // display days and separation separation lines
+        graph_x = graph_left + index * unit_width;
+        if (index > 0) WSContentSend_P (PSTR ("<line class='time' x1='%d' y1='%d%%' x2='%d' y2='%d%%' />\n"), graph_x, 1, graph_x, 99);
+        GetTextIndexed (str_text, sizeof (str_text), index, kTeleinfoWeekDay);
+        WSContentSend_P (PSTR ("<text class='time' x='%d' y='%d%%'>%s</text>\n"), graph_x + 50, 99, str_text);
       }
       break;
   }
 }
 
-// Display specific data curve curve
-void TeleinfoWebDisplayData (int period, int data, int phase, int histo)
+// Display specific data curve
+void TeleinfoWebDisplayData (const uint8_t period, const uint8_t data, const uint8_t phase, const uint8_t histo, const uint8_t month)
 {
   bool first_point = true;
-  int  index_array;
-  long index, value;
-  long graph_x, graph_y;
+  int  index, index_array;
+  long value, value_x, value_y, label_x, label_y;
+  long graph_x, graph_y, graph_range, graph_delta, graph_width, graph_height, graph_x_end, graph_max, graph_label, graph_char;    
+  // , graph_value;
+  long arr_value[TELEINFO_GRAPH_SAMPLE];
+  char str_text[8];
+  char str_type[8];
+  char str_value[16];
 
-  // if pmax not defined, return
-  if (teleinfo_graph.pmax == 0) return;
+  // check parameters
+  if (period >= TELEINFO_PERIOD_MAX) return;
+  if (teleinfo_config.max_va == 0) return;
 
-  // start data value curve
-  switch (data)
-  {
-    case TELEINFO_HISTO_PEAK_VA:
-      WSContentSend_P ("<polyline class='pk%d' points='", phase);
-      break;
+  // init array
+  for (index = 0; index < TELEINFO_GRAPH_SAMPLE; index ++) arr_value[index] = LONG_MAX;
 
-    case TELEINFO_HISTO_VA:
-    case TELEINFO_HISTO_W:
-      WSContentSend_P ("<path class='ph%d' ", phase);
-      break;
-
-    case TELEINFO_HISTO_V:
-      WSContentSend_P ("<polyline class='ph%d' points='", phase); 
-      break;
-    
-    case TELEINFO_HISTO_PEAK_V:
-      WSContentSend_P ("<polyline class='pk%d' points='", phase); 
-      break;
-
-    case TELEINFO_HISTO_COSPHI:
-      WSContentSend_P ("<polyline class='ph%d' points='", phase);
-      break;
-  }
-  
-  // if data should be displayed from memory
-  if (period < TELEINFO_MEMORY_PERIOD_MAX)
-  {
-    // boucle a travers tous les points du graph
+  //     collect data : memory
+  // ------------------------------
+  if (period == TELEINFO_PERIOD_LIVE) 
     for (index = 0; index < TELEINFO_GRAPH_SAMPLE; index++)
     {
       // get current array index if in live memory mode
-      index_array = (index + teleinfo_period[period].index) % TELEINFO_GRAPH_SAMPLE;
-
-      // init calculation
-      graph_x = teleinfo_graph.left + (index * teleinfo_graph.width / TELEINFO_GRAPH_SAMPLE);
+      index_array = (teleinfo_period[period].index + index) % TELEINFO_GRAPH_SAMPLE;
 
       // display according to data type
       switch (data)
       {
-        case TELEINFO_HISTO_VA:
-          if (teleinfo_graph.data[period].arr_papp[phase][index_array] != UINT8_MAX)
-          {
-            // calculate value and y position
-            value   = (long)teleinfo_graph.data[period].arr_papp[phase][index_array] * teleinfo_contract.ssousc / 200;
-            graph_y = teleinfo_config.height - (value * teleinfo_config.height / teleinfo_graph.pmax);
-
-            // display graph
-            if (first_point) WSContentSend_P ("d='M%d %d ", graph_x, teleinfo_config.height);
-            WSContentSend_P ("L%d %d ", graph_x, graph_y);
-            first_point = false;
-          }
+        case TELEINFO_UNIT_VA:
+          if (teleinfo_graph.data[period].arr_papp[phase][index_array] != UINT8_MAX) arr_value[index] = (long)teleinfo_graph.data[period].arr_papp[phase][index_array] * teleinfo_contract.ssousc / 200;
           break;
 
-        case TELEINFO_HISTO_W:
-          if (teleinfo_graph.data[period].arr_pact[phase][index_array] != UINT8_MAX)
-          {
-            // calculate value and y position
-            value   = (long)teleinfo_graph.data[period].arr_pact[phase][index_array] * teleinfo_contract.ssousc / 200;
-            graph_y = teleinfo_config.height - (value * teleinfo_config.height / teleinfo_graph.pmax);
-
-            // display graph
-            if (first_point) WSContentSend_P ("d='M%d %d ", graph_x, teleinfo_config.height); 
-            WSContentSend_P ("L%d %d ", graph_x, graph_y);
-            first_point = false;
-          }
+        case TELEINFO_UNIT_W:
+          if (teleinfo_graph.data[period].arr_pact[phase][index_array] != UINT8_MAX) arr_value[index] = (long)teleinfo_graph.data[period].arr_pact[phase][index_array] * teleinfo_contract.ssousc / 200;
           break;
 
-        case TELEINFO_HISTO_V:
-          if (teleinfo_graph.data[period].arr_volt[phase][index_array] != UINT8_MAX)
-          {
-            // calculate value and y position
-            value = TELEINFO_VOLTAGE - 128 + teleinfo_graph.data[period].arr_volt[phase][index_array];
-            value = value + TELEINFO_GRAPH_VOLTAGE_RANGE - teleinfo_graph.vmax;
-            graph_y = teleinfo_config.height - (value * teleinfo_config.height / TELEINFO_GRAPH_VOLTAGE_RANGE);
-
-            // display graph
-            WSContentSend_P ("%d,%d ", graph_x, graph_y);
-          }
+        case TELEINFO_UNIT_V:
+          if (teleinfo_graph.data[period].arr_volt[phase][index_array] != UINT8_MAX) arr_value[index] = (long)TELEINFO_VOLTAGE - 128 + teleinfo_graph.data[period].arr_volt[phase][index_array];
           break;
 
-        case TELEINFO_HISTO_COSPHI:
-          if (teleinfo_graph.data[period].arr_cosphi[phase][index_array] != UINT8_MAX)
-          {
-            // calculate value and y position
-            value = (long)teleinfo_graph.data[period].arr_cosphi[phase][index_array];
-            graph_y = teleinfo_config.height - (value * teleinfo_config.height / 100);
-
-            // display graph
-            WSContentSend_P ("%d,%d ", graph_x, graph_y);
-          }
+        case TELEINFO_UNIT_COSPHI:
+          if (teleinfo_graph.data[period].arr_cosphi[phase][index_array] != UINT8_MAX) arr_value[index] = (long)teleinfo_graph.data[period].arr_cosphi[phase][index_array];
           break;
       }
     }
-  }
 
+  //     collect data : file
+  // ----------------------------
 #ifdef USE_UFILESYS
-  // else data should be displayed from file
   else
   {
-    int  column;
-    size_t size_line, size_value;
-    char str_value[16];
-    char str_line[128];
-    char str_filename[UFS_FILENAME_SIZE];
-    File file;
+    uint8_t  column;
+    size_t  size_line, size_value;
+    char    str_line[128];
+    char    str_filename[UFS_FILENAME_SIZE];
+    File    file;
 
     // if data file exists
     if (TeleinfoHistoGetFilename (period, histo, str_filename))
@@ -2985,56 +3088,70 @@ void TeleinfoWebDisplayData (int period, int data, int phase, int histo)
       file = ffsp->open (str_filename, "r");
       UfsReadNextLine (file, str_line, sizeof (str_line));
 
-      // calculate column where to read data
-      column = 4 + (TELEINFO_HISTO_MAX * phase) + data;
-
       // loop to read lines
       do
       {
-        // read next line
+        // read line
         size_line = UfsReadNextLine (file, str_line, sizeof (str_line));
         if (size_line > 0)
         {
-          // extract index from line
-          size_value = UfsExtractCsvColumn (str_line, ';', 1, str_value, sizeof (str_value), false);
-          if (size_value > 0) index = atol (str_value); else index = LONG_MAX;
-
-          // extract value from line
-          size_value = UfsExtractCsvColumn (str_line, ';', column, str_value, sizeof (str_value), false);
-          if (size_value > 0) value = atol (str_value); else value = LONG_MAX;
-
-          if ((index != LONG_MAX) && (value != LONG_MAX))
+          // handle values for day and week
+          if (period <= TELEINFO_PERIOD_WEEK)
           {
-            // calculate x position
-            graph_x = teleinfo_graph.left + (index * teleinfo_graph.width / TELEINFO_GRAPH_SAMPLE);
+            // set column with data
+            column = 4 + (phase * 6) + data;
 
-            // display y position according to data
-            switch (data)
+            // extract index from line
+            size_value = UfsExtractCsvColumn (str_line, ';', 1, str_value, sizeof (str_value), false);
+            if (size_value > 0) index = atoi (str_value); else index = INT_MAX;
+
+            // extract value from line
+            size_value = UfsExtractCsvColumn (str_line, ';', column, str_value, sizeof (str_value), false);
+            if (size_value > 0) value = atol (str_value); else value = LONG_MAX;
+
+            // if index and value are valid, update value to be displayed
+            if ((index < TELEINFO_GRAPH_SAMPLE) && (value != LONG_MAX)) arr_value[index] = value;
+          }
+
+          // else, handle values for a full year
+          else if ((period == TELEINFO_PERIOD_YEAR) && (month == 0))
+          {
+            // extract month index from line
+            size_value = UfsExtractCsvColumn (str_line, ';', 2, str_value, sizeof (str_value), false);
+            if (size_value > 0) index = atoi (str_value); else index = INT_MAX;
+
+            // extract value from line
+            size_value = UfsExtractCsvColumn (str_line, ';', 5, str_value, sizeof (str_value), false);
+            if (size_value > 0) value = atol (str_value); else value = LONG_MAX;
+
+            // if index and value are valid, add value to month
+            if ((index <= 12) && (value != LONG_MAX))
             {
-              case TELEINFO_HISTO_PEAK_VA:
-                graph_y = teleinfo_config.height - (value * teleinfo_config.height / teleinfo_graph.pmax);
-                WSContentSend_P ("%d,%d ", graph_x, graph_y);
-                break;
+              if (arr_value[index] == LONG_MAX) arr_value[index] = value;
+                else arr_value[index] += value;
+            } 
+          }
 
-              case TELEINFO_HISTO_VA:
-              case TELEINFO_HISTO_W:
-                graph_y = teleinfo_config.height - (value * teleinfo_config.height / teleinfo_graph.pmax);
-                if (first_point) WSContentSend_P ("d='M%d %d ", graph_x, teleinfo_config.height);
-                WSContentSend_P ("L%d %d ", graph_x, graph_y);
-                first_point = false;
-                break;
+          // else, handle values for a month in a year
+          else if (period == TELEINFO_PERIOD_YEAR)
+          {
+            // extract month index from line
+            size_value = UfsExtractCsvColumn (str_line, ';', 2, str_value, sizeof (str_value), false);
+            if (size_value > 0) index = atoi (str_value); else index = INT_MAX;
 
-              case TELEINFO_HISTO_V:
-              case TELEINFO_HISTO_PEAK_V:
-                value   = value + TELEINFO_GRAPH_VOLTAGE_RANGE - teleinfo_graph.vmax;
-                graph_y = teleinfo_config.height - (value * teleinfo_config.height / TELEINFO_GRAPH_VOLTAGE_RANGE);
-                WSContentSend_P ("%d,%d ", graph_x, graph_y);
-                break;
+            // if we are dealing with target month
+            if (index == month)
+            {
+              // extract month index from line
+              size_value = UfsExtractCsvColumn (str_line, ';', 3, str_value, sizeof (str_value), false);
+              if (size_value > 0) index = atoi (str_value); else index = INT_MAX;
 
-              case TELEINFO_HISTO_COSPHI:
-                graph_y = teleinfo_config.height - (value * teleinfo_config.height / 100);
-                WSContentSend_P ("%d,%d ", graph_x, graph_y);
-                break;
+              // extract value from line
+              size_value = UfsExtractCsvColumn (str_line, ';', 5, str_value, sizeof (str_value), false);
+              if (size_value > 0) value = atol (str_value); else value = LONG_MAX;
+
+              // if index and value are valid, add value to month
+              if ((index <= 31) && (value != LONG_MAX)) arr_value[index] = value;
             }
           }
         }
@@ -3047,39 +3164,181 @@ void TeleinfoWebDisplayData (int period, int data, int phase, int histo)
   }
 #endif    // USE_UFILESYS
 
-  // end data value curve
-  switch (data)
+  //           LIVE, DAY and WEEK
+  //          Display instant data
+  // ------------------------------------------
+  if (period <= TELEINFO_PERIOD_WEEK)
   {
-    case TELEINFO_HISTO_PEAK_VA:
-      WSContentSend_P (PSTR("'/>\n"));
-      break;
+    // start of curve
+    switch (data)
+    {
+      case TELEINFO_UNIT_PEAK_VA:
+        WSContentSend_P ("<polyline class='pk%u' points='", phase);
+        break;
 
-    case TELEINFO_HISTO_VA:
-    case TELEINFO_HISTO_W:
-      WSContentSend_P (PSTR("L%d %d Z'/>\n"), graph_x, teleinfo_config.height);
-      break;
+      case TELEINFO_UNIT_VA:
+      case TELEINFO_UNIT_W:
+        WSContentSend_P ("<path class='ph%u' ", phase);
+        break;
 
-    case TELEINFO_HISTO_V:
-    case TELEINFO_HISTO_PEAK_V:
-      WSContentSend_P (PSTR("'/>\n"));
-      break;
+      case TELEINFO_UNIT_V:
+        WSContentSend_P ("<polyline class='ph%u' points='", phase); 
+        break;
+      
+      case TELEINFO_UNIT_PEAK_V:
+        WSContentSend_P ("<polyline class='pk%u' points='", phase); 
+        break;
 
-    case TELEINFO_HISTO_COSPHI:
-      WSContentSend_P (PSTR("'/>\n"));
-      break;
+      case TELEINFO_UNIT_COSPHI:
+        WSContentSend_P ("<polyline class='ph%u' points='", phase);
+        break;
+    }
+
+    // display values
+    for (index = 0; index < TELEINFO_GRAPH_SAMPLE; index++)
+    {
+      // if value is valid
+      if (arr_value[index] != LONG_MAX) 
+      {
+        // calculate x position
+        graph_x = teleinfo_graph.left + (index * teleinfo_graph.width / TELEINFO_GRAPH_SAMPLE);
+
+        // calculate y position according to data
+        switch (data)
+        {
+          case TELEINFO_UNIT_PEAK_VA:
+            graph_y = teleinfo_config.height - (arr_value[index] * teleinfo_config.height / teleinfo_config.max_va);
+            WSContentSend_P ("%d,%d ", graph_x, graph_y);
+            break;
+
+          case TELEINFO_UNIT_VA:
+          case TELEINFO_UNIT_W:
+            graph_y = teleinfo_config.height - (arr_value[index] * teleinfo_config.height / teleinfo_config.max_va);
+            if (first_point) WSContentSend_P ("d='M%u %u ", graph_x, teleinfo_config.height);
+            WSContentSend_P ("L%d %d ", graph_x, graph_y);
+            first_point = false;
+            break;
+
+          case TELEINFO_UNIT_V:
+          case TELEINFO_UNIT_PEAK_V:
+            graph_range = abs (teleinfo_config.max_v - TELEINFO_VOLTAGE);
+            graph_delta = (TELEINFO_VOLTAGE - arr_value[index]) * teleinfo_config.height / 2 / graph_range;
+            graph_y = (teleinfo_config.height / 2) + graph_delta;
+            if (graph_y < 0) graph_y = 0;
+            if (graph_y > teleinfo_config.height) graph_y = teleinfo_config.height;
+            WSContentSend_P ("%d,%d ", graph_x, graph_y);
+            break;
+
+          case TELEINFO_UNIT_COSPHI:
+            graph_y = teleinfo_config.height - (arr_value[index] * teleinfo_config.height / 100);
+            WSContentSend_P ("%d,%d ", graph_x, graph_y);
+            break;
+        }
+      }
+    }
+
+    // end data value curve
+    switch (data)
+    {
+      case TELEINFO_UNIT_PEAK_VA:
+        WSContentSend_P (PSTR("'/>\n"));
+        break;
+
+      case TELEINFO_UNIT_VA:
+      case TELEINFO_UNIT_W:
+        WSContentSend_P (PSTR("L%d %d Z'/>\n"), graph_x, teleinfo_config.height);
+        break;
+
+      case TELEINFO_UNIT_V:
+      case TELEINFO_UNIT_PEAK_V:
+        WSContentSend_P (PSTR("'/>\n"));
+        break;
+
+      case TELEINFO_UNIT_COSPHI:
+        WSContentSend_P (PSTR("'/>\n"));
+        break;
+    }
   }
+
+  //              YEAR
+  //          Display bar sums
+  // ---------------------------------
+#ifdef USE_UFILESYS
+  else if (period == TELEINFO_PERIOD_YEAR)
+  {
+    // init graph units
+    if (month == 0)
+    {
+      graph_width = 90;
+      graph_range = 12;      // number of months
+      graph_delta = 20;      // separation between bars
+      graph_char  = 6;
+      graph_max   = teleinfo_config.max_wh_month;
+      strcpy (str_type, "month");
+    }
+    else
+    {
+      graph_width = 35;
+      graph_range = 31;      // number of days
+      graph_delta = 4;       // separation between bars
+      graph_char  = 4;
+      graph_max   = teleinfo_config.max_wh_day;
+      strcpy (str_type, "day");
+    }
+
+    graph_height = teleinfo_config.height;
+    graph_x      = teleinfo_graph.left + graph_delta / 2;
+    graph_x_end  = graph_x + graph_width - graph_delta;
+
+    // loop thru months
+    for (index = 1; index <= graph_range; index ++)
+    {
+      if (arr_value[index] != LONG_MAX)
+      {
+        // convvert value to string
+        ltoa (arr_value[index], str_value, 10);
+
+        // calculate bar height
+        graph_y = graph_height - (graph_height * arr_value[index] / graph_max);
+        if (graph_y < 0) graph_y = 0;
+
+        // bar label
+        if (month == 0) GetTextIndexed (str_text, sizeof (str_text), index, kTeleinfoYearMonth);
+          else sprintf (str_text, "%02d", index);
+
+        // calculate bar graph value position
+        value_x = graph_x + (graph_width - graph_delta) / 2 - graph_char * strlen (str_value);
+        value_y = graph_y + 20;
+        if (value_y > graph_height - 30) value_y = graph_height - 30;
+
+        // calculate bar graph label position
+        label_x = graph_x + (graph_width - graph_delta) / 2 - 5 * strlen (str_text);
+        label_y = graph_height - 10;
+
+        // display bar
+        WSContentSend_P (PSTR("<path class='ph0' d='M%d %d L%d %d L%d %d L%d %d L%d %d L%d %d Z'></path>\n"), graph_x, graph_height, graph_x, graph_y + 2, graph_x + 2, graph_y, graph_x_end - 2, graph_y, graph_x_end, graph_y + 2, graph_x_end, graph_height);
+        WSContentSend_P (PSTR("<text class='%s' x='%d' y='%d'>%s</text>\n"), str_type, value_x, value_y, str_value);
+        WSContentSend_P (PSTR("<text class='label' x='%d' y='%d'>%s</text>\n"), label_x, label_y, str_text);
+      }
+
+      // increment bar position
+      graph_x     += graph_width;
+      graph_x_end += graph_width;
+    }
+  }
+#endif    // USE_UFILESYS
 }
 
 // Display graph curve
-void TeleinfoWebGraphCurve (int period, int data, int phase, int histo)
+void TeleinfoWebGraphCurve (const uint8_t period, const uint8_t data, const uint8_t phase, const uint8_t histo, const uint8_t month)
 {
 #ifdef USE_UFILESYS
   // if data is for current period file, force flush for the period
-  if ((histo == 0) && (period >=TELEINFO_MEMORY_PERIOD_MAX)) TeleinfoHistoFlushData (period);
+  if ((histo == 0) && (period != TELEINFO_PERIOD_LIVE)) TeleinfoFlushHistoData (period);
 #endif    // USE_UFILESYS
 
   // boundaries of SVG graph
-  teleinfo_graph.left  = TELEINFO_GRAPH_PERCENT_START * TELEINFO_GRAPH_WIDTH / 100 + 1;
+  teleinfo_graph.left  = TELEINFO_GRAPH_PERCENT_START * TELEINFO_GRAPH_WIDTH / 100;
   teleinfo_graph.right = TELEINFO_GRAPH_PERCENT_STOP  * TELEINFO_GRAPH_WIDTH / 100;
   teleinfo_graph.width = teleinfo_graph.right - teleinfo_graph.left;
 
@@ -3088,24 +3347,29 @@ void TeleinfoWebGraphCurve (int period, int data, int phase, int histo)
   {
     // Apparent Power
     case TELEINFO_UNIT_VA:
-      TeleinfoWebDisplayData (period, TELEINFO_HISTO_PEAK_VA, phase, histo);
-      TeleinfoWebDisplayData (period, TELEINFO_HISTO_VA, phase, histo);
+      TeleinfoWebDisplayData (period, TELEINFO_UNIT_PEAK_VA, phase, histo, month);
+      TeleinfoWebDisplayData (period, TELEINFO_UNIT_VA,      phase, histo, month);
       break;
       
     // Active Power
     case TELEINFO_UNIT_W:
-      TeleinfoWebDisplayData (period, TELEINFO_HISTO_W, phase, histo);
+      TeleinfoWebDisplayData (period, TELEINFO_UNIT_W, phase, histo, month);
       break;
 
     // Voltage
     case TELEINFO_UNIT_V:
-      TeleinfoWebDisplayData (period, TELEINFO_HISTO_V, phase, histo);
-      TeleinfoWebDisplayData (period, TELEINFO_HISTO_PEAK_V, phase, histo);
+      TeleinfoWebDisplayData (period, TELEINFO_UNIT_V,      phase, histo, month);
+      TeleinfoWebDisplayData (period, TELEINFO_UNIT_PEAK_V, phase, histo, month);
       break;
     
     // Cos Phi
     case TELEINFO_UNIT_COSPHI:
-      TeleinfoWebDisplayData (period, TELEINFO_HISTO_COSPHI, phase, histo);
+      TeleinfoWebDisplayData (period, TELEINFO_UNIT_COSPHI, phase, histo, month);
+      break;
+
+    // Total in Wh
+    case TELEINFO_UNIT_WH:
+      TeleinfoWebDisplayData (period, TELEINFO_UNIT_WH, phase, histo, month);
       break;
   }
 }
@@ -3113,14 +3377,15 @@ void TeleinfoWebGraphCurve (int period, int data, int phase, int histo)
 // Graph curves data update
 void TeleinfoWebGraphData ()
 {
-  int  phase, period, data, histo;
-  char str_phase[8];
-  char str_text[32];
+  uint8_t phase, period, data, histo, month;
+  char    str_phase[8];
+  char    str_text[32];
 
   // get numerical argument values
-  period = TeleinfoWebGetArgValue (D_CMND_TELEINFO_PERIOD, TELEINFO_PERIOD_LIVE,  0, TELEINFO_PERIOD_MAX - 1);
-  data   = TeleinfoWebGetArgValue (D_CMND_TELEINFO_DATA,   TELEINFO_UNIT_VA, 0, TELEINFO_UNIT_MAX - 1);
-  histo  = TeleinfoWebGetArgValue (D_CMND_TELEINFO_HISTO,  0, 0, 0);
+  period = (uint8_t)TeleinfoWebGetArgValue (D_CMND_TELEINFO_PERIOD, TELEINFO_PERIOD_LIVE,  0, TELEINFO_PERIOD_MAX - 1);
+  data   = (uint8_t)TeleinfoWebGetArgValue (D_CMND_TELEINFO_DATA,   TELEINFO_UNIT_VA, 0, TELEINFO_UNIT_MAX - 1);
+  histo  = (uint8_t)TeleinfoWebGetArgValue (D_CMND_TELEINFO_HISTO,  0, 0, 0);
+  month  = (uint8_t)TeleinfoWebGetArgValue (D_CMND_TELEINFO_MONTH,  0, 0, 12);
 
   // check phase display argument
   strcpy (str_phase, "");
@@ -3129,7 +3394,7 @@ void TeleinfoWebGraphData ()
 
   // start of SVG graph
   WSContentBegin (200, CT_HTML);
-  WSContentSend_P (PSTR ("<svg viewBox='%d %d %d %d'>\n"), 0, 0, TELEINFO_GRAPH_WIDTH, teleinfo_config.height);
+  WSContentSend_P (PSTR ("<svg viewBox='%u %u %u %u'>\n"), 0, 0, TELEINFO_GRAPH_WIDTH, teleinfo_config.height);
 
   // SVG style 
   WSContentSend_P (PSTR ("<style type='text/css'>\n"));
@@ -3148,12 +3413,24 @@ void TeleinfoWebGraphData ()
     WSContentSend_P (PSTR ("polyline.pk%d {stroke:%s;stroke-dasharray:1 4;}\n"), phase, str_text);
   }
 
-  WSContentSend_P (PSTR ("line.time {stroke-width:1;stroke:white;}\n"));
-  WSContentSend_P (PSTR ("text.time {font-size:1.2rem;fill:grey;}\n"));
+  WSContentSend_P (PSTR ("line.time {stroke-width:1;stroke:white;stroke-dasharray:1 8;}\n"));
+  WSContentSend_P (PSTR ("text.time {font-size:1.2rem;fill:white;}\n"));
+
+  WSContentSend_P (PSTR ("text.month {font-size:1.2rem;font-style:italic;fill:white;}\n"));
+  WSContentSend_P (PSTR ("text.day   {font-size:0.8rem;font-style:italic;fill:white;}\n"));
+  WSContentSend_P (PSTR ("text.label {font-size:1rem;fill:white;}\n"));
+
   WSContentSend_P (PSTR ("</style>\n"));
 
-  // loop thru phases to display them if asked
-  for (phase = 0; phase < teleinfo_contract.phase; phase++) if (str_phase[phase] != '0') TeleinfoWebGraphCurve (period, data, phase, histo);
+  // if dealing with live, day or week, loop thru phases to display them if asked
+  if (period <= TELEINFO_PERIOD_WEEK) 
+    for (phase = 0; phase < teleinfo_contract.phase; phase++)
+    {
+      if (str_phase[phase] != '0') TeleinfoWebGraphCurve (period, data, phase, histo, month);
+    }
+
+  // else dealing with yearly data
+  else if (period == TELEINFO_PERIOD_YEAR) TeleinfoWebGraphCurve (period, data, 0, histo, month);
 
   // display time units
   TeleinfoWebGraphTime (period, histo);
@@ -3166,47 +3443,51 @@ void TeleinfoWebGraphData ()
 // Graph frame
 void TeleinfoWebGraphFrame ()
 {
-  int   nb_digit = -1;
-  int   index, phase, period, data;  
-  int   graph_left, graph_right, graph_width;
-  long  value;
-  float font_size, unit, unit_min, unit_max;
-  char  str_unit[8];
-  char  str_text[8];
-  char  arr_label[5][8];
+  int  nb_digit = -1;
+  int  index, period, data, month;  
+  int  graph_left, graph_right, graph_width;
+  long unit_min, unit_max, unit_range;
+  char str_unit[8];
+  char str_text[8];
+  char arr_label[5][12];
 
   // get parameters
-  period = TeleinfoWebGetArgValue (D_CMND_TELEINFO_PERIOD, TELEINFO_PERIOD_LIVE,  0, TELEINFO_PERIOD_MAX  - 1);
-  data   = TeleinfoWebGetArgValue (D_CMND_TELEINFO_DATA,   TELEINFO_UNIT_W,       0, TELEINFO_UNIT_MAX - 1);
+  period = TeleinfoWebGetArgValue (D_CMND_TELEINFO_PERIOD, TELEINFO_PERIOD_LIVE, TELEINFO_PERIOD_LIVE, TELEINFO_PERIOD_MAX - 1);
+  data   = TeleinfoWebGetArgValue (D_CMND_TELEINFO_DATA,   TELEINFO_UNIT_VA,     TELEINFO_UNIT_VA,     TELEINFO_UNIT_MAX - 1);
+  month  = TeleinfoWebGetArgValue (D_CMND_TELEINFO_MONTH,  0, 0, 12);
 
-  // set labels according to type of data
+  // set labels according to data type
   switch (data) 
   {
     // apparent power
     case TELEINFO_UNIT_VA:
       itoa (0, arr_label[0], 10);
-      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_graph.pmax / 4,     arr_label[1], sizeof (arr_label[1]), true);
-      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_graph.pmax / 2,     arr_label[2], sizeof (arr_label[2]), true);
-      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_graph.pmax * 3 / 4, arr_label[3], sizeof (arr_label[3]), true);
-      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_graph.pmax,         arr_label[4], sizeof (arr_label[4]), true);
+      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_config.max_va / 4,     arr_label[1], sizeof (arr_label[1]), true);
+      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_config.max_va / 2,     arr_label[2], sizeof (arr_label[2]), true);
+      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_config.max_va * 3 / 4, arr_label[3], sizeof (arr_label[3]), true);
+      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_config.max_va,         arr_label[4], sizeof (arr_label[4]), true);
       break;
 
     // active power
     case TELEINFO_UNIT_W:
       itoa (0, arr_label[0], 10);
-      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_graph.pmax / 4,     arr_label[1], sizeof (arr_label[1]), true);
-      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_graph.pmax / 2,     arr_label[2], sizeof (arr_label[2]), true);
-      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_graph.pmax * 3 / 4, arr_label[3], sizeof (arr_label[3]), true);
-      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_graph.pmax,         arr_label[4], sizeof (arr_label[4]), true);
+      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_config.max_va / 4,     arr_label[1], sizeof (arr_label[1]), true);
+      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_config.max_va / 2,     arr_label[2], sizeof (arr_label[2]), true);
+      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_config.max_va * 3 / 4, arr_label[3], sizeof (arr_label[3]), true);
+      TeleinfoDisplayValue (TELEINFO_UNIT_MAX, teleinfo_config.max_va,         arr_label[4], sizeof (arr_label[4]), true);
       break;
 
     // voltage
     case TELEINFO_UNIT_V:
-      itoa (teleinfo_graph.vmax - TELEINFO_GRAPH_VOLTAGE_RANGE,         arr_label[0], 10);
-      itoa (teleinfo_graph.vmax - TELEINFO_GRAPH_VOLTAGE_RANGE * 3 / 4, arr_label[1], 10);
-      itoa (teleinfo_graph.vmax - TELEINFO_GRAPH_VOLTAGE_RANGE / 2,     arr_label[2], 10);
-      itoa (teleinfo_graph.vmax - TELEINFO_GRAPH_VOLTAGE_RANGE / 4,     arr_label[3], 10);
-      itoa (teleinfo_graph.vmax, arr_label[4], 10);
+      unit_max   = teleinfo_config.max_v;
+      unit_min   = 2 * TELEINFO_VOLTAGE - teleinfo_config.max_v;
+      unit_range = unit_max - unit_min;
+
+      itoa (unit_min,                      arr_label[0], 10);
+      itoa (unit_min + unit_range / 4,     arr_label[1], 10);
+      itoa (unit_min + unit_range / 2,     arr_label[2], 10);
+      itoa (unit_min + unit_range * 3 / 4, arr_label[3], 10);
+      itoa (unit_max,                      arr_label[4], 10);
       break;
 
     // cos phi
@@ -3217,6 +3498,17 @@ void TeleinfoWebGraphFrame ()
       strcpy_P (arr_label[3], PSTR ("0.75"));
       strcpy_P (arr_label[4], PSTR ("1"));
       break;
+
+    // watt per hour
+    case TELEINFO_UNIT_WH:
+    if (month == 0) unit_max = teleinfo_config.max_wh_month;
+      else unit_max = teleinfo_config.max_wh_day;
+    itoa (0, arr_label[0], 10);
+    TeleinfoDisplayValue (TELEINFO_UNIT_MAX, unit_max / 4,     arr_label[1], sizeof (arr_label[1]), true);
+    TeleinfoDisplayValue (TELEINFO_UNIT_MAX, unit_max / 2,     arr_label[2], sizeof (arr_label[2]), true);
+    TeleinfoDisplayValue (TELEINFO_UNIT_MAX, unit_max * 3 / 4, arr_label[3], sizeof (arr_label[3]), true);
+    TeleinfoDisplayValue (TELEINFO_UNIT_MAX, unit_max,         arr_label[4], sizeof (arr_label[4]), true);
+     break;
 
     default:
       for (index = 0; index < 5; index ++) strcpy (arr_label[index], "");
@@ -3235,8 +3527,7 @@ void TeleinfoWebGraphFrame ()
   // SVG style 
   WSContentSend_P (PSTR ("<style type='text/css'>\n"));
   WSContentSend_P (PSTR ("rect {stroke:grey;fill:none;}\n"));
-  WSContentSend_P (PSTR ("line.dash {stroke:grey;stroke-width:1;stroke-dasharray:8;}\n"));
-  WSContentSend_P (PSTR ("line.time {stroke:white;stroke-width:1;}\n"));
+  WSContentSend_P (PSTR ("line.dash {stroke:grey;stroke-width:1;stroke-dasharray:2 8;}\n"));
   WSContentSend_P (PSTR ("text.power {font-size:1.1rem;stroke:white;fill:white;}\n"));
   WSContentSend_P (PSTR ("</style>\n"));
 
@@ -3251,7 +3542,8 @@ void TeleinfoWebGraphFrame ()
   // get unit label
   strcpy (str_text, "");
   if (nb_digit != -1) strcpy (str_text, "k");
-  GetTextIndexed (str_unit, sizeof (str_unit), data, kTeleinfoGraphDisplay);
+  if (period == TELEINFO_PERIOD_YEAR) strcpy (str_unit, "Wh");
+  else GetTextIndexed (str_unit, sizeof (str_unit), data, kTeleinfoGraphDisplay);
   strlcat (str_text, str_unit, sizeof (str_text));
 
   // units graduation
@@ -3270,19 +3562,27 @@ void TeleinfoWebGraphFrame ()
 // Graph public page
 void TeleinfoWebGraphPage ()
 {
-  bool display;
-  int  index, phase, period, data, histo, choice, counter;  
-  long percentage;
-  char str_phase[8];
-  char str_type[8];
-  char str_text[16];
-  char str_date[16];
+  bool     display;
+  uint8_t  phase, period, data, histo, month, choice, counter;  
+  uint16_t index;  
+  long     percentage;
+  char     str_phase[8];
+  char     str_type[8];
+  char     str_text[16];
+  char     str_date[16];
 
   // get numerical argument values
-  period = TeleinfoWebGetArgValue (D_CMND_TELEINFO_PERIOD, TELEINFO_PERIOD_LIVE,  0, TELEINFO_PERIOD_MAX  - 1);
-  data   = TeleinfoWebGetArgValue (D_CMND_TELEINFO_DATA,   TELEINFO_UNIT_VA, 0, TELEINFO_UNIT_MAX - 1);
-  histo  = TeleinfoWebGetArgValue (D_CMND_TELEINFO_HISTO,  0, 0, 0);
+  period = (uint8_t)TeleinfoWebGetArgValue (D_CMND_TELEINFO_PERIOD, TELEINFO_PERIOD_LIVE,  0, TELEINFO_PERIOD_MAX - 1);
+  data   = (uint8_t)TeleinfoWebGetArgValue (D_CMND_TELEINFO_DATA,   TELEINFO_UNIT_VA, 0, TELEINFO_UNIT_MAX - 1);
+  histo  = (uint8_t)TeleinfoWebGetArgValue (D_CMND_TELEINFO_HISTO,  0, 0, 0);
+  month  = (uint8_t)TeleinfoWebGetArgValue (D_CMND_TELEINFO_MONTH,  0, 0, 12);
   teleinfo_config.height = TeleinfoWebGetArgValue (D_CMND_TELEINFO_HEIGHT, teleinfo_config.height, 100, INT_MAX);
+
+  // if period is yearly, force data to Wh
+  if (period == TELEINFO_PERIOD_YEAR) data = TELEINFO_UNIT_WH;
+
+  // else if back to other curves, switch to W
+  else if (data == TELEINFO_UNIT_WH) data = TELEINFO_UNIT_W;
 
   // check phase display argument
   strcpy (str_phase, "");
@@ -3292,30 +3592,42 @@ void TeleinfoWebGraphPage ()
   // check unit increment
   if (Webserver->hasArg (D_CMND_TELEINFO_INCREMENT)) 
   {
-    if ((data == TELEINFO_UNIT_VA) || (data == TELEINFO_UNIT_W)) teleinfo_graph.pmax += teleinfo_contract.ssousc / 4;
-    else if (data == TELEINFO_UNIT_V) teleinfo_graph.vmax += TELEINFO_GRAPH_VOLTAGE_STEP;
+    // update values
+    if ((period == TELEINFO_PERIOD_YEAR) && (month == 0)) teleinfo_config.max_wh_month += 5000;
+    else if (period == TELEINFO_PERIOD_YEAR) teleinfo_config.max_wh_day += 500;
+    else if ((data == TELEINFO_UNIT_VA) || (data == TELEINFO_UNIT_W)) teleinfo_config.max_va += 2000;
+    else if (data == TELEINFO_UNIT_V) teleinfo_config.max_v += TELEINFO_GRAPH_INC_VOLTAGE;
   }
 
   // check unit decrement
   if (Webserver->hasArg (D_CMND_TELEINFO_DECREMENT)) 
   {
-    if ((data == TELEINFO_UNIT_VA) || (data == TELEINFO_UNIT_W)) teleinfo_graph.pmax -= teleinfo_contract.ssousc / 4;
-    else if (data == TELEINFO_UNIT_V) teleinfo_graph.vmax -= TELEINFO_GRAPH_VOLTAGE_STEP;
-
-    teleinfo_graph.pmax = max (teleinfo_graph.pmax, teleinfo_contract.ssousc / 4);
-    teleinfo_graph.vmax = max (teleinfo_graph.vmax, (long)TELEINFO_GRAPH_VOLTAGE_RANGE);
+    // update values
+    if ((period == TELEINFO_PERIOD_YEAR) && (month == 0)) teleinfo_config.max_wh_month -= 5000;
+    else if (period == TELEINFO_PERIOD_YEAR) teleinfo_config.max_wh_day -= 500;
+    else if ((data == TELEINFO_UNIT_VA) || (data == TELEINFO_UNIT_W)) teleinfo_config.max_va -= 2000;
+    else if (data == TELEINFO_UNIT_V) teleinfo_config.max_v -= TELEINFO_GRAPH_INC_VOLTAGE;
   }
+
+  // set minimum values for graph maximum
+  teleinfo_config.max_wh_month = max (teleinfo_config.max_wh_month, 5000l);
+  teleinfo_config.max_wh_day = max (teleinfo_config.max_wh_day, 500l);
+  teleinfo_config.max_va = max (teleinfo_config.max_va, 2000l);
+  teleinfo_config.max_v = max (teleinfo_config.max_v, TELEINFO_VOLTAGE + 10);
 
   // beginning of form without authentification
   WSContentStart_P (D_TELEINFO_GRAPH, false);
   WSContentSend_P (PSTR ("</script>\n"));
+
+  // set page as scalable
+  WSContentSend_P (PSTR ("<meta name='viewport' content='width=device-width,initial-scale=1,user-scalable=yes'/>\n"));
 
   // page data refresh script
   WSContentSend_P (PSTR ("<script type='text/javascript'>\n"));
   WSContentSend_P (PSTR ("function update()\n"));
   WSContentSend_P (PSTR ("{\n"));
   WSContentSend_P (PSTR (" httpUpd=new XMLHttpRequest();\n"));
-  WSContentSend_P (PSTR (" httpUpd.open('GET','%s?period=%d&data=%d&histo=%d',true);\n"), D_TELEINFO_PAGE_GRAPH_UPD, period, data, histo);
+  WSContentSend_P (PSTR (" httpUpd.open('GET','%s?period=%u&data=%u&histo=%u',true);\n"), D_TELEINFO_PAGE_GRAPH_UPD, period, data, histo);
   WSContentSend_P (PSTR (" httpUpd.send();\n"));
   WSContentSend_P (PSTR (" httpUpd.onreadystatechange=function()\n"));
   WSContentSend_P (PSTR (" {\n"));
@@ -3325,7 +3637,7 @@ void TeleinfoWebGraphPage ()
   WSContentSend_P (PSTR ("   if (arr_param[0]==1)\n"));
   WSContentSend_P (PSTR ("   {\n"));
   WSContentSend_P (PSTR ("    str_random=Math.floor(Math.random()*100000);\n"));
-  WSContentSend_P (PSTR ("    document.getElementById('data').data='%s?period=%d&data=%d&phase=%s&rnd='+str_random;\n"), D_TELEINFO_PAGE_GRAPH_DATA, period, data, str_phase);
+  WSContentSend_P (PSTR ("    document.getElementById('data').data='%s?period=%u&data=%u&phase=%s&rnd='+str_random;\n"), D_TELEINFO_PAGE_GRAPH_DATA, period, data, str_phase);
   WSContentSend_P (PSTR ("   }\n"));
   WSContentSend_P (PSTR ("   num_param=arr_param.length;\n"));
   WSContentSend_P (PSTR ("   for (i=1;i<num_param;i++)\n"));
@@ -3345,6 +3657,7 @@ void TeleinfoWebGraphPage ()
   WSContentSend_P (PSTR ("div a {color:white;}\n"));
 
   WSContentSend_P (PSTR (".title {font-size:2rem;font-weight:bold;}\n"));
+  WSContentSend_P (PSTR ("div.live {height:32px;}\n"));
   WSContentSend_P (PSTR ("div.phase {display:inline-block;width:90px;padding:0.2rem;margin:0.2rem;border-radius:8px;}\n"));
   WSContentSend_P (PSTR ("div.phase span.power {font-size:1rem;font-weight:bold;}\n"));
   WSContentSend_P (PSTR ("div.phase span.volt {font-size:0.8rem;font-style:italic;}\n"));
@@ -3354,11 +3667,11 @@ void TeleinfoWebGraphPage ()
     WSContentSend_P (PSTR ("div.ph%d {color:%s;border:1px %s solid;}\n"), phase, str_text, str_text);    
   }
 
-  WSContentSend_P (PSTR ("div.choice {display:inline-block;font-size:1rem;padding:0px;margin:auto 5px;border:1px #666 solid;background:none;color:#fff;border-radius:6px;}\n"));
+  WSContentSend_P (PSTR ("div.choice {display:inline-block;padding:0px;margin:0px;border:1px #666 solid;background:none;color:#fff;border-radius:6px;}\n"));
   WSContentSend_P (PSTR ("div.choice div {background:#666;}\n"));
   WSContentSend_P (PSTR ("div.choice a div {background:none;}\n"));
 
-  WSContentSend_P (PSTR ("div.item {display:inline-block;padding:0.2rem auto;margin:1px;border:none;border-radius:4px;}\n"));
+  WSContentSend_P (PSTR ("div.item {display:inline-block;margin:1px;border:none;border-radius:4px;}\n"));
   WSContentSend_P (PSTR ("div.histo {font-size:0.9rem;padding:0px;margin-top:0px;}\n"));
   WSContentSend_P (PSTR ("div.day {width:50px;}\n"));
   WSContentSend_P (PSTR ("div.week {width:90px;}\n"));
@@ -3368,9 +3681,11 @@ void TeleinfoWebGraphPage ()
   WSContentSend_P (PSTR ("div.left {float:left;margin-left:6%%;}\n"));
   WSContentSend_P (PSTR ("div.right {float:right;margin-right:6%%;}\n"));
   
-  WSContentSend_P (PSTR ("div.period {width:70px;}\n"));
+  WSContentSend_P (PSTR ("div.period {width:60px;}\n"));
+  WSContentSend_P (PSTR ("div.month {width:25px;font-size:0.85rem;padding:1px 2px;}\n"));
   WSContentSend_P (PSTR ("div.data {width:50px;}\n"));
   WSContentSend_P (PSTR ("div.size {width:25px;}\n"));
+  WSContentSend_P (PSTR ("div a div.active {background:#666;}\n"));
 
   WSContentSend_P (PSTR ("select {background:#666;color:white;font-size:0.8rem;margin:1px;border:solid #666 2px;border-radius:4px;}\n"));
 
@@ -3386,40 +3701,13 @@ void TeleinfoWebGraphPage ()
   // device name
   WSContentSend_P (PSTR ("<div class='title'>%s</div>\n"), SettingsText(SET_DEVICENAME));
 
-  // display icon
-  WSContentSend_P (PSTR ("<div><a href='/'><img height=64 src='%s'></a></div>\n"), D_TELEINFO_ICON_PNG);
-
-  // -----------------
-  //      Values
-  // -----------------
-  WSContentSend_P (PSTR ("<div>\n"));
-  for (phase = 0; phase < teleinfo_contract.phase; phase++)
-  {
-    // display phase inverted link
-    strlcpy (str_text, str_phase, sizeof (str_text));
-    display = (str_text[phase] != '0');
-    if (display) str_text[phase] = '0'; else str_text[phase] = '1';
-    WSContentSend_P (PSTR ("<a href='%s?period=%d&data=%d&histo=%d&phase=%s'>"), D_TELEINFO_PAGE_GRAPH, period, data, histo, str_text);
-
-    // display phase data
-    if (display) strcpy (str_text, ""); else strcpy_P (str_text, PSTR ("disabled"));
-    WSContentSend_P (PSTR ("<div class='phase ph%d %s'>"), phase, str_text);    
-    TeleinfoDisplayCurrentValue (data, phase, str_text, sizeof (str_text));
-    WSContentSend_P (PSTR ("<span class='power' id='p%d'>%s</span>"), phase + 1, str_text);
-    WSContentSend_P (PSTR ("</div></a>\n"));
-  }
-  WSContentSend_P (PSTR ("</div>\n"));
-
-  WSContentSend_P (PSTR ("<div>\n"));     // line
-
   // -------------------
   //      Unit range
   // -------------------
 
-  WSContentSend_P (PSTR ("<div class='incr left'>"));
-  WSContentSend_P (PSTR ("<a href='%s?period=%d&data=%d&histo=%d&phase=%s&incr=1'><div class='item size'>%s</div></a>"), D_TELEINFO_PAGE_GRAPH, period, data, histo, str_phase, "+");
-  WSContentSend_P (PSTR ("<br>"));
-  WSContentSend_P (PSTR ("<a href='%s?period=%d&data=%d&histo=%d&phase=%s&decr=1'><div class='item size'>%s</div></a>"), D_TELEINFO_PAGE_GRAPH, period, data, histo, str_phase, "-");
+  WSContentSend_P (PSTR ("<div class='incr left'>\n"));
+  WSContentSend_P (PSTR ("<a href='%s?period=%u&data=%u&histo=%u&month=%u&phase=%s&incr=1'><div class='item size'>%s</div></a><br>\n"), D_TELEINFO_PAGE_GRAPH, period, data, histo, month, str_phase, "+");
+  WSContentSend_P (PSTR ("<a href='%s?period=%u&data=%u&histo=%u&month=%u&phase=%s&decr=1'><div class='item size'>%s</div></a>\n"), D_TELEINFO_PAGE_GRAPH, period, data, histo, month, str_phase, "-");
   WSContentSend_P (PSTR ("</div>\n"));      // choice
 
   // -----------------
@@ -3427,55 +3715,38 @@ void TeleinfoWebGraphPage ()
   // -----------------
 
   WSContentSend_P (PSTR ("<div class='incr right'>\n"));
-  index = teleinfo_config.height + TELEINFO_GRAPH_STEP;
-  WSContentSend_P (PSTR ("<a href='%s?period=%d&data=%d&histo=%d&height=%d&phase=%s'><div class='item size'>%s</div></a>"), D_TELEINFO_PAGE_GRAPH, period, data, histo, index, str_phase, "⬆️");
-  WSContentSend_P (PSTR ("<br>"));
-  index = teleinfo_config.height - TELEINFO_GRAPH_STEP;
-  WSContentSend_P (PSTR ("<a href='%s?period=%d&data=%d&histo=%d&height=%d&phase=%s'><div class='item size'>%s</div></a>"), D_TELEINFO_PAGE_GRAPH, period, data, histo, index, str_phase, "⬇️");
+  WSContentSend_P (PSTR ("<a href='%s?period=%u&data=%u&histo=%u&month=%u&height=%u&phase=%s'><div class='item size'>%s</div></a><br>\n"), D_TELEINFO_PAGE_GRAPH, period, data, histo, month, teleinfo_config.height + TELEINFO_GRAPH_STEP, str_phase, "⬆️");
+  WSContentSend_P (PSTR ("<a href='%s?period=%u&data=%u&histo=%u&month=%u&height=%u&phase=%s'><div class='item size'>%s</div></a>\n"),     D_TELEINFO_PAGE_GRAPH, period, data, histo, month, teleinfo_config.height - TELEINFO_GRAPH_STEP, str_phase, "⬇️");
   WSContentSend_P (PSTR ("</div>\n"));      // choice
 
   // -----------------
-  //     Data type
+  //      Icon
   // -----------------
 
-
-  WSContentSend_P (PSTR ("<div class='choice'>\n"));
-  for (index = 0; index < TELEINFO_UNIT_MAX; index++)
-  {
-    GetTextIndexed (str_text, sizeof (str_text), index, kTeleinfoGraphDisplay);
-    if (data != index) WSContentSend_P (PSTR ("<a href='%s?period=%d&data=%d&histo=%d&phase=%s'>"), D_TELEINFO_PAGE_GRAPH, period, index, histo, str_phase);
-    WSContentSend_P (PSTR ("<div class='item data'>%s</div>"), str_text);
-    if (data != index) WSContentSend_P (PSTR ("</a>"));
-    WSContentSend_P (PSTR ("\n"));
-  }
-  WSContentSend_P (PSTR ("</div>\n"));      // choice
-
-  // start second line of parameters
-  WSContentSend_P (PSTR ("</div>\n"));      // line
+  WSContentSend_P (PSTR ("<div><a href='/'><img height=64 src='%s'></a></div>\n"), D_TELEINFO_ICON_PNG);
 
   // -----------------
   //      Period 
   // -----------------
 
-  WSContentSend_P (PSTR ("<form method='post' action='%s?period=%d&data=%d&phase=%s'>\n"), D_TELEINFO_PAGE_GRAPH, period, data, str_phase);
-  WSContentSend_P (PSTR ("<div>\n"));       // line
-
-  WSContentSend_P (PSTR ("<div class='choice'>\n"));
-  for (index = 0; index < TELEINFO_MEMORY_PERIOD_MAX; index++)
+  WSContentSend_P (PSTR ("<div><div class='choice'>\n"));
+  WSContentSend_P (PSTR ("<form method='post' action='%s?period=%u&month=%u&data=%u&phase=%s'>\n"), D_TELEINFO_PAGE_GRAPH, period, month, data, str_phase);
+  for (index = 0; index < TELEINFO_PERIOD_DAY; index++)
   {
     // get period label
     GetTextIndexed (str_text, sizeof (str_text), index, kTeleinfoGraphPeriod);
 
     // set button according to active state
-    if (period != index) WSContentSend_P (PSTR ("<a href='%s?period=%d&data=%d&phase=%s'>"), D_TELEINFO_PAGE_GRAPH, index, data, str_phase);
+    if (period != index) WSContentSend_P (PSTR ("<a href='%s?period=%d&month=%u&data=%u&phase=%s'>"), D_TELEINFO_PAGE_GRAPH, index, month, data, str_phase);
     WSContentSend_P (PSTR ("<div class='item period'>%s</div>"), str_text);
     if (period != index) WSContentSend_P (PSTR ("</a>"));
     WSContentSend_P (PSTR ("\n"));
   }
 
 #ifdef USE_UFILESYS
+  char str_filename[UFS_FILENAME_SIZE];
 
-  for (index = TELEINFO_MEMORY_PERIOD_MAX; index < TELEINFO_PERIOD_MAX; index++)
+  for (index = TELEINFO_PERIOD_DAY; index < TELEINFO_PERIOD_MAX; index++)
   {
     // get period label
     GetTextIndexed (str_text, sizeof (str_text), index, kTeleinfoGraphPeriod);
@@ -3486,6 +3757,7 @@ void TeleinfoWebGraphPage ()
       // get number of saved periods
       if (period == TELEINFO_PERIOD_DAY) choice = teleinfo_config.nb_daily;
       else if (period == TELEINFO_PERIOD_WEEK) choice = teleinfo_config.nb_weekly;
+      else if (period == TELEINFO_PERIOD_YEAR) choice = 20;
       else choice = 0;
 
       WSContentSend_P (PSTR ("<select name='histo' id='histo' onchange='this.form.submit();'>\n"));
@@ -3493,7 +3765,7 @@ void TeleinfoWebGraphPage ()
       for (counter = 0; counter < choice; counter++)
       {
         // check if file exists
-        if (TeleinfoHistoGetFilename (period, counter, str_text))
+        if (TeleinfoHistoGetFilename (period, counter, str_filename))
         {
           TeleinfoHistoGetDate (period, counter, str_date);
           if (counter == histo) strcpy_P (str_text, PSTR (" selected")); else strcpy (str_text, "");
@@ -3503,23 +3775,96 @@ void TeleinfoWebGraphPage ()
 
       WSContentSend_P (PSTR ("</select>\n"));      
     }
-    else WSContentSend_P (PSTR ("<a href='%s?period=%d&data=%d&phase=%s'><div class='item period'>%s</div></a>\n"), D_TELEINFO_PAGE_GRAPH, index, data, str_phase, str_text);
+    else WSContentSend_P (PSTR ("<a href='%s?period=%d&month=%u&data=%u&phase=%s'><div class='item period'>%s</div></a>\n"), D_TELEINFO_PAGE_GRAPH, index, month, data, str_phase, str_text);
   }
 
 # endif     // USE_UFILESYS
 
-  WSContentSend_P (PSTR ("</div>\n"));        // choice
-  WSContentSend_P (PSTR ("</div>\n"));        // line
   WSContentSend_P (PSTR ("</form>\n"));
+  WSContentSend_P (PSTR ("</div></div>\n"));        // choice
+
+
+  WSContentSend_P (PSTR ("<div><div class='choice'>\n"));
+
+  // -----------------
+  //     Data type
+  // -----------------
+
+  if (period <= TELEINFO_PERIOD_WEEK)
+  {
+    for (index = 0; index <= TELEINFO_UNIT_COSPHI; index++)
+    {
+      // get unit label
+      GetTextIndexed (str_text, sizeof (str_text), index, kTeleinfoGraphDisplay);
+
+      // display selection
+      if (data != index) WSContentSend_P (PSTR ("<a href='%s?period=%u&data=%d&histo=%u&month=%u&phase=%s'>"), D_TELEINFO_PAGE_GRAPH, period, index, histo, month, str_phase);
+      WSContentSend_P (PSTR ("<div class='item data'>%s</div>"), str_text);
+      if (data != index) WSContentSend_P (PSTR ("</a>"));
+      WSContentSend_P (PSTR ("\n"));
+    }
+  }
+
+  // -------------------
+  //        Months 
+  // -------------------
+
+  else if (period == TELEINFO_PERIOD_YEAR)
+  {
+    for (counter = 1; counter <= 12; counter++)
+    {
+      // init
+      choice = counter;
+      strcpy (str_text, "");
+      GetTextIndexed (str_date, sizeof (str_date), counter, kTeleinfoYearMonth);
+
+      if (month == counter)
+      {
+        choice = 0;
+        strcpy_P (str_text, PSTR ("active"));
+      }
+
+      // display month selection
+      WSContentSend_P (PSTR ("<a href='%s?period=%u&data=%u&histo=%u&month=%u&phase=%s'>"), D_TELEINFO_PAGE_GRAPH, period, data, histo, choice, str_phase);
+      WSContentSend_P (PSTR ("<div class='item month %s'>%s</div>"), str_text, str_date);    
+      WSContentSend_P (PSTR ("</a>\n"), str_text, str_date);    
+    }
+  }
+
+  WSContentSend_P (PSTR ("</div></div>\n"));      // choice
+
+  // --------------------
+  //      Live Values 
+  // --------------------
+
+  WSContentSend_P (PSTR ("<div class='live'>\n"));
+  if (period == TELEINFO_PERIOD_LIVE)
+  {
+    for (phase = 0; phase < teleinfo_contract.phase; phase++)
+    {
+      // display phase inverted link
+      strlcpy (str_text, str_phase, sizeof (str_text));
+      display = (str_text[phase] != '0');
+      if (display) str_text[phase] = '0'; else str_text[phase] = '1';
+      WSContentSend_P (PSTR ("<a href='%s?period=%u&data=%u&histo=%u&month=%u&phase=%s'>"), D_TELEINFO_PAGE_GRAPH, period, data, histo, month, str_text);
+
+      // display phase data
+      if (display) strcpy (str_text, ""); else strcpy_P (str_text, PSTR ("disabled"));
+      WSContentSend_P (PSTR ("<div class='phase ph%u %s'>"), phase, str_text);    
+      TeleinfoDisplayCurrentValue (data, phase, str_text, sizeof (str_text));
+      WSContentSend_P (PSTR ("<span class='power' id='p%u'>%s</span>"), phase + 1, str_text);
+      WSContentSend_P (PSTR ("</div></a>\n"));
+    }
+  }
+  WSContentSend_P (PSTR ("</div>\n"));
 
   // -----------------
   //      Graph 
   // -----------------
 
-  // display graph base and data
   WSContentSend_P (PSTR ("<div class='svg-container'>\n"));
-  WSContentSend_P (PSTR ("<object class='svg-content' id='base' type='image/svg+xml' width='100%%' height='100%%' data='%s?period=%d&data=%d'></object>\n"), D_TELEINFO_PAGE_GRAPH_FRAME, period, data);
-  WSContentSend_P (PSTR ("<object class='svg-content' id='data' type='image/svg+xml' width='100%%' height='100%%' data='%s?period=%d&data=%d&histo=%d&phase=%s&ts=0'></object>\n"), D_TELEINFO_PAGE_GRAPH_DATA, period, data, histo, str_phase);
+  WSContentSend_P (PSTR ("<object class='svg-content' id='base' type='image/svg+xml' width='100%%' height='100%%' data='%s?period=%u&data=%u&month=%u'></object>\n"), D_TELEINFO_PAGE_GRAPH_FRAME, period, data, month);
+  WSContentSend_P (PSTR ("<object class='svg-content' id='data' type='image/svg+xml' width='100%%' height='100%%' data='%s?period=%u&data=%u&month=%u&histo=%u&phase=%s&ts=0'></object>\n"), D_TELEINFO_PAGE_GRAPH_DATA, period, data, month, histo, str_phase);
   WSContentSend_P (PSTR ("</div>\n"));
 
   // end of page
@@ -3621,4 +3966,3 @@ bool Xsns99 (uint8_t function)
 
 #endif      // USE_TELEINFO
 #endif      // USE_ENERGY_SENSOR
-#endif      // FIRMWARE_SAFEBOOT
