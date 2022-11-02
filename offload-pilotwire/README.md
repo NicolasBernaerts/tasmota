@@ -119,6 +119,7 @@ If you want to compile this firmware version, you just need to :
 
 Here is where you should place different files from this repository and from **tasmota/common** :
 * **platformio_override.ini**
+* lib/default/**ArduinoJson**
 * tasmota/**user_config_override.h**
 * tasmota/include/**tasmota.h**
 * tasmota/tasmota_drv_driver/**xdrv_01_9_webserver.ino**
