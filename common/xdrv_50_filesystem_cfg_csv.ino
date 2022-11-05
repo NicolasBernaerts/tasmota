@@ -27,7 +27,6 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef FIRMWARE_SAFEBOOT
 #ifdef USE_UFILESYS
 
 // partition constant
@@ -49,7 +48,7 @@ enum UfsCsvLineAction { UFS_CSV_NONE, UFS_CSV_NEXT, UFS_CSV_PREVIOUS };
  *            Configuration files
 \*********************************************/
 
-// read key value in configuration file
+// read key value in configuration file (key may be separated with = or ;)
 String UfsCfgLoadKey (const char* pstr_filename, const char* pstr_key) 
 {
   bool   finished = false;
@@ -75,9 +74,16 @@ String UfsCfgLoadKey (const char* pstr_filename, const char* pstr_key)
       length = file.readBytesUntil ('\n', str_line, sizeof (str_line));
       if (length > 0)
       {
-        // split resulting string
+        // set end of string
         str_line[length] = 0;
+
+        // search for '=' separator
         pstr_data = strchr (str_line, '=');
+
+        // if not found, search for ';' separator
+        if (pstr_data == nullptr) pstr_data = strchr (str_line, ';');
+
+        // if separator is found, compare key
         if (pstr_data != nullptr)
         {
           // separate key and value
@@ -217,15 +223,16 @@ bool UfsSeekToEnd (File &file)
 
 // extract specific column from given line (first column is 1)
 // return size of column string
-size_t UfsExtractCsvColumn (char* pstr_line, const char separator, int column, char* pstr_value, const size_t size_value, const bool till_end_of_line)
+size_t UfsExtractCsvColumn (const char* pstr_content, const char separator, int column, char* pstr_value, const size_t size_value, const bool till_end_of_line)
 {
   bool  search = true;
   int   index  = 0;
+  char *pstr_line  = (char*)pstr_content;
   char *pstr_start = pstr_line;
   char *pstr_stop  = nullptr;
 
   // check parameter
-  if ((pstr_line  == nullptr) || (pstr_value == nullptr)) return 0;
+  if ((pstr_content == nullptr) || (pstr_value == nullptr)) return 0;
 
   // loop to find column
   strcpy (pstr_value, "");
@@ -475,4 +482,3 @@ void UfsCleanupFileSystem (uint32_t size_minimum, const char* pstr_extension)
 }
 
 #endif    // USE_UFILESYS
-#endif    // FIRMWARE_SAFEBOOT
