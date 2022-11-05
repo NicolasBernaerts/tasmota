@@ -4,6 +4,7 @@
   Copyright (C) 2022  Theo Arends, Nicolas Bernaerts
 
     06/10/2022 - v1.0 - Creation
+    21/10/2022 - v1.1 - Add sandbox management (with day shift to have green/orange/red on current day)
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -59,7 +60,7 @@
 // extension data
 #define EXTENSION_NAME    "Ecowatt"           // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
-#define EXTENSION_VERSION "1.0"               // version
+#define EXTENSION_VERSION "1.1"               // version
 
 // MQTT default
 #undef MQTT_HOST
