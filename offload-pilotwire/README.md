@@ -50,8 +50,24 @@ It manages :
   * **presence detection** to lower thermostat in case of vacancy
   * **opened window detection** to cut power when window is opened
   * **night mode** to lower temperature at night
-  * **offload** mnagement
+  * **offload** management
   * **ecowatt** signal action to lower thermostat in case of risk of power cut
+
+Presence detection works as follow :
+
+  * Main rules
+    * if no movement sensor is present, movement is considered as permanent
+    * you can configure an **initial** timeout period in minutes
+    * you can configure a **no movement** timeout period in minutes
+  * When **Confort Mode** is set :
+    * when you set comfort mode, target temperature is set to comfort mode
+    * if there is no movement after **initial** timeout, target temperature is set to **eco** mode 
+    * as soon as there is a movement detected, target temperature is set to comfort mode
+    * if there is no movement after **no movement** timeout, target temperature is set to **eco** mode
+  * When **Confort Temperature** is changed :
+    * when you change comfort mode target temperature, target temperature is set back to comfort mode
+    * if there is no movement after **no movement** timeout, target temperature is set to **eco** mode
+ 
 
 **Pilotwire** has been tested on **Sonoff Basic** (1Mb), **ESP01** (1Mb), **Wemos D1 Mini** (4Mb) and **ESP32** (4Mb).
 
