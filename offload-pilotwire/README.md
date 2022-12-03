@@ -53,6 +53,12 @@ It manages :
   * **offload** management
   * **ecowatt** signal action to lower thermostat in case of risk of power cut
 
+**Pilotwire** has been tested on **Sonoff Basic** (1Mb), **ESP01** (1Mb), **Wemos D1 Mini** (4Mb) and **ESP32** (4Mb).
+
+Pilotwire protocol is described at http://www.radiateur-electrique.org/fil-pilote-radiateur.php
+
+### Presence Detection ###
+
 Presence detection works as follow :
 
   * Main rules
@@ -68,11 +74,6 @@ Presence detection works as follow :
     * when you change comfort mode target temperature, target temperature is set back to comfort mode
     * if there is no movement after **no movement** timeout, target temperature is set to **eco** mode
  
-
-**Pilotwire** has been tested on **Sonoff Basic** (1Mb), **ESP01** (1Mb), **Wemos D1 Mini** (4Mb) and **ESP32** (4Mb).
-
-Pilotwire protocol is described at http://www.radiateur-electrique.org/fil-pilote-radiateur.php
-
 ### Hardware setup ###
 
 You first need to connect a diode between your relay output and the heater's *fil pilote*
