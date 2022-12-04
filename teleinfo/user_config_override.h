@@ -71,6 +71,9 @@
     01/09/2022 - v9.9.2 - Add Tempo and Production mode (thanks to Sébastien)
     08/09/2022 - v9.9.3 - Correct publication synchronised with teleperiod
     26/10/2022 - v10.0  - Add monthly and yearly bar graph
+    06/11/2022 - v10.1  - Bug fixes on monthly and yearly graph
+                          Change in lltoa conversion
+    15/11/2022 - v10.2  - Add daily bar graph
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -143,7 +146,7 @@
 // extension data
 #define EXTENSION_NAME    "Teleinfo"          // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
-#define EXTENSION_VERSION "10.0"              // version
+#define EXTENSION_VERSION "10.2"              // version
 
 // MQTT default
 #undef MQTT_HOST
@@ -155,7 +158,7 @@
 #undef MQTT_PASS
 #define MQTT_PASS          ""
 #undef MQTT_TOPIC
-#define MQTT_TOPIC         "compteur"
+#define MQTT_TOPIC         "teleinfo"
 #undef MQTT_FULLTOPIC
 #define MQTT_FULLTOPIC     "%topic%/%prefix%/"
 #undef FRIENDLY_NAME
