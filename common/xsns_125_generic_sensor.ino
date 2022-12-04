@@ -141,13 +141,13 @@ sensor_mqtt sensor_config[SENSOR_TYPE_MAX];       // remote sensors configuratio
 // status
 struct sensor_data
 {
+  bool     flag;                                  // current sensor flag
   float    value;                                 // current sensor value
   uint8_t  source;                                // source of data (local sensor type)
   uint32_t delay;                                 // delay since last update
 };
 struct {
-  bool     publish_json     = false;              // flag to publish JSON
-  uint32_t presence_counter = 0;                  // presence detection counter
+  bool publish_json = false;                      // flag to publish JSON
   sensor_data type[SENSOR_TYPE_MAX];              // sensor types
 } sensor_status;
 
@@ -165,6 +165,7 @@ void SensorInit ()
   {
     sensor_status.type[sensor].source = SENSOR_SOURCE_MAX;
     sensor_status.type[sensor].value  = NAN;
+    sensor_status.type[sensor].flag   = false;
     sensor_status.type[sensor].delay  = UINT32_MAX;
   }
 
@@ -493,34 +494,15 @@ uint8_t SensorTemperatureSource (char* pstr_source, size_t size_source)
 float SensorTemperatureRead () { return SensorTemperatureRead (SENSOR_TIMEOUT_TEMPERATURE); }
 float SensorTemperatureRead (uint32_t timeout)
 {
-  uint32_t index;
-  float    value = NAN;
+  float value = sensor_status.type[SENSOR_TYPE_TEMP].value;
 
-  switch (sensor_status.type[SENSOR_TYPE_TEMP].source)
-  { 
-    case SENSOR_SOURCE_DSB:
-#ifdef ESP8266
-      Ds18x20Read (0);
-      index = ds18x20_sensor[0].index;
-      value = ds18x20_sensor[index].temperature;
-#else
-      Ds18x20Read (0, value);
-#endif
-      break;
-
-    case SENSOR_SOURCE_DHT:
-      value = Dht[0].t;
-      break;
-
-    case SENSOR_SOURCE_REMOTE:
-      if (sensor_status.type[SENSOR_TYPE_TEMP].delay == UINT32_MAX) value = NAN;
+  // handle timeout in case of remote sensor
+  if (sensor_status.type[SENSOR_TYPE_TEMP].source == SENSOR_SOURCE_REMOTE)
+  {
+    // if temperature has never been read or after timeout
+    if (sensor_status.type[SENSOR_TYPE_TEMP].delay == UINT32_MAX) value = NAN;
       else if (sensor_status.type[SENSOR_TYPE_TEMP].delay > timeout) value = NAN;
-      else value = sensor_status.type[SENSOR_TYPE_TEMP].value + ((float)Settings->temp_comp / 10);
-      break;
   }
-
-  // truncate temperature to 0.1 °C
-  if (!isnan (value)) value = round (value * 10) / 10;
 
   return value;
 }
@@ -542,22 +524,15 @@ uint8_t SensorHumiditySource (char* pstr_source, size_t size_source)
 float SensorHumidityRead () { return SensorHumidityRead (SENSOR_TIMEOUT_HUMIDITY); }
 float SensorHumidityRead (uint32_t timeout)
 {
-  float value = NAN;
+  float value = sensor_status.type[SENSOR_TYPE_HUMI].value;
 
-  switch (sensor_status.type[SENSOR_TYPE_HUMI].source)
-  { 
-    case SENSOR_SOURCE_DHT:
-      value = Dht[0].h;
-      break;
-    case SENSOR_SOURCE_REMOTE:
-      if (sensor_status.type[SENSOR_TYPE_HUMI].delay == UINT32_MAX) value = NAN;
+  // handle timeout in case of remote sensor
+  if (sensor_status.type[SENSOR_TYPE_HUMI].source == SENSOR_SOURCE_REMOTE)
+  {
+    // if humidity has never been read or after timeout
+    if (sensor_status.type[SENSOR_TYPE_HUMI].delay == UINT32_MAX) value = NAN;
       else if (sensor_status.type[SENSOR_TYPE_HUMI].delay > timeout) value = NAN;
-      else value = sensor_status.type[SENSOR_TYPE_HUMI].value;
-      break;
   }
-
-  // truncate humidity to 0.1 %
-  if (!isnan (value)) value = round (value * 10) / 10;
 
   return value;
 }
@@ -584,11 +559,9 @@ bool SensorPresenceDetected (uint32_t timeout)
   // if movement detection sensor is available
   if (sensor_status.type[SENSOR_TYPE_PRES].source != SENSOR_SOURCE_MAX)
   {
-    // if movement has never been detected 
+    // if movement has never been detected or after timeout
     if (sensor_status.type[SENSOR_TYPE_PRES].delay == UINT32_MAX) result = false;
-
-    // else movement detected within timeout
-    else if (sensor_status.type[SENSOR_TYPE_PRES].delay > timeout) result = false;
+      else if (sensor_status.type[SENSOR_TYPE_PRES].delay > timeout) result = false;
   }
 
   return result;
@@ -609,11 +582,13 @@ void SensorPresenceResetDetection ()
 // update sensor condition every second
 void SensorEverySecond ()
 {
-  bool sensor   = false;
-  bool presence = false;
-  bool publish  = false;
+  bool     presence = false;
+  bool     publish  = false;
+  uint32_t sensor, index;
 
-  // handle local temperature sensor
+  // ------------------------
+  // local temperature sensor
+  // ------------------------
   if ((sensor_status.type[SENSOR_TYPE_TEMP].source != SENSOR_SOURCE_MAX) && (sensor_status.type[SENSOR_TYPE_TEMP].source != SENSOR_SOURCE_REMOTE))
   {
     // first reading
@@ -622,16 +597,41 @@ void SensorEverySecond ()
     // if needed, read temperature
     if (sensor_status.type[SENSOR_TYPE_TEMP].delay == 0)
     {
-      SensorTemperatureRead ();
+      switch (sensor_status.type[SENSOR_TYPE_TEMP].source)
+      { 
+        case SENSOR_SOURCE_DSB:
+#ifdef ESP8266
+          for (sensor = 0; sensor < DS18X20Data.sensors; sensor++)
+          {
+            index = ds18x20_sensor[sensor].index;
+            if (ds18x20_sensor[index].valid) sensor_status.type[SENSOR_TYPE_TEMP].value = ds18x20_sensor[index].temperature;
+          }
+#else
+          Ds18x20Read (0, sensor_status.type[SENSOR_TYPE_TEMP].value);
+#endif
+          break;
+
+        case SENSOR_SOURCE_DHT:
+          sensor_status.type[SENSOR_TYPE_TEMP].value = Dht[0].t;
+          break;
+      }
+
+      // truncate temperature to 0.1 °C
+      if (!isnan (sensor_status.type[SENSOR_TYPE_TEMP].value)) sensor_status.type[SENSOR_TYPE_TEMP].value = round (sensor_status.type[SENSOR_TYPE_TEMP].value * 10) / 10;
+
+      // publish change
       publish = true;
     }
-
+ 
     // update delay
-    sensor_status.type[SENSOR_TYPE_TEMP].delay = (sensor_status.type[SENSOR_TYPE_TEMP].delay + 1) % SENSOR_TIMEOUT_TEMPERATURE;
+    sensor_status.type[SENSOR_TYPE_TEMP].delay++;
+    sensor_status.type[SENSOR_TYPE_TEMP].delay = sensor_status.type[SENSOR_TYPE_TEMP].delay % SENSOR_TIMEOUT_TEMPERATURE;
   }
 
-  // handle local humidity sensor
-  if ((sensor_status.type[SENSOR_TYPE_HUMI].source != SENSOR_SOURCE_MAX) && (sensor_status.type[SENSOR_TYPE_HUMI].source == SENSOR_SOURCE_REMOTE))
+  // ---------------------
+  // local humidity sensor
+  // ---------------------
+  if ((sensor_status.type[SENSOR_TYPE_HUMI].source != SENSOR_SOURCE_MAX) && (sensor_status.type[SENSOR_TYPE_HUMI].source != SENSOR_SOURCE_REMOTE))
   {
     // first reading
     if (sensor_status.type[SENSOR_TYPE_HUMI].delay == UINT32_MAX) sensor_status.type[SENSOR_TYPE_HUMI].delay = 0;
@@ -639,61 +639,68 @@ void SensorEverySecond ()
     // if needed, read temperature
     if (sensor_status.type[SENSOR_TYPE_HUMI].delay == 0)
     {
-      SensorHumidityRead ();
+      switch (sensor_status.type[SENSOR_TYPE_HUMI].source)
+      { 
+        case SENSOR_SOURCE_DHT:
+          sensor_status.type[SENSOR_TYPE_HUMI].value = Dht[0].h;
+          break;
+      }
+
+      // truncate humidity to 0.1 %
+      if (!isnan (sensor_status.type[SENSOR_TYPE_HUMI].value)) sensor_status.type[SENSOR_TYPE_HUMI].value = round (sensor_status.type[SENSOR_TYPE_HUMI].value * 10) / 10;
+
+      // publish change
       publish = true;
     }
 
     // update delay
-    sensor_status.type[SENSOR_TYPE_HUMI].delay = (sensor_status.type[SENSOR_TYPE_HUMI].delay + 1) % SENSOR_TIMEOUT_HUMIDITY;
+    sensor_status.type[SENSOR_TYPE_HUMI].delay++;
+    sensor_status.type[SENSOR_TYPE_HUMI].delay = sensor_status.type[SENSOR_TYPE_HUMI].delay % SENSOR_TIMEOUT_HUMIDITY;
   }
 
-  // handle local presence sensor
-  switch (sensor_status.type[SENSOR_TYPE_PRES].source)
+  // ---------------------
+  // local presence sensor
+  // ---------------------
+  if ((sensor_status.type[SENSOR_TYPE_PRES].source != SENSOR_SOURCE_MAX) && (sensor_status.type[SENSOR_TYPE_PRES].source != SENSOR_SOURCE_REMOTE))
   {
-    // generic sensor
-    case SENSOR_SOURCE_INPUT:
-      sensor   = true;
-      presence = digitalRead (Pin (GPIO_INPUT, 0));
-      break;
-
-#ifdef USE_HLKLD11
-    case SENSOR_SOURCE_SERIAL:
-      sensor   = true;
-      presence = HLKLDGetDetectionStatus (HLKLD_DATA_ANY, 1);
-      break;
-#endif
-  }
-
-  // if sensor is present
-  if (sensor)
-  {
-    // if first detection, publish value
-    if (sensor_status.type[SENSOR_TYPE_PRES].delay == UINT32_MAX) publish = true;
-
-    // if presence is currently detected
-    if (presence)
+    // handle local presence sensor
+    switch (sensor_status.type[SENSOR_TYPE_PRES].source)
     {
-      // if last detection was before timeout, publish value
-      if ((sensor_status.type[SENSOR_TYPE_PRES].value == 0) && (sensor_status.type[SENSOR_TYPE_PRES].delay > SENSOR_TIMEOUT_PRESENCE)) publish = true;
+      // generic sensor
+      case SENSOR_SOURCE_INPUT:
+        presence = digitalRead (Pin (GPIO_INPUT, 0));
+        break;
 
-      // update sensor value
-      sensor_status.type[SENSOR_TYPE_PRES].delay = 0;
-      sensor_status.type[SENSOR_TYPE_PRES].value = 1;
+  #ifdef USE_HLKLD11
+      case SENSOR_SOURCE_SERIAL:
+        presence = HLKLDGetDetectionStatus (HLKLD_DATA_ANY, 1);
+        break;
+  #endif
     }
 
-    // else, no presence detected
-    else 
+    // increase detection delay
+    sensor_status.type[SENSOR_TYPE_PRES].delay++;
+
+    // if presence newly detected, publish
+    if (presence && (sensor_status.type[SENSOR_TYPE_PRES].value == 0)) publish = true;
+
+    // if no presence detected since timeout, reset presence
+    if (!presence && (sensor_status.type[SENSOR_TYPE_PRES].value != 0) && (sensor_status.type[SENSOR_TYPE_PRES].delay >= SENSOR_TIMEOUT_PRESENCE))
     {
       sensor_status.type[SENSOR_TYPE_PRES].value = 0;
-      sensor_status.type[SENSOR_TYPE_PRES].delay++;
+      publish = true;
     }
 
-    // if timeout reached, publish value
-    if (sensor_status.type[SENSOR_TYPE_PRES].delay % SENSOR_TIMEOUT_PRESENCE == 0) publish = true;
+    // if presence detected, declare it
+    if (presence)
+    {
+      sensor_status.type[SENSOR_TYPE_PRES].value = 1;
+      sensor_status.type[SENSOR_TYPE_PRES].delay = 0;
+    }
   }
 
   // if needed, publish sensor values
-  if (publish) OffloadShowJSON (true);
+  if (publish) SensorShowJSON (true);
 }
 
 // Show JSON status (for MQTT)
@@ -701,7 +708,7 @@ void SensorShowJSON (bool is_autonomous)
 {
   bool temperature, humidity, presence;
   bool first = true;
-  char str_value[8];
+  char str_value[16];
 
   // check if sensors are available
   temperature = (sensor_status.type[SENSOR_TYPE_TEMP].source != SENSOR_SOURCE_MAX);
@@ -734,9 +741,17 @@ void SensorShowJSON (bool is_autonomous)
     // presence
     if (presence)
     {
-      ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%00_f"), &sensor_status.type[SENSOR_TYPE_HUMI].value);
+      // detection state
+      ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%00_f"), &sensor_status.type[SENSOR_TYPE_PRES].value);
       if (!first) ResponseAppend_P (PSTR (","));
       ResponseAppend_P (PSTR ("\"pres\":%s"), str_value);
+
+      // delay in seconds
+      ResponseAppend_P (PSTR (",\"pres-delay\":%u"), sensor_status.type[SENSOR_TYPE_PRES].delay);
+
+      // since in readable format
+      SensorGetDelayText (sensor_status.type[SENSOR_TYPE_PRES].delay, str_value, sizeof (str_value));
+      ResponseAppend_P (PSTR (",\"pres-since\":\"%s\""), str_value);
     }
 
     // publish it if message is autonomous
@@ -837,7 +852,7 @@ bool SensorMqttData ()
 
       // save remote value
       sensor_status.type[SENSOR_TYPE_TEMP].delay = 0;
-      sensor_status.type[SENSOR_TYPE_TEMP].value = atof (str_value);
+      sensor_status.type[SENSOR_TYPE_TEMP].value = atof (str_value) + ((float)Settings->temp_comp / 10);
 
       // log
       is_found = true;

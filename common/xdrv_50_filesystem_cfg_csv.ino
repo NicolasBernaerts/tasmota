@@ -14,6 +14,8 @@
     27/07/2022 - v1.4 - Use String to report strings
     31/08/2022 - v1.5 - Handle empty lines in CSV
     29/09/2022 - v1.6 - Rework of CSV files handling
+    09/11/2022 - v1.7 - Add long long handling in config file
+                        Remove filesystem cleanup as it can create deadlock
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -29,16 +31,9 @@
 
 #ifdef USE_UFILESYS
 
-// partition constant
-#define UFS_PARTITION_MIN_KB            25                  // minimum free space in USF partition (kb)
-
 // configuration file constant
 #define UFS_CFG_LINE_LENGTH             128                 // maximum size of a configuration line
-#define UFS_CFG_VALUE_MAX               16                  // maximum size of a numerical value (int or float)
-
-// CSV file constant
-#define UFS_CSV_LINE_LENGTH             128                 // maximum line length in CSV files
-#define UFS_CSV_COLUMN_MAX              32                  // maximum number of columns in CSV files
+#define UFS_CFG_VALUE_MAX               22                  // maximum size of a numerical value (int, long, long long or float)
 
 // action when reading a CSV line
 enum UfsCsvAccessType { UFS_CSV_ACCESS_READ, UFS_CSV_ACCESS_WRITE, UFS_CSV_ACCESS_MAX };
@@ -72,7 +67,8 @@ String UfsCfgLoadKey (const char* pstr_filename, const char* pstr_key)
     do
     {
       length = file.readBytesUntil ('\n', str_line, sizeof (str_line));
-      if (length > 0)
+      finished = (length == 0);
+      if (!finished)
       {
         // set end of string
         str_line[length] = 0;
@@ -97,7 +93,6 @@ String UfsCfgLoadKey (const char* pstr_filename, const char* pstr_key)
           if (found) str_value = pstr_data;
         }
       }
-      else finished = true;
     } while (!finished && !found);
 
     // close file
@@ -129,6 +124,19 @@ long UfsCfgLoadKeyLong (const char* pstr_filename, const char* pstr_key, const l
   // open file in read only mode in littlefs filesystem
   str_result = UfsCfgLoadKey (pstr_filename, pstr_key);
   if (str_result.length () > 0) result = str_result.toInt ();
+
+  return result;
+}
+
+// read long key value in configuration file
+long long UfsCfgLoadKeyLongLong (const char* pstr_filename, const char* pstr_key, const long long default_value) 
+{
+  long long result = default_value;
+  String    str_result;
+  
+  // open file in read only mode in littlefs filesystem
+  str_result = UfsCfgLoadKey (pstr_filename, pstr_key);
+  if (str_result.length () > 0) result = atoll (str_result.c_str ());
 
   return result;
 }
@@ -167,7 +175,7 @@ void UfsCfgSaveKey (const char* pstr_filename, const char* pstr_key, const char*
   file.close ();
 }
 
-// save key value in configuration file
+// save int as a key in configuration file
 void UfsCfgSaveKeyInt (const char* pstr_filename, const char* pstr_key, const int value, bool create) 
 {
   char str_value[UFS_CFG_VALUE_MAX];
@@ -177,7 +185,7 @@ void UfsCfgSaveKeyInt (const char* pstr_filename, const char* pstr_key, const in
   UfsCfgSaveKey (pstr_filename, pstr_key, str_value, create);
 }
 
-// save key value in configuration file
+// save long as a key in configuration file
 void UfsCfgSaveKeyLong (const char* pstr_filename, const char* pstr_key, const long value, bool create) 
 {
   char str_value[UFS_CFG_VALUE_MAX];
@@ -187,7 +195,37 @@ void UfsCfgSaveKeyLong (const char* pstr_filename, const char* pstr_key, const l
   UfsCfgSaveKey (pstr_filename, pstr_key, str_value, create);
 }
 
-// save key value in configuration file
+// save long long as a key in configuration file
+void UfsCfgSaveKeyLongLong (const char* pstr_filename, const char* pstr_key, const long long value, bool create) 
+{
+  lldiv_t result;
+  char    str_value[12];
+  char    str_result[UFS_CFG_VALUE_MAX];
+
+  // if needed convert upper digits
+  result = lldiv (value, 10000000000000000LL);
+  if (result.quot != 0) ltoa ((long)result.quot, str_value, 10);
+    else strcpy (str_result, "");
+
+  // convert middle digits
+  result = lldiv (result.rem, 100000000LL);
+  if (result.quot != 0)
+  {
+    if (strlen (str_result) == 0) ltoa ((long)result.quot, str_value, 10);
+      else sprintf_P (str_value, PSTR ("%08d"), (long)result.quot);
+    strlcat (str_result, str_value, sizeof (str_result));
+  }
+
+  // convert lower digits
+  if (strlen (str_result) == 0) ltoa ((long)result.rem, str_value, 10);
+    else sprintf_P (str_value, PSTR ("%08d"), (long)result.rem);
+  strlcat (str_result, str_value, sizeof(str_result));
+
+  // save key = value
+  UfsCfgSaveKey (pstr_filename, pstr_key, str_result, create);
+}
+
+// save float as a key in configuration file
 void UfsCfgSaveKeyFloat (const char* pstr_filename, const char* pstr_key, const float value, bool create) 
 {
   char str_value[UFS_CFG_VALUE_MAX];
@@ -424,61 +462,6 @@ uint32_t UfsGetFileSizeKb (const char* pstr_filename)
   }
 
   return file_size;
-}
-
-// cleanup filesystem from oldest CSV files according to free size left (in Kb)
-void UfsCleanupFileSystem (uint32_t size_minimum, const char* pstr_extension) 
-{
-  bool     removal_done = true;
-  uint32_t size_available;
-  time_t   file_time;
-  char     str_filename[UFS_FILENAME_SIZE];
-  File     root_dir; 
-
-  // open root directory
-  root_dir = dfsp->open ("/", UFS_FILE_READ);
-
-  // loop till minimum space is available
-  size_available = UfsInfo (1, 0);
-  while (removal_done && (size_available < size_minimum))
-  {
-    // init
-    removal_done = false;
-    strcpy (str_filename, "");
-    file_time = time (NULL);
-
-    // loop thru filesystem to get oldest CSV file
-    while (true) 
-    {
-      // read next file
-      File current_file = root_dir.openNextFile();
-      if (!current_file) break;
-
-      // check if file is candidate for removal
-      if ((strstr (current_file.name (), pstr_extension) != nullptr) && (current_file.getLastWrite () < file_time))
-      {
-        strcpy (str_filename, "/");
-        strlcat (str_filename, current_file.name (), sizeof (str_filename));
-        file_time = current_file.getLastWrite ();
-      }
-
-      // close file
-      current_file.close ();
-    }
-
-    // remove oldest CSV file
-    if (strlen (str_filename) > 0) removal_done = ffsp->remove (str_filename);
-    if (removal_done) AddLog (LOG_LEVEL_INFO, PSTR ("UFS: Purged %s"), str_filename);
-
-    // read new space left
-    size_available = UfsInfo (1, 0);
-
-    // give control back to system to avoid watchdog
-    yield ();
-  }
-
-  // close directory
-  root_dir.close ();
 }
 
 #endif    // USE_UFILESYS
