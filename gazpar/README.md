@@ -4,39 +4,30 @@ Gazpar Tasmota firmware
 Presentation
 ------------
 
-This evolution of **Tasmota 12** firmware has been enhanced to handle France gaz meters known as **Gazpar** using a druy contact counter.
+This evolution of **Tasmota 12** firmware has been enhanced to handle France gaz meters known as **Gazpar** using a dry contact counter.
 
 It is compatible with **ESP8266** chipsets.
  
-Some of these firmware versions are using a LittleFS partition to store graph data. Il allows to keep historical data over reboots.
+This firmware uses LittleFS partition to store graph data. Il allows to keep historical data over reboots.
 To take advantage of this feature, make sure to follow partitioning procedure given in the **readme** of the **binary** folder.
 
 This firmware provides some extra Web page on the device :
-  * **/graph** : live, daily and weekly graphs
-
-It also provides :
-  * a FTP server to easily retrieve historical data files
+  * **/graph** : yearly, monthly and daily graphs
 
 Pre-compiled versions are available in the [**binary**](https://github.com/NicolasBernaerts/tasmota/tree/master/gazpar/binary) folder.
 
 Configuration
 -------------
 
-Gazpar impulse connector should be declared as Counter 1
+Gazpar impulse connector should be declared as **Counter 1**
 
-To be on the safe side and to avoid false trigger, set :
+To be on the safe side and to avoid false triggering, it's better to configure debounce :
 
     # CounterDebounce 150
     # CounterDebounceHigh 50
     # CounterDebounceLow 50
 
-If LittleFS partition is available, config is stored in /gazpar.cfg
-If no partition is available, settings are stored using **Settings** parameters :
-
-  - Settings->weight_max = Coefficient de conversion from m3 to kWh (x100). This coefficient is available from https://www.grdf.fr/particuliers/coefficient-conversion-commune
-  - Settings->weight_item        = Counter at start of current year
-  - Settings->weight_reference   = Counter at start of current month
-  - Settings->weight_calibration = Counter at start of current day
+In LittleFS partition, config is stored in /gazpar.cfg
 
 Compilation
 -----------
