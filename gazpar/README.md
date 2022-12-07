@@ -52,3 +52,7 @@ Here is where you should place different files from this repository and from **t
 
 If everything goes fine, you should be able to compile your own build.
 
+
+ ![Grah yearly](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/gazpar/screen/gazpar-graph-year.png)
+ 
+ ![Grah monthly](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/gazpar/screen/gazpar-graph-month.png)
