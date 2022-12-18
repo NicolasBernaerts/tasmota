@@ -22,7 +22,6 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef FIRMWARE_SAFEBOOT
 #ifdef USE_HLKLD11
 
 #include <TasmotaSerial.h>
@@ -748,7 +747,7 @@ void HLKLDShowJSON (bool append)
     GetTextIndexed (str_text, sizeof (str_text), hlkld_device.model, HLKLDModelName);
     ResponseAppend_P (PSTR (",\"Model\":\"%s\""), str_text);
 
-    // add , if needed
+    // convert config as JSON
     if (hlkld_status.str_config.length () > 0)
     {
       // trasnform config as JSON string
@@ -803,7 +802,8 @@ void HLKLDWebSensor ()
   }
 
   // display mov or global status
-  if (hlkld_status.display_all) info_type = HLKLD_DATA_MOV; else info_type = HLKLD_DATA_ANY;
+  if (hlkld_status.display_all) info_type = HLKLD_DATA_MOV;
+    else info_type = HLKLD_DATA_ANY;
   GetTextIndexed (str_icon, sizeof (str_icon), info_type, HLKLDDataIcon);
   HLKLDGetDelayText (info_type, str_text, sizeof (str_text));
   WSContentSend_P (PSTR ("%s %s{e}"), str_icon, str_text);
@@ -1142,11 +1142,10 @@ bool Xsns124 (uint8_t function)
 #endif  // USE_HLKLD11_WEB_CONFIG
 
 #endif  // USE_WEBSERVER
-
   }
 
   return result;
 }
 
 #endif      // USE_HLKLD11
-#endif      // FIRMWARE_SAFEBOOT
+

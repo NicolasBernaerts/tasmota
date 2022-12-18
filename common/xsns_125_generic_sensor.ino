@@ -42,7 +42,7 @@
   Handled local sensor are :
     * Temperature = DHT11, AM2301, SI7021 or DS18x20
     * Humidity    = DHT11, AM2301, SI7021
-    * Presence    = Generic presence/movement detector declared as Input 1
+    * Presence    = Generic presence/movement detector declared as Counter 1
                     HLK-LD1115 or HLK-LD1125 connected thru serial port (Rx and Tx)
     
   This program is free software: you can redistribute it and/or modify
@@ -57,16 +57,15 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef FIRMWARE_SAFEBOOT
 #ifdef USE_GENERIC_SENSOR
 
 #define XSNS_125                      125
 
 #include <ArduinoJson.h>
 
-#define SENSOR_TIMEOUT_TEMPERATURE    30            // temperature default validity (in sec.)
-#define SENSOR_TIMEOUT_HUMIDITY       30            // humidity default validity (in sec.)
-#define SENSOR_TIMEOUT_PRESENCE       30            // presence default validity (in sec.)
+#define SENSOR_TIMEOUT_TEMPERATURE    3600            // temperature default validity (in sec.)
+#define SENSOR_TIMEOUT_HUMIDITY       3600            // humidity default validity (in sec.)
+#define SENSOR_TIMEOUT_PRESENCE       3600            // presence default validity (in sec.)
 
 #define SENSOR_TEMP_DRIFT_MAX         10
 #define SENSOR_TEMP_DRIFT_STEP        0.1
@@ -112,7 +111,7 @@
 enum SensorType { SENSOR_TYPE_TEMP, SENSOR_TYPE_HUMI, SENSOR_TYPE_PRES, SENSOR_TYPE_MAX };
 
 // remote sensor sources
-enum SensorSource { SENSOR_SOURCE_DSB, SENSOR_SOURCE_DHT, SENSOR_SOURCE_INPUT, SENSOR_SOURCE_SERIAL, SENSOR_SOURCE_REMOTE, SENSOR_SOURCE_MAX };
+enum SensorSource { SENSOR_SOURCE_DSB, SENSOR_SOURCE_DHT, SENSOR_SOURCE_COUNTER, SENSOR_SOURCE_SERIAL, SENSOR_SOURCE_REMOTE, SENSOR_SOURCE_NONE };
 const char kSensorSource[] PROGMEM = "Local|Local|Local|Local|Local|Remote|Undef.";                                                           // device source labels
 
 // remote sensor commands
@@ -129,26 +128,20 @@ const char SENSOR_FIELD_CONFIG[]   PROGMEM = "<p>%s (%s)<span class='key'>%s</sp
  *               Variables
 \*************************************************/
 
-// configuration
-struct sensor_mqtt
-{
-  uint16_t timeout;                               // data publication timeout
-  String   topic;                                 // remote sensor topic
-  String   key;                                   // remote sensor key
-};
-sensor_mqtt sensor_config[SENSOR_TYPE_MAX];       // remote sensors configuration
-
-// status
+// sensor data
 struct sensor_data
 {
-  bool     flag;                                  // current sensor flag
-  float    value;                                 // current sensor value
   uint8_t  source;                                // source of data (local sensor type)
-  uint32_t delay;                                 // delay since last update
+  uint16_t timeout;                               // data publication timeout
+  uint32_t update;                                // last time sensor was updated
+  float    mqtt_value;                            // current remote sensor value
+  String   mqtt_topic;                            // remote sensor topic
+  String   mqtt_key;                              // remote sensor key
 };
 struct {
-  bool publish_json = false;                      // flag to publish JSON
   sensor_data type[SENSOR_TYPE_MAX];              // sensor types
+  uint32_t counter     = UINT32_MAX;              // sensor counter
+  uint32_t time_ignore = 0;                       // timestamp to ignore sensor update
 } sensor_status;
 
 /**************************************************\
@@ -163,10 +156,9 @@ void SensorInit ()
   // init remote sensor values
   for (sensor = 0; sensor < SENSOR_TYPE_MAX; sensor ++)
   {
-    sensor_status.type[sensor].source = SENSOR_SOURCE_MAX;
-    sensor_status.type[sensor].value  = NAN;
-    sensor_status.type[sensor].flag   = false;
-    sensor_status.type[sensor].delay  = UINT32_MAX;
+    sensor_status.type[sensor].source = SENSOR_SOURCE_NONE;
+    sensor_status.type[sensor].update = UINT32_MAX;
+    sensor_status.type[sensor].mqtt_value = NAN;
   }
 
   // check for DHT11 sensor
@@ -204,9 +196,10 @@ void SensorInit ()
   }
 
   // presence : check for generic sensor
-  if (PinUsed (GPIO_INPUT, SENSOR_MOVEMENT_INDEX))
+  if (PinUsed (GPIO_CNTR1, SENSOR_MOVEMENT_INDEX))
   {
-    sensor_status.type[SENSOR_TYPE_PRES].source = SENSOR_SOURCE_INPUT;
+    sensor_status.type[SENSOR_TYPE_PRES].source = SENSOR_SOURCE_COUNTER;
+    sensor_status.counter = RtcSettings.pulse_counter[0];
     AddLog (LOG_LEVEL_INFO, PSTR ("SEN: %s presence sensor detected"), "Generic");
   }
 
@@ -238,16 +231,16 @@ void SensorLoadConfig ()
 #ifdef USE_UFILESYS
 
   // retrieve saved settings from flash filesystem
-  sensor_config[SENSOR_TYPE_TEMP].topic   = UfsCfgLoadKey    (D_SENSOR_FILE_CFG, D_CMND_SENSOR_TEMP_TOPIC);
-  sensor_config[SENSOR_TYPE_TEMP].key     = UfsCfgLoadKey    (D_SENSOR_FILE_CFG, D_CMND_SENSOR_TEMP_KEY);
-  sensor_config[SENSOR_TYPE_HUMI].topic   = UfsCfgLoadKey    (D_SENSOR_FILE_CFG, D_CMND_SENSOR_HUMI_TOPIC);
-  sensor_config[SENSOR_TYPE_HUMI].key     = UfsCfgLoadKey    (D_SENSOR_FILE_CFG, D_CMND_SENSOR_HUMI_KEY);
-  sensor_config[SENSOR_TYPE_PRES].topic   = UfsCfgLoadKey    (D_SENSOR_FILE_CFG, D_CMND_SENSOR_PRES_TOPIC);
-  sensor_config[SENSOR_TYPE_PRES].key     = UfsCfgLoadKey    (D_SENSOR_FILE_CFG, D_CMND_SENSOR_PRES_KEY);
+  sensor_status.type[SENSOR_TYPE_TEMP].mqtt_topic   = UfsCfgLoadKey    (D_SENSOR_FILE_CFG, D_CMND_SENSOR_TEMP_TOPIC);
+  sensor_status.type[SENSOR_TYPE_TEMP].mqtt_key     = UfsCfgLoadKey    (D_SENSOR_FILE_CFG, D_CMND_SENSOR_TEMP_KEY);
+  sensor_status.type[SENSOR_TYPE_HUMI].mqtt_topic   = UfsCfgLoadKey    (D_SENSOR_FILE_CFG, D_CMND_SENSOR_HUMI_TOPIC);
+  sensor_status.type[SENSOR_TYPE_HUMI].mqtt_key     = UfsCfgLoadKey    (D_SENSOR_FILE_CFG, D_CMND_SENSOR_HUMI_KEY);
+  sensor_status.type[SENSOR_TYPE_PRES].mqtt_topic   = UfsCfgLoadKey    (D_SENSOR_FILE_CFG, D_CMND_SENSOR_PRES_TOPIC);
+  sensor_status.type[SENSOR_TYPE_PRES].mqtt_key     = UfsCfgLoadKey    (D_SENSOR_FILE_CFG, D_CMND_SENSOR_PRES_KEY);
 
-  sensor_config[SENSOR_TYPE_TEMP].timeout = UfsCfgLoadKeyInt (D_SENSOR_FILE_CFG, D_CMND_SENSOR_TEMP_TIMEOUT, SENSOR_TIMEOUT_TEMPERATURE);
-  sensor_config[SENSOR_TYPE_HUMI].timeout = UfsCfgLoadKeyInt (D_SENSOR_FILE_CFG, D_CMND_SENSOR_HUMI_TIMEOUT, SENSOR_TIMEOUT_HUMIDITY);
-  sensor_config[SENSOR_TYPE_PRES].timeout = UfsCfgLoadKeyInt (D_SENSOR_FILE_CFG, D_CMND_SENSOR_PRES_TIMEOUT, SENSOR_TIMEOUT_PRESENCE);
+  sensor_status.type[SENSOR_TYPE_TEMP].timeout = UfsCfgLoadKeyInt (D_SENSOR_FILE_CFG, D_CMND_SENSOR_TEMP_TIMEOUT, SENSOR_TIMEOUT_TEMPERATURE);
+  sensor_status.type[SENSOR_TYPE_HUMI].timeout = UfsCfgLoadKeyInt (D_SENSOR_FILE_CFG, D_CMND_SENSOR_HUMI_TIMEOUT, SENSOR_TIMEOUT_HUMIDITY);
+  sensor_status.type[SENSOR_TYPE_PRES].timeout = UfsCfgLoadKeyInt (D_SENSOR_FILE_CFG, D_CMND_SENSOR_PRES_TIMEOUT, SENSOR_TIMEOUT_PRESENCE);
 
   // log
   AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Config from LittleFS"));
@@ -255,16 +248,16 @@ void SensorLoadConfig ()
 #else       // No LittleFS
 
   // retrieve saved settings from flash memory
-  sensor_config[SENSOR_TYPE_TEMP].topic = SettingsText (SET_SENSOR_TEMP_TOPIC);
-  sensor_config[SENSOR_TYPE_TEMP].key   = SettingsText (SET_SENSOR_TEMP_KEY);
-  sensor_config[SENSOR_TYPE_HUMI].topic = SettingsText (SET_SENSOR_HUMI_TOPIC);
-  sensor_config[SENSOR_TYPE_HUMI].key   = SettingsText (SET_SENSOR_HUMI_KEY);
-  sensor_config[SENSOR_TYPE_PRES].topic = SettingsText (SET_SENSOR_MOVE_TOPIC);
-  sensor_config[SENSOR_TYPE_PRES].key   = SettingsText (SET_SENSOR_MOVE_KEY);
+  sensor_status.type[SENSOR_TYPE_TEMP].mqtt_topic = SettingsText (SET_SENSOR_TEMP_TOPIC);
+  sensor_status.type[SENSOR_TYPE_TEMP].mqtt_key   = SettingsText (SET_SENSOR_TEMP_KEY);
+  sensor_status.type[SENSOR_TYPE_HUMI].mqtt_topic = SettingsText (SET_SENSOR_HUMI_TOPIC);
+  sensor_status.type[SENSOR_TYPE_HUMI].mqtt_key   = SettingsText (SET_SENSOR_HUMI_KEY);
+  sensor_status.type[SENSOR_TYPE_PRES].mqtt_topic = SettingsText (SET_SENSOR_MOVE_TOPIC);
+  sensor_status.type[SENSOR_TYPE_PRES].mqtt_key   = SettingsText (SET_SENSOR_MOVE_KEY);
 
-  sensor_config[SENSOR_TYPE_TEMP].timeout = Settings->weight_item;
-  sensor_config[SENSOR_TYPE_HUMI].timeout = Settings->weight_reference;
-  sensor_config[SENSOR_TYPE_PRES].timeout = Settings->weight_calibration;
+  sensor_status.type[SENSOR_TYPE_TEMP].timeout = Settings->weight_item;
+  sensor_status.type[SENSOR_TYPE_HUMI].timeout = Settings->weight_reference;
+  sensor_status.type[SENSOR_TYPE_PRES].timeout = Settings->weight_calibration;
 
   // log
   AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Config from Settings"));
@@ -272,12 +265,12 @@ void SensorLoadConfig ()
 # endif     // USE_UFILESYS
 
   // check parameters validity
-  if (sensor_config[SENSOR_TYPE_TEMP].timeout == 0)          sensor_config[SENSOR_TYPE_TEMP].timeout = SENSOR_TIMEOUT_TEMPERATURE;
-  if (sensor_config[SENSOR_TYPE_TEMP].timeout == UINT32_MAX) sensor_config[SENSOR_TYPE_TEMP].timeout = SENSOR_TIMEOUT_TEMPERATURE;
-  if (sensor_config[SENSOR_TYPE_HUMI].timeout == 0)          sensor_config[SENSOR_TYPE_HUMI].timeout = SENSOR_TIMEOUT_HUMIDITY;
-  if (sensor_config[SENSOR_TYPE_HUMI].timeout == UINT32_MAX) sensor_config[SENSOR_TYPE_HUMI].timeout = SENSOR_TIMEOUT_HUMIDITY;
-  if (sensor_config[SENSOR_TYPE_PRES].timeout == 0)          sensor_config[SENSOR_TYPE_PRES].timeout = SENSOR_TIMEOUT_PRESENCE;
-  if (sensor_config[SENSOR_TYPE_PRES].timeout == UINT32_MAX) sensor_config[SENSOR_TYPE_PRES].timeout = SENSOR_TIMEOUT_PRESENCE;
+  if (sensor_status.type[SENSOR_TYPE_TEMP].timeout == 0)          sensor_status.type[SENSOR_TYPE_TEMP].timeout = SENSOR_TIMEOUT_TEMPERATURE;
+  if (sensor_status.type[SENSOR_TYPE_TEMP].timeout == UINT32_MAX) sensor_status.type[SENSOR_TYPE_TEMP].timeout = SENSOR_TIMEOUT_TEMPERATURE;
+  if (sensor_status.type[SENSOR_TYPE_HUMI].timeout == 0)          sensor_status.type[SENSOR_TYPE_HUMI].timeout = SENSOR_TIMEOUT_HUMIDITY;
+  if (sensor_status.type[SENSOR_TYPE_HUMI].timeout == UINT32_MAX) sensor_status.type[SENSOR_TYPE_HUMI].timeout = SENSOR_TIMEOUT_HUMIDITY;
+  if (sensor_status.type[SENSOR_TYPE_PRES].timeout == 0)          sensor_status.type[SENSOR_TYPE_PRES].timeout = SENSOR_TIMEOUT_PRESENCE;
+  if (sensor_status.type[SENSOR_TYPE_PRES].timeout == UINT32_MAX) sensor_status.type[SENSOR_TYPE_PRES].timeout = SENSOR_TIMEOUT_PRESENCE;
 }
 
 // save configuration parameters
@@ -286,30 +279,30 @@ void SensorSaveConfig ()
 #ifdef USE_UFILESYS
 
   // save settings into flash filesystem
-  UfsCfgSaveKey    (D_SENSOR_FILE_CFG, D_CMND_SENSOR_TEMP_TOPIC,   sensor_config[SENSOR_TYPE_TEMP].topic.c_str (), true);
-  UfsCfgSaveKey    (D_SENSOR_FILE_CFG, D_CMND_SENSOR_TEMP_KEY,     sensor_config[SENSOR_TYPE_TEMP].key.c_str (),   false);
-  UfsCfgSaveKey    (D_SENSOR_FILE_CFG, D_CMND_SENSOR_HUMI_TOPIC,   sensor_config[SENSOR_TYPE_HUMI].topic.c_str (), false);
-  UfsCfgSaveKey    (D_SENSOR_FILE_CFG, D_CMND_SENSOR_HUMI_KEY,     sensor_config[SENSOR_TYPE_HUMI].key.c_str (),   false);
-  UfsCfgSaveKey    (D_SENSOR_FILE_CFG, D_CMND_SENSOR_PRES_TOPIC,   sensor_config[SENSOR_TYPE_PRES].topic.c_str (), false);
-  UfsCfgSaveKey    (D_SENSOR_FILE_CFG, D_CMND_SENSOR_PRES_KEY,     sensor_config[SENSOR_TYPE_PRES].key.c_str (),   false);
+  UfsCfgSaveKey    (D_SENSOR_FILE_CFG, D_CMND_SENSOR_TEMP_TOPIC,   sensor_status.type[SENSOR_TYPE_TEMP].mqtt_topic.c_str (), true);
+  UfsCfgSaveKey    (D_SENSOR_FILE_CFG, D_CMND_SENSOR_TEMP_KEY,     sensor_status.type[SENSOR_TYPE_TEMP].mqtt_key.c_str (),   false);
+  UfsCfgSaveKey    (D_SENSOR_FILE_CFG, D_CMND_SENSOR_HUMI_TOPIC,   sensor_status.type[SENSOR_TYPE_HUMI].mqtt_topic.c_str (), false);
+  UfsCfgSaveKey    (D_SENSOR_FILE_CFG, D_CMND_SENSOR_HUMI_KEY,     sensor_status.type[SENSOR_TYPE_HUMI].mqtt_key.c_str (),   false);
+  UfsCfgSaveKey    (D_SENSOR_FILE_CFG, D_CMND_SENSOR_PRES_TOPIC,   sensor_status.type[SENSOR_TYPE_PRES].mqtt_topic.c_str (), false);
+  UfsCfgSaveKey    (D_SENSOR_FILE_CFG, D_CMND_SENSOR_PRES_KEY,     sensor_status.type[SENSOR_TYPE_PRES].mqtt_key.c_str (),   false);
 
-  UfsCfgSaveKeyInt (D_SENSOR_FILE_CFG, D_CMND_SENSOR_TEMP_TIMEOUT, sensor_config[SENSOR_TYPE_TEMP].timeout, false);
-  UfsCfgSaveKeyInt (D_SENSOR_FILE_CFG, D_CMND_SENSOR_HUMI_TIMEOUT, sensor_config[SENSOR_TYPE_HUMI].timeout, false);
-  UfsCfgSaveKeyInt (D_SENSOR_FILE_CFG, D_CMND_SENSOR_PRES_TIMEOUT, sensor_config[SENSOR_TYPE_PRES].timeout, false);
+  UfsCfgSaveKeyInt (D_SENSOR_FILE_CFG, D_CMND_SENSOR_TEMP_TIMEOUT, sensor_status.type[SENSOR_TYPE_TEMP].timeout, false);
+  UfsCfgSaveKeyInt (D_SENSOR_FILE_CFG, D_CMND_SENSOR_HUMI_TIMEOUT, sensor_status.type[SENSOR_TYPE_HUMI].timeout, false);
+  UfsCfgSaveKeyInt (D_SENSOR_FILE_CFG, D_CMND_SENSOR_PRES_TIMEOUT, sensor_status.type[SENSOR_TYPE_PRES].timeout, false);
 
 # else       // No LittleFS
 
   // save settings into flash memory
-  SettingsUpdateText (SET_SENSOR_TEMP_TOPIC, sensor_config[SENSOR_TYPE_TEMP].topic.c_str ());
-  SettingsUpdateText (SET_SENSOR_TEMP_KEY,   sensor_config[SENSOR_TYPE_TEMP].key.c_str ());
-  SettingsUpdateText (SET_SENSOR_HUMI_TOPIC, sensor_config[SENSOR_TYPE_HUMI].topic.c_str ());
-  SettingsUpdateText (SET_SENSOR_HUMI_KEY,   sensor_config[SENSOR_TYPE_HUMI].key.c_str ());
-  SettingsUpdateText (SET_SENSOR_MOVE_TOPIC, sensor_config[SENSOR_TYPE_PRES].topic.c_str ());
-  SettingsUpdateText (SET_SENSOR_MOVE_KEY,   sensor_config[SENSOR_TYPE_PRES].key.c_str ());
+  SettingsUpdateText (SET_SENSOR_TEMP_TOPIC, sensor_status.type[SENSOR_TYPE_TEMP].mqtt_topic.c_str ());
+  SettingsUpdateText (SET_SENSOR_TEMP_KEY,   sensor_status.type[SENSOR_TYPE_TEMP].mqtt_key.c_str ());
+  SettingsUpdateText (SET_SENSOR_HUMI_TOPIC, sensor_status.type[SENSOR_TYPE_HUMI].mqtt_topic.c_str ());
+  SettingsUpdateText (SET_SENSOR_HUMI_KEY,   sensor_status.type[SENSOR_TYPE_HUMI].mqtt_key.c_str ());
+  SettingsUpdateText (SET_SENSOR_MOVE_TOPIC, sensor_status.type[SENSOR_TYPE_PRES].mqtt_topic.c_str ());
+  SettingsUpdateText (SET_SENSOR_MOVE_KEY,   sensor_status.type[SENSOR_TYPE_PRES].mqtt_key.c_str ());
 
-  Settings->weight_item        = sensor_config[SENSOR_TYPE_TEMP].timeout;
-  Settings->weight_reference   = sensor_config[SENSOR_TYPE_HUMI].timeout;
-  Settings->weight_calibration = sensor_config[SENSOR_TYPE_PRES].timeout;
+  Settings->weight_item        = sensor_status.type[SENSOR_TYPE_TEMP].timeout;
+  Settings->weight_reference   = sensor_status.type[SENSOR_TYPE_HUMI].timeout;
+  Settings->weight_calibration = sensor_status.type[SENSOR_TYPE_PRES].timeout;
 
 # endif     // USE_UFILESYS
 }
@@ -345,10 +338,10 @@ void CmndSensorTemperatureTopic ()
   if (XdrvMailbox.data_len > 0)
   {
     strncpy (str_text, XdrvMailbox.data, min (sizeof (str_text) - 1, XdrvMailbox.data_len));
-    sensor_config[SENSOR_TYPE_TEMP].topic = str_text;
+    sensor_status.type[SENSOR_TYPE_TEMP].mqtt_topic = str_text;
     SensorSaveConfig ();
   }
-  ResponseCmndChar (sensor_config[SENSOR_TYPE_TEMP].topic.c_str ());
+  ResponseCmndChar (sensor_status.type[SENSOR_TYPE_TEMP].mqtt_topic.c_str ());
 }
 
 void CmndSensorTemperatureKey ()
@@ -358,10 +351,10 @@ void CmndSensorTemperatureKey ()
   if (XdrvMailbox.data_len > 0)
   {
     strncpy (str_text, XdrvMailbox.data, min (sizeof (str_text) - 1, XdrvMailbox.data_len));
-    sensor_config[SENSOR_TYPE_TEMP].key = str_text;
+    sensor_status.type[SENSOR_TYPE_TEMP].mqtt_key = str_text;
     SensorSaveConfig ();
   }
-  ResponseCmndChar (sensor_config[SENSOR_TYPE_TEMP].key.c_str ());
+  ResponseCmndChar (sensor_status.type[SENSOR_TYPE_TEMP].mqtt_key.c_str ());
 }
 
 void CmndSensorTemperatureValue ()
@@ -393,10 +386,10 @@ void CmndSensorHumidityTopic ()
   if (XdrvMailbox.data_len > 0)
   {
     strncpy (str_text, XdrvMailbox.data, min (sizeof (str_text) - 1, XdrvMailbox.data_len));
-    sensor_config[SENSOR_TYPE_HUMI].topic = str_text;
+    sensor_status.type[SENSOR_TYPE_HUMI].mqtt_topic = str_text;
     SensorSaveConfig ();
   }
-  ResponseCmndChar (sensor_config[SENSOR_TYPE_HUMI].topic.c_str ());
+  ResponseCmndChar (sensor_status.type[SENSOR_TYPE_HUMI].mqtt_topic.c_str ());
 }
 
 void CmndSensorHumidityKey ()
@@ -406,10 +399,10 @@ void CmndSensorHumidityKey ()
   if (XdrvMailbox.data_len > 0)
   {
     strncpy (str_text, XdrvMailbox.data, min (sizeof (str_text) - 1, XdrvMailbox.data_len));
-    sensor_config[SENSOR_TYPE_HUMI].key = str_text;
+    sensor_status.type[SENSOR_TYPE_HUMI].mqtt_key = str_text;
     SensorSaveConfig ();
   }
-  ResponseCmndChar (sensor_config[SENSOR_TYPE_HUMI].key.c_str ());
+  ResponseCmndChar (sensor_status.type[SENSOR_TYPE_HUMI].mqtt_key.c_str ());
 }
 
 void CmndSensorHumidityValue ()
@@ -428,10 +421,10 @@ void CmndSensorPresenceTopic ()
   if (XdrvMailbox.data_len > 0)
   {
     strncpy (str_text, XdrvMailbox.data, min (sizeof (str_text) - 1, XdrvMailbox.data_len));
-    sensor_config[SENSOR_TYPE_PRES].topic = str_text;
+    sensor_status.type[SENSOR_TYPE_PRES].mqtt_topic = str_text;
     SensorSaveConfig ();
   }
-  ResponseCmndChar (sensor_config[SENSOR_TYPE_PRES].topic.c_str ());
+  ResponseCmndChar (sensor_status.type[SENSOR_TYPE_PRES].mqtt_topic.c_str ());
 }
 
 void CmndSensorPresenceKey ()
@@ -441,10 +434,10 @@ void CmndSensorPresenceKey ()
   if (XdrvMailbox.data_len > 0)
   {
     strncpy (str_text, XdrvMailbox.data, min (sizeof (str_text) - 1, XdrvMailbox.data_len));
-    sensor_config[SENSOR_TYPE_PRES].key = str_text;
+    sensor_status.type[SENSOR_TYPE_PRES].mqtt_key = str_text;
     SensorSaveConfig ();
   }
-  ResponseCmndChar (sensor_config[SENSOR_TYPE_PRES].key.c_str ());
+  ResponseCmndChar (sensor_status.type[SENSOR_TYPE_PRES].mqtt_key.c_str ());
 }
 
 void CmndSensorPresenceValue ()
@@ -481,8 +474,7 @@ void SensorGetDelayText (const uint32_t delay, char* pstr_result, size_t size_re
 uint8_t SensorTemperatureSource (char* pstr_source, size_t size_source)
 {
   // check parameters
-  if (pstr_source == nullptr) return UINT8_MAX;
-  if (size_source == 0) return UINT8_MAX;
+  if ((pstr_source == nullptr) || (size_source == 0)) return UINT8_MAX;
 
   // retrieve source label
   GetTextIndexed (pstr_source, size_source, sensor_status.type[SENSOR_TYPE_TEMP].source, kSensorSource);
@@ -491,18 +483,41 @@ uint8_t SensorTemperatureSource (char* pstr_source, size_t size_source)
 }
 
 // read temperature value
-float SensorTemperatureRead () { return SensorTemperatureRead (SENSOR_TIMEOUT_TEMPERATURE); }
+float SensorTemperatureRead () { return SensorTemperatureRead (0); }
 float SensorTemperatureRead (uint32_t timeout)
 {
-  float value = sensor_status.type[SENSOR_TYPE_TEMP].value;
+  uint32_t sensor, index;
+  float    value = NAN;
 
-  // handle timeout in case of remote sensor
-  if (sensor_status.type[SENSOR_TYPE_TEMP].source == SENSOR_SOURCE_REMOTE)
-  {
-    // if temperature has never been read or after timeout
-    if (sensor_status.type[SENSOR_TYPE_TEMP].delay == UINT32_MAX) value = NAN;
-      else if (sensor_status.type[SENSOR_TYPE_TEMP].delay > timeout) value = NAN;
+  // if needed, set default timeout
+  if (timeout == 0) timeout = sensor_status.type[SENSOR_TYPE_TEMP].timeout;
+
+  // handle reading according to sensor
+  switch (sensor_status.type[SENSOR_TYPE_TEMP].source)
+  { 
+    case SENSOR_SOURCE_DSB:
+#ifdef ESP8266
+      for (sensor = 0; sensor < DS18X20Data.sensors; sensor++)
+      {
+        index = ds18x20_sensor[sensor].index;
+        if (ds18x20_sensor[index].valid) value = ds18x20_sensor[index].temperature;
+      }
+#else
+      Ds18x20Read (0, value);
+#endif
+      break;
+
+    case SENSOR_SOURCE_DHT:
+      value = Dht[0].t;
+      break;
+
+    case SENSOR_SOURCE_REMOTE:
+      if ((sensor_status.type[SENSOR_TYPE_TEMP].update != UINT32_MAX) && (LocalTime () < sensor_status.type[SENSOR_TYPE_TEMP].update + timeout)) value = sensor_status.type[SENSOR_TYPE_TEMP].mqtt_value;
+      break;
   }
+
+  // truncate temperature to 0.1 °C
+  if (!isnan (value)) value = round (value * 10) / 10;
 
   return value;
 }
@@ -511,8 +526,7 @@ float SensorTemperatureRead (uint32_t timeout)
 uint8_t SensorHumiditySource (char* pstr_source, size_t size_source)
 {
   // check parameters
-  if (pstr_source == nullptr) return UINT8_MAX;
-  if (size_source == 0) return UINT8_MAX;
+  if ((pstr_source == nullptr) || (size_source == 0)) return UINT8_MAX;
 
   // retrieve source label
   GetTextIndexed (pstr_source, size_source, sensor_status.type[SENSOR_TYPE_HUMI].source, kSensorSource);
@@ -521,17 +535,24 @@ uint8_t SensorHumiditySource (char* pstr_source, size_t size_source)
 }
 
 // read humidity level
-float SensorHumidityRead () { return SensorHumidityRead (SENSOR_TIMEOUT_HUMIDITY); }
+float SensorHumidityRead () { return SensorHumidityRead (0); }
 float SensorHumidityRead (uint32_t timeout)
 {
-  float value = sensor_status.type[SENSOR_TYPE_HUMI].value;
+  float value = NAN;
 
-  // handle timeout in case of remote sensor
-  if (sensor_status.type[SENSOR_TYPE_HUMI].source == SENSOR_SOURCE_REMOTE)
-  {
-    // if humidity has never been read or after timeout
-    if (sensor_status.type[SENSOR_TYPE_HUMI].delay == UINT32_MAX) value = NAN;
-      else if (sensor_status.type[SENSOR_TYPE_HUMI].delay > timeout) value = NAN;
+  // if needed, set default timeout
+  if (timeout == 0) timeout = sensor_status.type[SENSOR_TYPE_HUMI].timeout;
+
+  // handle reading according to sensor
+  switch (sensor_status.type[SENSOR_TYPE_HUMI].source)
+  { 
+    case SENSOR_SOURCE_DHT:
+      value = Dht[0].h;
+      break;
+
+    case SENSOR_SOURCE_REMOTE:
+      if ((sensor_status.type[SENSOR_TYPE_HUMI].update != UINT32_MAX) && (LocalTime () < sensor_status.type[SENSOR_TYPE_HUMI].update + timeout)) value = sensor_status.type[SENSOR_TYPE_HUMI].mqtt_value;
+      break;
   }
 
   return value;
@@ -541,8 +562,7 @@ float SensorHumidityRead (uint32_t timeout)
 uint8_t SensorPresenceSource (char* pstr_source, size_t size_source)
 {
   // check parameters
-  if (pstr_source == nullptr) return UINT8_MAX;
-  if (size_source == 0) return UINT8_MAX;
+  if ((pstr_source == nullptr) || (size_source == 0)) return UINT8_MAX;
 
   // retrieve source label
   GetTextIndexed (pstr_source, size_source, sensor_status.type[SENSOR_TYPE_PRES].source, kSensorSource);
@@ -551,18 +571,16 @@ uint8_t SensorPresenceSource (char* pstr_source, size_t size_source)
 }
 
 // read movement detection status (timeout in sec.)
-bool SensorPresenceDetected () { return SensorPresenceDetected (SENSOR_TIMEOUT_PRESENCE); }
+bool SensorPresenceDetected () { return SensorPresenceDetected (0); }
 bool SensorPresenceDetected (uint32_t timeout)
 {
-  bool result = true;        // by default, movement considered ON
+  bool result = false;
 
-  // if movement detection sensor is available
-  if (sensor_status.type[SENSOR_TYPE_PRES].source != SENSOR_SOURCE_MAX)
-  {
-    // if movement has never been detected or after timeout
-    if (sensor_status.type[SENSOR_TYPE_PRES].delay == UINT32_MAX) result = false;
-      else if (sensor_status.type[SENSOR_TYPE_PRES].delay > timeout) result = false;
-  }
+  // if needed, set default timeout
+  if (timeout == 0) timeout = sensor_status.type[SENSOR_TYPE_HUMI].timeout;
+
+  // if movement detection sensor is available, no presence if movement has never been detected or after timeout
+  if ((sensor_status.type[SENSOR_TYPE_PRES].source != SENSOR_SOURCE_NONE) && (sensor_status.type[SENSOR_TYPE_PRES].update != UINT32_MAX)) result = (LocalTime () < sensor_status.type[SENSOR_TYPE_PRES].update + timeout);
 
   return result;
 }
@@ -570,105 +588,53 @@ bool SensorPresenceDetected (uint32_t timeout)
 // get delay since last movement was detected
 uint32_t SensorPresenceDelaySinceDetection ()
 {
-  return sensor_status.type[SENSOR_TYPE_PRES].delay;
+  uint32_t result = UINT32_MAX;
+
+  if (sensor_status.type[SENSOR_TYPE_PRES].update != UINT32_MAX) result = LocalTime () - sensor_status.type[SENSOR_TYPE_PRES].update;
+
+  return result;
+}
+
+// suspend presence detection
+void SensorPresenceSuspendDetection (const uint32_t duration)
+{
+  // set timestamp to ignore sensor state
+  sensor_status.time_ignore = LocalTime () + duration;
 }
 
 // reset presence detection
 void SensorPresenceResetDetection ()
 {
-  sensor_status.type[SENSOR_TYPE_PRES].delay = 0;
+  sensor_status.type[SENSOR_TYPE_PRES].update = LocalTime ();
 }
 
 // update sensor condition every second
 void SensorEverySecond ()
 {
-  bool     presence = false;
-  bool     publish  = false;
-  uint32_t sensor, index;
-
-  // ------------------------
-  // local temperature sensor
-  // ------------------------
-  if ((sensor_status.type[SENSOR_TYPE_TEMP].source != SENSOR_SOURCE_MAX) && (sensor_status.type[SENSOR_TYPE_TEMP].source != SENSOR_SOURCE_REMOTE))
-  {
-    // first reading
-    if (sensor_status.type[SENSOR_TYPE_TEMP].delay == UINT32_MAX) sensor_status.type[SENSOR_TYPE_TEMP].delay = 0;
-
-    // if needed, read temperature
-    if (sensor_status.type[SENSOR_TYPE_TEMP].delay == 0)
-    {
-      switch (sensor_status.type[SENSOR_TYPE_TEMP].source)
-      { 
-        case SENSOR_SOURCE_DSB:
-#ifdef ESP8266
-          for (sensor = 0; sensor < DS18X20Data.sensors; sensor++)
-          {
-            index = ds18x20_sensor[sensor].index;
-            if (ds18x20_sensor[index].valid) sensor_status.type[SENSOR_TYPE_TEMP].value = ds18x20_sensor[index].temperature;
-          }
-#else
-          Ds18x20Read (0, sensor_status.type[SENSOR_TYPE_TEMP].value);
-#endif
-          break;
-
-        case SENSOR_SOURCE_DHT:
-          sensor_status.type[SENSOR_TYPE_TEMP].value = Dht[0].t;
-          break;
-      }
-
-      // truncate temperature to 0.1 °C
-      if (!isnan (sensor_status.type[SENSOR_TYPE_TEMP].value)) sensor_status.type[SENSOR_TYPE_TEMP].value = round (sensor_status.type[SENSOR_TYPE_TEMP].value * 10) / 10;
-
-      // publish change
-      publish = true;
-    }
- 
-    // update delay
-    sensor_status.type[SENSOR_TYPE_TEMP].delay++;
-    sensor_status.type[SENSOR_TYPE_TEMP].delay = sensor_status.type[SENSOR_TYPE_TEMP].delay % SENSOR_TIMEOUT_TEMPERATURE;
-  }
-
-  // ---------------------
-  // local humidity sensor
-  // ---------------------
-  if ((sensor_status.type[SENSOR_TYPE_HUMI].source != SENSOR_SOURCE_MAX) && (sensor_status.type[SENSOR_TYPE_HUMI].source != SENSOR_SOURCE_REMOTE))
-  {
-    // first reading
-    if (sensor_status.type[SENSOR_TYPE_HUMI].delay == UINT32_MAX) sensor_status.type[SENSOR_TYPE_HUMI].delay = 0;
-
-    // if needed, read temperature
-    if (sensor_status.type[SENSOR_TYPE_HUMI].delay == 0)
-    {
-      switch (sensor_status.type[SENSOR_TYPE_HUMI].source)
-      { 
-        case SENSOR_SOURCE_DHT:
-          sensor_status.type[SENSOR_TYPE_HUMI].value = Dht[0].h;
-          break;
-      }
-
-      // truncate humidity to 0.1 %
-      if (!isnan (sensor_status.type[SENSOR_TYPE_HUMI].value)) sensor_status.type[SENSOR_TYPE_HUMI].value = round (sensor_status.type[SENSOR_TYPE_HUMI].value * 10) / 10;
-
-      // publish change
-      publish = true;
-    }
-
-    // update delay
-    sensor_status.type[SENSOR_TYPE_HUMI].delay++;
-    sensor_status.type[SENSOR_TYPE_HUMI].delay = sensor_status.type[SENSOR_TYPE_HUMI].delay % SENSOR_TIMEOUT_HUMIDITY;
-  }
+  bool presence = false;
 
   // ---------------------
   // local presence sensor
   // ---------------------
-  if ((sensor_status.type[SENSOR_TYPE_PRES].source != SENSOR_SOURCE_MAX) && (sensor_status.type[SENSOR_TYPE_PRES].source != SENSOR_SOURCE_REMOTE))
+  if (sensor_status.type[SENSOR_TYPE_PRES].source < SENSOR_SOURCE_REMOTE)
   {
+    // if presence detection is suspended
+    if (sensor_status.time_ignore != 0)
+    {
+      // update counter
+      sensor_status.counter = RtcSettings.pulse_counter[0];
+
+      // if timeout is reached, reset
+      if (sensor_status.time_ignore < LocalTime ()) sensor_status.time_ignore = 0;
+    }
+
     // handle local presence sensor
-    switch (sensor_status.type[SENSOR_TYPE_PRES].source)
+    if (sensor_status.time_ignore == 0) switch (sensor_status.type[SENSOR_TYPE_PRES].source)
     {
       // generic sensor
-      case SENSOR_SOURCE_INPUT:
-        presence = digitalRead (Pin (GPIO_INPUT, 0));
+      case SENSOR_SOURCE_COUNTER:
+        presence = (RtcSettings.pulse_counter[0] > sensor_status.counter);
+        sensor_status.counter = RtcSettings.pulse_counter[0];
         break;
 
   #ifdef USE_HLKLD11
@@ -678,89 +644,8 @@ void SensorEverySecond ()
   #endif
     }
 
-    // increase detection delay
-    sensor_status.type[SENSOR_TYPE_PRES].delay++;
-
-    // if presence newly detected, publish
-    if (presence && (sensor_status.type[SENSOR_TYPE_PRES].value == 0)) publish = true;
-
-    // if no presence detected since timeout, reset presence
-    if (!presence && (sensor_status.type[SENSOR_TYPE_PRES].value != 0) && (sensor_status.type[SENSOR_TYPE_PRES].delay >= SENSOR_TIMEOUT_PRESENCE))
-    {
-      sensor_status.type[SENSOR_TYPE_PRES].value = 0;
-      publish = true;
-    }
-
-    // if presence detected, declare it
-    if (presence)
-    {
-      sensor_status.type[SENSOR_TYPE_PRES].value = 1;
-      sensor_status.type[SENSOR_TYPE_PRES].delay = 0;
-    }
-  }
-
-  // if needed, publish sensor values
-  if (publish) SensorShowJSON (true);
-}
-
-// Show JSON status (for MQTT)
-void SensorShowJSON (bool is_autonomous)
-{
-  bool temperature, humidity, presence;
-  bool first = true;
-  char str_value[16];
-
-  // check if sensors are available
-  temperature = (sensor_status.type[SENSOR_TYPE_TEMP].source != SENSOR_SOURCE_MAX);
-  humidity    = (sensor_status.type[SENSOR_TYPE_HUMI].source != SENSOR_SOURCE_MAX);
-  presence    = (sensor_status.type[SENSOR_TYPE_PRES].source != SENSOR_SOURCE_MAX);
-
-  // if at least one sensor is available
-  if (temperature || humidity || presence)
-  {
-    // add , in append mode
-    if (is_autonomous) Response_P (PSTR ("{")); else ResponseAppend_P (PSTR (","));
-
-    // temperature
-    if (temperature)
-    {
-      ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%01_f"), &sensor_status.type[SENSOR_TYPE_TEMP].value);
-      ResponseAppend_P (PSTR ("\"temp\":%s"), str_value);
-      first = false;
-    }
-
-    // humidity
-    if (humidity)
-    {
-      ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%00_f"), &sensor_status.type[SENSOR_TYPE_HUMI].value);
-      if (!first) ResponseAppend_P (PSTR (","));
-      ResponseAppend_P (PSTR ("\"humi\":%s"), str_value);
-      first = false;
-    }
-
-    // presence
-    if (presence)
-    {
-      // detection state
-      ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%00_f"), &sensor_status.type[SENSOR_TYPE_PRES].value);
-      if (!first) ResponseAppend_P (PSTR (","));
-      ResponseAppend_P (PSTR ("\"pres\":%s"), str_value);
-
-      // delay in seconds
-      ResponseAppend_P (PSTR (",\"pres-delay\":%u"), sensor_status.type[SENSOR_TYPE_PRES].delay);
-
-      // since in readable format
-      SensorGetDelayText (sensor_status.type[SENSOR_TYPE_PRES].delay, str_value, sizeof (str_value));
-      ResponseAppend_P (PSTR (",\"pres-since\":\"%s\""), str_value);
-    }
-
-    // publish it if message is autonomous
-    if (is_autonomous)
-    {
-      // publish message
-      ResponseAppend_P (PSTR ("}"));
-      MqttPublishTeleSensor ();
-    } 
+    // if presence detected,
+    if (presence) sensor_status.type[SENSOR_TYPE_PRES].update = LocalTime ();
   }
 }
 
@@ -768,27 +653,27 @@ void SensorShowJSON (bool is_autonomous)
 void SensorMqttSubscribe ()
 {
   // if topic is defined, subscribe to remote temperature
-  if (sensor_config[SENSOR_TYPE_TEMP].topic.length () > 0)
+  if (sensor_status.type[SENSOR_TYPE_TEMP].mqtt_topic.length () > 0)
   {
     // subscribe to sensor topic
-    MqttSubscribe (sensor_config[SENSOR_TYPE_TEMP].topic.c_str ());
-    AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Subscribed remote temperature from %s"), sensor_config[SENSOR_TYPE_TEMP].topic.c_str ());
+    MqttSubscribe (sensor_status.type[SENSOR_TYPE_TEMP].mqtt_topic.c_str ());
+    AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Subscribed remote temperature from %s"), sensor_status.type[SENSOR_TYPE_TEMP].mqtt_topic.c_str ());
   }
 
   // if topic is defined, subscribe to remote humidity
-  if (sensor_config[SENSOR_TYPE_HUMI].topic.length () > 0)
+  if (sensor_status.type[SENSOR_TYPE_HUMI].mqtt_topic.length () > 0)
   {
     // subscribe to sensor topic
-    MqttSubscribe (sensor_config[SENSOR_TYPE_HUMI].topic.c_str ());
-    AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Subscribed remote humidity from %s"), sensor_config[SENSOR_TYPE_HUMI].topic.c_str ());
+    MqttSubscribe (sensor_status.type[SENSOR_TYPE_HUMI].mqtt_topic.c_str ());
+    AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Subscribed remote humidity from %s"), sensor_status.type[SENSOR_TYPE_HUMI].mqtt_topic.c_str ());
   }
 
   // if topic is defined, subscribe to remote movement
-  if (sensor_config[SENSOR_TYPE_PRES].topic.length () > 0)
+  if (sensor_status.type[SENSOR_TYPE_PRES].mqtt_topic.length () > 0)
   {
     // subscribe to sensor topic
-    MqttSubscribe (sensor_config[SENSOR_TYPE_PRES].topic.c_str ());
-    AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Subscribed remote movement from %s"), sensor_config[SENSOR_TYPE_PRES].topic.c_str ());
+    MqttSubscribe (sensor_status.type[SENSOR_TYPE_PRES].mqtt_topic.c_str ());
+    AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Subscribed remote movement from %s"), sensor_status.type[SENSOR_TYPE_PRES].mqtt_topic.c_str ());
   }
 }
 
@@ -831,12 +716,16 @@ bool SensorGetJsonKey (const char* pstr_json, const char* pstr_key, char* pstr_v
 // read received MQTT data to retrieve sensor value
 bool SensorMqttData ()
 {
-  bool is_topic, is_key;
-  bool is_found = false;
-  char str_value[32];
+  bool     is_topic, is_key, movement;
+  bool     is_found = false;
+  char     str_value[32];
+  uint32_t time_now;
+
+  // read timestamp
+  time_now = LocalTime ();
 
   // if dealing with temperature topic
-  is_topic = (sensor_config[SENSOR_TYPE_TEMP].topic == XdrvMailbox.topic);
+  is_topic = (sensor_status.type[SENSOR_TYPE_TEMP].mqtt_topic == XdrvMailbox.topic);
   if (is_topic)
   {
     // log
@@ -844,15 +733,15 @@ bool SensorMqttData ()
     AddLog (LOG_LEVEL_DEBUG, PSTR ("SEN: Received %s"), XdrvMailbox.topic);
 
     // look for temperature key
-    is_key = SensorGetJsonKey (XdrvMailbox.data, sensor_config[SENSOR_TYPE_TEMP].key.c_str (), str_value, sizeof (str_value));
+    is_key = SensorGetJsonKey (XdrvMailbox.data, sensor_status.type[SENSOR_TYPE_TEMP].mqtt_key.c_str (), str_value, sizeof (str_value));
     if (is_key)
     {
       // if needed, set remote source for temperature
-      if (sensor_status.type[SENSOR_TYPE_TEMP].source == SENSOR_SOURCE_MAX) sensor_status.type[SENSOR_TYPE_TEMP].source = SENSOR_SOURCE_REMOTE;
+      if (sensor_status.type[SENSOR_TYPE_TEMP].source == SENSOR_SOURCE_NONE) sensor_status.type[SENSOR_TYPE_TEMP].source = SENSOR_SOURCE_REMOTE;
 
       // save remote value
-      sensor_status.type[SENSOR_TYPE_TEMP].delay = 0;
-      sensor_status.type[SENSOR_TYPE_TEMP].value = atof (str_value) + ((float)Settings->temp_comp / 10);
+      sensor_status.type[SENSOR_TYPE_TEMP].update = time_now;
+      sensor_status.type[SENSOR_TYPE_TEMP].mqtt_value = atof (str_value) + ((float)Settings->temp_comp / 10);
 
       // log
       is_found = true;
@@ -861,7 +750,7 @@ bool SensorMqttData ()
   }
 
   // if dealing with humidity topic
-  is_topic = (sensor_config[SENSOR_TYPE_HUMI].topic == XdrvMailbox.topic);
+  is_topic = (sensor_status.type[SENSOR_TYPE_HUMI].mqtt_topic == XdrvMailbox.topic);
   if (is_topic)
   {
     // log
@@ -869,15 +758,15 @@ bool SensorMqttData ()
     AddLog (LOG_LEVEL_DEBUG, PSTR ("SEN: Received %s"), XdrvMailbox.topic);
 
     // look for humidity key
-    is_key = SensorGetJsonKey (XdrvMailbox.data, sensor_config[SENSOR_TYPE_HUMI].key.c_str (), str_value, sizeof (str_value));
+    is_key = SensorGetJsonKey (XdrvMailbox.data, sensor_status.type[SENSOR_TYPE_HUMI].mqtt_key.c_str (), str_value, sizeof (str_value));
     if (is_key)
     {
       // if needed, set remote source for humidity
-      if (sensor_status.type[SENSOR_TYPE_HUMI].source == SENSOR_SOURCE_MAX) sensor_status.type[SENSOR_TYPE_HUMI].source = SENSOR_SOURCE_REMOTE;
+      if (sensor_status.type[SENSOR_TYPE_HUMI].source == SENSOR_SOURCE_NONE) sensor_status.type[SENSOR_TYPE_HUMI].source = SENSOR_SOURCE_REMOTE;
 
       // save remote value
-      sensor_status.type[SENSOR_TYPE_HUMI].delay = 0;
-      sensor_status.type[SENSOR_TYPE_HUMI].value = atof (str_value);
+      sensor_status.type[SENSOR_TYPE_HUMI].update = time_now;
+      sensor_status.type[SENSOR_TYPE_HUMI].mqtt_value = atof (str_value);
 
       // log
       AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Remote humidity is %s %%"), str_value);
@@ -885,7 +774,7 @@ bool SensorMqttData ()
   }
 
   // if dealing with movement topic
-  is_topic = (sensor_config[SENSOR_TYPE_PRES].topic == XdrvMailbox.topic);
+  is_topic = (sensor_status.type[SENSOR_TYPE_PRES].mqtt_topic == XdrvMailbox.topic);
   if (is_topic)
   {
     // log
@@ -893,21 +782,15 @@ bool SensorMqttData ()
     AddLog (LOG_LEVEL_DEBUG, PSTR ("SEN: Received %s"), XdrvMailbox.topic);
 
     // look for movement key
-    is_key = SensorGetJsonKey (XdrvMailbox.data, sensor_config[SENSOR_TYPE_PRES].key.c_str (), str_value, sizeof (str_value));
+    is_key = SensorGetJsonKey (XdrvMailbox.data, sensor_status.type[SENSOR_TYPE_PRES].mqtt_key.c_str (), str_value, sizeof (str_value));
     if (is_key)
     {
       // if needed, set remote source for movement
-      if (sensor_status.type[SENSOR_TYPE_PRES].source == SENSOR_SOURCE_MAX) sensor_status.type[SENSOR_TYPE_PRES].source = SENSOR_SOURCE_REMOTE;
+      if (sensor_status.type[SENSOR_TYPE_PRES].source == SENSOR_SOURCE_NONE) sensor_status.type[SENSOR_TYPE_PRES].source = SENSOR_SOURCE_REMOTE;
 
-      // convert off, OFF, on, ON and values to 0 or 1
-      if (strcmp (str_value, "off") == 0) sensor_status.type[SENSOR_TYPE_PRES].value = 0;
-      else if (strcmp (str_value, "OFF") == 0) sensor_status.type[SENSOR_TYPE_PRES].value = 0;
-      else if (strcmp (str_value, "on") == 0) sensor_status.type[SENSOR_TYPE_PRES].value = 1;
-      else if (strcmp (str_value, "ON") == 0) sensor_status.type[SENSOR_TYPE_PRES].value = 1;
-      else sensor_status.type[SENSOR_TYPE_PRES].value = atof (str_value);
-
-      // if movement detected, update detection time
-      if (sensor_status.type[SENSOR_TYPE_PRES].value > 0) sensor_status.type[SENSOR_TYPE_PRES].delay = 0;
+      // read movement
+      movement = ((strcmp (str_value, "on") == 0) || (strcmp (str_value, "ON") == 0));
+      if (movement) sensor_status.type[SENSOR_TYPE_PRES].update = time_now;
 
       // log
       AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Remote movement is %s"), str_value);
@@ -915,6 +798,43 @@ bool SensorMqttData ()
   }
 
   return is_found;
+}
+
+// Show JSON status (for local sensors and presence sensor)
+void SensorShowJSON ()
+{
+  bool     presence = false;
+  uint32_t delay    = UINT32_MAX;
+  float    value;
+  char     str_value[16];
+
+  // if local temperature sensor present
+  if (sensor_status.type[SENSOR_TYPE_TEMP].source < SENSOR_SOURCE_REMOTE)
+  {
+    value = SensorTemperatureRead ();
+    ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%01_f"), &value);
+    ResponseAppend_P (PSTR (",\"Temp\":%s"), str_value);
+  }
+
+  // if local humidity sensor present
+  if (sensor_status.type[SENSOR_TYPE_HUMI].source < SENSOR_SOURCE_REMOTE)
+  {
+    value = SensorHumidityRead ();
+    ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%00_f"), &value);
+    ResponseAppend_P (PSTR (",\"Humi\":%s"), str_value);
+  }
+
+  // if local presence sensor present
+  if (sensor_status.type[SENSOR_TYPE_PRES].source != SENSOR_SOURCE_NONE)
+  {
+    // check delay since last presence detection
+    if (sensor_status.type[SENSOR_TYPE_PRES].update != UINT32_MAX) delay = LocalTime () - sensor_status.type[SENSOR_TYPE_PRES].update;
+    if (delay != UINT32_MAX) presence = (delay < sensor_status.type[SENSOR_TYPE_PRES].timeout);
+
+    // append presence detection
+    ResponseAppend_P (PSTR (",\"Pres\":%u"), presence);
+    if (delay != UINT32_MAX) ResponseAppend_P (PSTR (",\"Delay\":%u"), delay);
+  }
 }
 
 /***********************************************\
@@ -932,27 +852,30 @@ void SensorWebSensor ()
   // if temperature is remote
   if (sensor_status.type[SENSOR_TYPE_TEMP].source == SENSOR_SOURCE_REMOTE)
   {
-    ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%1_f"), &sensor_status.type[SENSOR_TYPE_TEMP].value);
+    ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%1_f"), &sensor_status.type[SENSOR_TYPE_TEMP].mqtt_value);
     WSContentSend_PD (PSTR ("{s}%s %s{m}%s °C{e}"), D_SENSOR_REMOTE, D_SENSOR_TEMPERATURE, str_value);
   }
 
   // if humidity is remote
   if (sensor_status.type[SENSOR_TYPE_HUMI].source == SENSOR_SOURCE_REMOTE)
   {
-    ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%1_f"), &sensor_status.type[SENSOR_TYPE_HUMI].value);
+    ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%1_f"), &sensor_status.type[SENSOR_TYPE_HUMI].mqtt_value);
     WSContentSend_PD (PSTR ("{s}%s %s{m}%s %%{e}"), D_SENSOR_REMOTE, D_SENSOR_HUMIDITY, str_value);
   }
 
-  // if movement is remote or generic
-  if ((sensor_status.type[SENSOR_TYPE_PRES].source == SENSOR_SOURCE_REMOTE) || (sensor_status.type[SENSOR_TYPE_PRES].source == SENSOR_SOURCE_INPUT))
+  // if presence is remote or generic
+  if ((sensor_status.type[SENSOR_TYPE_PRES].source == SENSOR_SOURCE_REMOTE) || (sensor_status.type[SENSOR_TYPE_PRES].source == SENSOR_SOURCE_COUNTER))
   {
     // check sensor type
     if (sensor_status.type[SENSOR_TYPE_PRES].source == SENSOR_SOURCE_REMOTE) strcpy (str_type, D_SENSOR_REMOTE);
       else strcpy (str_type, D_SENSOR_LOCAL);
     
     // get last presence detection delay
-    SensorGetDelayText (sensor_status.type[SENSOR_TYPE_PRES].delay, str_value, sizeof (str_value));
-    WSContentSend_PD (PSTR ("{s}%s detector{m}%s{e}"), str_type, str_value);
+    if (sensor_status.type[SENSOR_TYPE_PRES].update != UINT32_MAX)
+    {
+      SensorGetDelayText (LocalTime () - sensor_status.type[SENSOR_TYPE_PRES].update, str_value, sizeof (str_value));
+      WSContentSend_PD (PSTR ("{s}%s detector{m}%s{e}"), str_type, str_value);
+    }
   }
 }
 
@@ -980,39 +903,39 @@ void SensorWebConfigurePage ()
 
     // set temperature timeout according to 'ttime' parameter
     WebGetArg (D_CMND_SENSOR_TEMP_TIMEOUT, str_text, sizeof (str_text));
-    sensor_config[SENSOR_TYPE_TEMP].timeout = (uint16_t)atoi (str_text);
+    sensor_status.type[SENSOR_TYPE_TEMP].timeout = (uint16_t)atoi (str_text);
 
     // set temperature topic according to 'ttopic' parameter
     WebGetArg (D_CMND_SENSOR_TEMP_TOPIC, str_text, sizeof (str_text));
-    sensor_config[SENSOR_TYPE_TEMP].topic = str_text;
+    sensor_status.type[SENSOR_TYPE_TEMP].mqtt_topic = str_text;
 
     // set temperature key according to 'tkey' parameter
     WebGetArg (D_CMND_SENSOR_TEMP_KEY, str_text, sizeof (str_text));
-    sensor_config[SENSOR_TYPE_TEMP].key = str_text;
+    sensor_status.type[SENSOR_TYPE_TEMP].mqtt_key = str_text;
 
     // set humidity timeout according to 'htime' parameter
     WebGetArg (D_CMND_SENSOR_HUMI_TIMEOUT, str_text, sizeof (str_text));
-    sensor_config[SENSOR_TYPE_HUMI].timeout = (uint16_t)atoi (str_text);
+    sensor_status.type[SENSOR_TYPE_HUMI].timeout = (uint16_t)atoi (str_text);
 
     // set humidity topic according to 'htopic' parameter
     WebGetArg (D_CMND_SENSOR_HUMI_TOPIC, str_text, sizeof (str_text));
-    sensor_config[SENSOR_TYPE_HUMI].topic = str_text;
+    sensor_status.type[SENSOR_TYPE_HUMI].mqtt_topic = str_text;
 
     // set humidity key according to 'hkey' parameter
     WebGetArg (D_CMND_SENSOR_HUMI_KEY, str_text, sizeof (str_text));
-    sensor_config[SENSOR_TYPE_HUMI].key = str_text;
+    sensor_status.type[SENSOR_TYPE_HUMI].mqtt_key = str_text;
 
     // set presence timeout according to 'ptime' parameter
     WebGetArg (D_CMND_SENSOR_PRES_TIMEOUT, str_text, sizeof (str_text));
-    sensor_config[SENSOR_TYPE_PRES].timeout = (uint16_t)atoi (str_text);
+    sensor_status.type[SENSOR_TYPE_PRES].timeout = (uint16_t)atoi (str_text);
 
     // set presence topic according to 'ptopic' parameter
     WebGetArg (D_CMND_SENSOR_PRES_TOPIC, str_text, sizeof (str_text));
-    sensor_config[SENSOR_TYPE_PRES].topic = str_text;
+    sensor_status.type[SENSOR_TYPE_PRES].mqtt_topic = str_text;
 
     // set presence key according to 'pkey' parameter
     WebGetArg (D_CMND_SENSOR_PRES_KEY, str_text, sizeof (str_text));
-    sensor_config[SENSOR_TYPE_PRES].key = str_text;
+    sensor_status.type[SENSOR_TYPE_PRES].mqtt_key = str_text;
 
     // save config
     SensorSaveConfig ();
@@ -1046,7 +969,7 @@ void SensorWebConfigurePage ()
 
   // timeout 
   WSContentSend_P (PSTR ("<p>\n"));
-  itoa (sensor_config[SENSOR_TYPE_TEMP].timeout, str_value, 10);
+  itoa (sensor_status.type[SENSOR_TYPE_TEMP].timeout, str_value, 10);
   WSContentSend_P (SENSOR_FIELD_CONFIG, D_SENSOR_TIMEOUT, "sec.", D_CMND_SENSOR_TEMP_TIMEOUT, D_CMND_SENSOR_TEMP_TIMEOUT, 1, 3600, "1", str_value);
   WSContentSend_P (PSTR ("</p>\n"));
 
@@ -1055,8 +978,8 @@ void SensorWebConfigurePage ()
   // topic and key
   WSContentSend_P (PSTR ("<p>\n"));
 
-  WSContentSend_P (SENSOR_FIELD_INPUT, D_SENSOR_TOPIC, D_CMND_SENSOR_TEMP_TOPIC, D_CMND_SENSOR_TEMP_TOPIC, sensor_config[SENSOR_TYPE_TEMP].topic.c_str ());
-  WSContentSend_P (SENSOR_FIELD_INPUT, D_SENSOR_KEY, D_CMND_SENSOR_TEMP_KEY, D_CMND_SENSOR_TEMP_KEY, sensor_config[SENSOR_TYPE_TEMP].key.c_str ());
+  WSContentSend_P (SENSOR_FIELD_INPUT, D_SENSOR_TOPIC, D_CMND_SENSOR_TEMP_TOPIC, D_CMND_SENSOR_TEMP_TOPIC, sensor_status.type[SENSOR_TYPE_TEMP].mqtt_topic.c_str ());
+  WSContentSend_P (SENSOR_FIELD_INPUT, D_SENSOR_KEY, D_CMND_SENSOR_TEMP_KEY, D_CMND_SENSOR_TEMP_KEY, sensor_status.type[SENSOR_TYPE_TEMP].mqtt_key.c_str ());
 
   WSContentSend_P (PSTR ("</p>\n"));
   WSContentSend_P (SENSOR_FIELDSET_STOP);
@@ -1068,7 +991,7 @@ void SensorWebConfigurePage ()
 
   // timeout 
   WSContentSend_P (PSTR ("<p>\n"));
-  itoa (sensor_config[SENSOR_TYPE_HUMI].timeout, str_value, 10);
+  itoa (sensor_status.type[SENSOR_TYPE_HUMI].timeout, str_value, 10);
   WSContentSend_P (SENSOR_FIELD_CONFIG, D_SENSOR_TIMEOUT, "sec.", D_CMND_SENSOR_HUMI_TIMEOUT, D_CMND_SENSOR_HUMI_TIMEOUT, 1, 3600, "1", str_value);
   WSContentSend_P (PSTR ("</p>\n"));
 
@@ -1077,8 +1000,8 @@ void SensorWebConfigurePage ()
   // topic and key
   WSContentSend_P (PSTR ("<p>\n"));
 
-  WSContentSend_P (SENSOR_FIELD_INPUT, D_SENSOR_TOPIC, D_CMND_SENSOR_HUMI_TOPIC, D_CMND_SENSOR_HUMI_TOPIC, sensor_config[SENSOR_TYPE_HUMI].topic.c_str ());
-  WSContentSend_P (SENSOR_FIELD_INPUT, D_SENSOR_KEY, D_CMND_SENSOR_HUMI_KEY, D_CMND_SENSOR_HUMI_KEY, sensor_config[SENSOR_TYPE_HUMI].key.c_str ());
+  WSContentSend_P (SENSOR_FIELD_INPUT, D_SENSOR_TOPIC, D_CMND_SENSOR_HUMI_TOPIC, D_CMND_SENSOR_HUMI_TOPIC, sensor_status.type[SENSOR_TYPE_HUMI].mqtt_topic.c_str ());
+  WSContentSend_P (SENSOR_FIELD_INPUT, D_SENSOR_KEY, D_CMND_SENSOR_HUMI_KEY, D_CMND_SENSOR_HUMI_KEY, sensor_status.type[SENSOR_TYPE_HUMI].mqtt_key.c_str ());
 
   WSContentSend_P (PSTR ("</p>\n"));
   WSContentSend_P (SENSOR_FIELDSET_STOP);
@@ -1090,7 +1013,7 @@ void SensorWebConfigurePage ()
 
   // timeout 
   WSContentSend_P (PSTR ("<p>\n"));
-  itoa (sensor_config[SENSOR_TYPE_PRES].timeout, str_value, 10);
+  itoa (sensor_status.type[SENSOR_TYPE_PRES].timeout, str_value, 10);
   WSContentSend_P (SENSOR_FIELD_CONFIG, D_SENSOR_TIMEOUT, "sec.", D_CMND_SENSOR_PRES_TIMEOUT, D_CMND_SENSOR_PRES_TIMEOUT, 1, 3600, "1", str_value);
   WSContentSend_P (PSTR ("</p>\n"));
 
@@ -1099,8 +1022,8 @@ void SensorWebConfigurePage ()
   // topic and key 
   WSContentSend_P (PSTR ("<p>\n"));
 
-  WSContentSend_P (SENSOR_FIELD_INPUT, D_SENSOR_TOPIC, D_CMND_SENSOR_PRES_TOPIC, D_CMND_SENSOR_PRES_TOPIC, sensor_config[SENSOR_TYPE_PRES].topic.c_str ());
-  WSContentSend_P (SENSOR_FIELD_INPUT, D_SENSOR_KEY, D_CMND_SENSOR_PRES_KEY, D_CMND_SENSOR_PRES_KEY, sensor_config[SENSOR_TYPE_PRES].key.c_str ());
+  WSContentSend_P (SENSOR_FIELD_INPUT, D_SENSOR_TOPIC, D_CMND_SENSOR_PRES_TOPIC, D_CMND_SENSOR_PRES_TOPIC, sensor_status.type[SENSOR_TYPE_PRES].mqtt_topic.c_str ());
+  WSContentSend_P (SENSOR_FIELD_INPUT, D_SENSOR_KEY, D_CMND_SENSOR_PRES_KEY, D_CMND_SENSOR_PRES_KEY, sensor_status.type[SENSOR_TYPE_PRES].mqtt_key.c_str ());
 
   WSContentSend_P (PSTR ("</p>\n"));
   WSContentSend_P (SENSOR_FIELDSET_STOP);
@@ -1139,7 +1062,7 @@ bool Xsns125 (uint8_t function)
       if (TasmotaGlobal.uptime > 5) SensorEverySecond ();
       break;
     case FUNC_JSON_APPEND:
-      SensorShowJSON (false);
+      SensorShowJSON ();
       break;
 
 #ifdef USE_WEBSERVER
@@ -1159,5 +1082,3 @@ bool Xsns125 (uint8_t function)
 }
 
 #endif      // USE_GENERIC_SENSOR
-#endif      //  FIRMWARE_SAFEBOOT
-
