@@ -44,10 +44,10 @@
 #define KORAD_RECV_BUFFER_MAX     64        // maximum size of a reception buffer
 
 #define KORAD_GRAPH_SAMPLE        1200       // number of samples in graph (2mn with one sample every 100ms)
-#define KORAD_GRAPH_HEIGHT        500        // height of graph in pixels
+#define KORAD_GRAPH_HEIGHT        600        // height of graph in pixels
 #define KORAD_GRAPH_WIDTH         1200       // width of graph in pixels
-#define KORAD_GRAPH_PERCENT_START 10     
-#define KORAD_GRAPH_PERCENT_STOP  90
+#define KORAD_GRAPH_PERCENT_START 6     
+#define KORAD_GRAPH_PERCENT_STOP  94
 
 #define KORAD_UNIT_SIZE           4
 #define KORAD_VALUE_SIZE          8
@@ -117,8 +117,8 @@ const char D_KORAD_COLOR_RECORD_OFF[]  PROGMEM = "#800";
 const char D_KORAD_PAGE_CONFIG[]      PROGMEM = "/config";
 const char D_KORAD_PAGE_CONTROL[]     PROGMEM = "/ctrl";
 const char D_KORAD_PAGE_DATA_UPDATE[] PROGMEM = "/data.upd";
-const char D_KORAD_PAGE_GRAPH_FRAME[] PROGMEM = "/frame.svg";
-const char D_KORAD_PAGE_GRAPH_DATA[]  PROGMEM = "/curve.svg";
+const char D_KORAD_PAGE_GRAPH_FRAME[] PROGMEM = "/frame.html";
+const char D_KORAD_PAGE_GRAPH_DATA[]  PROGMEM = "/curve.html";
 
 // power supply units
 enum KoradUnit { KORAD_UNIT_V, KORAD_UNIT_A, KORAD_UNIT_W };
@@ -178,7 +178,6 @@ static struct {
 // graph
 static struct {
   int   index;                                   // current array index per refresh period
-  int   height;                                  // height of graph in pixels
   float vmax;                                    // maximum voltage scale
   float imax;                                    // maximum current scale
   uint16_t arr_voltage[KORAD_GRAPH_SAMPLE];      // array of instant voltage (x 100)
@@ -609,7 +608,6 @@ void KoradInit ()
 
   // init graph data
   korad_graph.index  = 0;
-  korad_graph.height = KORAD_GRAPH_HEIGHT;
   if (korad_graph.vmax == 0) korad_graph.vmax = KORAD_VOLTAGE_MAX;
   if (korad_graph.imax == 0) korad_graph.imax = KORAD_CURRENT_MAX;
   for (index = 0; index < KORAD_GRAPH_SAMPLE; index++)
@@ -1040,12 +1038,11 @@ void KoradWebGraphData ()
   
   // start of SVG graph
   WSContentBegin (200, CT_HTML);
-  WSContentSend_P (PSTR ("<svg viewBox='%d %d %d %d'>\n"), 0, 0, KORAD_GRAPH_WIDTH, korad_graph.height);
+  WSContentSend_P (PSTR ("<svg viewBox='%d %d %d %d' preserveAspectRatio='none' width='100%%' height='100%%'>\n"), 0, 0, KORAD_GRAPH_WIDTH, KORAD_GRAPH_HEIGHT);
 
   // SVG style 
   WSContentSend_P (PSTR ("<style type='text/css'>\n"));
-  WSContentSend_P (PSTR ("polyline {fill:none;stroke-width:1;}\n"));
-  WSContentSend_P (PSTR ("polyline.voltage {stroke:%s;}\n"), D_KORAD_COLOR_VOLTAGE);
+  WSContentSend_P (PSTR ("polyline.voltage {stroke:%s;fill:none;stroke-width:2;}\n"), D_KORAD_COLOR_VOLTAGE);
   WSContentSend_P (PSTR ("path.current {stroke:%s;fill:%s;fill-opacity:0.6;}\n"), D_KORAD_COLOR_CURRENT, D_KORAD_COLOR_CURRENT);
   WSContentSend_P (PSTR ("line.time {stroke:white;stroke-width:1;}\n"));
   WSContentSend_P (PSTR ("text.time {font-size:1.5rem;fill:grey;}\n"), str_data);
@@ -1071,7 +1068,7 @@ void KoradWebGraphData ()
     // if voltage is defined, display point
     if (graph_value != UINT16_MAX)
     {
-      graph_y = korad_graph.height - (graph_value * korad_graph.height / graph_vmax);
+      graph_y = KORAD_GRAPH_HEIGHT - (graph_value * KORAD_GRAPH_HEIGHT / graph_vmax);
       graph_x = graph_left + (graph_width * index / KORAD_GRAPH_SAMPLE);
 
       // if point has changed or last point
@@ -1133,7 +1130,7 @@ void KoradWebGraphData ()
     if (graph_value != UINT16_MAX)
     {
       graph_x = graph_left + (graph_width * index / KORAD_GRAPH_SAMPLE);
-      graph_y = korad_graph.height - (graph_value * korad_graph.height / graph_imax);
+      graph_y = KORAD_GRAPH_HEIGHT - (graph_value * KORAD_GRAPH_HEIGHT / graph_imax);
 
       // if first point
       if (first_point)
@@ -1222,14 +1219,13 @@ void KoradWebGraphFrame ()
 
   // start of SVG graph
   WSContentBegin (200, CT_HTML);
-  WSContentSend_P (PSTR ("<svg viewBox='%d %d %d %d'>\n"), 0, 0, KORAD_GRAPH_WIDTH, korad_graph.height);
+  WSContentSend_P (PSTR ("<svg viewBox='%d %d %d %d' preserveAspectRatio='none' width='100%%' height='100%%'>\n"), 0, 0, KORAD_GRAPH_WIDTH, KORAD_GRAPH_HEIGHT);
 
   // SVG style 
   WSContentSend_P (PSTR ("<style type='text/css'>\n"));
   WSContentSend_P (PSTR ("rect {stroke:grey;fill:none;}\n"));
   WSContentSend_P (PSTR ("line.dash {stroke:grey;stroke-width:1;stroke-dasharray:8;}\n"));
-  WSContentSend_P (PSTR ("line.time {stroke:white;stroke-width:1;}\n"));
-  WSContentSend_P (PSTR ("text {font-size:1rem;}\n"));
+  WSContentSend_P (PSTR ("text {font-size:0.8rem;}\n"));
   WSContentSend_P (PSTR ("text.voltage {stroke:%s;fill:%s;}\n"), D_KORAD_COLOR_VOLTAGE, D_KORAD_COLOR_VOLTAGE);
   WSContentSend_P (PSTR ("text.current {stroke:%s;fill:%s;}\n"), D_KORAD_COLOR_CURRENT, D_KORAD_COLOR_CURRENT);
   WSContentSend_P (PSTR ("</style>\n"));
@@ -1262,21 +1258,21 @@ void KoradWebGraphFrame ()
 
   // Current graduation
   KoradGenerateValueLabel (str_value, str_unit, korad_graph.imax, 2, KORAD_UNIT_A);
-  WSContentSend_P (KORAD_HTML_UNIT, "current", KORAD_GRAPH_PERCENT_STOP + 2, 3, str_value, str_unit);
+  WSContentSend_P (KORAD_HTML_UNIT, "current", KORAD_GRAPH_PERCENT_STOP + 1, 3, str_value, str_unit);
 
   value = korad_graph.imax * 0.75;
   KoradGenerateValueLabel (str_value, str_unit, value, 2, KORAD_UNIT_A);
-  WSContentSend_P (KORAD_HTML_UNIT, "current", KORAD_GRAPH_PERCENT_STOP + 2, 26, str_value, str_unit);
+  WSContentSend_P (KORAD_HTML_UNIT, "current", KORAD_GRAPH_PERCENT_STOP + 1, 26, str_value, str_unit);
 
   value = korad_graph.imax * 0.5;
   KoradGenerateValueLabel (str_value, str_unit, value, 2, KORAD_UNIT_A);
-  WSContentSend_P (KORAD_HTML_UNIT, "current", KORAD_GRAPH_PERCENT_STOP + 2, 51, str_value, str_unit);
+  WSContentSend_P (KORAD_HTML_UNIT, "current", KORAD_GRAPH_PERCENT_STOP + 1, 51, str_value, str_unit);
 
   value = korad_graph.imax * 0.25;
   KoradGenerateValueLabel (str_value, str_unit, value, 2, KORAD_UNIT_A);
-  WSContentSend_P (KORAD_HTML_UNIT, "current", KORAD_GRAPH_PERCENT_STOP + 2, 76, str_value, str_unit);
+  WSContentSend_P (KORAD_HTML_UNIT, "current", KORAD_GRAPH_PERCENT_STOP + 1, 76, str_value, str_unit);
 
-  WSContentSend_P (KORAD_HTML_UNIT, "current", KORAD_GRAPH_PERCENT_STOP + 2, 99, "0", "");
+  WSContentSend_P (KORAD_HTML_UNIT, "current", KORAD_GRAPH_PERCENT_STOP + 1, 99, "0", "");
 
   // end of SVG graph
   WSContentSend_P (PSTR ("</svg>\n"));
@@ -1288,9 +1284,7 @@ void KoradWebPageControl ()
 {
   bool  result;
   int   index, digit; 
-  long  percentage; 
   float value;
-  char* pstr_digit;
   char  str_unit[KORAD_UNIT_SIZE];
   char  str_value[KORAD_VALUE_SIZE];
   char  str_next[8];
@@ -1367,13 +1361,6 @@ void KoradWebPageControl ()
   {
     WebGetArg (D_CMND_KORAD_IMAX, str_value, sizeof (str_value)); 
     korad_graph.imax = min ((float)KORAD_CURRENT_MAX, (float)atof (str_value));
-  }
-
-  // get graph height
-  if (Webserver->hasArg (D_CMND_KORAD_HEIGHT))
-  {
-    WebGetArg (D_CMND_KORAD_HEIGHT, str_value, sizeof (str_value)); 
-    korad_graph.height = atoi (str_value);
   }
 
   // beginning of form without authentification
@@ -1453,7 +1440,7 @@ void KoradWebPageControl ()
   WSContentSend_P (PSTR ("div.set div.ref {width:25%%;background:none;}\n"));
 
   // graph + and -
-  WSContentSend_P (PSTR ("div.adjust {width:100%%;max-width:1000px;margin:1rem auto 0.25rem auto;}\n"));
+  WSContentSend_P (PSTR ("div.adjust {width:100%%;margin:0px;}\n"));
   WSContentSend_P (PSTR ("div.choice {display:inline-block;font-size:0.8rem;padding:0.1rem;margin:auto;border:1px #666 solid;background:none;color:#fff;border-radius:6px;}\n"));
   WSContentSend_P (PSTR ("div.choice a {color:white;}\n"));
   WSContentSend_P (PSTR ("div.choice div {font-weight:bold;padding:0.1rem;width:30px;height:15px;}\n"));
@@ -1462,7 +1449,6 @@ void KoradWebPageControl ()
   WSContentSend_P (PSTR ("div.choice a div.item:hover {background:#666;}\n"));
   WSContentSend_P (PSTR ("div.left {float:left;margin-left:1%%;}\n"));
   WSContentSend_P (PSTR ("div.right {float:right;margin-right:2%%;}\n"));
-  WSContentSend_P (PSTR ("div.center {float:middle;}\n"));
 
   // watt meter
   WSContentSend_P (PSTR (".watt div {color:%s;border:1px %s solid;}\n"), D_KORAD_COLOR_WATT, D_KORAD_COLOR_WATT_OFF);
@@ -1511,10 +1497,10 @@ void KoradWebPageControl ()
   WSContentSend_P (PSTR ("a:link {text-decoration:none;}\n"));
 
   // graph
-  percentage = (100 * korad_graph.height / KORAD_GRAPH_WIDTH) + 2; 
-  WSContentSend_P (PSTR (".svg-container {position:relative;width:100%%;max-width:%dpx;padding-top:%d%%;margin:auto;}\n"), KORAD_GRAPH_WIDTH, percentage);
-  WSContentSend_P (PSTR (".svg-content {display:inline-block;position:absolute;top:0;left:0;}\n"));
+  WSContentSend_P (PSTR ("div.graph {position:relative;width:100%%;margin:auto;margin-top:3vh;height:60vh;}\n"));
+  WSContentSend_P (PSTR ("object.graph {display:inline-block;position:absolute;top:0;left:0;}\n"));
 
+  // end of header & start of page
   WSContentSend_P (PSTR ("</style>\n"));
   WSContentSend_P (PSTR ("</head>\n"));
   WSContentSend_P (PSTR ("<body>\n"));
@@ -1717,14 +1703,6 @@ void KoradWebPageControl ()
   WSContentSend_P (PSTR ("<a href='/ctrl?%s=%s' title='Increase max voltage to %s V'><div class='item size'>∧</div></a>"), D_CMND_KORAD_VMAX, str_value, str_value);
   WSContentSend_P (PSTR ("</div>\n"));      // choice left volt
 
-  // graph height
-  WSContentSend_P (PSTR ("<div class='choice center'>"));
-  index = korad_graph.height - 50;
-  WSContentSend_P (PSTR ("<a href='/ctrl?%s=%d' title='Reduce graph height to %d pixels'><div class='item size'>-</div></a>"), D_CMND_KORAD_HEIGHT, index, index);
-  index = korad_graph.height + 50;
-  WSContentSend_P (PSTR ("<a href='/ctrl?%s=%d' title='Increase graph height to %d pixels'><div class='item size'>+</div></a>"), D_CMND_KORAD_HEIGHT, index, index);
-  WSContentSend_P (PSTR ("</div>\n"));      // choice center
-
   // current increase/decrease buttons
   WSContentSend_P (PSTR ("<div class='choice right amp'>"));
   value = korad_graph.imax / 2;
@@ -1743,9 +1721,9 @@ void KoradWebPageControl ()
   // -----------------
 
   // graph frame and data
-  WSContentSend_P (PSTR ("<div class='svg-container'>\n"));
-  WSContentSend_P (PSTR ("<object class='svg-content' id='base' type='image/svg+xml' width='100%%' height='100%%' data='%s'></object>\n"), D_KORAD_PAGE_GRAPH_FRAME);
-  WSContentSend_P (PSTR ("<object class='svg-content' id='data' type='image/svg+xml' width='100%%' height='100%%' data='%s?ts=0'></object>\n"), D_KORAD_PAGE_GRAPH_DATA); 
+  WSContentSend_P (PSTR ("<div class='graph'>\n"));
+  WSContentSend_P (PSTR ("<object class='graph' id='base' type='image/svg+xml' data='%s' width='100%%' height='100%%'></object>\n"), D_KORAD_PAGE_GRAPH_FRAME);
+  WSContentSend_P (PSTR ("<object class='graph' id='data' type='image/svg+xml' data='%s' width='100%%' height='100%%'></object>\n"), D_KORAD_PAGE_GRAPH_DATA); 
   WSContentSend_P (PSTR ("</div>\n"));      // svg-container
 
   // end of page
