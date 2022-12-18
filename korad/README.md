@@ -14,11 +14,22 @@ A complete explanation with step by step procedure is available at http://www.be
 
 Pre-compiled versions are available in the [**binary**](https://github.com/NicolasBernaerts/tasmota/tree/master/korad/binary) folder.
 
+Adapter board
+-------------
+
+To communication with your **Korad KA3005P** power supply, you need to connect an internal Tasmota adapter board.
+
+This board replaces the serial <-> USB internal board. Tasmota will then handle all serial protocol allowing you to manage thje power supply thru a simple Web browser.
+
 Here is the adapter board diagram and board design based on a **Wemos mini D1 Pro**.
 
 ![Interface diagram](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/korad-interface-diagram.png)
 
-![Interface board](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/korad-interface-board.png) 
+![Interface board](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/korad-interface-board.png)
+
+Once placed in the power supply unit you should get something like this :
+
+![Daughter card](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/tasmota-daughter-card.jpg) ![Internal connector](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/tasmota-internal-connector.jpg) ![External antenna](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/tasmota-external-antenna.jpg)
 
 Configuration
 -------------
