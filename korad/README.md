@@ -35,7 +35,9 @@ Once placed in the power supply unit you should get something like this :
 ![Daughter card](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/tasmota-daughter-card.jpg)
 ![External antenna](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/tasmota-external-antenna.jpg)
 
-You can see tthe original **serial <-> USB** board under the new **Wemos Mini** daughter board.
+You can see the original **serial <-> USB** board under the new **Wemos Mini** daughter board.
+
+Connector used is the original one, just unplugged from original daughter board.
 
 Configuration
 -------------
