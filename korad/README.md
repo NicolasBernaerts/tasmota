@@ -29,7 +29,9 @@ Here is the adapter board diagram and board design based on a **Wemos mini D1 Pr
 
 Once placed in the power supply unit you should get something like this :
 
-![Daughter card](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/tasmota-daughter-card.jpg) ![Internal connector](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/tasmota-internal-connector.jpg) ![External antenna](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/tasmota-external-antenna.jpg)
+![Internal connector](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/tasmota-internal-connector.jpg)
+![Daughter card](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/tasmota-daughter-card.jpg)
+![External antenna](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/tasmota-external-antenna.jpg)
 
 Configuration
 -------------
