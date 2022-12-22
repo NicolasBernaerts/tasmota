@@ -123,7 +123,7 @@
 #define FTP_SERVER_PASSWORD       "teleinfo"
 
 // build
-#if defined BUILD_ESP32S3
+#if defined BUILD_ESP32S3_16M
 #define EXTENSION_BUILD "esp32s3_16m10m"
 #elif defined BUILD_ESP32S2
 #define EXTENSION_BUILD "esp32s2-4m320k"
