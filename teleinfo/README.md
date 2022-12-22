@@ -167,17 +167,17 @@ Finaly, in **Configure Teleinfo** you need to select your Teleinfo adapter baud 
 
 ![Config page](./screen/tasmota-teleinfo-config.png)
 
-### Realtime message
+### Realtime messages
 
 ![Grah message](./screen/tasmota-teleinfo-message.png) 
 
-### Power, voltage and CosPhi
+### Power, Voltage and CosPhi
 
 ![Grah monophase power](./screen/tasmota-teleinfo-graph-power.png)
 ![Grah monophase voltage](./screen/tasmota-teleinfo-graph-voltage.png) 
 ![Grah monophase Cos phi](./screen/tasmota-teleinfo-graph-cosphi.png) 
  
-### Totals
+### Wh Totals
 
 ![Daily total](./screen/tasmota-teleinfo-total-day.png)
 ![Monthly total](./screen/tasmota-teleinfo-total-month.png)
