@@ -1,14 +1,11 @@
 /*
   xdrv_97_ecowatt_client.ino - Ecowatt MQTT client (needs a ecowatt server)
   
-  This module connects to french RTE EcoWatt server to retrieve electricity production forecast.
-  It publishes status of current slot and next 2 slots on the MQTT stream under
-  
-    {"Time":"2022-10-10T23:51:09","Ecowatt":{"now":1,"next":2,
-      "day0":{"jour":"2022-10-06","dvalue":1,"0":1,"1":1,"2":1,"3":1,"4":1,"5":1,"6":1,...,"23":1},
-      "day1":{"jour":"2022-10-07","dvalue":2,"0":1,"1":1,"2":2,"3":1,"4":1,"5":1,"6":1,...,"23":1},
-      "day2":{"jour":"2022-10-08","dvalue":3,"0":1,"1":1,"2":1,"3":1,"4":1,"5":3,"6":1,...,"23":1},
-      "day3":{"jour":"2022-10-09","dvalue":2,"0":1,"1":1,"2":1,"3":2,"4":1,"5":1,"6":1,...,"23":1} }}
+  This module is a client of the french RTE EcoWatt server available under ecowatt project.
+
+  It subscribes to MQTT topic from the server and make current and next slot availables.
+
+  It also add today's ecowatt slots on the main page.
 
   Copyright (C) 2022  Nicolas Bernaerts
     06/10/2022 - v1.0 - Creation 
@@ -29,7 +26,6 @@
  *        EcoWatt electricity production forecast
 \****************************************************/
 
-#ifndef FIRMWARE_SAFEBOOT
 #ifdef USE_ECOWATT_CLIENT
 
 #define XDRV_97                    97
@@ -87,7 +83,7 @@ static struct {
 void CmndEcowattHelp ()
 {
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Ecowatt MQTT client commands :"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - eco_topic = set topic where Ecowatt data are published"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - eco_topic <topic> = set Ecowatt topic to subscribe"));
   ResponseCmndDone ();
 }
 
@@ -179,7 +175,7 @@ void EcowattInit ()
   }
 
   // log help command
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: eco_help to get help on Ecowatt production forecast commands"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: eco_help to get help on Ecowatt client commands"));
 }
 
 // check and update MQTT ecowatt
@@ -342,4 +338,3 @@ bool Xdrv97 (uint8_t function)
 }
 
 #endif    // USE_ECOWATT_CLIENT
-#endif    // FIRMWARE_SAFEBOOT
