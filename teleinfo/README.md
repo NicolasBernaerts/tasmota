@@ -179,6 +179,6 @@ Finaly, in **Configure Teleinfo** you need to select your Teleinfo adapter baud 
  
 ### Wh Totals
 
-![Daily total](./screen/tasmota-teleinfo-total-day.png)
-![Monthly total](./screen/tasmota-teleinfo-total-month.png)
 ![Yearly total](./screen/tasmota-teleinfo-total-year.png)
+![Monthly total](./screen/tasmota-teleinfo-total-month.png)
+![Daily total](./screen/tasmota-teleinfo-total-day.png)
