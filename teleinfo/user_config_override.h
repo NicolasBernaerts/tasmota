@@ -63,17 +63,15 @@
     01/04/2022 - v9.6   - Add software watchdog feed to avoid lock
     22/04/2022 - v9.7   - Option to minimise LittleFS writes (day:every 1h and week:every 6h)
     09/06/2022 - v9.7.1 - Correction of EAIT bug
-    04/08/2022 - v9.8   - Based on Tasmota 12
-                          Add ESP32S2 support
+    04/08/2022 - v9.8   - Based on Tasmota 12, add ESP32S2 support
                           Remove FTP server auto start
     18/08/2022 - v9.9   - Force GPIO_TELEINFO_RX as digital input
     31/08/2022 - v9.9.1 - Bug littlefs config and graph data recording
     01/09/2022 - v9.9.2 - Add Tempo and Production mode (thanks to Sébastien)
     08/09/2022 - v9.9.3 - Correct publication synchronised with teleperiod
-    26/10/2022 - v10.0  - Add monthly and yearly bar graph
-    06/11/2022 - v10.1  - Bug fixes on monthly and yearly graph
-                          Change in lltoa conversion
-    15/11/2022 - v10.2  - Add daily bar graph
+    26/10/2022 - v10.0  - Add bar graph monthly (every day) and yearly (every month)
+    06/11/2022 - v10.1  - Bug fixes on bar graphs and change in lltoa conversion
+    15/11/2022 - v10.2  - Add bar graph daily (every hour)
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -125,22 +123,24 @@
 #define FTP_SERVER_PASSWORD       "teleinfo"
 
 // build
-#if defined BUILD_ESP32S2
-#define EXTENSION_BUILD   "esp32s2"
+#if defined BUILD_ESP32S3
+#define EXTENSION_BUILD "esp32s3_16m10m"
+#elif defined BUILD_ESP32S2
+#define EXTENSION_BUILD "esp32s2-4m320k"
 #elif defined BUILD_ESP32_4M
-#define EXTENSION_BUILD   "esp32-4m1.3m"
+#define EXTENSION_BUILD "esp32-4m1.3m"
 #elif defined BUILD_16M14M
-#define EXTENSION_BUILD   "esp-16m14m"
+#define EXTENSION_BUILD "esp8266-16m14m"
 #elif defined BUILD_4M2M
-#define EXTENSION_BUILD   "esp-4m2m"
+#define EXTENSION_BUILD "esp8266-4m2m"
 #elif defined BUILD_2M1M
-#define EXTENSION_BUILD   "esp-2m1m"
+#define EXTENSION_BUILD "esp8266-2m1m"
 #elif defined BUILD_1M128K
-#define EXTENSION_BUILD   "esp-1m128k"
+#define EXTENSION_BUILD "esp8266-1m128k"
 #elif defined BUILD_1M64K
-#define EXTENSION_BUILD   "esp-1m64k"
+#define EXTENSION_BUILD "esp8266-1m64k"
 #else
-#define EXTENSION_BUILD   "esp-nofs"
+#define EXTENSION_BUILD "esp8266"
 #endif
 
 // extension data
@@ -326,7 +326,7 @@
 #undef USE_IBEACON
 
 #undef USE_AUTOCONF                           // Disable Esp32 autoconf feature
-#define USE_BERRY
+#undef USE_BERRY
 
 #undef USE_DISPLAY
 #undef USE_SR04
