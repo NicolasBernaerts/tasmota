@@ -1,8 +1,6 @@
-Teleinfo Tasmota firmware for Linky meters
-=============
+# Teleinfo Tasmota firmware for Linky meters
 
-Presentation
-------------
+## Presentation
 
 This evolution of **Tasmota 12** firmware has been enhanced to handle France energy meters known as **Linky** using **Teleinfo** protocol.
 
@@ -41,8 +39,7 @@ Pre-compiled versions are available in the [**binary**](https://github.com/Nicol
 
 Teleinfo protocol is described in [this document](https://www.enedis.fr/sites/default/files/Enedis-NOI-CPT_54E.pdf)
 
-MQTT data
----------
+## MQTT data
 
 In the configuration page, you can ecide to publish Teleinfo data in a specific MQTT **TIC** section.
 
@@ -74,8 +71,7 @@ MQTT result should look like that :
     compteur/tele/STATE = {"Time":"2021-03-13T09:25:26","Uptime":"0T13:25:12","UptimeSec":48312,"Heap":18,"SleepMode":"Dynamic","Sleep":50,"LoadAvg":19,"MqttCount":1,"Wifi":{"AP":1,"SSId":"hello-nantes","BSSId":"30:23:03:xx:xx:xx","Channel":5,"RSSI":64,"Signal":-68,"LinkCount":1,"Downtime":"0T00:00:05"}}
     compteur/tele/SENSOR = {"Time":"2021-03-13T09:25:26","ENERGY":{"TotalStartTime":"2021-03-13T09:25:26","Total":7970.950,"Yesterday":3.198,"Today":6.071,"Period":47,"Power":860,"Current":4.000},"TIC":{"ADCO":"061964xxxxxx","OPTARIF":"BASE","ISOUSC":"30","BASE":"007970950","PTEC":"TH..","IINST":"004","IMAX":"090","PAPP":"00860","HHPHC":"A","MOTDETAT":"000000","PHASE":1,"SSOUSC":"6000","IINST1":"4","SINSTS1":"860"},"IP":"192.168.xx.xx","MAC":"50:02:91:xx:xx:xx"}
 
-TCP server
-----------
+## TCP server
 
 To retrieve the complete teleinfo stream over your LAN, you just need to start the embedded TCP server thru tasmota console :
 
@@ -101,8 +97,7 @@ To stop streaming, you just need to stop the embedded TCP server thru tasmota co
         11:59:49.840 TCP: Stoping TCP server
         11:59:49.844 MQT: turenne/compteur/stat/RESULT = {"tcp_stop":"Done"}
 
-FTP server
-----------
+## FTP server
 
 If you are using a build with a LittleFS partition, this firmware can run a simple FTP server.
 
@@ -117,8 +112,7 @@ Credentials are :
 This embedded FTP server main limitation is that it can only one connexion at a time. \
 So you need to limit simultaneous connexions to **1** on your FTP client. Otherwise, connexion will fail.
 
-Compilation
------------
+## Compilation
 
 If you want to compile this firmware version, you just need to :
 1. install official tasmota sources
@@ -142,8 +136,7 @@ Here is where you should place different files from this repository and from **t
 
 If everything goes fine, you should be able to compile your own build.
 
-Adapter
--------
+## Adapter
 
 Between your Energy meter and your Tasmota device, you'll need an adapter to convert **Teleinfo** signal to **TTL serial**.
 
@@ -168,17 +161,21 @@ Finaly, in **Configure Teleinfo** you need to select your Teleinfo adapter baud 
   * **1200** (original white meter or green Linky in historic mode)
   * **9600** (green Linky in standard mode)
 
-Screenshot
-----------
+## Screenshot
 
-Configuration
+### Configuration
 
-![Config page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-config.png)  
+![Config page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-config.png)
+
+### Realtime message
+
 ![Grah message](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-message.png) 
+
+### Power, voltage and CosPhi
 
 ![Grah monophase power](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-graph-power.png)
 ![Grah monophase voltage](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-graph-voltage.png) 
 ![Grah monophase Cos phi](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-graph-cosphi.png) 
  
-![Board page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-board.png)
+### Totals
 
