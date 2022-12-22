@@ -10,6 +10,21 @@ A complete explanation with step by step procedure is available at http://www.be
 
 Pre-compiled versions are available in the [**binary**](https://github.com/NicolasBernaerts/tasmota/tree/master/korad/binary) folder.
 
+## Description
+
+This firmware allows to fully manage your **Korad 3005P** power supply from any browser.
+
+It allows you to :
+  * define up to 4 preset voltage values
+  * define up to 4 preset current values
+  * change output voltage and/or maximum current
+  * Set Overload Voltage Protection
+  * Set Overload Current Protection
+  * Switch output On/Off
+  * Record voltage and current to CSV file in realtime
+  
+It has been developped specifically for ESP8266 with 4Mb with a LittleFS partition.  
+
 ## Adapter board
 
 To communication with your **Korad KA3005P** power supply, you need to connect an internal Tasmota adapter board.
