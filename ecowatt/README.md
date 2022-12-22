@@ -87,3 +87,7 @@ You can also retrieve latest ArduinoJson library thru git :
     # git clone https://github.com/bblanchon/ArduinoJson.git
 
 If everything goes fine, you should be able to compile your own build.
+
+## Screenshot
+
+![Main](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/ecowatt/screen/tasmota-ecowatt-main.png)
