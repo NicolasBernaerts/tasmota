@@ -142,11 +142,11 @@ Between your Energy meter and your Tasmota device, you'll need an adapter to con
 
 A very simple adapter diagram can be this one. Pleasee note that some Linky meters may need a resistor as low as **1k** instead of **1.5k** to avoid transmission errors.
 
-![Simple Teleinfo adapter](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/teleinfo-adapter-simple-diagram.png)
+![Simple Teleinfo adapter](./screen/teleinfo-adapter-simple-diagram.png)
 
 Here is a board example using a monolithic 3.3V power supply and an ESP-01.
 
-![Simple Teleinfo board](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/teleinfo-adapter-simple-board.png)
+![Simple Teleinfo board](./screen/teleinfo-adapter-simple-board.png)
 
 You need to connect your adapter output **ESP Rx** to any available serial port of your Tasmota device.
 
@@ -165,21 +165,20 @@ Finaly, in **Configure Teleinfo** you need to select your Teleinfo adapter baud 
 
 ### Configuration
 
-![Config page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-config.png)
+![Config page](./screen/tasmota-teleinfo-config.png)
 
 ### Realtime message
 
-![Grah message](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-message.png) 
+![Grah message](./screen/tasmota-teleinfo-message.png) 
 
 ### Power, voltage and CosPhi
 
-![Grah monophase power](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-graph-power.png)
-![Grah monophase voltage](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-graph-voltage.png) 
-![Grah monophase Cos phi](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-graph-cosphi.png) 
+![Grah monophase power](./screen/tasmota-teleinfo-graph-power.png)
+![Grah monophase voltage](./screen/tasmota-teleinfo-graph-voltage.png) 
+![Grah monophase Cos phi](./screen/tasmota-teleinfo-graph-cosphi.png) 
  
 ### Totals
 
-![Daily total](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-total-day.png)
-![Monthly total](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-total-month.png)
-![Yearly total](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-total-year.png)
-
+![Daily total](./screen/tasmota-teleinfo-total-day.png)
+![Monthly total](./screen/tasmota-teleinfo-total-month.png)
+![Yearly total](./screen/tasmota-teleinfo-total-year.png)
