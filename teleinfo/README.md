@@ -168,18 +168,17 @@ Finaly, in **Configure Teleinfo** you need to select your Teleinfo adapter baud 
   * **1200** (original white meter or green Linky in historic mode)
   * **9600** (green Linky in standard mode)
 
-![Config page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-config.png)  
+Screenshot
+----------
 
-![Main page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-main-triphase.png) 
+Configuration
+
+![Config page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-config.png)  
 ![Grah message](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-message.png) 
 
-
- ![Grah monophase power](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-graph-power.png)
+![Grah monophase power](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-graph-power.png)
+![Grah monophase voltage](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-graph-voltage.png) 
+![Grah monophase Cos phi](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-graph-cosphi.png) 
  
- ![Grah monophase voltage](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-graph-voltage.png) 
- 
- ![Grah monophase Cos phi](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-graph-cosphi.png) 
- 
-
 ![Board page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/teleinfo/screen/tasmota-teleinfo-board.png)
 
