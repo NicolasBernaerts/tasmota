@@ -33,7 +33,9 @@ You can declare your private Base64 key thru this console command :
 
 ### 2- Root CA ###
 
-To declare the root CA of https://data.rte-france.com/, you can collect it from the site itself :
+To declare the root CA of https://data.rte-france.com/, you can collect it from the site itself.
+
+With Firefox :
   * go on the home page
   * click on the lock just before the URL
   * select the certificate in the menu and select **more information**
