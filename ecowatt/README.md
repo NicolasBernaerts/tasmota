@@ -25,13 +25,13 @@ This **Ecowatt** firmware needs :
   * the PEM root certificate authority from https://data.rte-france.com/
   * a topic where to publish Ecowatt data
 
-### 1- Private Key ###
+### 1. Private Key ###
 
 You can declare your private Base64 key thru this console command :
 
     # eco_key your-rte-base64-private-key
 
-### 2- Root CA ###
+### 2. Root CA ###
 
 To declare the root CA of https://data.rte-france.com/, you can collect it from the site itself.
 
@@ -50,7 +50,7 @@ To ease the process, the certificate has been uploaded to this repository. To do
 
 Once the certificate is downloaded and renamed ***ecowatt.pem***, just upload it to the root of the LittleFS partition.
 
-### 3- MQTT Topic ### 
+### 3. MQTT Topic ### 
 
 To declare the MQTT topic where to publish Ecowatt data, run following console command :
 
@@ -58,7 +58,7 @@ To declare the MQTT topic where to publish Ecowatt data, run following console c
     
 You can replace *ecowatt/tele/SENSOR* by any other topic you want.
 
-### 4- Restart ###
+### 4. Restart ###
 
 Once you've setup these 3 data, restart your Tasmota module.
 
@@ -90,4 +90,4 @@ If everything goes fine, you should be able to compile your own build.
 
 ## Screenshot
 
-![Main](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/ecowatt/screen/tasmota-ecowatt-main.png)
+![Main](./screen/tasmota-ecowatt-main.png)
