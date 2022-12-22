@@ -1,8 +1,4 @@
-KORAD power supply Tasmota firmware
-==============
-
-Presentation
-------------
+# KORAD power supply Tasmota firmware
 
 This evolution of **Tasmota 12** has been specifically developped to manage **Korad KA3005P** laboratory power supply.
 
@@ -14,8 +10,7 @@ A complete explanation with step by step procedure is available at http://www.be
 
 Pre-compiled versions are available in the [**binary**](https://github.com/NicolasBernaerts/tasmota/tree/master/korad/binary) folder.
 
-Adapter board
--------------
+## Adapter board
 
 To communication with your **Korad KA3005P** power supply, you need to connect an internal Tasmota adapter board.
 
@@ -25,22 +20,21 @@ Tasmota will then handle all serial protocol allowing you to manage the power su
 
 Here is the adapter board diagram and board design based on a **Wemos mini D1 Pro**.
 
-![Interface diagram](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/korad-interface-diagram.png)
+![Interface diagram](./screen/korad-interface-diagram.png)
 
-![Interface board](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/korad-interface-board.png)
+![Interface board](./screen/korad-interface-board.png)
 
 Once placed in the power supply unit you should get something like this :
 
-![Internal connector](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/tasmota-internal-connector.jpg)
-![Daughter card](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/tasmota-daughter-card.jpg)
-![External antenna](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/tasmota-external-antenna.jpg)
+![Internal connector](./screen/tasmota-internal-connector.jpg)
+![Daughter card](./tasmota-daughter-card.jpg)
+![External antenna](./screen/tasmota-external-antenna.jpg)
 
 You can see the original **serial <-> USB** board under the new **Wemos Mini** daughter board.
 
 Connector used is the original one, just unplugged from original daughter board.
 
-Configuration
--------------
+## Configuration
 
 Input devices should be configured as followed :
   - Serial Rx : connected to Korad Tx
@@ -48,8 +42,7 @@ Input devices should be configured as followed :
 
 As LittleFS is enabled, settings are stored in /korad.cfg
 
-Compilation
------------
+## Compilation
 
 If you want to compile this firmware version, you just need to :
 1. install official tasmota sources
@@ -67,11 +60,15 @@ Here is where you should place different files from this repository and from **t
 
 If everything goes fine, you should be able to compile your own build.
 
-
-
+## Screen shots
 
 Once you've flashed the specific Tasmota firmware, you should get the following control panel accessible thru Tasmota.
 
-![Control page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/tasmota-korad-control.png)
+### Configuration
 
-![Main page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/tasmota-korad-main.png) ![Presets](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/korad/screen/tasmota-korad-preset.png)  
+![Main page](./screen/tasmota-korad-main.png) ![Presets](./screen/tasmota-korad-preset.png)  
+
+### Control
+
+![Control page](./screen/tasmota-korad-control.png)
+
