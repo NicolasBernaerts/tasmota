@@ -75,23 +75,6 @@ This firmware specifically manages :
 **Pilotwire** has been tested on **Sonoff Basic** (1Mb), **ESP01** (1Mb), **Wemos D1 Mini** (4Mb) and **ESP32** (4Mb).
 
 Pilotwire protocol is described at http://www.radiateur-electrique.org/fil-pilote-radiateur.php
-
-### Presence Detection
-
-Presence detection works as follow :
-
-  * Main rules
-    * if no movement sensor is present, movement is considered as permanent
-    * you can configure an **initial** timeout period in minutes
-    * you can configure a **no movement** timeout period in minutes
-  * When **Confort Mode** is set :
-    * when you set comfort mode, target temperature is set to comfort mode
-    * if there is no movement after **initial** timeout, target temperature is set to **eco** mode 
-    * as soon as there is a movement detected, target temperature is set to comfort mode
-    * if there is no movement after **no movement** timeout, target temperature is set to **eco** mode
-  * When **Confort Temperature** is changed :
-    * when you change comfort mode target temperature, target temperature is set back to comfort mode
-    * if there is no movement after **no movement** timeout, target temperature is set to **eco** mode
  
 ### Hardware setup
 
@@ -110,7 +93,7 @@ Next you need to connect a temperature sensor to your device. Typically, you can
 
 First you need to configure normal Tasmota stuff and **Offload** section.
 
-Then, you may configure **Sensor** section. It allows you to declare topic and key of remote sensors you want to use (temperature & presence detection).
+Then, if you are using remote MQTT sensors (temperature and/or presence), you may need to configure **Sensor** section.
 
 Then you need to configure **Pilotwire** section. It allows :
   * to select pilotwire protocol or direct plug management
@@ -125,17 +108,42 @@ You can adjust topic to your environment.
 
 It then allows to adjust target temperature according to Ecowatt signals level 2 (low risk of power cut) and level 3 (high risk of power cut).
 
-**Night mode** is configure thru standard Tasmota **timers** :
+#### Night mode
+
+Night mode allows to automatically drop temperature at night.
+
+It is configured thru standard Tasmota **timers** :
   * Timer **ON** switch to **comfort** temperature
   * Timer **OFF** switches to **night mode** temperature
 
-**open window** detection principle is simple : if temperature drops 0.5°C in less than 4mn heater is switched off, it is switched back on when temperature increase 0.2°C
+#### Open Window detection
 
-**presence** detection decreases temperature to **Eco** level after a certain time of vacancy and to **No frost** level after longer vacancy.
+Open window detection allows to automatically cut the heater when a window is opened and to sxwitch it back on when window is closed.
 
-Here is the template you can use if you are are using a Sonoff Basic.
+Its principle is quite simple : 
+  * if temperature drops 0.5°C in less than 4mn heater is switched off
+  * it is switched back on when temperature increase 0.2°C
 
-![Template Sonoff Basic](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload-pilotwire/screen/tasmota-pilotwire-template.png) 
+Any change in running mode resets the open window detection.
+
+#### Presence detection
+
+Presence detection works as follow :
+
+  * Main rules
+    * if no movement sensor is present, movement is considered as permanent
+    * you can configure an **initial** timeout period in minutes
+    * you can configure a **no movement** timeout period in minutes
+
+  * When **Confort Mode** is set :
+    * when you set comfort mode, target temperature is set to comfort mode
+    * if there is no movement after **initial** timeout, target temperature is set to **eco** mode 
+    * as soon as there is a movement detected, target temperature is set to comfort mode
+    * if there is no movement after **no movement** timeout, target temperature is set to **eco** mode
+
+  * When **Confort Temperature** is changed :
+    * when you change comfort mode target temperature, target temperature is set back to comfort mode
+    * if there is no movement after **no movement** timeout, target temperature is set to **eco** mode
 
 ### Console commands
 
