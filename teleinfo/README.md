@@ -4,7 +4,7 @@
 
 This evolution of **Tasmota 12** firmware has been enhanced to handle France energy meters known as **Linky** using **Teleinfo** protocol.
 
-This implementation has been tested on :
+This firmware has been developped and tested on  :
   * Sagem classic meter **monophase** with TIC **historique**
   * Linky meter **monophase** with TIC **historique**
   * Linky meter **monophase** with TIC **standard**
@@ -12,14 +12,24 @@ This implementation has been tested on :
   * Linky meter **triphase** with TIC **standard**
   * Ace6000 meter **triphase** with TIC **PME/PMI**
 
-It is compatible with **ESP8266**, **ESP12F 4Mb/16Mb**, **ESP32**, **ESP32S2** and **ESP32S3 16Mb** chipsets.
+It has been compiled and tested on the following devices :
+  * **ESP8266**
+  * **ESP12F** 4Mb and 16Mb
+  * **ESP32**
+  * **ESP32S2**
+  * **ESP32S3** 16Mb
  
 Please note that it is a completly different implementation than the one published early 2020 by Charles Hallard. 
 
 Some of these firmware versions are using a LittleFS partition to store graph data. Il allows to keep historical data over reboots.
 To take advantage of this feature, make sure to follow partitioning procedure given in the **readme** of the **binary** folder.
 
-This firmware calculates Power Factor (Cos φ) from Teleinfo totals (W) and Instant Power (VA). It is calculated everytime total power increases.
+It manages :
+  * Voltage (V)
+  * Current (A)
+  * Power (VA and W)
+  * Meter totals (Wh)
+  * Power Factor (Cos φ), calculated from Instant Power (VA) and meter Total (Wh)
 
 This firmware provides some extra Web page on the device :
   * **/graph** : live, daily and weekly graphs (VA, W, V and Cos phi)
@@ -35,7 +45,7 @@ If your linky in in historic mode, it doesn't provide instant voltage. Voltage i
 
 If you are using an **ESP32** board, you can use the wired connexion by selection the proper board model in **Configuration/ESP32 board**.
 
-Pre-compiled versions are available in the [**binary**](https://github.com/NicolasBernaerts/tasmota/tree/master/teleinfo/binary) folder.
+Pre-compiled versions are available in the [**binary**](./binary) folder.
 
 Teleinfo protocol is described in [this document](https://www.enedis.fr/sites/default/files/Enedis-NOI-CPT_54E.pdf)
 
