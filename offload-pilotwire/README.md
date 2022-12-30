@@ -46,7 +46,7 @@ Here the console commands provided with this firmware :
   * **ol_type** [value] : device type (see **ol_help** for the full list)
   * **ol_prio** [value] : device priority (1 max ... 10 min)
   * **ol_max** [value] : contract power (VA)
-  * **ol_adj** [value] : contract power adjustment (in %, 100% = contract)
+  * **ol_adj** [+-value] : contract power adjustment (in %, 0 = contract)
   * **ol_topic** [topic] : MQTT topic of the meter
   * **ol_kmax** [key] : MQTT key for contract power
   * **ol_kinst** [key] : MQTT key for current meter instant power
