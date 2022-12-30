@@ -349,6 +349,9 @@ size_t UfsReadNextLine (File &file, char* pstr_line, const size_t size_line)
   length = strlen (pstr_start);
   if (pstr_start > pstr_line) for (index = 0; index <= length; index ++) pstr_line[index] = pstr_start[index];
 
+  // give control back to system to avoid watchdog
+  yield ();
+
   return length;
 }
 
@@ -402,6 +405,9 @@ size_t UfsReadPreviousLine (File &file, char* pstr_line, const size_t size_line)
       file.seek (pos_search);
     }
   }
+
+  // give control back to system to avoid watchdog
+  yield ();
 
   return length;
 }
