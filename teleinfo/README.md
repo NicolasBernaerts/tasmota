@@ -71,16 +71,44 @@ MQTT result should look like that :
     compteur/tele/STATE = {"Time":"2021-03-13T09:25:26","Uptime":"0T13:25:12","UptimeSec":48312,"Heap":18,"SleepMode":"Dynamic","Sleep":50,"LoadAvg":19,"MqttCount":1,"Wifi":{"AP":1,"SSId":"hello-nantes","BSSId":"30:23:03:xx:xx:xx","Channel":5,"RSSI":64,"Signal":-68,"LinkCount":1,"Downtime":"0T00:00:05"}}
     compteur/tele/SENSOR = {"Time":"2021-03-13T09:25:26","ENERGY":{"TotalStartTime":"2021-03-13T09:25:26","Total":7970.950,"Yesterday":3.198,"Today":6.071,"Period":47,"Power":860,"Current":4.000},"TIC":{"ADCO":"061964xxxxxx","OPTARIF":"BASE","ISOUSC":"30","BASE":"007970950","PTEC":"TH..","IINST":"004","IMAX":"090","PAPP":"00860","HHPHC":"A","MOTDETAT":"000000","PHASE":1,"SSOUSC":"6000","IINST1":"4","SINSTS1":"860"},"IP":"192.168.xx.xx","MAC":"50:02:91:xx:xx:xx"}
 
+## Commands
+
+This Teleinfo firmware can be configured thru some  specific console commands :
+
+  * **tic_help** : list all available commands
+  * **tic_enable** [0/1] : disable / enable teleinfo messages reception
+  * **tic_rate** [rate] : set serial rate (1200, 9600 or 19200)
+
+  * **tic_romupd** [value] : energy counter ROM update interval (in mn). 
+  * **tic_percent** [value] : maximum acceptable power according to contrat (in %). Used to calculate **PMAX**
+  * **tic_msgpol** [value] : message publish policy (0 - Never, 1 - Every TIC message, 2 - When Power fluctuates (± 5%), 3 - With Telemetry only)
+  * **tic_msgtype** [value] : message type publish policy (0 - None, 1 - METER only, 2 - TIC only, 3 - METER and TIC)
+
+  * **tic_logpol** [0/1] : log policy (0:buffered, 1:immediate)
+  * **tic_logday** [value] : number of daily logs
+  * **tic_logweek** [value] : number of weekly logs
+  * **tic_logrot** : force log rotate for daily and weekly files
+
+  * **tic_maxv** [value] : maximum voltage (v) in graph display
+  * **tic_maxva** [value] : maximum power (va and w) in graph display
+  * **tic_maxhour** [value] : maximum total per hour (wh) in graph display
+  * **tic_maxday** [value] : maximum total per day (wh) in graph display
+  * **tic_maxmonth** [value] : maximum total per month (wh) in graph display
+
 ## TCP server
 
-To retrieve the complete teleinfo stream over your LAN, you just need to start the embedded TCP server thru tasmota console :
+This firmware brings a minimal embedded TCP server.
 
-    # tcp_start 8888
-        11:39:49.836 CMD: tcp_start 8888
-        11:39:49.840 TCP: Starting TCP server on port 8888
-        11:39:49.844 MQT: turenne/compteur/stat/RESULT = {"tcp_start":"Done"}
+This server allows you to retrieve the complete teleinfo stream over your LAN.
 
-You can now receive your Linky teleinfo stream in real time on any Linux pc :
+Here are the commands available for this TCP server :
+
+  * **tcp_help** : list of available commands
+  * **tcp_status** : status of TCP server (running port or 0 if not running)
+  * **tcp_start** [port] : start TCP server on specified port
+  * **tcp_stop** : stop TCP server
+
+When started, you can now receive your Linky teleinfo stream in real time on any Linux pc :
 
     # nc 192.168.1.10 8888
         SMAXSN-1	E220422144756	05210	W
@@ -90,22 +118,21 @@ You can now receive your Linky teleinfo stream in real time on any Linux pc :
         STGE	003A0001	:
         MSG1	PAS DE          MESSAGE         	<
 
-To stop streaming, you just need to stop the embedded TCP server thru tasmota console :
-
-    # tcp_stop
-        11:59:49.836 CMD: tcp_stop
-        11:59:49.840 TCP: Stoping TCP server
-        11:59:49.844 MQT: turenne/compteur/stat/RESULT = {"tcp_stop":"Done"}
+Server allows only 1 concurrent connexion. Any new client will kill previous one.
 
 ## FTP server
 
-If you are using a build with a LittleFS partition, this firmware can run a simple FTP server.
+If you are using a build with a LittleFS partition, you can access the partition thru a very basic FTP server embedded in this firmware.
 
-Il allows you to connect automatically to retrieve daily and weekly energy logs.
+This can allow you to retrieve automatically any CSV generated file.
 
-It is can be started thru **ftp_start** command. 
+Here are the commands available for this TCP server :
+  * **ftp_help** : list of available commands
+  * **ftp_status** : status of FTP server (running port or 0 if not running)
+  * **ftp_start** : start FTP server on port 21
+  * **ftp_stop** : stop FTP server
 
-Credentials are :
+On the client side, credentials are :
   * login : **teleinfo**
   * password : **teleinfo**
 
