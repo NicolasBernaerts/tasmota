@@ -70,16 +70,18 @@
  *                  Offload
 \*************************************************/
 
-#ifndef FIRMWARE_SAFEBOOT
 #ifdef USE_OFFLOAD
 
 #define XDRV_96                 96
 
+#include <ArduinoJson.h>
+
 #define OFFLOAD_PHASE_MAX       3
 #define OFFLOAD_POWER_MAX       10000
+#define OFFLOAD_POWER_MINIMUM   20                // minimum power to consider that device is active
 #define OFFLOAD_DELAY_MAX       1000
 #define OFFLOAD_PRIORITY_MAX    10
-#define OFFLOAD_POWER_UPDATE    300              // update peak power every 5 minutes
+#define OFFLOAD_POWER_UPDATE    300               // update peak power every 5 minutes
 
 #define OFFLOAD_EVENT_MAX       10
 
@@ -97,7 +99,6 @@
 #define D_CMND_OFFLOAD_TOPIC     "topic"
 #define D_CMND_OFFLOAD_KINST     "kinst"
 #define D_CMND_OFFLOAD_KMAX      "kmax"
-#define D_CMND_OFFLOAD_STAGE     "stage"
 #define D_CMND_OFFLOAD_REARM     "rearm"
 
 #define D_CMND_OFFLOAD_CHOICE    "choice"
@@ -105,7 +106,7 @@
 #define D_JSON_OFFLOAD           "Offload"
 #define D_JSON_OFFLOAD_STATE     "State"
 #define D_JSON_OFFLOAD_STAGE     "Stage"
-#define D_JSON_OFFLOAD_DEVICE    "Device"
+#define D_JSON_OFFLOAD_POWER     "Power"
 #define D_JSON_OFFLOAD_CONTRACT  "Contract"
 #define D_JSON_OFFLOAD_TOPIC     "Topic"
 #define D_JSON_OFFLOAD_KEY_INST  "KeyInst"
@@ -127,18 +128,16 @@
 #define D_OFFLOAD_PRIORITY       "Priority"
 #define D_OFFLOAD_REARM          "Auto rearm"
 
-#define D_OFFLOAD_UNIT_VA        "VA"
-#define D_OFFLOAD_UNIT_W         "W"
-#define D_OFFLOAD_UNIT_SEC       "sec."
-#define D_OFFLOAD_UNIT_PERCENT   "%"
-#define D_OFFLOAD_SELECTED       "selected"
+#ifdef USE_UFILESYS
+#define D_OFFLOAD_FILE_CFG "/offload.cfg"                               // offloag configuration file
+const char D_OFFLOAD_FILE_YEAR[] PROGMEM = "/offload-year-%04u.log";    // offload history file
+#endif    // USE_UFILESYS
 
-#define D_OFFLOAD_CFG            "/offload.cfg"
 #define D_OFFLOAD_ICON_LOGO      "logo"    
 
 // offloading commands
-const char kOffloadCommands[] PROGMEM = D_CMND_OFFLOAD_PREFIX "|" D_CMND_OFFLOAD_HELP "|" D_CMND_OFFLOAD_TYPE "|" D_CMND_OFFLOAD_PRIORITY "|" D_CMND_OFFLOAD_POWER  "|" D_CMND_OFFLOAD_MAX "|" D_CMND_OFFLOAD_ADJUST "|" D_CMND_OFFLOAD_TOPIC "|" D_CMND_OFFLOAD_KINST "|" D_CMND_OFFLOAD_KMAX "|" D_CMND_OFFLOAD_STAGE "|" D_CMND_OFFLOAD_REARM;
-void (* const OffloadCommand[])(void) PROGMEM = { &CmndOffloadHelp, &CmndOffloadType, &CmndOffloadPriority, &CmndOffloadPower, &CmndOffloadMax, &CmndOffloadAdjust, &CmndOffloadPowerTopic, &CmndOffloadPowerKeyInst, &CmndOffloadPowerKeyMax, &CmndOffloadStage, &CmndOffloadRearm };
+const char kOffloadCommands[] PROGMEM = D_CMND_OFFLOAD_PREFIX "|" D_CMND_OFFLOAD_HELP "|" D_CMND_OFFLOAD_TYPE "|" D_CMND_OFFLOAD_PRIORITY "|" D_CMND_OFFLOAD_POWER  "|" D_CMND_OFFLOAD_MAX "|" D_CMND_OFFLOAD_ADJUST "|" D_CMND_OFFLOAD_TOPIC "|" D_CMND_OFFLOAD_KINST "|" D_CMND_OFFLOAD_KMAX "|" D_CMND_OFFLOAD_REARM;
+void (* const OffloadCommand[])(void) PROGMEM = { &CmndOffloadHelp, &CmndOffloadType, &CmndOffloadPriority, &CmndOffloadPower, &CmndOffloadMax, &CmndOffloadAdjust, &CmndOffloadPowerTopic, &CmndOffloadPowerKeyInst, &CmndOffloadPowerKeyMax, &CmndOffloadRearmDelay };
  
 // strings
 const char OFFLOAD_FIELDSET_START[]      PROGMEM = "<fieldset><legend><b>&nbsp;%s %s&nbsp;</b></legend>\n";
@@ -170,7 +169,7 @@ struct {
   uint8_t   nbr_device_type = 0;
   uint16_t  device_type     = OFFLOAD_DEVICE_APPLIANCE;   // device type
   uint16_t  device_priority = 0;                          // device priority
-  uint16_t  device_power    = 0;                          // power of device
+  uint16_t  device_pmax     = 0;                          // maximum power of device
   uint16_t  contract_power  = 0;                          // maximum power limit before offload
   int       contract_adjust = 0;                          // adjustement of maximum power in %
   uint16_t  rearm_delay     = 0;                          // delay before automatically rearming the relay (in sec.)
@@ -180,22 +179,22 @@ struct {
 } offload_config;
 
 struct {
-  uint8_t  stage         = OFFLOAD_STAGE_NONE;    // current offloading state
-  uint8_t  relay_state   = 0;                     // relay state before offloading
-  uint16_t power_inst    = 0;                     // actual phase instant power (retrieved thru MQTT)
-  uint32_t time_message  = 0;                     // time of last power message
-  uint32_t time_stage    = UINT32_MAX;            // time of next stage
-  uint32_t time_json     = UINT32_MAX;            // time of next JSON update
-  uint32_t time_update   = UINT32_MAX;            // time of last peak power update
-  uint32_t time_rearm    = UINT32_MAX;            // time when relay should be automatically rearmed
-  uint16_t delay_before  = 0;                     // delay in seconds before effective offloading
-  uint16_t delay_after   = 0;                     // delay in seconds before removing offload
-  bool     power_sensor  = false;                 // flag to define if power sensor is available
-  bool     relay_managed = true;                  // flag to define if relay is managed directly
-  bool     state_changed = false;                 // flag to signal that offload state has changed
-  time_t   event_start   = UINT32_MAX;            // offload start time
-  time_t   event_stop    = UINT32_MAX;            // offload release time
-  uint16_t event_power   = 0;                     // power overload when offload triggered
+  bool     device_sensor    = false;                 // flag to define if power sensor is available
+  bool     relay_managed    = true;                  // flag to define if relay is managed directly
+  bool     state_changed    = false;                 // flag to signal that offload state has changed
+  uint8_t  stage            = OFFLOAD_STAGE_NONE;    // current offloading state
+  uint8_t  relay_state      = 0;                     // relay state before offloading
+  uint16_t phase_pinst      = 0;                     // actual phase instant power (retrieved thru MQTT)
+  uint16_t device_pinst     = 0;                     // device instant power (mesured thru sensor)
+  uint32_t time_message     = 0;                     // time of last power message
+  uint32_t time_stage       = UINT32_MAX;            // time of next stage
+  uint32_t time_json        = UINT32_MAX;            // time of next JSON update
+  uint32_t time_rearm       = UINT32_MAX;            // time when relay should be automatically rearmed
+  uint16_t delay_before     = 0;                     // delay in seconds before effective offloading
+  uint16_t delay_after      = 0;                     // delay in seconds before removing offload
+  time_t   event_start      = UINT32_MAX;            // offload start time
+  time_t   event_stop       = UINT32_MAX;            // offload release time
+  uint16_t event_power      = 0;                     // power overload when offload triggered
 } offload_status;
 
 /**************************************************\
@@ -210,19 +209,19 @@ void OffloadLoadConfig ()
 #ifdef USE_UFILESYS
 
   // retrieve saved settings from flash filesystem
-  device_type = UfsCfgLoadKeyInt (D_OFFLOAD_CFG, D_CMND_OFFLOAD_TYPE, OFFLOAD_DEVICE_APPLIANCE);
-  offload_config.device_power    = (uint16_t)UfsCfgLoadKeyInt (D_OFFLOAD_CFG, D_CMND_OFFLOAD_POWER, 0);
-  offload_config.contract_power  = (uint16_t)UfsCfgLoadKeyInt (D_OFFLOAD_CFG, D_CMND_OFFLOAD_MAX, 0);
-  offload_config.device_priority = (uint16_t)UfsCfgLoadKeyInt (D_OFFLOAD_CFG, D_CMND_OFFLOAD_PRIORITY, OFFLOAD_PRIORITY_MAX);
-  offload_config.contract_adjust = UfsCfgLoadKeyInt (D_OFFLOAD_CFG, D_CMND_OFFLOAD_ADJUST, 0);
+  device_type = UfsCfgLoadKeyInt (D_OFFLOAD_FILE_CFG, D_CMND_OFFLOAD_TYPE, OFFLOAD_DEVICE_APPLIANCE);
+  offload_config.device_pmax     = (uint16_t)UfsCfgLoadKeyInt (D_OFFLOAD_FILE_CFG, D_CMND_OFFLOAD_POWER, 0);
+  offload_config.contract_power  = (uint16_t)UfsCfgLoadKeyInt (D_OFFLOAD_FILE_CFG, D_CMND_OFFLOAD_MAX, 0);
+  offload_config.device_priority = (uint16_t)UfsCfgLoadKeyInt (D_OFFLOAD_FILE_CFG, D_CMND_OFFLOAD_PRIORITY, OFFLOAD_PRIORITY_MAX);
+  offload_config.contract_adjust = UfsCfgLoadKeyInt (D_OFFLOAD_FILE_CFG, D_CMND_OFFLOAD_ADJUST, 0);
 
   // get periodicity from flash filesystem
-  offload_config.rearm_delay   = (uint16_t)UfsCfgLoadKeyInt (D_OFFLOAD_CFG, D_CMND_OFFLOAD_REARM, 0);
+  offload_config.rearm_delay   = (uint16_t)UfsCfgLoadKeyInt (D_OFFLOAD_FILE_CFG, D_CMND_OFFLOAD_REARM, 0);
 
   // mqtt config
-  offload_config.str_topic = UfsCfgLoadKey (D_OFFLOAD_CFG, D_CMND_OFFLOAD_TOPIC);
-  offload_config.str_kinst = UfsCfgLoadKey (D_OFFLOAD_CFG, D_CMND_OFFLOAD_KINST);
-  offload_config.str_kmax  = UfsCfgLoadKey (D_OFFLOAD_CFG, D_CMND_OFFLOAD_KMAX);
+  offload_config.str_topic = UfsCfgLoadKey (D_OFFLOAD_FILE_CFG, D_CMND_OFFLOAD_TOPIC);
+  offload_config.str_kinst = UfsCfgLoadKey (D_OFFLOAD_FILE_CFG, D_CMND_OFFLOAD_KINST);
+  offload_config.str_kmax  = UfsCfgLoadKey (D_OFFLOAD_FILE_CFG, D_CMND_OFFLOAD_KMAX);
 
   // log
   AddLog (LOG_LEVEL_INFO, PSTR ("OFL: Config from LittleFS"));
@@ -231,7 +230,7 @@ void OffloadLoadConfig ()
 
   // retrieve saved settings from flash memory
   device_type = Settings->knx_GA_addr[0];
-  offload_config.device_power    = Settings->knx_GA_addr[1];
+  offload_config.device_pmax     = Settings->knx_GA_addr[1];
   offload_config.device_priority = Settings->knx_GA_addr[2];
   offload_config.contract_power  = Settings->knx_GA_addr[3];
   offload_config.contract_adjust = (int)Settings->knx_GA_addr[4] - 100;
@@ -250,7 +249,7 @@ void OffloadLoadConfig ()
 # endif     // USE_UFILESYS
 
   // check for out of range values
-  if (offload_config.device_power > OFFLOAD_POWER_MAX) offload_config.device_power = 0;
+  if (offload_config.device_pmax > OFFLOAD_POWER_MAX) offload_config.device_pmax = 0;
   if (offload_config.contract_power > OFFLOAD_POWER_MAX) offload_config.contract_power = 0;
   if (offload_config.device_priority > OFFLOAD_PRIORITY_MAX) offload_config.device_priority = OFFLOAD_PRIORITY_MAX;
   if (offload_config.contract_adjust > 100) offload_config.contract_adjust = 0;
@@ -267,25 +266,25 @@ void OffloadSaveConfig ()
 #ifdef USE_UFILESYS
 
   // save settings to flash filesystem
-  UfsCfgSaveKeyInt (D_OFFLOAD_CFG, D_CMND_OFFLOAD_TYPE,     (int)offload_config.device_type,     true);
-  UfsCfgSaveKeyInt (D_OFFLOAD_CFG, D_CMND_OFFLOAD_PRIORITY, (int)offload_config.device_priority, false);
-  UfsCfgSaveKeyInt (D_OFFLOAD_CFG, D_CMND_OFFLOAD_POWER,    (int)offload_config.device_power,    false);
-  UfsCfgSaveKeyInt (D_OFFLOAD_CFG, D_CMND_OFFLOAD_MAX,      (int)offload_config.contract_power,  false);
-  UfsCfgSaveKeyInt (D_OFFLOAD_CFG, D_CMND_OFFLOAD_ADJUST,   offload_config.contract_adjust,      false);
+  UfsCfgSaveKeyInt (D_OFFLOAD_FILE_CFG, D_CMND_OFFLOAD_TYPE,     (int)offload_config.device_type,     true);
+  UfsCfgSaveKeyInt (D_OFFLOAD_FILE_CFG, D_CMND_OFFLOAD_PRIORITY, (int)offload_config.device_priority, false);
+  UfsCfgSaveKeyInt (D_OFFLOAD_FILE_CFG, D_CMND_OFFLOAD_POWER,    (int)offload_config.device_pmax,     false);
+  UfsCfgSaveKeyInt (D_OFFLOAD_FILE_CFG, D_CMND_OFFLOAD_MAX,      (int)offload_config.contract_power,  false);
+  UfsCfgSaveKeyInt (D_OFFLOAD_FILE_CFG, D_CMND_OFFLOAD_ADJUST,   offload_config.contract_adjust,      false);
 
   // periodicity of power cut
-  UfsCfgSaveKeyInt (D_OFFLOAD_CFG, D_CMND_OFFLOAD_REARM,  (int)offload_config.rearm_delay, false);
+  UfsCfgSaveKeyInt (D_OFFLOAD_FILE_CFG, D_CMND_OFFLOAD_REARM,  (int)offload_config.rearm_delay, false);
 
   // mqtt config
-  UfsCfgSaveKey (D_OFFLOAD_CFG, D_CMND_OFFLOAD_TOPIC, offload_config.str_topic.c_str (), false);
-  UfsCfgSaveKey (D_OFFLOAD_CFG, D_CMND_OFFLOAD_KINST, offload_config.str_kinst.c_str (), false);
-  UfsCfgSaveKey (D_OFFLOAD_CFG, D_CMND_OFFLOAD_KMAX,  offload_config.str_kmax.c_str (),  false);
+  UfsCfgSaveKey (D_OFFLOAD_FILE_CFG, D_CMND_OFFLOAD_TOPIC, offload_config.str_topic.c_str (), false);
+  UfsCfgSaveKey (D_OFFLOAD_FILE_CFG, D_CMND_OFFLOAD_KINST, offload_config.str_kinst.c_str (), false);
+  UfsCfgSaveKey (D_OFFLOAD_FILE_CFG, D_CMND_OFFLOAD_KMAX,  offload_config.str_kmax.c_str (),  false);
 
 # else      // No LittleFS
 
   // save settings to flash memory
   Settings->knx_GA_addr[0] = offload_config.device_type;
-  Settings->knx_GA_addr[1] = offload_config.device_power;
+  Settings->knx_GA_addr[1] = offload_config.device_pmax;
   Settings->knx_GA_addr[2] = offload_config.device_priority;
   Settings->knx_GA_addr[3] = offload_config.contract_power;
   Settings->knx_GA_addr[4] = (uint16_t)(offload_config.contract_adjust + 100);
@@ -323,12 +322,11 @@ void CmndOffloadHelp ()
   AddLog (LOG_LEVEL_INFO, PSTR (" - ol_max   = maximum acceptable contract power (W)"));
   AddLog (LOG_LEVEL_INFO, PSTR (" - ol_adj   = contract maximum power adjustment (100% = contract)"));
 
-  AddLog (LOG_LEVEL_INFO, PSTR (" - ol_topic = Topic for contract power"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - ol_kinst = Key for current instant power"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - ol_kmax  = Key for contract maximum power"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - ol_topic = MQTT topic of the meter"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - ol_kmax  = MQTT key for contract power"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - ol_kinst = MQTT key for current meter instant power"));
 
-  AddLog (LOG_LEVEL_INFO, PSTR (" - ol_stage = Offload stage (%u...%u)"), 0, OFFLOAD_STAGE_MAX - 1);
-  AddLog (LOG_LEVEL_INFO, PSTR (" - ol_rearm = Switch rearm delay (0 no rearm or timeout in sec.)"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - ol_rearm = Switch rearm delay (0 no rearm or rearm delay in sec.)"));
 
   ResponseCmndDone();
 }
@@ -347,10 +345,10 @@ void CmndOffloadPower ()
 {
   if ((XdrvMailbox.data_len > 0) && (XdrvMailbox.payload <= OFFLOAD_POWER_MAX))
   {
-    offload_config.device_power = (uint16_t)XdrvMailbox.payload;
+    offload_config.device_pmax = (uint16_t)XdrvMailbox.payload;
     OffloadSaveConfig ();
   }
-  ResponseCmndNumber (offload_config.device_power);
+  ResponseCmndNumber (offload_config.device_pmax);
 }
 
 void CmndOffloadPriority ()
@@ -409,18 +407,7 @@ void CmndOffloadPowerKeyMax ()
   ResponseCmndChar (offload_config.str_kmax.c_str ());
 }
 
-void CmndOffloadStage ()
-{
-  if ((XdrvMailbox.data_len > 0) && (XdrvMailbox.payload >= 0) && (XdrvMailbox.payload < OFFLOAD_STAGE_MAX))
-  {
-    offload_status.time_stage = UINT32_MAX;
-    offload_status.stage      = (uint8_t)XdrvMailbox.payload;
-  }
-
-  ResponseCmndNumber (offload_status.stage);
-}
-
-void CmndOffloadRearm ()
+void CmndOffloadRearmDelay ()
 {
   if (XdrvMailbox.data_len > 0)
   {
@@ -564,7 +551,7 @@ void OffloadActivate ()
   char str_value[8];
 
   // set current event
-  offload_status.event_power   = offload_status.power_inst;
+  offload_status.event_power   = offload_status.phase_pinst;
   offload_status.event_start   = LocalTime ();
   offload_status.state_changed = true;
 
@@ -658,17 +645,15 @@ bool OffloadSetDevicePower ()
 }
 
 // Show JSON status (for MQTT)
+// Format is : "Offload":{"State":0,"Stage":1,"Power":1000}
 void OffloadShowJSON (bool is_autonomous)
 {
   // add , in append mode
-  if (is_autonomous) Response_P (PSTR ("{")); else ResponseAppend_P (PSTR (","));
+  if (is_autonomous) Response_P (PSTR ("{"));
+    else ResponseAppend_P (PSTR (","));
 
-  // "Offload":{"State":"OFF","Stage":1,"Device":1000}
-  ResponseAppend_P (PSTR ("\"%s\":{"), D_JSON_OFFLOAD);
-  ResponseAppend_P (PSTR ("\"%s\":%u"), D_JSON_OFFLOAD_STATE, OffloadIsOffloaded ());
-  ResponseAppend_P (PSTR (",\"%s\":%d"), D_JSON_OFFLOAD_STAGE, offload_status.stage);
-  ResponseAppend_P (PSTR (",\"DeviceVA\":%u"), offload_config.device_power);
-  ResponseAppend_P (PSTR ("}"));
+  // generate JSON
+  ResponseAppend_P (PSTR ("\"Offload\":{\"State\":%u,\"Stage\":%u,\"Power\":%u}"), OffloadIsOffloaded (), offload_status.stage, offload_config.device_pmax);
 
   // publish it if message is autonomous
   if (is_autonomous)
@@ -698,36 +683,49 @@ void OffloadMqttSubscribe ()
 // read received MQTT data to retrieve house instant power
 bool OffloadMqttData ()
 {
-  bool data_handled;
+  bool is_topic, is_key;
+  bool is_found = false;
   long power;
   char str_value[16];
 
-  // if topic is the instant house power
-  data_handled = (strcmp (offload_config.str_topic.c_str (), XdrvMailbox.topic) == 0);
-  if (data_handled)
+  // check for meter topic
+  is_topic = (strcmp (offload_config.str_topic.c_str (), XdrvMailbox.topic) == 0);
+
+  if (is_topic)
   {
-    // set message timestamp
-    offload_status.time_message = LocalTime ();
+    // log
+    AddLog (LOG_LEVEL_DEBUG, PSTR ("OFL: Received %s"), XdrvMailbox.topic);
 
     // look for max power key
-    if (SensorGetJsonKey (XdrvMailbox.data, offload_config.str_kmax.c_str (), str_value, sizeof (str_value)))
+    is_key = SensorGetJsonKey (XdrvMailbox.data, offload_config.str_kmax.c_str (), str_value, sizeof (str_value));
+    if (is_key)
     {
+      is_found = true;
       power = atol (str_value);
       if (power > 0) offload_config.contract_power = (uint16_t)power;
     }
 
     // look for instant power key
-    if (SensorGetJsonKey (XdrvMailbox.data, offload_config.str_kinst.c_str (), str_value, sizeof (str_value)))
+    is_key = SensorGetJsonKey (XdrvMailbox.data, offload_config.str_kinst.c_str (), str_value, sizeof (str_value));
+    if (is_key)
     {
+      is_found = true;
       power = atol (str_value);
-      offload_status.power_inst = (uint16_t)power;
+      offload_status.phase_pinst = (uint16_t)power;
     }
-
-    // log
-    AddLog (LOG_LEVEL_DEBUG, PSTR ("OFL: Power is %u/%u"), offload_status.power_inst, offload_config.contract_power);
   }
 
-  return data_handled;
+  // if meter value have been found
+  if (is_found)
+  {
+    // set message timestamp
+    offload_status.time_message = LocalTime ();
+
+    // log
+    AddLog (LOG_LEVEL_INFO, PSTR ("OFL: %u / %u VA"), offload_status.phase_pinst, offload_config.contract_power);
+  }
+
+  return is_topic;
 }
 
 // update offloading status according to all parameters
@@ -740,7 +738,7 @@ void OffloadEvery250ms ()
 
   // if contract power and device power are defined
   power = OffloadGetMaxPower ();
-  if ((power > 0) && (offload_config.device_power > 0))
+  if ((power > 0) && (offload_config.device_pmax > 0))
   {
     // get current time
     time_now = LocalTime ();
@@ -766,7 +764,7 @@ void OffloadEvery250ms ()
         offload_status.relay_state = bitRead (TasmotaGlobal.power, 0);
 
         // if overload is detected, start offload process
-        if (offload_status.power_inst > power) next_stage = OFFLOAD_STAGE_BEFORE;
+        if (offload_status.phase_pinst > power) next_stage = OFFLOAD_STAGE_BEFORE;
         break;
 
       // pending offloading
@@ -782,7 +780,7 @@ void OffloadEvery250ms ()
         offload_status.relay_state = bitRead (TasmotaGlobal.power, 0);
 
         // if house power has gone down, remove pending offloading
-        if (offload_status.power_inst <= power) next_stage = OFFLOAD_STAGE_NONE;
+        if (offload_status.phase_pinst <= power) next_stage = OFFLOAD_STAGE_NONE;
 
         // else if delay is reached, set active offloading
         else if (offload_status.time_stage <= time_now) next_stage = OFFLOAD_STAGE_ACTIVE;
@@ -799,11 +797,11 @@ void OffloadEvery250ms ()
         }
 
         // calculate maximum power allowed when substracting device power
-        if (power > offload_config.device_power) power -= offload_config.device_power;
-        else power = 0;
+        if (power > offload_config.device_pmax) power -= offload_config.device_pmax;
+          else power = 0;
 
         // if instant power is under this value, prepare to remove offload
-        if (offload_status.power_inst <= power) next_stage = OFFLOAD_STAGE_AFTER;
+        if (offload_status.phase_pinst <= power) next_stage = OFFLOAD_STAGE_AFTER;
         break;
 
       // actually just after offloading should stop
@@ -816,11 +814,11 @@ void OffloadEvery250ms ()
         }
 
         // calculate maximum power allowed when substracting device power
-        if (power > offload_config.device_power) power -= offload_config.device_power;
-        else power = 0;
+        if (power > offload_config.device_pmax) power -= offload_config.device_pmax;
+          else power = 0;
 
         // if house power has gone again too high, offloading back again
-        if (offload_status.power_inst > power) next_stage = OFFLOAD_STAGE_ACTIVE;
+        if (offload_status.phase_pinst > power) next_stage = OFFLOAD_STAGE_ACTIVE;
         
         // else if delay is reached, set remove offloading
         else if (offload_status.time_stage <= time_now) next_stage = OFFLOAD_STAGE_NONE;
@@ -842,46 +840,23 @@ void OffloadEverySecond ()
   time_now = LocalTime ();
 
 #ifdef USE_ENERGY_SENSOR
+  float    power;
+  uint16_t new_power = UINT16_MAX;
+
   // if current is detected (more than eq 20w), set power sensor flag
-  if (Energy.current[0] > 0.1) offload_status.power_sensor = true;
+  if (Energy.current[0] > 0.1) offload_status.device_sensor = true;
 
   // if power sensor present
-  if (offload_status.power_sensor)
+  if (offload_status.device_sensor)
   {
-    float    power;
-    uint16_t apparent_power;
-    uint16_t new_power = UINT16_MAX;
-
     // record apparent power if greater than previous reference
     power = Energy.voltage[0] * Energy.current[0];
-    apparent_power = (uint16_t)power;
+    offload_status.device_pinst = (uint16_t)power;
 
-    // calculate power evolution
-    if (offload_config.device_power < apparent_power) new_power = apparent_power;
-      else if (apparent_power < offload_config.device_power / 2) new_power = apparent_power;
-
-    // if power has changed
-    if (new_power != UINT16_MAX)
+    // detect new peak power
+    if (offload_config.device_pmax < offload_status.device_pinst)
     {
-      // update device power value
-      offload_config.device_power = new_power;
-
-      // update
-      offload_status.time_update = time_now + OFFLOAD_POWER_UPDATE;
-      offload_status.time_json   = time_now; 
-    }
-
-    // else, if needed, update power value
-    else if (offload_status.time_update == UINT32_MAX) offload_status.time_update = time_now + OFFLOAD_POWER_UPDATE;
-
-    // else, if timer is reached, update power
-    else if (offload_status.time_update < time_now)
-    {
-      // update max value
-      offload_config.device_power = apparent_power;
-
-      // update
-      offload_status.time_update = time_now + OFFLOAD_POWER_UPDATE;
+      offload_config.device_pmax = offload_status.device_pinst;
       offload_status.time_json   = time_now; 
     }
   }
@@ -920,7 +895,10 @@ void OffloadInit ()
   Energy.current[0] = 0;
 
   // set log history parameters
-  LogFileSetFilename ("/offload-%u.log", UFS_LOG_PERIOD_YEAR);
+#ifdef USE_UFILESYS
+  LogFileSetFilename (D_OFFLOAD_FILE_YEAR, UFS_LOG_PERIOD_YEAR);
+#endif    // USE_UFILESYS
+  
   LogHistoSetDescription ("Offload Events", "Date;Time;Duration;Power", 4);
   LogHistoSetDateColumn (true, true, false, false, true);
 
@@ -1011,7 +989,7 @@ void OffloadWebSensor ()
   // display device type
   GetTextIndexed (str_text, sizeof (str_text), offload_config.device_type, kOffloadDevice);
   GetTextIndexed (str_value, sizeof (str_value), offload_config.device_type, kOffloadIcon);
-  WSContentSend_PD (PSTR ("{s}%s %s{m}%u VA{e}"), str_text, str_value, offload_config.device_power);
+  WSContentSend_PD (PSTR ("{s}%s %s{m}%u VA{e}"), str_text, str_value, offload_config.device_pmax);
 
   // if house power is subscribed, display power
   if (offload_config.str_topic.length () > 0)
@@ -1042,7 +1020,7 @@ void OffloadWebSensor ()
 
     // display current power and max power limit
     power = OffloadGetMaxPower ();
-    if (power > 0) WSContentSend_PD (PSTR ("{s}%s <small><i>[%s]</i></small>{m}<b>%u</b> / %u VA{e}"), D_OFFLOAD_POWER, str_text, offload_status.power_inst, power);
+    if (power > 0) WSContentSend_PD (PSTR ("{s}%s <small><i>[%s]</i></small>{m}<b>%u</b> / %u VA{e}"), D_OFFLOAD_POWER, str_text, offload_status.phase_pinst, power);
 
     // get offload color and label
     GetTextIndexed (str_value, sizeof (str_value), offload_status.stage, kOffloadStageColor);
@@ -1085,7 +1063,7 @@ void OffloadWebPageConfig ()
     if (strlen (str_argument) > 0)
     {
       value = atoi (str_argument);
-      if (value <= OFFLOAD_POWER_MAX) offload_config.device_power = (uint16_t)value;
+      if (value <= OFFLOAD_POWER_MAX) offload_config.device_pmax = (uint16_t)value;
     }
 
     // set contract power limit according to 'max' parameter
@@ -1161,19 +1139,18 @@ void OffloadWebPageConfig ()
     device = offload_config.arr_device_type[index];
     GetTextIndexed (str_default, sizeof (str_default), device, kOffloadDevice);
     GetTextIndexed (str_icon, sizeof (str_icon), device, kOffloadIcon);
-    if (device == offload_config.device_type) strcpy_P (str_argument, PSTR (D_OFFLOAD_SELECTED)); else strcpy (str_argument, "");
+    if (device == offload_config.device_type) strcpy (str_argument, "selected"); else strcpy (str_argument, "");
     WSContentSend_P (PSTR ("<option value='%d' %s>%s %s</option>\n"), device, str_argument, str_icon, str_default);
   }
   WSContentSend_P (PSTR ("</select>\n"));
   WSContentSend_P (PSTR ("</p>\n"));
 
   // device power
-  sprintf_P (str_argument, PSTR ("%s (%s)"), D_OFFLOAD_POWER, D_OFFLOAD_UNIT_VA);
-  WSContentSend_P (OFFLOAD_INPUT_NUMBER_HALF, str_argument, D_CMND_OFFLOAD_PREFIX, D_CMND_OFFLOAD_POWER, D_CMND_OFFLOAD_POWER, D_CMND_OFFLOAD_POWER, 0, 65000, 10, offload_config.device_power);
+  sprintf_P (str_argument, PSTR ("%s (VA)"), D_OFFLOAD_POWER);
+  WSContentSend_P (OFFLOAD_INPUT_NUMBER_HALF, str_argument, D_CMND_OFFLOAD_PREFIX, D_CMND_OFFLOAD_POWER, D_CMND_OFFLOAD_POWER, D_CMND_OFFLOAD_POWER, 0, 65000, 10, offload_config.device_pmax);
 
   // priority
-  sprintf_P (str_argument, PSTR ("%s"), D_OFFLOAD_PRIORITY);
-  WSContentSend_P (OFFLOAD_INPUT_NUMBER_SWITCH, str_argument, D_CMND_OFFLOAD_PREFIX, D_CMND_OFFLOAD_PRIORITY, D_CMND_OFFLOAD_PRIORITY, D_CMND_OFFLOAD_PRIORITY, 1, OFFLOAD_PRIORITY_MAX, 1, offload_config.device_priority);
+  WSContentSend_P (OFFLOAD_INPUT_NUMBER_SWITCH, D_OFFLOAD_PRIORITY, D_CMND_OFFLOAD_PREFIX, D_CMND_OFFLOAD_PRIORITY, D_CMND_OFFLOAD_PRIORITY, D_CMND_OFFLOAD_PRIORITY, 1, OFFLOAD_PRIORITY_MAX, 1, offload_config.device_priority);
 
   WSContentSend_P (OFFLOAD_FIELDSET_STOP);
 
@@ -1184,11 +1161,11 @@ void OffloadWebPageConfig ()
   WSContentSend_P (OFFLOAD_FIELDSET_START, "⚡", D_OFFLOAD_METER);
 
   // contract power
-  sprintf_P (str_argument, PSTR ("%s (%s)"), D_OFFLOAD_MAX, D_OFFLOAD_UNIT_VA);
+  sprintf_P (str_argument, PSTR ("%s (VA)"), D_OFFLOAD_MAX);
   WSContentSend_P (OFFLOAD_INPUT_NUMBER_HALF, str_argument, D_CMND_OFFLOAD_PREFIX, D_CMND_OFFLOAD_MAX, D_CMND_OFFLOAD_MAX, D_CMND_OFFLOAD_MAX, 0, 65000, 1, offload_config.contract_power);
 
   // contract adjustment
-  sprintf_P (str_argument, PSTR ("%s (%s)"), D_OFFLOAD_ADJUST, D_OFFLOAD_UNIT_PERCENT);
+  sprintf_P (str_argument, PSTR ("%s (%%)"), D_OFFLOAD_ADJUST);
   WSContentSend_P (OFFLOAD_INPUT_NUMBER_HALF, str_argument, D_CMND_OFFLOAD_PREFIX, D_CMND_OFFLOAD_ADJUST, D_CMND_OFFLOAD_ADJUST, D_CMND_OFFLOAD_ADJUST, -99, 100, 1, offload_config.contract_adjust);
 
   // line break
@@ -1406,6 +1383,9 @@ bool Xdrv96 (uint8_t function)
       result = OffloadMqttData ();
       result |= SensorMqttData ();
       break;
+    case FUNC_JSON_APPEND:
+      OffloadShowJSON (false);
+      break;
 
 #ifdef USE_WEBSERVER
     case FUNC_WEB_ADD_HANDLER:
@@ -1440,4 +1420,3 @@ bool Xdrv96 (uint8_t function)
 }
 
 #endif    // USE_OFFLOAD
-#endif    // FIRMWARE_SAFEBOOT

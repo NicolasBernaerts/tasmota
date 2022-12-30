@@ -48,6 +48,7 @@
     27/07/2022 - v9.3  - Tasmota 12 compatibility
                          Add HLK-LD1115H and HLK-LD1125H presence sensor support
     16/10/2022 - v10.0 - Add Ecowatt signal management
+    03/12/2022 - v10.1 - Redesign of movement detection management
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -95,32 +96,34 @@
 #define USE_TIMEZONE                          // Add support for Timezone management
 #define USE_COMMON_LOG                        // Use common log file library
 #define USE_OFFLOAD                           // Add support for MQTT maximum power offloading
+#define USE_GENERIC_SENSOR                    // Add support for generic sensor management
 //#define USE_HLKLD2410                         // Add support for HLK-LD2410 presence & movement sensors
 #define USE_HLKLD11                           // Add support for HLK-LD11xx presence & movement sensors
 #define USE_HLKLD11_WEB_CONFIG                // Add graphical configuration for HLK-LD11xx sensors
-#define USE_GENERIC_SENSOR                    // Add support for generic sensor management
 #define USE_ECOWATT_CLIENT                    // Add support for ecowatt client module
 //#define USE_PRESENCE_FORECAST                 // Add support for a presence forecast module
 
 // build
-#if defined BUILD_ESP32
+#if defined BUILD_ESP32S2
+#define EXTENSION_BUILD   "esp32s2-4m320k"
+#elif defined BUILD_ESP32
 #define EXTENSION_BUILD   "esp32-4m1.3m"
 #elif defined BUILD_16M14M
-#define EXTENSION_BUILD   "esp-16m14m"
+#define EXTENSION_BUILD   "esp8266-16m14m"
 #elif defined BUILD_4M2M
-#define EXTENSION_BUILD   "esp-4m2m"
+#define EXTENSION_BUILD   "esp8266-4m2m"
 #elif defined BUILD_2M1M
-#define EXTENSION_BUILD   "esp-2m1m"
+#define EXTENSION_BUILD   "esp8266-2m1m"
 #elif defined BUILD_1M128K
-#define EXTENSION_BUILD   "esp-1m128k"
+#define EXTENSION_BUILD   "esp8266-1m128k"
 #elif defined BUILD_1M64K
-#define EXTENSION_BUILD   "esp-1m64k"
+#define EXTENSION_BUILD   "esp8266-1m64k"
 #else
-#define EXTENSION_BUILD   "esp-nofs"
+#define EXTENSION_BUILD   "esp8266"
 #endif
 
 // extension data
-#define EXTENSION_VERSION "10.0"              // version
+#define EXTENSION_VERSION "10.1"              // version
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
 #ifdef USE_PILOTWIRE
 #define EXTENSION_NAME    "Pilotwire"         // name
@@ -327,7 +330,7 @@
 #undef USE_IBEACON
 
 #undef USE_AUTOCONF                           // Disable Esp32 autoconf feature
-#define USE_BERRY
+#undef USE_BERRY
 
 #undef USE_DISPLAY
 #undef USE_SR04
