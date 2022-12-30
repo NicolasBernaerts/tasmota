@@ -196,7 +196,17 @@ If everything goes fine, you should be able to compile your own build.
 
 ### Screen shot
 
-![Main page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload-pilotwire/screen/tasmota-pilotwire-main.png) 
-![Offload config page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload-pilotwire/screen/tasmota-offload-config.png) 
-![Pilotwire cnfig page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload-pilotwire/screen/tasmota-pilotwire-config.png) 
-![Control page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload-pilotwire/screen/tasmota-pilotwire-control.jpg)
+#### Main
+
+![Main page](./screen/tasmota-pilotwire-main.png) 
+
+#### Control and Graph
+
+![Control page](./screen/tasmota-pilotwire-control.jpg)
+![Graph page](./screen/tasmota-pilotwire-graph.png)
+
+### Config
+
+![Offload config page](./screen/tasmota-offload-config.png) 
+![Pilotwire cnfig page](./screen/tasmota-pilotwire-config.png) 
+
