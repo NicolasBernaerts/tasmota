@@ -71,6 +71,17 @@ MQTT result should look like that :
     compteur/tele/STATE = {"Time":"2021-03-13T09:25:26","Uptime":"0T13:25:12","UptimeSec":48312,"Heap":18,"SleepMode":"Dynamic","Sleep":50,"LoadAvg":19,"MqttCount":1,"Wifi":{"AP":1,"SSId":"hello-nantes","BSSId":"30:23:03:xx:xx:xx","Channel":5,"RSSI":64,"Signal":-68,"LinkCount":1,"Downtime":"0T00:00:05"}}
     compteur/tele/SENSOR = {"Time":"2021-03-13T09:25:26","ENERGY":{"TotalStartTime":"2021-03-13T09:25:26","Total":7970.950,"Yesterday":3.198,"Today":6.071,"Period":47,"Power":860,"Current":4.000},"TIC":{"ADCO":"061964xxxxxx","OPTARIF":"BASE","ISOUSC":"30","BASE":"007970950","PTEC":"TH..","IINST":"004","IMAX":"090","PAPP":"00860","HHPHC":"A","MOTDETAT":"000000","PHASE":1,"SSOUSC":"6000","IINST1":"4","SINSTS1":"860"},"IP":"192.168.xx.xx","MAC":"50:02:91:xx:xx:xx"}
 
+## Log files
+
+If you run this firmware on an ESP having a LittleFS partition, it will generate 3 types of energy logs :
+  * **teleinfo-day-n.csv** : average values daily file with a record every ~5 mn. **0** is today's log, **1** yesterday's log, ...
+  * **teleinfo-week-nn.csv** : average values weekly file with a record every ~30 mn. **00** is current week's log, **01** is previous week's log, ...
+  * **teleinfo-year-yyyy.csv** : kWh total yearly file with a line per day and detail of hourly total for each day.
+
+Every CSV file includes a header.
+
+These files are used to generate all graphs other than **Live** ones.
+
 ## Commands
 
 This Teleinfo firmware can be configured thru some  specific console commands :
