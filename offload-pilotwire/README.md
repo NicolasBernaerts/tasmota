@@ -78,16 +78,11 @@ Pilotwire protocol is described at http://www.radiateur-electrique.org/fil-pilot
  
 ### Hardware setup
 
-You first need to connect a diode between your relay output and the heater's *fil pilote*
-  * connect a temperature sensor
-  * Flash firmware
-  * setup the device
+You need to connect a diode between your relay output and the heater's *fil pilote* (usually black color wire).
 
 Typical diode to use is **1N4007**. Connexion should be done directly on the relay output :
 
-![Sonoff Basic](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload-pilotwire/screen/pilotwire-diode-single.jpg)
-
-Next you need to connect a temperature sensor to your device. Typically, you can connect a **DF18B20** temperature sensor on **GPIO03 serial RX**.
+![Diode setup](./screen/pilotwire-diode-single.jpg)
 
 ### Configuration
 
