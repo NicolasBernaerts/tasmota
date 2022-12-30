@@ -65,7 +65,7 @@ Pilotwire firmware allows to handle an electrical heater using the **fil pilote*
 It is an extension of previous **Offload** firmware, so that it provides the same offload capabilities described before.
 
 This firmware specifically manages :
-  * **thermostat** according to any temperature sensor (local or remote)
+  * **thermostat** according to any declared temperature sensor (local or remote)
   * **presence detection** to lower thermostat in case of vacancy
   * **opened window detection** to cut power when window is opened
   * **night mode** to lower temperature at night
