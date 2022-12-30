@@ -1,7 +1,7 @@
 # Offload & Pilotwire Tasmota firmware #
 
 These firmware are based on Tasmota **v12**. It has been enhanced to handle :
-* **Offload** capacity based on a MQTT subscription to a general Meter
+* **Offload** capacity based on a MQTT subscription to a global Meter
 * **Pilotwire** to manage France electrical heaters using **Fil Pilote** protocol
 
 This firmare provides :
@@ -9,16 +9,19 @@ This firmare provides :
   * extension of JSON MQTT status
   * new specific MQTT commands
   * automatic offload when global power is overloading your contract
-  * timers management (switch ON = go to night mode, switch OFF = go back to normal mode)
+  * night mode management (timer ON = go to night mode, timer OFF = go back to normal mode)
   * **/control** public page to control the device
   * **/histo** public page to get offloading history
-  * **/info.json** to get device main caracteristics
 
-## Offload ##
+## Offload
 
-**Offload** firmware provides an offload capability based on the device consumption, your actual global consumption and your contact level.
+**Offload** firmware provides an offload capability based on :
+  * the device power
+  * your actual global consumption
+  * your contact maximum power
 
-If global power exceed your contract level, device is offloaded as long as your global consumption has not drop enougth.
+If global power exceed your contract level, device is offloaded as long as your global consumption has not dropped enougth. \
+It allows to cut devices like geaser, ... before your house meter strips because of over-power.
 
 It has been tested on **Sonoff S26**, **Sonoff Pow R2**, **Athom power plug** and various **ESP32** boards.
 
@@ -35,29 +38,45 @@ Here, you need to configure :
   
 After next restart, offload mecanism will start.
 
-### MQTT ###
+### Console commands
+
+Here the console commands provided with this firmware :
+  * **ol_help** : list of available commands
+  * **ol_power** [value] : device power (VA)
+  * **ol_type** [value] : device type (see **ol_help** for the full list)
+  * **ol_prio** [value] : device priority (1 max ... 10 min)
+  * **ol_max** [value] : contract power (VA)
+  * **ol_adj** [value] : contract power adjustment (in %, 100% = contract)
+  * **ol_topic** [topic] : MQTT topic of the meter
+  * **ol_kmax** [key] : MQTT key for contract power
+  * **ol_kinst** [key] : MQTT key for current meter instant power
+  * **ol_rearm** [value] : Switch rearm delay (0 no rearm or rearm delay in sec.)
+
+### MQTT
 
 Offload MQTT JSON result should look like that :
 
     23:59:26.476 MQT: chambre2nd/tele/STATE = {"Time":"2022-01-19T23:59:26","Offload":{"State":0,"Stage":0,"Device":1500},"TempUnit":"C"}}
 
-## Pilotwire ##
+## Pilotwire
 
 Pilotwire firmware allows to handle an electrical heater using the **fil pilote** french protocol.
 
-It manages :
+It is an extension of previous **Offload** firmware, so that it provides the same offload capabilities described before.
+
+This firmware specifically manages :
   * **thermostat** according to any temperature sensor (local or remote)
   * **presence detection** to lower thermostat in case of vacancy
   * **opened window detection** to cut power when window is opened
   * **night mode** to lower temperature at night
-  * **offload** management
   * **ecowatt** signal action to lower thermostat in case of risk of power cut
+  * **offload** management
 
 **Pilotwire** has been tested on **Sonoff Basic** (1Mb), **ESP01** (1Mb), **Wemos D1 Mini** (4Mb) and **ESP32** (4Mb).
 
 Pilotwire protocol is described at http://www.radiateur-electrique.org/fil-pilote-radiateur.php
 
-### Presence Detection ###
+### Presence Detection
 
 Presence detection works as follow :
 
@@ -74,7 +93,7 @@ Presence detection works as follow :
     * when you change comfort mode target temperature, target temperature is set back to comfort mode
     * if there is no movement after **no movement** timeout, target temperature is set to **eco** mode
  
-### Hardware setup ###
+### Hardware setup
 
 You first need to connect a diode between your relay output and the heater's *fil pilote*
   * connect a temperature sensor
@@ -87,7 +106,7 @@ Typical diode to use is **1N4007**. Connexion should be done directly on the rel
 
 Next you need to connect a temperature sensor to your device. Typically, you can connect a **DF18B20** temperature sensor on **GPIO03 serial RX**.
 
-### Configuration ###
+### Configuration
 
 First you need to configure normal Tasmota stuff and **Offload** section.
 
@@ -118,14 +137,34 @@ Here is the template you can use if you are are using a Sonoff Basic.
 
 ![Template Sonoff Basic](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload-pilotwire/screen/tasmota-pilotwire-template.png) 
 
+### Console commands
 
-### MQTT ###
+Here the console commands provided with this firmware :
+  * **pw_help** : list of available commands
+  * **pw_type** [value] : device type (0 - Pilotwire, 1 - Direct connexion)
+  * **pw_mode** [value] : heater running mode (0 - Off, 1 - Economie, 2 - Nuit, 3 - Confort, 4 - Forcé)
+  * **pw_target** [value] : target temperature (°C)
+  * **pw_ecowatt** [0/1] : disable/enable ecowatt management
+  * **pw_window** [0/1] : disable/enable open window detection
+  * **pw_presence** [0/1] : disable/enable presence detection
+  * **pw_low** [value] : lowest acceptable temperature (°C)
+  * **pw_high** [value] : highest acceptable temperature (°C)
+  * **pw_comfort** [value] : default comfort temperature (°C)
+  * **pw_nofrost** [value] : no frost temperature (delta with comfort if negative)
+  * **pw_eco** [value] : eco temperature (delta with comfort if negative)
+  * **pw_night** [value] : night temperature (delta with comfort if negative)
+  * **pw_eco2** [value] : ecowatt level 2 temperature (delta with comfort if negative)
+  * **pw_eco3** [value] : ecowatt level 3 temperature (delta with comfort if negative)
+  * **pw_initial** [value] : presence detection timeout when changing running mode (mn)
+  * **pw_normal** [value] : presence detection timeout after detection (mn)
+
+### MQTT
 
 Pilotwire MQTT JSON result should look like that :
 
     23:59:26.476 MQT: chambre2nd/tele/STATE = {"Time":"2022-01-19T23:59:26","Pilotwire":{"Mode":2,"Status":2,"Heating":1,"Temperature":16.9,"Target":17.0,"Detect":128,"Window":0},"Offload":{"State":0,"Stage":0,"Device":1500},"TempUnit":"C"}}
 
-## Compilation ##
+### Compilation
 
 Pre-compiled version of Tasmota handling **offload** and **fil pilote** are available in the **bin** directory.
 
@@ -152,8 +191,7 @@ Here is where you should place different files from this repository and from **t
 
 If everything goes fine, you should be able to compile your own build.
 
-Screen shot
------------
+### Screen shot
 
 ![Main page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload-pilotwire/screen/tasmota-pilotwire-main.png) 
 ![Offload config page](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/offload-pilotwire/screen/tasmota-offload-config.png) 
