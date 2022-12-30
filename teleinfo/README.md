@@ -12,7 +12,7 @@ This implementation has been tested on :
   * Linky meter **triphase** with TIC **standard**
   * Ace6000 meter **triphase** with TIC **PME/PMI**
 
-It is compatible with **ESP8266**, **ESP32** and **ESP32S2** chipsets.
+It is compatible with **ESP8266**, **ESP12F 4Mb/16Mb**, **ESP32**, **ESP32S2** and **ESP32S3 16Mb** chipsets.
  
 Please note that it is a completly different implementation than the one published early 2020 by Charles Hallard. 
 
