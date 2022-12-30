@@ -25,11 +25,11 @@ Some of these firmware versions are using a LittleFS partition to store graph da
 To take advantage of this feature, make sure to follow partitioning procedure given in the **readme** of the **binary** folder.
 
 It manages :
-  * Voltage (V)
-  * Current (A)
-  * Power (VA and W)
-  * Meter totals (Wh)
-  * Power Factor (Cos φ), calculated from Instant Power (VA) and meter Total (Wh)
+  * Voltage (**V**)
+  * Current (**A**)
+  * Power (**VA** and **W**)
+  * Meter totals (**Wh**)
+  * Power Factor (**Cosφ**), calculated from Instant Power (VA) and meter Total (Wh)
 
 This firmware provides some extra Web page on the device :
   * **/graph** : live, daily and weekly graphs (VA, W, V and Cos phi)
