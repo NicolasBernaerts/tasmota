@@ -40,8 +40,8 @@ If you want to compile this firmware version, you just need to :
 
 Here is where you should place different files from this repository and from **tasmota/common** :
 * **platformio_override.ini**
+* boards/**esp8266_16M14M.json**
 * tasmota/**user_config_override.h**
-* tasmota/boards/**esp8266_16M14M.json**
 * tasmota/tasmota_drv_driver/**xdrv_01_9_webserver.ino**
 * tasmota/tasmota_drv_driver/**xdrv_50_filesystem_cfg_csv.ino**
 * tasmota/tasmota_drv_driver/**xdrv_94_ip_address.ino**
