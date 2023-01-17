@@ -1,6 +1,6 @@
 # Offload & Pilotwire Tasmota firmware #
 
-These 2 firmwares are based on Tasmota **v12**. They have been developped to provide :
+These 2 firmwares are based on Tasmota **v12.3.1**. They have been developped to provide :
 * **Offload** capacity based on a MQTT subscription to a global Meter
 * **Pilotwire** management for electrical heaters using **Fil Pilote** protocol widely available in France
 
