@@ -17,6 +17,7 @@
   Copyright (C) 2022  Nicolas Bernaerts
     06/10/2022 - v1.0 - Creation 
     21/10/2022 - v1.1 - Add sandbox management (with day shift to have green/orange/red on current day)
+    09/02/2023 - v1.2 - Disable wifi sleep to avoid latency
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -584,6 +585,14 @@ void EcowattPublishJson ()
  *                      Callback
 \***********************************************************/
 
+// module init
+void EcowattModuleInit ()
+{
+  // disable wifi sleep mode
+  Settings->flag5.wifi_no_sleep = true;
+  TasmotaGlobal.wifi_stay_asleep = false;
+}
+
 // init main status
 void EcowattInit ()
 {
@@ -672,63 +681,63 @@ void EcowattWebSensor ()
 {
   bool     ca_ready, pk_ready;
   uint8_t  index, slot;
-  uint32_t time_now, time_next;
-  char     str_color[12];
-  char     str_select[48];
+  uint32_t time_now;   //, time_next;
+  char     str_text[16];
 
-  // check for RTE private key
-  if (ecowatt_config.str_private_key.length () == 0) WSContentSend_P (PSTR ("{s}Ecowatt{m}Private key missing{e}"));
+  // start of ecowatt data
+  WSContentSend_P (PSTR ("<div style='font-size:10px;text-align:center;padding:2px;'>\n"));
 
-  // check for root certificate authority
-  else if (ecowatt_config.str_root_ca.length () == 0) WSContentSend_P (PSTR ("{s}Ecowatt{m}Root CA missing{e}"));
-
-  // else, never received ecowatt signal
-  else if (ecowatt_status.time_update == UINT32_MAX) WSContentSend_P (PSTR ("{s}Ecowatt{m}Waiting for 1st signal{e}"));
-
+  WSContentSend_P (PSTR ("<div style='display:flex;margin-top:2px;padding:0px;font-size:16px;'>\n"));
+  WSContentSend_P (PSTR ("<div style='width:25%%;padding:0px;text-align:left;'><b>Ecowatt</b></div>\n"));
+  WSContentSend_P (PSTR ("<div style='width:75%%;padding:0px;'>"));
+  if (ecowatt_config.str_private_key.length () == 0) WSContentSend_P (PSTR ("<small><i>Private key missing</i></small></div>\n"));
+  else if (ecowatt_config.str_root_ca.length () == 0) WSContentSend_P (PSTR ("<small><i>Root CA missing</i></small></div>\n"));
+  else if (ecowatt_status.time_update == UINT32_MAX) WSContentSend_P (PSTR ("<small><i>Waiting for 1st signal</i></small></div>\n"));
   else
   {
     // display next update slot
     time_now = LocalTime ();
-    if (ecowatt_status.time_update > time_now) WSContentSend_P (PSTR ("{s}Ecowatt{m}Update in %u mn{e}"), (ecowatt_status.time_update - time_now) / 60);
-      else WSContentSend_P (PSTR ("{s}Ecowatt{m}Updating now{e}")); 
+    if (ecowatt_status.time_update > time_now) WSContentSend_P (PSTR ("<small><i>Update in %u mn</i></small></div>\n"), (ecowatt_status.time_update - time_now) / 60);
+      else WSContentSend_P (PSTR ("<small><i>Updating now</i></small></div>\n")); 
+  }
+  WSContentSend_P (PSTR ("</div>\n"));
 
-    // start of graph
-    WSContentSend_P (PSTR ("<tr>\n"));
-
-    // graph header
-    WSContentSend_P (PSTR ("<div style='display:flex;margin:0px;padding:0px;font-size:12px;'>\n"));
-    WSContentSend_P (PSTR ("<div style='width:50%%;text-align:left;'>%uh</div>\n"), 0);
-    WSContentSend_P (PSTR ("<div style='width:100%%;text-align:center;'>%uh</div>\n"), 4);
-    WSContentSend_P (PSTR ("<div style='width:100%%;text-align:center;'>%uh</div>\n"), 8);
-    WSContentSend_P (PSTR ("<div style='width:100%%;text-align:center;'>%uh</div>\n"), 12);
-    WSContentSend_P (PSTR ("<div style='width:100%%;text-align:center;'>%uh</div>\n"), 16);
-    WSContentSend_P (PSTR ("<div style='width:100%%;text-align:center;'>%uh</div>\n"), 20);
-    WSContentSend_P (PSTR ("<div style='width:50%%;text-align:right;'>%uh</div>\n"), 24);
-    WSContentSend_P (PSTR ("</div>\n"));
-
+  // if ecowatt signal has been received
+  if (ecowatt_status.time_update != UINT32_MAX)
+  {
     // loop thru days
     for (index = 0; index < ECOWATT_DAY_MAX; index ++)
     {
       WSContentSend_P (PSTR ("<div style='display:flex;margin:0px;padding:2px 0px;height:16px;'>\n"));
+      WSContentSend_P (PSTR ("<div style='width:20%%;padding:2px 0px;text-align:left;'>%s</div>\n"), ecowatt_status.arr_day[index].str_jour);
       for (slot = 0; slot < ECOWATT_SLOT_PER_DAY; slot ++)
       {
-        // get segment color
-        GetTextIndexed (str_color, sizeof (str_color), ecowatt_status.arr_day[index].arr_hvalue[slot], kEcowattLevelColor);
-        
-        // check if segment is the current slot
-        if ((index == ECOWATT_DAY_TODAY) && (slot == ecowatt_status.hour)) strcpy (str_select, "outline:4px solid white;outline-offset:-8px;"); else strcpy (str_select, "");
+        // segment beginning
+        GetTextIndexed (str_text, sizeof (str_text), ecowatt_status.arr_day[index].arr_hvalue[slot], kEcowattLevelColor);
+        WSContentSend_P (PSTR ("<div style='width:3.3%%;padding:1px 0px;background-color:%s;"), str_text);
 
-        // display segment
-        if (slot == 0) WSContentSend_P (PSTR ("<div style='width:100%%;margin-right:1px;border-radius:2px;background-color:%s;border-top-left-radius:6px;border-bottom-left-radius:6px;%s'></div>\n"), str_color, str_select);
-        else if (slot == ECOWATT_SLOT_PER_DAY - 1) WSContentSend_P (PSTR ("<div style='width:100%%;margin-right:1px;border-radius:2px;background-color:%s;border-top-right-radius:6px;border-bottom-right-radius:6px;%s'></div>\n"), str_color, str_select);
-        else WSContentSend_P (PSTR ("<div style='width:100%%;margin-right:1px;border-radius:2px;background-color:%s;%s'></div>\n"), str_color, str_select);
+        // first and last segment specificities
+        if (slot == 0) WSContentSend_P (PSTR ("border-top-left-radius:6px;border-bottom-left-radius:6px;"));
+          else if (slot == ECOWATT_SLOT_PER_DAY - 1) WSContentSend_P (PSTR ("border-top-right-radius:6px;border-bottom-right-radius:6px;"));
+
+        // segment end
+        if ((index == ECOWATT_DAY_TODAY) && (slot == ecowatt_status.hour)) WSContentSend_P (PSTR ("font-size:9px;'>⚪</div>\n"), str_text);
+          else WSContentSend_P (PSTR ("'></div>\n"));
       }
       WSContentSend_P (PSTR ("</div>\n"));
     }
 
-    // end of graph
-    WSContentSend_P (PSTR ("</tr>\n")); 
+    // hour scale
+    WSContentSend_P (PSTR ("<div style='display:flex;margin:0px;padding:0px;'>\n"));
+    WSContentSend_P (PSTR ("<div style='width:20%%;padding:0px;'></div>\n"), 0);
+    WSContentSend_P (PSTR ("<div style='width:6.6%%;padding:0px;text-align:left;'>%uh</div>\n"), 0);
+    for (index = 1; index < 6; index ++) WSContentSend_P (PSTR ("<div style='width:13.2%%;padding:0px;'>%uh</div>\n"), index * 4);
+    WSContentSend_P (PSTR ("<div style='width:6.6%%;padding:0px;text-align:right;'>%uh</div>\n"), 24);
+    WSContentSend_P (PSTR ("</div>\n"));
   }  
+
+  // end of ecowatt data
+  WSContentSend_P (PSTR ("</div>\n")); 
 }
 
 #endif  // USE_WEBSERVER
@@ -737,13 +746,16 @@ void EcowattWebSensor ()
  *                      Interface
 \***********************************************************/
 
-bool Xsns121 (uint8_t function)
+bool Xsns121 (uint32_t function)
 {
   bool result = false;
 
   // main callback switch
   switch (function)
   { 
+    case FUNC_MODULE_INIT:
+      EcowattModuleInit ();
+      break;
     case FUNC_INIT:
       EcowattInit ();
       break;
