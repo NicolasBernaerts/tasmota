@@ -240,7 +240,7 @@ void TCPInit ()
  *                      Interface
 \***********************************************************/
 
-bool Xdrv97 (uint8_t function)
+bool Xdrv97 (uint32_t function)
 {
   bool result = false;
 

@@ -19,7 +19,6 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef FIRMWARE_SAFEBOOT
 #ifdef USE_COMMON_LOG
 
 #define XDRV_93                   93
@@ -443,7 +442,7 @@ void LogWebPageHistory ()
  *                      Interface
 \***********************************************************/
 
-bool Xdrv93 (uint8_t function)
+bool Xdrv93 (uint32_t function)
 {
   bool result = false;
 
@@ -469,4 +468,3 @@ bool Xdrv93 (uint8_t function)
 }
 
 #endif		// USE_COMMON_LOG
-#endif    // FIRMWARE_SAFEBOOT

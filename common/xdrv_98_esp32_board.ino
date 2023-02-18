@@ -213,7 +213,7 @@ void ESP32BoardWebPageConfig ()
 \***************************************/
 
 // teleinfo sensor
-bool Xdrv98 (uint8_t function)
+bool Xdrv98 (uint32_t function)
 {
   // swtich according to context
   switch (function) 

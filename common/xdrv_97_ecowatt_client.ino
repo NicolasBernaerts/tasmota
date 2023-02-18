@@ -51,7 +51,7 @@ enum EcowattDays { ECOWATT_DAY_TODAY, ECOWATT_DAY_TOMORROW, ECOWATT_DAY_DAYAFTER
 
 // Ecowatt states
 enum EcowattStates { ECOWATT_LEVEL_NONE, ECOWATT_LEVEL_NORMAL, ECOWATT_LEVEL_WARNING, ECOWATT_LEVEL_POWERCUT, ECOWATT_LEVEL_MAX };
-const char kEcowattStateColor[] PROGMEM = "|#00AF00|#FFAF00|#CF0000";
+const char kEcowattStateColor[] PROGMEM = "|#080|#E80|#D00";
 
 /***********************************************************\
  *                        Data
@@ -253,52 +253,47 @@ bool EcowattMqttData ()
 void EcowattWebSensor ()
 {
   uint8_t slot;
+  char    str_text[8];
   char    str_color[12];
-  char    str_select[48];
+
+  WSContentSend_PD (PSTR ("<div style='font-size:10px;text-align:center;margin-top:4px;padding:2px 6px;background:#333333;border-radius:8px;'>\n"));
+  WSContentSend_PD (PSTR ("<div style='display:flex;padding:0px;'>\n"));
+  WSContentSend_PD (PSTR ("<div style='width:28%%;padding:0px;margin-bottom:-4px;text-align:left;font-size:16px;font-weight:bold;'>Ecowatt</div>\n"));
 
   // if topic is missing
-  if (ecowatt_config.str_topic.length () == 0) WSContentSend_PD (PSTR ("{s}Ecowatt{m}Please configure topic{e}"));
+  if (ecowatt_config.str_topic.length () == 0) WSContentSend_PD (PSTR ("<div style='width:72%%;padding:3px 0px;'>Please configure topic</div>\n"));
 
   // else if ecowatt signal has never been received
-  else if (ecowatt_status.hour == UINT8_MAX) WSContentSend_PD (PSTR ("{s}Ecowatt{m}Waiting for 1st signal{e}"));
+  else if (ecowatt_status.hour == UINT8_MAX) WSContentSend_PD (PSTR ("<div style='width:72%%;padding:3px 0px;'>Waiting for 1st signal</div>\n"));
 
   // else, display today ecowatt chart
   else
   {
-    // start of graph
-    WSContentSend_P (PSTR ("<tr>\n"));
+    // scale
+    WSContentSend_PD (PSTR ("<div style='width:6%%;padding:0px;text-align:left;'>%uh</div>\n"), 0);
+    for (slot = 1; slot < 6; slot ++) WSContentSend_PD (PSTR ("<div style='width:12%%;padding:0px;'>%uh</div>\n"), slot * 4);
+    WSContentSend_PD (PSTR ("<div style='width:6%%;padding:0px;text-align:right;'>%uh</div>\n"), 24);
+    WSContentSend_PD (PSTR ("</div>\n"));
 
-    // graph header
-    WSContentSend_P (PSTR ("<div style='display:flex;margin:0px;padding:0px;font-size:12px;'>\n"));
-    WSContentSend_P (PSTR ("<div style='width:50%%;text-align:left;'>%uh</div>\n"), 0);
-    WSContentSend_P (PSTR ("<div style='width:100%%;text-align:center;'>%uh</div>\n"), 4);
-    WSContentSend_P (PSTR ("<div style='width:100%%;text-align:center;'>%uh</div>\n"), 8);
-    WSContentSend_P (PSTR ("<div style='width:100%%;text-align:center;'>%uh</div>\n"), 12);
-    WSContentSend_P (PSTR ("<div style='width:100%%;text-align:center;'>%uh</div>\n"), 16);
-    WSContentSend_P (PSTR ("<div style='width:100%%;text-align:center;'>%uh</div>\n"), 20);
-    WSContentSend_P (PSTR ("<div style='width:50%%;text-align:right;'>%uh</div>\n"), 24);
-    WSContentSend_P (PSTR ("</div>\n"));
-
-    // display slots of today
-    WSContentSend_P (PSTR ("<div style='display:flex;margin:0px;padding:2px 0px;height:16px;'>\n"));
+    // daily ecowatt slots
+    WSContentSend_PD (PSTR ("<div style='display:flex;margin:0px;padding:0px;font-size:8px;'>\n"));
+    WSContentSend_PD (PSTR ("<div style='width:28%%;padding:0px;'>&nbsp;</div>\n"));
     for (slot = 0; slot < ECOWATT_SLOT_PER_DAY; slot ++)
     {
-      // get segment color
-      GetTextIndexed (str_color, sizeof (str_color), ecowatt_status.arr_day[0].arr_hvalue[slot], kEcowattStateColor);
-
-      // check if segment is the current slot
-      if (slot == ecowatt_status.hour) strcpy (str_select, "outline:4px solid white;outline-offset:-8px;"); else strcpy (str_select, "");
-
       // display segment
-      if (slot == 0) WSContentSend_P (PSTR ("<div style='width:100%%;margin-right:1px;border-radius:2px;background-color:%s;border-top-left-radius:6px;border-bottom-left-radius:6px;%s'></div>\n"), str_color, str_select);
-      else if (slot == ECOWATT_SLOT_PER_DAY - 1) WSContentSend_P (PSTR ("<div style='width:100%%;margin-right:1px;border-radius:2px;background-color:%s;border-top-right-radius:6px;border-bottom-right-radius:6px;%s'></div>\n"), str_color, str_select);
-      else WSContentSend_P (PSTR ("<div style='width:100%%;margin-right:1px;border-radius:2px;background-color:%s;%s'></div>\n"), str_color, str_select);
+      GetTextIndexed (str_color, sizeof (str_color), ecowatt_status.arr_day[0].arr_hvalue[slot], kEcowattStateColor);
+      WSContentSend_PD (PSTR ("<div style='width:3%%;padding:1px 0px;background:%s;"), str_color);
+      if (slot == 0) WSContentSend_PD (PSTR ("border-top-left-radius:4px;border-bottom-left-radius:4px;"));
+        else if (slot == ECOWATT_SLOT_PER_DAY - 1) WSContentSend_PD (PSTR ("border-top-right-radius:4px;border-bottom-right-radius:4px;"));
+        
+      // display current status
+      if (slot == ecowatt_status.hour) WSContentSend_P (PSTR ("font-size:9px;'>⚪</div>\n"), str_text);
+          else WSContentSend_P (PSTR ("'></div>\n"));
     }
-    WSContentSend_P (PSTR ("</div>\n"));
-
-    // end of graph
-    WSContentSend_P (PSTR ("</tr>\n"));
+    WSContentSend_PD (PSTR ("</div>\n"));
   }
+
+  WSContentSend_PD (PSTR ("</div>\n"));
 }
 
 #endif  // USE_WEBSERVER
@@ -307,7 +302,7 @@ void EcowattWebSensor ()
  *                      Interface
 \***********************************************************/
 
-bool Xdrv97 (uint8_t function)
+bool Xdrv97 (uint32_t function)
 {
   bool result = false;
 

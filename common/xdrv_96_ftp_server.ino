@@ -31,7 +31,6 @@
  *                FTP Server
 \*************************************************/
 
-#ifndef FIRMWARE_SAFEBOOT
 #ifdef USE_UFILESYS
 #ifdef USE_FTPSERVER
 
@@ -138,7 +137,7 @@ void FTPServerInit ()
  *                      Interface
 \***********************************************************/
 
-bool Xdrv96 (uint8_t function)
+bool Xdrv96 (uint32_t function)
 {
   bool result = false;
 
@@ -161,5 +160,5 @@ bool Xdrv96 (uint8_t function)
 
 #endif    // USE_FTPSERVER
 #endif    // USE_UFILESYS
-#endif    // FIRMWARE_SAFEBOOT
+
 

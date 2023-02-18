@@ -587,10 +587,10 @@ void HLKLDEverySecond ()
 // Handling of received data
 void HLKLDReceiveData ()
 {
-  uint8_t  type;
   int      index;
-  long     power;
-  float    distance;
+  uint8_t  type  = HLKLD_LINE_MAX;
+  long     power = LONG_MAX;
+  float    dist  = NAN;
   char     *pstr_tag;
   char     str_recv[2];
   char     str_value[8];
@@ -667,13 +667,9 @@ void HLKLDReceiveData ()
           // handle presence (occ) or movement (mov) line
           case HLKLD_LINE_OCC:
           case HLKLD_LINE_MOV:
-            // init
-            distance = NAN;
-            power    = LONG_MAX;
-
             // if dis= available, get distance
             pstr_tag = strstr (hlkld_status.str_buffer, "dis=");
-            if (pstr_tag != nullptr) distance = atof (pstr_tag + 4);
+            if (pstr_tag != nullptr) dist = atof (pstr_tag + 4);
 
             // if str= available, get power
             pstr_tag = strstr (hlkld_status.str_buffer, "str=");
@@ -681,11 +677,11 @@ void HLKLDReceiveData ()
 
             // if distance and power not available, get last value with space separation
             pstr_tag = nullptr;
-            if (isnan (distance) && (power == LONG_MAX)) pstr_tag = strrchr (hlkld_status.str_buffer, ' ');
+            if (isnan (dist) && (power == LONG_MAX)) pstr_tag = strrchr (hlkld_status.str_buffer, ' ');
             if (pstr_tag != nullptr) power = atol (pstr_tag + 1);
 
             // set current value
-            HLKLDSetPowerFromDistance (type, distance, power);
+            HLKLDSetPowerFromDistance (type, dist, power);
             break;
         }
 
@@ -698,6 +694,9 @@ void HLKLDReceiveData ()
         strlcat (hlkld_status.str_buffer, str_recv, sizeof (hlkld_status.str_buffer));
         break;
     }
+
+    // give control back to the system to avoid watchdog
+    yield ();
   }
 }
 
@@ -1102,7 +1101,7 @@ void HLKLDWebPageConfigUpdate ()
 \***************************************/
 
 // Teleinfo sensor
-bool Xsns124 (uint8_t function)
+bool Xsns124 (uint32_t function)
 {
   bool result = false;
 
@@ -1122,7 +1121,8 @@ bool Xsns124 (uint8_t function)
     case FUNC_JSON_APPEND:
       HLKLDShowJSON (true);
       break;
-    case FUNC_EVERY_100_MSECOND:
+//    case FUNC_EVERY_100_MSECOND:
+    case FUNC_LOOP:
       HLKLDReceiveData ();
       break;
 

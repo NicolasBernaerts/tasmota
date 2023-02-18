@@ -319,12 +319,17 @@ size_t UfsReadNextLine (File &file, char* pstr_line, const size_t size_line)
   char    *pstr_start;
   char    *pstr_token;
 
-  // check parameter
+  // check parameter & init
   if (pstr_line == nullptr) return 0;
-
-  // init
   strcpy (pstr_line, "");
 
+/*
+  String  str_line;
+
+  // read lines until non empty line
+  while (file.available() && (str_line.length () == 0)) str_line = file.readStringUntil ('\n');
+  if (str_line.length () > 0) strlcpy (pstr_line, str_line.c_str (), size_line);
+*/
   // read next line
   pos_start = file.position ();
   length = file.readBytes (pstr_line, size_line - 1);
@@ -353,6 +358,9 @@ size_t UfsReadNextLine (File &file, char* pstr_line, const size_t size_line)
   yield ();
 
   return length;
+
+
+//  return str_line.length ();
 }
 
 // read previous line and return number of caracters in the line

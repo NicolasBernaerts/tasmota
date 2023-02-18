@@ -26,7 +26,6 @@
  *                Timezone
 \*************************************************/
 
-#ifndef FIRMWARE_SAFEBOOT
 #ifdef USE_TIMEZONE
 
 #define XSNS_120                  120
@@ -140,9 +139,7 @@ void CmndTimezonePublish ()
   if (XdrvMailbox.data_len > 0)
   {
     // update flag
-    if (strcasecmp (XdrvMailbox.data, "OFF") == 0) timezone.publish_json = false;
-    else if (strcasecmp (XdrvMailbox.data, "ON") == 0) timezone.publish_json = true;
-    else timezone.publish_json = (XdrvMailbox.payload > 0);
+    timezone.publish_json = ((XdrvMailbox.payload != 0) || (strcasecmp (XdrvMailbox.data, "ON") == 0));
   }
   ResponseCmndNumber (timezone.publish_json);
 }
@@ -210,13 +207,11 @@ void CmndTimezoneDstD ()
 // append local time to main page
 void TimezoneWebSensor ()
 {
-  TIME_T   current_dst;
-  uint32_t current_time;
+  TIME_T current_dst;
 
   // dislay local time
-  current_time = LocalTime ();
-  BreakTime (current_time, current_dst);
-  WSContentSend_PD (PSTR ("<tr><div style='text-align:center;'>%02d:%02d:%02d</div></tr>\n"), current_dst.hour, current_dst.minute, current_dst.second);
+  BreakTime (LocalTime (), current_dst);
+  WSContentSend_PD (PSTR ("<div style='text-align:center;'>%02d:%02d:%02d</div>\n"), current_dst.hour, current_dst.minute, current_dst.second);
 }
 
 #ifdef USE_TIMEZONE_WEB_CONFIG
@@ -324,7 +319,7 @@ void TimezoneWebPageConfigure ()
  *                      Interface
 \***********************************************************/
 
-bool Xsns120 (uint8_t function)
+bool Xsns120 (uint32_t function)
 {
   bool result = false;
 
@@ -363,5 +358,4 @@ bool Xsns120 (uint8_t function)
 }
 
 #endif      // USE_TIMEZONE
-#endif      // FIRMWARE_SAFEBOOT
 

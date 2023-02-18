@@ -25,7 +25,6 @@
  *                IP Address
 \*************************************************/
 
-#ifndef FIRMWARE_SAFEBOOT
 #ifdef USE_IPADDRESS
 
 #define XDRV_94                   94
@@ -244,7 +243,7 @@ void IPAddressWebPageJSON ()
  *                      Interface
 \***********************************************************/
 
-bool Xdrv94 (uint8_t function)
+bool Xdrv94 (uint32_t function)
 {
   bool result = false;
 
@@ -271,4 +270,4 @@ bool Xdrv94 (uint8_t function)
 }
 
 #endif    // USE_IPADDRESS
-#endif    // FIRMWARE_SAFEBOOT
+
