@@ -72,6 +72,7 @@
     26/10/2022 - v10.0  - Add bar graph monthly (every day) and yearly (every month)
     06/11/2022 - v10.1  - Bug fixes on bar graphs and change in lltoa conversion
     15/11/2022 - v10.2  - Add bar graph daily (every hour)
+    04/02/2023 - v10.3  - Add graph swipe
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -146,7 +147,7 @@
 // extension data
 #define EXTENSION_NAME    "Teleinfo"          // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
-#define EXTENSION_VERSION "10.2"              // version
+#define EXTENSION_VERSION "10.3"              // version
 
 // MQTT default
 #undef MQTT_HOST

@@ -1,7 +1,7 @@
 /*
-  xnrg_15_teleinfo.ino - France Teleinfo energy sensor support for Sonoff-Tasmota
+  xnrg_15_teleinfo.ino - France Teleinfo energy sensor support for Tasmota devices
 
-  Copyright (C) 2019-2022  Nicolas Bernaerts
+  Copyright (C) 2019-2023  Nicolas Bernaerts
 
   Connexions :
     * On ESP8266, Teleinfo Rx must be connected to GPIO3 (as it must be forced to 7E1)
@@ -84,6 +84,8 @@
     26/10/2022 - v10.0  - Add bar graph monthly (every day) and yearly (every month)
     06/11/2022 - v10.1  - Bug fixes on bar graphs and change in lltoa conversion
     15/11/2022 - v10.2  - Add bar graph daily (every hour)
+    04/02/2023 - v10.3  - Add graph swipe (horizontal and vertical)
+                          Disable wifi sleep on ESP32 to avoid latency
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -211,8 +213,10 @@ TasmotaSerial *teleinfo_serial = nullptr;
 #define D_CMND_TELEINFO_MONTH           "month"
 #define D_CMND_TELEINFO_HEIGHT          "height"
 #define D_CMND_TELEINFO_DATA            "data"
-#define D_CMND_TELEINFO_INCREMENT       "incr"
-#define D_CMND_TELEINFO_DECREMENT       "decr"
+#define D_CMND_TELEINFO_PREV            "prev"
+#define D_CMND_TELEINFO_NEXT            "next"
+#define D_CMND_TELEINFO_MINUS           "minus"
+#define D_CMND_TELEINFO_PLUS            "plus"
 
 // JSON TIC extensions
 #define TELEINFO_JSON_TIC               "TIC"
@@ -743,6 +747,22 @@ char* lltoa (const long long value, char *pstr_result, const int base)
 
 #endif      // ESP32
 
+// calculate number of days in given month
+uint8_t TeleinfoGetDaysInMonth (const uint32_t year, const uint8_t month)
+{
+  uint8_t result;
+
+  // calculate number of days in given month
+  if ((month == 4) || (month == 6) || (month == 9 || (month == 11))) result = 30;         // months with 30 days  
+  else if (month != 2) result = 31;                                                       // months with 31 days
+  else if ((year % 400) == 0) result = 29;                                                // leap year
+  else if ((year % 100) == 0) result = 28;                                                // not a leap year
+  else if ((year % 4) == 0) result = 29;                                                  // leap year
+  else result = 28;                                                                       // not a leap year
+  
+  return result;
+}
+
 // Start serial reception
 bool TeleinfoEnableSerial ()
 {
@@ -1154,33 +1174,38 @@ uint32_t TeleinfoHistoGetStartTime (const uint8_t period, const uint8_t histo)
 // Get historisation period literal date
 bool TeleinfoHistoGetDate (const int period, const int histo, char* pstr_text)
 {
-  uint32_t calc_time, year;
-  TIME_T   start_dst, stop_dst;
+  uint32_t calc_time;
+  TIME_T   start_dst;
 
   // check parameters and init
   if (pstr_text == nullptr) return false;
-  strcpy (pstr_text, "");
 
   // start date
   calc_time = TeleinfoHistoGetStartTime (period, histo);
   BreakTime (calc_time, start_dst);
 
-  // generate time label for day graph
-  if (period == TELEINFO_PERIOD_DAY) sprintf_P (pstr_text, PSTR ("%02u/%02u"), start_dst.day_of_month, start_dst.month);
-
-  // generate time label for week graph
-  else if (period == TELEINFO_PERIOD_WEEK)
+  // set label according to period
+  switch (period)
   {
-    BreakTime (calc_time + 518400, stop_dst);        // end time
-    sprintf_P (pstr_text, PSTR ("%02u-%02u/%02u"), start_dst.day_of_month, stop_dst.day_of_month, stop_dst.month);
-  }
+    // generate time label for day graph
+    case TELEINFO_PERIOD_DAY:
+      sprintf_P (pstr_text, PSTR ("%02u/%02u"), start_dst.day_of_month, start_dst.month);
+      break;
 
-  // generate time label for year graph
-  else if (period == TELEINFO_PERIOD_YEAR)
-  {
-    // end date
-    year = 1970 + start_dst.year - histo;
-    sprintf_P (pstr_text, PSTR ("%04u"), year);
+    // generate time label for week graph
+    case TELEINFO_PERIOD_WEEK:
+      sprintf_P (pstr_text, PSTR ("W %02u/%02u"), start_dst.day_of_month, start_dst.month);
+      break;
+
+    // generate time label for year graph
+    case TELEINFO_PERIOD_YEAR:
+      sprintf_P (pstr_text, PSTR ("%04u"), 1970 + start_dst.year - histo);
+      break;
+
+    // default
+    default:
+      strcpy (pstr_text, "");
+      break;
   }
 
   return (strlen (pstr_text) > 0);
@@ -1370,7 +1395,7 @@ void TeleinfoSaveHistoData (const uint8_t period, const uint8_t log_policy)
 // Rotation of log files
 void TeleinfoRotateLog ()
 {
-  TIME_T time_dst;
+//  TIME_T time_dst;
 
   // log default method
   AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Rotate log files"));
@@ -1383,8 +1408,8 @@ void TeleinfoRotateLog ()
   UfsFileRotate (D_TELEINFO_HISTO_FILE_DAY, 0, teleinfo_config.log_nbday);
 
   // if we are monday, week has changed, rotate previous weekly files
-  BreakTime (LocalTime () - 60, time_dst);
-  if (time_dst.day_of_week == 1) UfsFileRotate (D_TELEINFO_HISTO_FILE_WEEK, 0, teleinfo_config.log_nbweek);
+//  BreakTime (LocalTime () - 60, time_dst);
+  if (RtcTime.day_of_week == 2) UfsFileRotate (D_TELEINFO_HISTO_FILE_WEEK, 0, teleinfo_config.log_nbweek);
 }
 
 // Save historisation data
@@ -1611,6 +1636,14 @@ void TeleinfoPreInit ()
   }
 }
 
+// Teleinfo module initialisation
+void TeleinfoModuleInit ()
+{
+  // disable wifi sleep mode
+  Settings->flag5.wifi_no_sleep  = true;
+  TasmotaGlobal.wifi_stay_asleep = false;
+}
+
 // Teleinfo driver initialisation
 void TeleinfoInit ()
 {
@@ -1773,9 +1806,8 @@ void TeleinfoReceiveData ()
   char      str_donnee[TELEINFO_DATA_MAX];
   char      str_text[TELEINFO_DATA_MAX];
 
-  // serial receive loop
-  while (teleinfo_serial->available()) 
-//  if (teleinfo_serial->available()) 
+  // if serial port active, serial receive loop
+  if (teleinfo_meter.status_rx == TIC_SERIAL_ACTIVE) while (teleinfo_serial->available()) 
   {
     // set timestamp
     timestamp = millis ();
@@ -2578,7 +2610,7 @@ void TeleinfoPublishJsonMeter ()
 void TeleinfoAfterTeleperiod ()
 {
   // if telemetry call, check for JSON update according to update policy
-  if (teleinfo_config.msg_policy == TELEINFO_POLICY_TELEMETRY) teleinfo_message.publish_msg = true;
+  if ((teleinfo_meter.status_rx == TIC_SERIAL_ACTIVE) && (teleinfo_config.msg_policy == TELEINFO_POLICY_TELEMETRY)) teleinfo_message.publish_msg = true;
 }
 
 /*********************************************\
@@ -2979,7 +3011,6 @@ void TeleinfoWebGraphTime (const uint8_t period, const uint8_t histo)
 // Display data curve
 void TeleinfoWebDisplayCurve (const uint8_t phase, const uint8_t data)
 {
-//  bool first_point = true;
   int  index, index_array;
   long graph_x, graph_y, graph_range, graph_delta;
   long prev_x, prev_y, bezier_y1, bezier_y2; 
@@ -3064,6 +3095,9 @@ void TeleinfoWebDisplayCurve (const uint8_t phase, const uint8_t data)
           // if index and value are valid, update value to be displayed
           if ((index < TELEINFO_GRAPH_SAMPLE) && (value != LONG_MAX)) arr_value[index] = value;
         }
+
+        // handle received data
+        TeleinfoReceiveData ();
       }
       while (size_line > 0);
 
@@ -3093,7 +3127,6 @@ void TeleinfoWebDisplayCurve (const uint8_t phase, const uint8_t data)
     case TELEINFO_UNIT_COSPHI:
       WSContentSend_P ("<path class='ln%u' ", phase);
       break;
-
   }
 
   // display values
@@ -3401,6 +3434,9 @@ void TeleinfoWebDisplayBarGraph (const uint8_t histo, const bool current)
           }
         }
       }
+
+      // handle received data
+      TeleinfoReceiveData ();
     }
     while (size_line > 0);
 
@@ -3571,12 +3607,16 @@ void TeleinfoWebGraphPage ()
   bool     display;
   uint8_t  phase, choice, counter;  
   uint16_t index;
-  uint32_t year; 
+  uint32_t year;
+  uint32_t timestart;
   long     percentage;
   TIME_T   time_dst;
   char     str_type[8];
   char     str_text[16];
   char     str_date[16];
+
+  // start timestamp
+  timestart = millis ();
 
   // get numerical argument values
   teleinfo_graph.data  = (uint8_t)TeleinfoWebGetArgValue (D_CMND_TELEINFO_DATA,  0, TELEINFO_UNIT_MAX - 1, teleinfo_graph.data);
@@ -3597,15 +3637,112 @@ void TeleinfoWebGraphPage ()
   if (Webserver->hasArg (D_CMND_TELEINFO_PHASE)) WebGetArg (D_CMND_TELEINFO_PHASE, teleinfo_graph.str_phase, sizeof (teleinfo_graph.str_phase));
   while (strlen (teleinfo_graph.str_phase) < teleinfo_contract.phase) strlcat (teleinfo_graph.str_phase, "1", sizeof (teleinfo_graph.str_phase));
 
-  // get graph limits
-  teleinfo_config.max_v         = TeleinfoWebGetArgValue (D_CMND_TELEINFO_MAX_V, TELEINFO_GRAPH_MIN_VOLTAGE, TELEINFO_GRAPH_MAX_VOLTAGE, teleinfo_config.max_v);
-  teleinfo_config.max_va        = TeleinfoWebGetArgValue (D_CMND_TELEINFO_MAX_VA, TELEINFO_GRAPH_MIN_POWER, TELEINFO_GRAPH_MAX_POWER, teleinfo_config.max_va);
-  teleinfo_config.max_kwh_hour  = TeleinfoWebGetArgValue (D_CMND_TELEINFO_MAX_KWH_HOUR, TELEINFO_GRAPH_MIN_WH_HOUR, TELEINFO_GRAPH_MAX_WH_HOUR, teleinfo_config.max_kwh_hour);
-  teleinfo_config.max_kwh_day   = TeleinfoWebGetArgValue (D_CMND_TELEINFO_MAX_KWH_DAY, TELEINFO_GRAPH_MIN_WH_DAY, TELEINFO_GRAPH_MAX_WH_DAY, teleinfo_config.max_kwh_day);
-  teleinfo_config.max_kwh_month = TeleinfoWebGetArgValue (D_CMND_TELEINFO_MAX_KWH_MONTH, TELEINFO_GRAPH_MIN_WH_MONTH, TELEINFO_GRAPH_MAX_WH_MONTH, teleinfo_config.max_kwh_month);
+  // graph increment
+  choice = TeleinfoWebGetArgValue (D_CMND_TELEINFO_PLUS, 0, 1, 0);
+  if (choice == 1)
+  {
+    if ((teleinfo_graph.period == TELEINFO_PERIOD_YEAR) && (teleinfo_graph.month == 0)) teleinfo_config.max_kwh_month += TELEINFO_GRAPH_INC_WH_MONTH;
+    else if ((teleinfo_graph.period == TELEINFO_PERIOD_YEAR) && (teleinfo_graph.day == 0)) teleinfo_config.max_kwh_day += TELEINFO_GRAPH_INC_WH_DAY;
+    else if (teleinfo_graph.period == TELEINFO_PERIOD_YEAR) teleinfo_config.max_kwh_hour += TELEINFO_GRAPH_INC_WH_HOUR;
+    else if ((teleinfo_graph.data == TELEINFO_UNIT_VA) || (teleinfo_graph.data == TELEINFO_UNIT_W)) teleinfo_config.max_va += TELEINFO_GRAPH_INC_POWER;
+    else if (teleinfo_graph.data == TELEINFO_UNIT_V) teleinfo_config.max_v += TELEINFO_GRAPH_INC_VOLTAGE;
+  }
+
+  // graph decrement
+  choice = TeleinfoWebGetArgValue (D_CMND_TELEINFO_MINUS, 0, 1, 0);
+  if (choice == 1)
+  {
+    if ((teleinfo_graph.period == TELEINFO_PERIOD_YEAR) && (teleinfo_graph.month == 0)) teleinfo_config.max_kwh_month = max ((long)TELEINFO_GRAPH_MIN_WH_MONTH, teleinfo_config.max_kwh_month - TELEINFO_GRAPH_INC_WH_MONTH);
+    else if ((teleinfo_graph.period == TELEINFO_PERIOD_YEAR) && (teleinfo_graph.day == 0)) teleinfo_config.max_kwh_day = max ((long)TELEINFO_GRAPH_MIN_WH_DAY , teleinfo_config.max_kwh_day - TELEINFO_GRAPH_INC_WH_DAY);
+    else if (teleinfo_graph.period == TELEINFO_PERIOD_YEAR) teleinfo_config.max_kwh_hour = max ((long)TELEINFO_GRAPH_MIN_WH_HOUR, teleinfo_config.max_kwh_hour - TELEINFO_GRAPH_INC_WH_HOUR);
+    else if ((teleinfo_graph.data == TELEINFO_UNIT_VA) || (teleinfo_graph.data == TELEINFO_UNIT_W)) teleinfo_config.max_va = max ((long)TELEINFO_GRAPH_MIN_POWER, teleinfo_config.max_va - TELEINFO_GRAPH_INC_POWER);
+    else if (teleinfo_graph.data == TELEINFO_UNIT_V) teleinfo_config.max_v = max ((int)TELEINFO_GRAPH_MIN_VOLTAGE, teleinfo_config.max_v - TELEINFO_GRAPH_INC_VOLTAGE);
+  }
+
+  // handle next page
+  choice = TeleinfoWebGetArgValue (D_CMND_TELEINFO_NEXT, 0, 1, 0);
+  if ((choice == 1) && (teleinfo_graph.period != TELEINFO_PERIOD_LIVE))
+  {
+    if ((teleinfo_graph.period != TELEINFO_PERIOD_YEAR) && (teleinfo_graph.histo > 0)) teleinfo_graph.histo--;
+    else if (teleinfo_graph.period == TELEINFO_PERIOD_YEAR)
+    {
+      // full year view
+      if ((teleinfo_graph.day == 0) && (teleinfo_graph.month == 0))
+      {
+       if (teleinfo_graph.histo > 0) teleinfo_graph.histo--;
+      }
+
+      // month view
+      else if (teleinfo_graph.day == 0)
+      {
+        if ((teleinfo_graph.month == 12) && (teleinfo_graph.histo > 0)) { teleinfo_graph.month = 1; teleinfo_graph.histo--; }
+        else if (teleinfo_graph.month < 12) teleinfo_graph.month++;
+      }
+
+      // day view
+      else
+      {
+        // calculate number of days in current month
+        BreakTime (LocalTime (), time_dst);
+        year = 1970 + (uint32_t)time_dst.year - teleinfo_graph.histo;
+        choice = TeleinfoGetDaysInMonth (year, teleinfo_graph.month);
+
+        if (teleinfo_graph.day == choice) { teleinfo_graph.day = 1; teleinfo_graph.month++; }
+        else teleinfo_graph.day++;
+
+        if ((teleinfo_graph.month == 13) && (teleinfo_graph.histo > 0)) { teleinfo_graph.month = 1; teleinfo_graph.histo--; }
+        else if (teleinfo_graph.month == 13) { teleinfo_graph.month = 12; teleinfo_graph.day = 31; }
+      }
+    }
+  }
+
+  // handle previous page
+  choice = TeleinfoWebGetArgValue (D_CMND_TELEINFO_PREV, 0, 1, 0);
+  if ((choice == 1) && (teleinfo_graph.period != TELEINFO_PERIOD_LIVE))
+  {
+    if (teleinfo_graph.period != TELEINFO_PERIOD_YEAR) teleinfo_graph.histo++;
+    else if (teleinfo_graph.period == TELEINFO_PERIOD_YEAR)
+    {
+      // full year view
+      if ((teleinfo_graph.day == 0) && (teleinfo_graph.month == 0)) teleinfo_graph.histo++;
+
+      // month view
+      else if (teleinfo_graph.day == 0)
+      {
+        if (teleinfo_graph.month == 1) { teleinfo_graph.month = 12; teleinfo_graph.histo++; }
+        else teleinfo_graph.month--;
+      }
+
+      // day view
+      else
+      {
+        teleinfo_graph.day--;
+        if (teleinfo_graph.day == 0) teleinfo_graph.month--;
+        if (teleinfo_graph.month == 0) { teleinfo_graph.month = 12; teleinfo_graph.histo++; }
+        if (teleinfo_graph.day == 0)
+        {
+          // calculate number of days in current month
+          BreakTime (LocalTime (), time_dst);
+          year = 1970 + (uint32_t)time_dst.year - teleinfo_graph.histo;
+          teleinfo_graph.day = TeleinfoGetDaysInMonth (year, teleinfo_graph.month);
+        }
+      }
+    }
+  }
 
   // beginning of form without authentification
   WSContentStart_P (D_TELEINFO_GRAPH, false);
+
+  // javascript : screen swipe for previous and next period
+  WSContentSend_P (PSTR ("\nlet startX=0;let stopX=0;\n"));
+  WSContentSend_P (PSTR ("window.addEventListener('touchstart',function(evt){startX=evt.changedTouches[0].screenX;},false);\n"));
+  WSContentSend_P (PSTR ("window.addEventListener('touchend',function(evt){stopX=evt.changedTouches[0].screenX;handleGesture();},false);\n"));
+  WSContentSend_P (PSTR ("function handleGesture(){\n"));
+  WSContentSend_P (PSTR ("if(stopX<startX-100){document.getElementById('%s').click();}\n"), D_CMND_TELEINFO_NEXT);
+  WSContentSend_P (PSTR ("else if(stopX>startX+100){document.getElementById('%s').click();}\n"), D_CMND_TELEINFO_PREV);
+  WSContentSend_P (PSTR ("}\n"));
+
+  // end of script section
   WSContentSend_P (PSTR ("</script>\n"));
 
   // set page as scalable
@@ -3631,7 +3768,7 @@ void TeleinfoWebGraphPage ()
   }
   WSContentSend_P (PSTR ("div.disabled {color:#666;border-color:#666;}\n"));
 
-  WSContentSend_P (PSTR ("div.choice {display:inline-block;padding:0px 2px;margin:0px;border:1px #666 solid;background:none;color:#fff;border-radius:6px;}\n"));
+  WSContentSend_P (PSTR ("div.choice {display:inline-block;padding:0px 2px;margin:0px;background:none;color:#fff;border:1px #666 solid;border-radius:6px;}\n"));
   WSContentSend_P (PSTR ("div.choice div {background:#666;}\n"));
   WSContentSend_P (PSTR ("div.choice a div {background:none;}\n"));
 
@@ -3639,7 +3776,9 @@ void TeleinfoWebGraphPage ()
   WSContentSend_P (PSTR ("div a div.item:hover {background:#aaa;}\n"));
   WSContentSend_P (PSTR ("div.histo {font-size:0.9rem;padding:0px;margin-top:0px;}\n"));
 
-  WSContentSend_P (PSTR ("div.incr {position:absolute;top:5vh;left:2%%;padding:0px;color:white;border:1px #666 solid;border-radius:6px;}\n"));
+  WSContentSend_P (PSTR ("div.prev {position:absolute;top:16px;left:2%%;padding:0px;}\n"));
+  WSContentSend_P (PSTR ("div.next {position:absolute;top:16px;right:2%%;padding:0px;}\n"));
+  WSContentSend_P (PSTR ("div.range {position:absolute;top:112px;left:2%%;padding:0px;}\n"));
   
   WSContentSend_P (PSTR ("div.period {width:60px;margin-top:2px;}\n"));
   WSContentSend_P (PSTR ("div.month {width:28px;font-size:0.85rem;}\n"));
@@ -3649,7 +3788,11 @@ void TeleinfoWebGraphPage ()
   WSContentSend_P (PSTR ("div.size {width:25px;}\n"));
   WSContentSend_P (PSTR ("div a div.active {background:#666;}\n"));
 
-  WSContentSend_P (PSTR ("select {background:#666;color:white;font-size:0.8rem;margin:1px;border:solid #666 2px;border-radius:4px;}\n"));
+  WSContentSend_P (PSTR ("select {background:#666;color:white;font-size:1rem;margin:1px;border:1px #666 solid;border-radius:6px;}\n"));
+
+  WSContentSend_P (PSTR ("button {padding:2px 12px;font-size:1rem;background:none;color:#fff;border:1px #666 solid;border-radius:6px;}\n"));
+  WSContentSend_P (PSTR ("button:hover {background:#aaa;}\n"));
+  WSContentSend_P (PSTR ("div.range button {width:32px;margin-bottom:8px;}\n"));
 
   WSContentSend_P (PSTR ("div.graph {width:100%%;margin:auto;margin-top:2vh;}\n"));
   WSContentSend_P (PSTR ("svg.graph {width:100%%;height:60vh;}\n"));
@@ -3663,23 +3806,19 @@ void TeleinfoWebGraphPage ()
   //      Unit range
   // -------------------
 
-  WSContentSend_P (PSTR ("<div class='incr'>\n"));
+  WSContentSend_P (PSTR ("<form method='get' action='%s'>\n"), D_TELEINFO_PAGE_GRAPH);
 
   // graph increment
-  if ((teleinfo_graph.period == TELEINFO_PERIOD_YEAR) && (teleinfo_graph.month == 0)) WSContentSend_P (PSTR ("<a href='%s?%s=%d'><div class='item size'>+</div></a><br>\n"), D_TELEINFO_PAGE_GRAPH, D_CMND_TELEINFO_MAX_KWH_MONTH, teleinfo_config.max_kwh_month + TELEINFO_GRAPH_INC_WH_MONTH);
-  else if ((teleinfo_graph.period == TELEINFO_PERIOD_YEAR) && (teleinfo_graph.day == 0)) WSContentSend_P (PSTR ("<a href='%s?%s=%d'><div class='item size'>+</div></a><br>\n"), D_TELEINFO_PAGE_GRAPH, D_CMND_TELEINFO_MAX_KWH_DAY, teleinfo_config.max_kwh_day + TELEINFO_GRAPH_INC_WH_DAY);
-  else if (teleinfo_graph.period == TELEINFO_PERIOD_YEAR) WSContentSend_P (PSTR ("<a href='%s?%s=%d'><div class='item size'>+</div></a><br>\n"), D_TELEINFO_PAGE_GRAPH, D_CMND_TELEINFO_MAX_KWH_HOUR, teleinfo_config.max_kwh_hour + TELEINFO_GRAPH_INC_WH_HOUR);
-  else if ((teleinfo_graph.data == TELEINFO_UNIT_VA) || (teleinfo_graph.data == TELEINFO_UNIT_W)) WSContentSend_P (PSTR ("<a href='%s?%s=%d'><div class='item size'>+</div></a><br>\n"), D_TELEINFO_PAGE_GRAPH, D_CMND_TELEINFO_MAX_VA, teleinfo_config.max_va + TELEINFO_GRAPH_INC_POWER);
-  else if (teleinfo_graph.data == TELEINFO_UNIT_V) WSContentSend_P (PSTR ("<a href='%s?%s=%d'><div class='item size'>+</div></a><br>\n"), D_TELEINFO_PAGE_GRAPH, D_CMND_TELEINFO_MAX_V, teleinfo_config.max_v + TELEINFO_GRAPH_INC_VOLTAGE);
+  if (teleinfo_graph.period != TELEINFO_PERIOD_LIVE)
+  {
+    WSContentSend_P (PSTR ("<div class='prev'><button name='%s' id='%s' value=1>&lt;&lt;</button></div>\n"), D_CMND_TELEINFO_PREV, D_CMND_TELEINFO_PREV);
+    WSContentSend_P (PSTR ("<div class='next'><button name='%s' id='%s' value=1>&gt;&gt;</button></div>\n"), D_CMND_TELEINFO_NEXT, D_CMND_TELEINFO_NEXT);
+  }
 
-  // graph decrement
-  if ((teleinfo_graph.period == TELEINFO_PERIOD_YEAR) && (teleinfo_graph.month == 0)) WSContentSend_P (PSTR ("<a href='%s?%s=%d'><div class='item size'>-</div></a><br>\n"), D_TELEINFO_PAGE_GRAPH, D_CMND_TELEINFO_MAX_KWH_MONTH, teleinfo_config.max_kwh_month - TELEINFO_GRAPH_INC_WH_MONTH);
-  else if ((teleinfo_graph.period == TELEINFO_PERIOD_YEAR) && (teleinfo_graph.day == 0)) WSContentSend_P (PSTR ("<a href='%s?%s=%d'><div class='item size'>-</div></a><br>\n"), D_TELEINFO_PAGE_GRAPH, D_CMND_TELEINFO_MAX_KWH_DAY, teleinfo_config.max_kwh_day - TELEINFO_GRAPH_INC_WH_DAY);
-  else if (teleinfo_graph.period == TELEINFO_PERIOD_YEAR) WSContentSend_P (PSTR ("<a href='%s?%s=%d'><div class='item size'>-</div></a><br>\n"), D_TELEINFO_PAGE_GRAPH, D_CMND_TELEINFO_MAX_KWH_HOUR, teleinfo_config.max_kwh_hour - TELEINFO_GRAPH_INC_WH_HOUR);
-  else if ((teleinfo_graph.data == TELEINFO_UNIT_VA) || (teleinfo_graph.data == TELEINFO_UNIT_W)) WSContentSend_P (PSTR ("<a href='%s?%s=%d'><div class='item size'>-</div></a><br>\n"), D_TELEINFO_PAGE_GRAPH, D_CMND_TELEINFO_MAX_VA, teleinfo_config.max_va - TELEINFO_GRAPH_INC_POWER);
-  else if (teleinfo_graph.data == TELEINFO_UNIT_V) WSContentSend_P (PSTR ("<a href='%s?%s=%d'><div class='item size'>-</div></a><br>\n"), D_TELEINFO_PAGE_GRAPH, D_CMND_TELEINFO_MAX_V, teleinfo_config.max_v - TELEINFO_GRAPH_INC_VOLTAGE);
-
-  WSContentSend_P (PSTR ("</div>\n"));      // choice
+  WSContentSend_P (PSTR ("<div class='range'>\n"));
+  WSContentSend_P (PSTR ("<button name='%s' id='%s' value=1>+</button><br>\n"), D_CMND_TELEINFO_PLUS, D_CMND_TELEINFO_PLUS);
+  WSContentSend_P (PSTR ("<button name='%s' id='%s' value=1>-</button><br>\n"), D_CMND_TELEINFO_MINUS, D_CMND_TELEINFO_MINUS);
+  WSContentSend_P (PSTR ("</div>\n"));
 
   // -----------------
   //      Icon
@@ -3687,12 +3826,17 @@ void TeleinfoWebGraphPage ()
 
   WSContentSend_P (PSTR ("<div><a href='/'><img height=64 src='%s'></a></div>\n"), D_TELEINFO_ICON_PNG);
 
+  // --------------------------
+  //    Level 1 : Navigation
+  // --------------------------
+
+  WSContentSend_P (PSTR ("<div>\n"));
+  WSContentSend_P (PSTR ("<div class='choice'>\n"));
+
   // ---------------------
   //    Level 1 - Period 
   // ---------------------
 
-  WSContentSend_P (PSTR ("<div><div class='choice'>\n"));
-  WSContentSend_P (PSTR ("<form method='post' action='%s'>\n"), D_TELEINFO_PAGE_GRAPH);
   for (index = 0; index < TELEINFO_PERIOD_DAY; index++)
   {
     // get period label
@@ -3743,11 +3887,14 @@ void TeleinfoWebGraphPage ()
 
 # endif     // USE_UFILESYS
 
-  WSContentSend_P (PSTR ("</form>\n"));
   WSContentSend_P (PSTR ("</div></div>\n"));        // choice
 
+  // ------------
+  //    Level 2
+  // ------------
 
-  WSContentSend_P (PSTR ("<div><div class='choice'>\n"));
+  WSContentSend_P (PSTR ("<div>\n"));
+  WSContentSend_P (PSTR ("<div class='choice'>\n"));
 
   // ------------------------
   //    Level 2 : Data type
@@ -3828,21 +3975,12 @@ void TeleinfoWebGraphPage ()
 
   else if ((teleinfo_graph.period == TELEINFO_PERIOD_YEAR) && (teleinfo_graph.month != 0))
   {
-    // calculate current year
-    BreakTime (LocalTime (), time_dst);
-    year = 1970 + (uint32_t)time_dst.year - teleinfo_graph.histo;
-
     // calculate number of days in current month
-    if ((teleinfo_graph.month == 4) || (teleinfo_graph.month == 11) || (teleinfo_graph.month == 9) || (teleinfo_graph.month == 6)) choice = 30;     // months with 30 days  
-    else if (teleinfo_graph.month != 2) choice = 31;                                                                                                // months with 31 days
-    else if ((year % 400) == 0) choice = 29;                                                                                                        // leap year
-    else if ((year % 100) == 0) choice = 28;                                                                                                        // not a leap year
-    else if ((year % 4) == 0) choice = 29;                                                                                                          // leap year
-    else choice = 28;                                                                                                                               // not a leap year 
-
-    WSContentSend_P (PSTR ("<div class='choice'>\n"));
+    BreakTime (LocalTime (), time_dst);
+    choice = TeleinfoGetDaysInMonth (1970 + (uint32_t)time_dst.year - teleinfo_graph.histo, teleinfo_graph.month);
 
     // loop thru days in the month
+    WSContentSend_P (PSTR ("<div class='choice'>\n"));
     for (counter = 1; counter <= choice; counter++)
     {
       // handle selected day
@@ -3860,11 +3998,14 @@ void TeleinfoWebGraphPage ()
 
   WSContentSend_P (PSTR ("</div>\n"));        // live
 
+  WSContentSend_P (PSTR ("</form>\n"));
+
   // ---------------
   //   SVG : Start 
   // ---------------
 
-  WSContentSend_P (PSTR ("<div class='graph'>\n<svg class='graph' viewBox='0 0 1200 %d' preserveAspectRatio='none'>\n"), teleinfo_config.height);
+  WSContentSend_P (PSTR ("<div class='graph'>\n"));
+  WSContentSend_P (PSTR ("<svg class='graph' viewBox='0 0 1200 %d' preserveAspectRatio='none'>\n"), teleinfo_config.height);
 
   // ---------------
   //   SVG : Style 
@@ -3973,10 +4114,14 @@ void TeleinfoWebGraphPage ()
   //   SVG : End 
   // -----------------
 
-  WSContentSend_P (PSTR ("</svg>\n</div>\n"));
+  WSContentSend_P (PSTR ("</svg>\n"));
+  WSContentSend_P (PSTR ("</div>\n"));
 
   // end of page
   WSContentStop ();
+
+  // log page serving time
+  AddLog (LOG_LEVEL_DEBUG, PSTR ("TIC: Graph in %ums"), millis () - timestart);
 }
 
 #endif  // USE_WEBSERVER
@@ -3986,7 +4131,7 @@ void TeleinfoWebGraphPage ()
 \***************************************/
 
 // Teleinfo energy driver
-bool Xnrg15 (uint8_t function)
+bool Xnrg15 (uint32_t function)
 {
   bool result = false;
 
@@ -4006,13 +4151,16 @@ bool Xnrg15 (uint8_t function)
 }
 
 // Teleinfo sensor
-bool Xsns99 (uint8_t function)
+bool Xsns99 (uint32_t function)
 {
   bool result = false;
 
   // swtich according to context
   switch (function) 
   {
+    case FUNC_MODULE_INIT:
+      TeleinfoModuleInit ();
+      break;
     case FUNC_INIT:
       TeleinfoGraphInit ();
       break;
@@ -4020,13 +4168,13 @@ bool Xsns99 (uint8_t function)
       TeleinfoSaveBeforeRestart ();
       break;
     case FUNC_AFTER_TELEPERIOD:
-      if (teleinfo_meter.status_rx == TIC_SERIAL_ACTIVE) TeleinfoAfterTeleperiod ();
+      TeleinfoAfterTeleperiod ();
       break;
     case FUNC_COMMAND:
       result = DecodeCommand (kTeleinfoCommands, TeleinfoCommand);
       break;
     case FUNC_LOOP:
-      if (teleinfo_meter.status_rx == TIC_SERIAL_ACTIVE) TeleinfoReceiveData ();
+      TeleinfoReceiveData ();
       break;
     case FUNC_EVERY_250_MSECOND:
       if (TasmotaGlobal.uptime > 5) TeleinfoEvery250ms ();
