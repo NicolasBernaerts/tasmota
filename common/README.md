@@ -10,17 +10,30 @@ This simple driver allows graphical configuration of Timezone and NTP server.
 
 ## xsns_125_generic_sensor.ino ##
 
+![RCWL0516](./screen/tasmota-sensor-main-pres.png)
+
 This generic sensor allows fews things around sensor management :
   * standard function to read temperature, humidity and presence (not depending on sensor type)
   * declaration and use of remote temperature, humidity and presence sensors
   * presence sensor reading based on timeout
   * visualisation of local presence sensor on main page
-  
+
+To get all available function, just type **sensor_help** in console.
+
 Handled local sensor are :
   * Temperature DHT11, AM2301, SI7021, SHT30 or DS18x20
   * Humidity DHT11, AM2301, SI7021 or SHT30
   * Movement detector RCWL-0516 or HW-MS03 (declared as Counter 1)
   * Presence detector HLK-LD1115H, HLK-LD1125H or HLK-LD2410 (connected thru Rx and Tx)
+
+![Config](./screen/tasmota-sensor-config-local.png)
+
+Remote sensor configuration can be done graphically.
+
+![Temperature](./screen/tasmota-sensor-config-temp.png)
+
+![Humidity](./screen/tasmota-sensor-config-humi.png) ![Presence](./screen/tasmota-sensor-config-pres.png)
+
 
 ## xdrv_40_telegram_extension.ino ##
 
