@@ -50,9 +50,17 @@ It provides functions to manage a structured event log file :
   - Append data in an existing logged event
   - Generate HTML display from an event log file
   
-  
+## xsns_102_hlk_ld2410.ino ##
 
-Configuration (INI) and CSV file manager for LittleFS
+![HLK LD2410](./screen/tasmota-main-hlk-ld2410.jpg)
+
+Driver for HLK-LD2410 presence & movement detector.
+
+Please note that this driver is different than the one in official Tasmota repository.
+
+To get the sensor operational, connect it on Tx and Rx and set **baudrate 256000** in console.
+
+To get all available function, just type **ld2410_help** in console.
 
 ## Others ##
 
@@ -62,10 +70,8 @@ Common files are :
   * **xdrv_96_ftp_server.ino** : Embedded FTP Server
   * **xdrv_97_tcp_server.ino** : Embedded TCP server for Teleinfo stream
   * **xdrv_98_esp32_board.ino** : Handler for ESP32 Ethernet board configuration
-  * **xsns_102_hlk_ld2410.ino** : Driver for HLK-LD2410 presence & movement detector
   * **xsns_121_hlk_ld1125.ino** : Driver for HLK-LD1125 presence & movement detector
   * **xsns_122_hlk_ld1115.ino** : Driver for HLK-LD1115 presence & movement detector
-  * **xsns_125_generic_sensor.ino** : Generic temperature, humidity and movement sensor, handling MQTT remote sensors 
 
 External libraries are :
 
