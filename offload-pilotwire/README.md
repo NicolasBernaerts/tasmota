@@ -22,7 +22,8 @@ This firmare provides :
   * your actual global consumption
   * your contact maximum power
 
-If global power exceed your contract level, device is offloaded as long as your global consumption has not dropped enougth. \
+If global power exceed your contract level, device is offloaded as long as your global consumption has not dropped enougth.
+
 It allows to cut devices like geaser, ... before your house meter strips because of over-power.
 
 It has been tested on **Sonoff S26**, **Sonoff Pow R2**, **Athom power plug** and various **ESP32** boards.
