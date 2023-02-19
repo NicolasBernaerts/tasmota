@@ -11,7 +11,7 @@ This firmare provides :
   * automatic offload when global power is overloading your contract
   * night mode management (timer ON = go to night mode, timer OFF = go back to normal mode)
   * **/control** public page to control the device
-  * **/histo** public page to get offloading history
+  * **/log** public page to get offloading history
 
 ## Offload ##
 
