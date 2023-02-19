@@ -34,6 +34,17 @@ Remote sensor configuration can be done graphically.
 
 ![Humidity](./screen/tasmota-sensor-config-humi.png) ![Presence](./screen/tasmota-sensor-config-pres.png)
 
+## xsns_102_hlk_ld2410.ino ##
+
+![HLK LD2410](./screen/tasmota-main-hlk-ld2410.jpg)
+
+Driver for HLK-LD2410 presence & movement detector.
+
+Please note that this driver is different than the one in official Tasmota repository.
+
+To get the sensor operational, connect it on Tx and Rx and set **baudrate 256000** in console.
+
+To get all available function, just type **ld2410_help** in console.
 
 ## xdrv_40_telegram_extension.ino ##
 
@@ -63,18 +74,6 @@ It provides functions to manage a structured event log file :
   - Append data in an existing logged event
   - Generate HTML display from an event log file
   
-## xsns_102_hlk_ld2410.ino ##
-
-![HLK LD2410](./screen/tasmota-main-hlk-ld2410.jpg)
-
-Driver for HLK-LD2410 presence & movement detector.
-
-Please note that this driver is different than the one in official Tasmota repository.
-
-To get the sensor operational, connect it on Tx and Rx and set **baudrate 256000** in console.
-
-To get all available function, just type **ld2410_help** in console.
-
 ## Others ##
 
 Common files are :
