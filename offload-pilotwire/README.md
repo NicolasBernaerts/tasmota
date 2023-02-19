@@ -208,7 +208,7 @@ If everything goes fine, you should be able to compile your own build.
 #### Control and Graph ####
 
 ![Control page](./screen/tasmota-pilotwire-control.png)
-![Graph page](./screen/tasmota-pilotwire-graph.png)
+![Graph page](./screen/tasmota-pilotwire-graph.jpg)
 
 #### Config ####
 
