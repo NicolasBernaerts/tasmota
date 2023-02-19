@@ -10,7 +10,7 @@ Common files are :
   * **xdrv_97_tcp_server.ino** : Embedded TCP server for Teleinfo stream
   * **xdrv_98_esp32_board.ino** : Handler for ESP32 Ethernet board configuration
   * **xsns_120_timezone.ino** : Timezone setup manager
-  * **xsns_123_hlk_ld2410.ino** : Driver for HLK LD2410 movement detector
+  * **xsns_102_hlk_ld2410.ino** : Driver for HLK LD2410 movement detector
   * **xsns_124_hlk_ld11.ino** : Driver for HLK LD1115 and LD1125 movement detector
   * **xsns_125_generic_sensor.ino** : Generic temperature, humidity and movement sensor, handling MQTT remote sensors 
 
