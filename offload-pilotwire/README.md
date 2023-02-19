@@ -13,7 +13,9 @@ This firmare provides :
   * **/control** public page to control the device
   * **/histo** public page to get offloading history
 
-## Offload
+## Offload ##
+
+![Offload main](./screen/tasmota-main-offload.jpg)
 
 **Offload** firmware provides an offload capability based on :
   * the device power
@@ -38,7 +40,7 @@ Here, you need to configure :
   
 After next restart, offload mecanism will start.
 
-### Console commands
+### Console commands ###
 
 Here the console commands provided with this firmware :
   * **ol_help** : list of available commands
@@ -52,13 +54,15 @@ Here the console commands provided with this firmware :
   * **ol_kinst** [key] : MQTT key for current meter instant power
   * **ol_rearm** [value] : Switch rearm delay (0 no rearm or rearm delay in sec.)
 
-### MQTT
+### MQTT ###
 
 Offload MQTT JSON result should look like that :
 
     23:59:26.476 MQT: chambre2nd/tele/STATE = {"Time":"2022-01-19T23:59:26","Offload":{"State":0,"Stage":0,"Device":1500},"TempUnit":"C"}}
 
-## Pilotwire
+## Pilotwire ##
+
+![Offload main](./screen/tasmota-main-pilotwire.jpg)
 
 Pilotwire firmware allows to handle an electrical heater using the **fil pilote** french protocol.
 
@@ -76,7 +80,7 @@ This firmware specifically manages :
 
 Pilotwire protocol is described at http://www.radiateur-electrique.org/fil-pilote-radiateur.php
  
-### Hardware setup
+### Hardware setup ###
 
 You need to connect a diode between your relay output and the heater's *fil pilote* (usually black color wire).
 
@@ -84,7 +88,7 @@ Typical diode to use is **1N4007**. Connexion should be done directly on the rel
 
 ![Diode setup](./screen/pilotwire-diode-single.jpg)
 
-### Configuration
+### Configuration ###
 
 First you need to configure normal Tasmota stuff and **Offload** section.
 
@@ -103,7 +107,7 @@ You can adjust topic to your environment.
 
 It then allows to adjust target temperature according to Ecowatt signals level 2 (low risk of power cut) and level 3 (high risk of power cut).
 
-#### Night mode
+#### Night mode ####
 
 Night mode allows to automatically drop temperature at night.
 
@@ -111,7 +115,7 @@ It is configured thru standard Tasmota **timers** :
   * Timer **ON** switch to **comfort** temperature
   * Timer **OFF** switches to **night mode** temperature
 
-#### Open Window detection
+#### Open Window detection ####
 
 Open window detection allows to automatically cut the heater when a window is opened and to sxwitch it back on when window is closed.
 
@@ -121,7 +125,7 @@ Its principle is quite simple :
 
 Any change in running mode resets the open window detection.
 
-#### Presence detection
+#### Presence detection ####
 
 Presence detection works as follow :
 
@@ -140,7 +144,7 @@ Presence detection works as follow :
     * when you change comfort mode target temperature, target temperature is set back to comfort mode
     * if there is no movement after **no movement** timeout, target temperature is set to **eco** mode
 
-### Console commands
+### Console commands ###
 
 Here the console commands provided with this firmware :
   * **pw_help** : list of available commands
@@ -161,13 +165,13 @@ Here the console commands provided with this firmware :
   * **pw_initial** [value] : presence detection timeout when changing running mode (mn)
   * **pw_normal** [value] : presence detection timeout after detection (mn)
 
-### MQTT
+### MQTT ###
 
 Pilotwire MQTT JSON result should look like that :
 
     23:59:26.476 MQT: chambre2nd/tele/STATE = {"Time":"2022-01-19T23:59:26","Pilotwire":{"Mode":2,"Status":2,"Heating":1,"Temperature":16.9,"Target":17.0,"Detect":128,"Window":0},"Offload":{"State":0,"Stage":0,"Device":1500},"TempUnit":"C"}}
 
-### Compilation
+### Compilation ###
 
 Pre-compiled version of Tasmota handling **offload** and **fil pilote** are available in the **bin** directory.
 
@@ -188,24 +192,25 @@ Here is where you should place different files from this repository and from **t
 * tasmota/tasmota_drv_driver/**xdrv_96_offload.ino**
 * tasmota/tasmota_drv_driver/**xdrv_97_ecowatt_client.ino**
 * tasmota/tasmota_sns_sensor/**xsns_120_timezone.ino**
-* tasmota/tasmota_sns_sensor/**xsns_124_hlk_ld.ino**
 * tasmota/tasmota_sns_sensor/**xsns_125_generic_sensor.ino**
 * tasmota/tasmota_sns_sensor/**xsns_126_pilotwire.ino**
 
+If needed, you can also add specific presence sensor drivers :
+
+* tasmota/tasmota_sns_sensor/**xsns_102_ld2410.ino**
+* tasmota/tasmota_sns_sensor/**xsns_121_ld1125.ino**
+* tasmota/tasmota_sns_sensor/**xsns_122_ld1115.ino**
+
 If everything goes fine, you should be able to compile your own build.
 
-### Screen shot
+### Screen shot ###
 
-#### Main
-
-![Main page](./screen/tasmota-pilotwire-main.png) 
-
-#### Control and Graph
+#### Control and Graph ####
 
 ![Control page](./screen/tasmota-pilotwire-control.png)
 ![Graph page](./screen/tasmota-pilotwire-graph.png)
 
-### Config
+#### Config ####
 
 ![Offload config page](./screen/tasmota-offload-config.png) 
 ![Pilotwire cnfig page](./screen/tasmota-pilotwire-config.png) 
