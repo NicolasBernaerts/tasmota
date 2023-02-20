@@ -1,7 +1,7 @@
 Tasmota firmware modified to control VMC
 =============
 
-This evolution of Tasmota firmware is bsed on **Tasmota v12** and has been enhanced to handle a Motor Controled Ventilator according to current humidity level.
+This evolution of Tasmota firmware is bsed on **Tasmota v12.3.1** and has been enhanced to handle a Motor Controled Ventilator according to current humidity level.
 
 In **Auto** mode, VMC is :
   * started as soon as humidity goes beyond a target value
