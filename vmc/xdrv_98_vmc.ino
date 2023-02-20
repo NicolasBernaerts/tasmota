@@ -2,9 +2,11 @@
   xdrv_98_vmc.ino - Ventilation Motor Controled support for Tasmota.
     It has been tested on Sonoff TH, Sonoff Basic and ESP01
   
-  This driver is used to subscribe to remote MQTT sensors
-  
-  See xsns_98_vmc.ino for all informations
+  Copyright (C) 2019-2023  Nicolas Bernaerts
+
+  Version history :
+    15/03/2019 - v1.0 - Creation
+    03/02/2023 - v1.1 - Tasmota 12.3 compatibility
     
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -26,7 +28,7 @@
  *                      Interface
 \*******************************************************/
 
-bool Xdrv98 (uint8_t function)
+bool Xdrv98 (uint32_t function)
 {
   bool result = false;
 

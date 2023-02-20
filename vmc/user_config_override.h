@@ -23,6 +23,8 @@
     24/02/2022 - v3.8 - Tasmota 10 compatibility
                         Sensor access rewrite
     22/08/2022 - v3.9 - Tasmota 12 & use generic sensor
+    03/02/2023 - v4.0 - Tasmota 12.3 compatibility
+                        Graph redesign with auto update
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -91,7 +93,7 @@
 // extension data
 #define EXTENSION_NAME    "VMC"               // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
-#define EXTENSION_VERSION "3.9"               // version
+#define EXTENSION_VERSION "4.0"               // version
 
 // MQTT default
 #undef MQTT_HOST
@@ -180,10 +182,11 @@
 
 #undef USE_COUNTER                            // Enable inputs as counter (+0k8 code)
 
-//#undef USE_DS18x20                            // Add support for DS18x20 sensors with id sort, single scan and read retry (+2k6 code)
-//#undef USE_DHT                                // Add support for internal DHT sensor
+#define USE_DS18x20                            // Add support for DS18x20 sensors with id sort, single scan and read retry (+2k6 code)
+#define USE_DHT                                // Add support for internal DHT sensor
 
-//#undef USE_I2C                                // Disable all I2C sensors and devices
+#define USE_I2C                               // Enable all I2C sensors and devices
+#define USE_SHT3X                             // Enable SHT30 and SHT40
 #define USE_SHT                                // [I2cDriver8] Enable SHT1X sensor (+1k4 code)
 #define USE_HTU                                // [I2cDriver9] Enable HTU21/SI7013/SI7020/SI7021 sensor (I2C address 0x40) (+1k5 code)
 #define USE_BMP                                // [I2cDriver10] Enable BMP085/BMP180/BMP280/BME280 sensors (I2C addresses 0x76 and 0x77) (+4k4 code)
