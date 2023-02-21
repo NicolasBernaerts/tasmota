@@ -171,6 +171,9 @@ If you want to compile this firmware version, you just need to :
 Here is where you should place different files from this repository and from **tasmota/common** :
 * **platformio_override.ini**
 * tasmota/**user_config_override.h**
+* boards/**esp32_4M_FS.json**
+* boards/**esp8266_16M14M.json**
+* boards/**esp32s3_lillygo_t7s3.json**
 * tasmota/tasmota_nrg_energy/**xnrg_15_teleinfo.ino**
 * tasmota/tasmota_drv_driver/**xdrv_01_9_webserver.ino**
 * tasmota/tasmota_drv_driver/**xdrv_50_filesystem_cfg_csv.ino**
@@ -179,7 +182,6 @@ Here is where you should place different files from this repository and from **t
 * tasmota/tasmota_drv_driver/**xdrv_97_tcp_server.ino**
 * tasmota/tasmota_drv_driver/**xdrv_98_esp32_board.ino**
 * tasmota/tasmota_sns_sensor/**xsns_120_timezone.ino**
-* boards/**esp8266_16M14M.json**
 * lib/default/**FTPClientServer** (extract content of **FTPClientServer.zip**) 
 
 If everything goes fine, you should be able to compile your own build.
