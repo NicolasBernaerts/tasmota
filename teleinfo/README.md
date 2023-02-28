@@ -174,9 +174,9 @@ Here is where you should place different files from this repository and from **t
 * boards/**esp32_4M_FS.json**
 * boards/**esp8266_16M14M.json**
 * boards/**esp32s3_lillygo_t7s3.json**
+* tasmota/include/**tasmota_type.h**
 * tasmota/tasmota_nrg_energy/**xnrg_15_teleinfo.ino**
 * tasmota/tasmota_drv_driver/**xdrv_01_9_webserver.ino**
-* tasmota/tasmota_drv_driver/**xdrv_50_filesystem_cfg_csv.ino**
 * tasmota/tasmota_drv_driver/**xdrv_94_ip_address.ino**
 * tasmota/tasmota_drv_driver/**xdrv_96_ftp_server.ino**
 * tasmota/tasmota_drv_driver/**xdrv_97_tcp_server.ino**
