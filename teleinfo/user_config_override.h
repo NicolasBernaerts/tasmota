@@ -1,78 +1,79 @@
 /*
   user_config_override.h - user configuration overrides my_user_config.h for Tasmota
 
-  Copyright (C) 2020  Theo Arends, Nicolas Bernaerts
+  Copyright (C) 2019-2023  Theo Arends, Nicolas Bernaerts
 
-    05/05/2019 - v1.0   - Creation
-    16/05/2019 - v1.1   - Add Tempo and EJP contracts
-    08/06/2019 - v1.2   - Handle active and apparent power
-    05/07/2019 - v2.0   - Rework with selection thru web interface
-    02/01/2020 - v3.0   - Functions rewrite for Tasmota 8.x compatibility
-    05/02/2020 - v3.1   - Add support for 3 phases meters
-    14/03/2020 - v3.2   - Add apparent power graph
-    05/04/2020 - v3.3   - Add Timezone management
-    13/05/2020 - v3.4   - Add overload management per phase
-    15/05/2020 - v3.5   - Add tele.info and tele.json pages
-    19/05/2020 - v3.6   - Add configuration for first NTP server
-    26/05/2020 - v3.7   - Add Information JSON page
-    07/07/2020 - v3.7.1 - Enable discovery (mDNS)
-    29/07/2020 - v3.8   - Add Meter section to JSON
-    05/08/2020 - v4.0   - Major code rewrite, JSON section is now TIC, numbered like new official Teleinfo module
-    24/08/2020 - v4.0.1 - Web sensor display update
-    18/09/2020 - v4.1   - Based on Tasmota 8.4
-    07/10/2020 - v5.0   - Handle different graph periods, javascript auto update
-    18/10/2020 - v5.1   - Expose icon on web server
-    25/10/2020 - v5.2   - Real time graph page update
-    30/10/2020 - v5.3   - Add TIC message page
-    02/11/2020 - v5.4   - Tasmota 9.0 compatibility
-    09/11/2020 - v6.0   - Handle ESP32 ethernet devices with board selection
-    11/11/2020 - v6.1   - Add data.json page
-    20/11/2020 - v6.2   - Checksum bug
-    29/12/2020 - v6.3   - Strengthen message error control
-    20/02/2021 - v6.4   - Add sub-totals (HCHP, HCHC, ...) to JSON
-    25/02/2021 - v7.0   - Prepare compatibility with TIC standard
-    01/03/2021 - v7.0.1 - Add power status bar
-    05/03/2021 - v7.1   - Correct bug on hardware energy counter
-    08/03/2021 - v7.2   - Handle voltage and checksum for horodatage
-    12/03/2021 - v7.3   - Use average / overload for graph
-    15/03/2021 - v7.4   - Change graph period parameter
-    21/03/2021 - v7.5   - Support for TIC Standard
-    29/03/2021 - v7.6   - Add voltage graph
-    04/04/2021 - v7.7   - Change in serial port & graph height selection
-    06/04/2021 - v7.7.1 - Handle number of indexes according to contract
-    10/04/2021 - v7.7.2 - Remove use of String to avoid heap fragmentation 
-    14/04/2021 - v7.8   - Calculate Cos phi and Active power (W) 
-    21/04/2021 - v8.0   - Fixed IP configuration and change in Cos phi calculation
-    29/04/2021 - v8.1   - Bug fix in serial port management and realtime energy totals
-    16/05/2021 - v8.1.1 - Control initial baud rate to avoid crash (thanks to Seb)
-    26/05/2021 - v8.2   - Add active power (W) graph
-    22/06/2021 - v8.3   - Change in serial management for ESP32
-    04/08/2021 - v9.0   - Tasmota 9.5 compatibility
-                          Add LittleFS historic data record
-                          Complete change in VA, W and cos phi measurement based on transmission time
-                          Add PME/PMI ACE6000 management
-                          Add energy update interval configuration
-                          Add TIC to TCP bridge (command 'TICtcp 8888' to publish teleinfo stream on port 8888)
-    04/09/2021 - v9.1   - Save settings in LittleFS partition if available
-                          Log rotate and old files deletion if space low
-    10/10/2021 - v9.2   - Add peak VA and V on history files
-    02/11/2021 - v9.3   - Add period and totals in history files
-                          Add simple FTP server to access history files
-    13/03/2022 - v9.4   - Change keys to ISUB and PSUB in METER section
-    20/03/2022 - v9.5   - Change serial init and in active power calculation
-    01/04/2022 - v9.6   - Add software watchdog feed to avoid lock
-    22/04/2022 - v9.7   - Option to minimise LittleFS writes (day:every 1h and week:every 6h)
-    09/06/2022 - v9.7.1 - Correction of EAIT bug
-    04/08/2022 - v9.8   - Based on Tasmota 12, add ESP32S2 support
-                          Remove FTP server auto start
-    18/08/2022 - v9.9   - Force GPIO_TELEINFO_RX as digital input
-    31/08/2022 - v9.9.1 - Bug littlefs config and graph data recording
-    01/09/2022 - v9.9.2 - Add Tempo and Production mode (thanks to Sébastien)
-    08/09/2022 - v9.9.3 - Correct publication synchronised with teleperiod
-    26/10/2022 - v10.0  - Add bar graph monthly (every day) and yearly (every month)
-    06/11/2022 - v10.1  - Bug fixes on bar graphs and change in lltoa conversion
-    15/11/2022 - v10.2  - Add bar graph daily (every hour)
-    04/02/2023 - v10.3  - Add graph swipe
+    05/05/2019 - v1.0  - Creation
+    16/05/2019 - v1.1  - Add Tempo and EJP contracts
+    08/06/2019 - v1.2  - Handle active and apparent power
+    05/07/2019 - v2.0  - Rework with selection thru web interface
+    02/01/2020 - v3.0  - Functions rewrite for Tasmota 8.x compatibility
+    05/02/2020 - v3.1  - Add support for 3 phases meters
+    14/03/2020 - v3.2  - Add apparent power graph
+    05/04/2020 - v3.3  - Add Timezone management
+    13/05/2020 - v3.4  - Add overload management per phase
+    19/05/2020 - v3.6  - Add configuration for first NTP server
+    26/05/2020 - v3.7  - Add Information JSON page
+    29/07/2020 - v3.8  - Add Meter section to JSON
+    05/08/2020 - v4.0  - Major code rewrite, JSON section is now TIC, numbered like new official Teleinfo module
+                         Web sensor display update
+    18/09/2020 - v4.1  - Based on Tasmota 8.4
+    07/10/2020 - v5.0  - Handle different graph periods and javascript auto update
+    18/10/2020 - v5.1  - Expose icon on web server
+    25/10/2020 - v5.2  - Real time graph page update
+    30/10/2020 - v5.3  - Add TIC message page
+    02/11/2020 - v5.4  - Tasmota 9.0 compatibility
+    09/11/2020 - v6.0  - Handle ESP32 ethernet devices with board selection
+    11/11/2020 - v6.1  - Add data.json page
+    20/11/2020 - v6.2  - Checksum bug
+    29/12/2020 - v6.3  - Strengthen message error control
+    25/02/2021 - v7.0  - Prepare compatibility with TIC standard
+                         Add power status bar
+    05/03/2021 - v7.1  - Correct bug on hardware energy counter
+    08/03/2021 - v7.2  - Handle voltage and checksum for horodatage
+    12/03/2021 - v7.3  - Use average / overload for graph
+    15/03/2021 - v7.4  - Change graph period parameter
+    21/03/2021 - v7.5  - Support for TIC Standard
+    29/03/2021 - v7.6  - Add voltage graph
+    04/04/2021 - v7.7  - Change in serial port & graph height selection
+                         Handle number of indexes according to contract
+                         Remove use of String to avoid heap fragmentation 
+    14/04/2021 - v7.8  - Calculate Cos phi and Active power (W)
+    21/04/2021 - v8.0  - Fixed IP configuration and change in Cos phi calculation
+    29/04/2021 - v8.1  - Bug fix in serial port management and realtime energy totals
+                         Control initial baud rate to avoid crash (thanks to Seb)
+    26/05/2021 - v8.2  - Add active power (W) graph
+    22/06/2021 - v8.3  - Change in serial management for ESP32
+    04/08/2021 - v9.0  - Tasmota 9.5 compatibility
+                         Add LittleFS historic data record
+                         Complete change in VA, W and cos phi measurement based on transmission time
+                         Add PME/PMI ACE6000 management
+                         Add energy update interval configuration
+                         Add TIC to TCP bridge (command 'tcpstart 8888' to publish teleinfo stream on port 8888)
+    04/09/2021 - v9.1  - Save settings in LittleFS partition if available
+                         Log rotate and old files deletion if space low
+    10/10/2021 - v9.2  - Add peak VA and V in history files
+    02/11/2021 - v9.3  - Add period and totals in history files
+                         Add simple FTP server to access history files
+    13/03/2022 - v9.4  - Change keys to ISUB and PSUB in METER section
+    20/03/2022 - v9.5  - Change serial init and major rework in active power calculation
+    01/04/2022 - v9.6  - Add software watchdog feed to avoid lock
+    22/04/2022 - v9.7  - Option to minimise LittleFS writes (day:every 1h and week:every 6h)
+                         Correction of EAIT bug
+    04/08/2022 - v9.8  - Based on Tasmota 12 , add ESP32S2 support
+                         Remove FTP server auto start
+    18/08/2022 - v9.9  - Force GPIO_TELEINFO_RX as digital input
+                         Correct bug littlefs config and graph data recording
+                         Add Tempo and Production mode (thanks to Sébastien)
+                         Correct publication synchronised with teleperiod
+    26/10/2022 - v10.0 - Add bar graph monthly (every day) and yearly (every month)
+    06/11/2022 - v10.1 - Bug fixes on bar graphs and change in lltoa conversion
+    15/11/2022 - v10.2 - Add bar graph daily (every hour)
+    04/02/2023 - v10.3 - Add graph swipe (horizontal and vertical)
+                         Disable wifi sleep on ESP32 to avoid latency
+    25/02/2023 - v11.0 - Split between xnrg and xsns
+                         Rewrite configuration management
+                         Update daily total
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -113,15 +114,19 @@
 \********************************************/
 
 // complementary modules
-#define USE_TELEINFO                          // Enable Teleinfo
+#define USE_TELEINFO                          // Enable Teleinfo energy module
+#define USE_TELEINFO_GRAPH                    // Enable Teleinfo sensor module for graph display
 #define USE_IPADDRESS                         // Add fixed IP configuration page
 #define USE_TIMEZONE                          // Enable Timezone management
 #define USE_TIMEZONE_WEB_CONFIG               // Enable timezone web configuration page
 #define USE_TCPSERVER                         // Enable TCP server (for TIC to TCP)
+#define USE_FTPSERVER                         // Enable embedded light FTP server
 
 // FTP server login and password
+#ifdef USE_FTPSERVER
 #define FTP_SERVER_LOGIN          "teleinfo"
 #define FTP_SERVER_PASSWORD       "teleinfo"
+#endif
 
 // build
 #if defined BUILD_ESP32S3_16M
@@ -147,7 +152,7 @@
 // extension data
 #define EXTENSION_NAME    "Teleinfo"          // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
-#define EXTENSION_VERSION "10.3"              // version
+#define EXTENSION_VERSION "11.0"              // version
 
 // MQTT default
 #undef MQTT_HOST
@@ -271,6 +276,7 @@
 #undef USE_BL09XX                             // Add support for various BL09XX Energy monitor as used in Blitzwolf SHP-10 or Sonoff Dual R3 v2 (+1k6 code)
 //#undef USE_TELEINFO                           // Add support for Teleinfo via serial RX interface (+5k2 code, +168 RAM + SmartMeter LinkedList Values RAM)
 #undef USE_IEM3000                            // Add support for Schneider Electric iEM3000-Modbus series energy monitor (+0k8 code)
+#undef USE_ADE7953                            // support for ADE7953 energy sensor 
 
 #undef USE_IR_REMOTE                          // Send IR remote commands using library IRremoteESP8266 and ArduinoJson (+4k3 code, 0k3 mem, 48 iram)
 #undef USE_IR_REMOTE_FULL                     // complete integration of IRremoteESP8266 for Tasmota
