@@ -2,7 +2,7 @@
 
 ## Presentation
 
-This evolution of **Tasmota 12.3.1** firmware has been enhanced to handle France energy meters known as **Linky** using **Teleinfo** protocol.
+This evolution of **Tasmota 12.4.0** firmware has been enhanced to handle France energy meters known as **Linky** using **Teleinfo** protocol.
 
 This firmware has been developped and tested on  :
   * Sagem classic meter **monophase** with TIC **historique**
@@ -100,15 +100,13 @@ This Teleinfo firmware can be configured thru some  specific console commands :
   * **tic_enable** [0/1] : disable / enable teleinfo messages reception
   * **tic_rate** [rate] : set serial rate (1200, 9600 or 19200)
 
-  * **tic_romupd** [value] : energy counter ROM update interval (in mn). 
   * **tic_percent** [value] : maximum acceptable power according to contrat (in %). Used to calculate **PMAX**
   * **tic_msgpol** [value] : message publish policy (0 - Never, 1 - Every TIC message, 2 - When Power fluctuates (± 5%), 3 - With Telemetry only)
   * **tic_msgtype** [value] : message type publish policy (0 - None, 1 - METER only, 2 - TIC only, 3 - METER and TIC)
 
-  * **tic_logpol** [0/1] : log policy (0:buffered, 1:immediate)
-  * **tic_logday** [value] : number of daily logs
-  * **tic_logweek** [value] : number of weekly logs
-  * **tic_logrot** : force log rotate for daily and weekly files
+  * **tic_buffer** [0/1] : log policy (0:immediate, 1:buffered)
+  * **tic_nbday** [value] : number of daily logs
+  * **tic_nbweek** [value] : number of weekly logs
 
   * **tic_maxv** [value] : maximum voltage (v) in graph display
   * **tic_maxva** [value] : maximum power (va and w) in graph display
@@ -181,6 +179,7 @@ Here is where you should place different files from this repository and from **t
 * tasmota/tasmota_drv_driver/**xdrv_96_ftp_server.ino**
 * tasmota/tasmota_drv_driver/**xdrv_97_tcp_server.ino**
 * tasmota/tasmota_drv_driver/**xdrv_98_esp32_board.ino**
+* tasmota/tasmota_sns_sensor/**xsns_104_teleinfo_graph.ino**
 * tasmota/tasmota_sns_sensor/**xsns_120_timezone.ino**
 * lib/default/**FTPClientServer** (extract content of **FTPClientServer.zip**) 
 
