@@ -1633,7 +1633,7 @@ void TeleinfoReceiveData ()
 #ifdef ESP32
         // update main counter
         if (Energy->total_sum > 0) Energy->daily_sum += total_kwh - Energy->total_sum;
-        Energy->total_sum = total_wh;
+        Energy->total_sum = total_kwh;
 #else
         // update main counter
         if (Energy->total[0] > 0) Energy->daily[0] += total_kwh - Energy->total[0];
