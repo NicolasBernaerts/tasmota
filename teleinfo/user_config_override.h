@@ -72,8 +72,8 @@
     04/02/2023 - v10.3 - Add graph swipe (horizontal and vertical)
                          Disable wifi sleep on ESP32 to avoid latency
     25/02/2023 - v11.0 - Split between xnrg and xsns
-                         Rewrite configuration management
-                         Update daily total
+                         Use Settings->teleinfo to store configuration
+                         Update today and yesterday totals
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by

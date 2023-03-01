@@ -78,9 +78,8 @@
     04/02/2023 - v10.3 - Add graph swipe (horizontal and vertical)
                          Disable wifi sleep on ESP32 to avoid latency
     25/02/2023 - v11.0 - Split between xnrg and xsns
-                         Rewrite configuration management
-                         Update daily total
-
+                         Use Settings->teleinfo to store configuration
+                         Update today and yesterday totals
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -1017,7 +1016,7 @@ void TeleinfoReceiveData ()
   long      value, total_current, increment;
   long long counter, counter_wh, delta_wh;
   uint32_t  timeout, timestamp, message_ms;
-  float     cosphi, papp_inc, total_wh;
+  float     cosphi, papp_inc, total_kwh;
   char*     pstr_match;
   char      checksum, byte_recv;
   char      str_etiquette[TELEINFO_KEY_MAX];
@@ -1630,13 +1629,15 @@ void TeleinfoReceiveData ()
         } 
 
         // update global active power counter
-        total_wh = (float)teleinfo_meter.total_wh / 1000;
+        total_kwh = (float)teleinfo_meter.total_wh / 1000;
 #ifdef ESP32
-        if (Energy->total_sum > 0) Energy->daily_sum += total_wh - Energy->total_sum;
+        // update main counter
+        if (Energy->total_sum > 0) Energy->daily_sum += total_kwh - Energy->total_sum;
         Energy->total_sum = total_wh;
 #else
-        if (Energy->total[0] > 0) Energy->daily[0] += total_wh - Energy->total[0];
-        Energy->total[0] = total_wh;
+        // update main counter
+        if (Energy->total[0] > 0) Energy->daily[0] += total_kwh - Energy->total[0];
+        Energy->total[0] = total_kwh;
 #endif
 
         // declare received message
@@ -1685,6 +1686,20 @@ void TeleinfoEverySecond ()
 
   // do nothing during first 5 seconds
   if (TasmotaGlobal.uptime < 5) return;
+
+  // midnight calculation
+  if ((RtcTime.hour == 0) && (RtcTime.minute == 0) && (RtcTime.second == 0))
+  {
+#ifdef ESP32
+    // update main counter
+    Settings->energy_kWhyesterday_ph[0] = (int32_t)(Energy->today_sum * 100000);
+    Energy->today_sum = 0;
+#else
+    // update main counter
+    Settings->energy_kWhyesterday_ph[0] = (int32_t)(Energy->daily[0] * 100000);
+    Energy->daily[0] = 0;
+#endif
+  }
 
   // check if message should be published for overload
   if (teleinfo_message.overload && (teleinfo_config.msg_policy != TELEINFO_POLICY_NEVER)) teleinfo_message.publish_msg = true;
