@@ -445,7 +445,6 @@ typedef union {
   };
 } As3935Param;
 
-#ifdef USE_TELEINFO
 /*
 typedef union {
   uint32_t data;
@@ -473,9 +472,6 @@ typedef union {
   uint32_t spare24 : 8;               // Keep some spares for future uses
   };
 } TeleinfoCfg;
-#endif
-
-
 
 typedef struct {
   uint32_t usage1_kWhtotal;
