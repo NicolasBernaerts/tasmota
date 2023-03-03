@@ -5,21 +5,19 @@
 This evolution of **Tasmota 12.4.0** firmware has been enhanced to handle France energy meters known as **Linky** using **Teleinfo** protocol.
 
 This firmware has been developped and tested on  :
-  * Sagem classic meter **monophase** with TIC **historique**
-  * Linky meter **monophase** with TIC **historique**
-  * Linky meter **monophase** with TIC **standard**
-  * Linky meter **triphase** with TIC **historique**
-  * Linky meter **triphase** with TIC **standard**
-  * Ace6000 meter **triphase** with TIC **PME/PMI**
+  * **Sagem Classic Monophase** with TIC **historique**
+  * **Linky Monophase** with TIC **Historique** & **Standard**
+  * **Linky Triphase** with TIC **Historique** & **Standard**
+  * **Ace6000 Triphase** with TIC **PME/PMI**
 
 It has been compiled and tested on the following devices :
-  * **ESP8266**
+  * **ESP8266** 1Mb
   * **ESP12F** 4Mb and 16Mb
-  * **ESP32**
-  * **ESP32S2**
+  * **ESP32** 4Mb
+  * **ESP32S2** 4Mb
   * **ESP32S3** 16Mb
  
-Please note that it is a completly different implementation than the one published early 2020 by Charles Hallard. 
+Please note that it is a completly different implementation than the one published early 2020 by Charles Hallard and actually on the official Tasmota repository. 
 
 Some of these firmware versions are using a LittleFS partition to store graph data. Il allows to keep historical data over reboots.
 To take advantage of this feature, make sure to follow partitioning procedure given in the **readme** of the **binary** folder.
@@ -27,8 +25,8 @@ To take advantage of this feature, make sure to follow partitioning procedure gi
 It manages :
   * Voltage (**V**)
   * Current (**A**)
-  * Power (**VA** and **W**)
-  * Meter totals (**Wh**)
+  * Instant Power (**VA** and **W**)
+  * Active Power total (**Wh**)
   * Power Factor (**Cosφ**), calculated from Instant Power (VA) and meter Total (Wh)
 
 This firmware provides some extra Web page on the device :
@@ -84,7 +82,7 @@ MQTT result should look like that :
 ## Log files
 
 If you run this firmware on an ESP having a LittleFS partition, it will generate 3 types of energy logs :
-  * **teleinfo-day-n.csv** : average values daily file with a record every ~5 mn. **0** is today's log, **1** yesterday's log, ...
+  * **teleinfo-day-nn.csv** : average values daily file with a record every ~5 mn. **00** is today's log, **01** yesterday's log, ...
   * **teleinfo-week-nn.csv** : average values weekly file with a record every ~30 mn. **00** is current week's log, **01** is previous week's log, ...
   * **teleinfo-year-yyyy.csv** : kWh total yearly file with a line per day and detail of hourly total for each day.
 
