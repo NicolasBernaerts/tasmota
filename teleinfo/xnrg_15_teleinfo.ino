@@ -272,8 +272,8 @@ enum TeleinfoPowerTarget { TIC_POWER_UPDATE_COUNTER, TIC_POWER_UPDATE_PAPP, TIC_
 enum TeleinfoSerialStatus { TIC_SERIAL_INIT, TIC_SERIAL_ACTIVE, TIC_SERIAL_STOPPED, TIC_SERIAL_FAILED };
 
 // phase colors
-const char kTeleinfoGraphColorPhase[] PROGMEM = "#6bc4ff|#ffca74|#23bf64";                            // phase colors (blue, orange, green)
-const char kTeleinfoGraphColorPeak[]  PROGMEM = "#5dade2|#d9ad67|#20a457";                            // peak colors (blue, orange, green)
+const char kTeleinfoColorPhase[] PROGMEM = "#6bc4ff|#ffca74|#23bf64";                            // phase colors (blue, orange, green)
+const char kTeleinfoColorPeak[]  PROGMEM = "#5dade2|#d9ad67|#20a457";                            // peak colors (blue, orange, green)
 
 /****************************************\
  *                 Data
@@ -339,6 +339,8 @@ static struct {
 static struct {
   bool      enabled        = true;                  // reception enabled by default
   uint8_t   status_rx      = TIC_SERIAL_INIT;       // Teleinfo Rx initialisation status
+  uint8_t   last_hour      = UINT8_MAX;
+
   int       interval_count = 0;                     // energy publication counter      
   long      papp           = 0;                     // current apparent power 
   long      nb_message     = 0;                     // total number of messages sent by the meter
@@ -349,9 +351,10 @@ static struct {
 
   long long total_wh       = 0;                     // total of all indexes of active powerhisto
   long long index_wh[TELEINFO_INDEX_MAX];           // array of indexes of different tarif periods
-  long long day_last_wh    = 0;                     // previous daily total
-  long long hour_last_wh   = 0;                     // previous hour total
   long      hour_wh[24];                            // hourly increments
+  long long last_hour_wh   = 0;                     // previous hour total
+  long long last_day_wh    = 0;                     // previous daily total
+  float     last_day_kwh   = 0;                     // daily total used to supply yesterday at midnight
 
   char      sep_line = 0;                           // detected line separator
   uint8_t   idx_line = 0;                           // caracter index of current line
@@ -954,11 +957,6 @@ void TeleinfoInit ()
   // init hardware energy counter
   Settings->flag3.hardware_energy_total = true;
 
-  // reset total counter
-  RtcSettings.energy_kWhtotal_ph[0] = 0;
-  RtcSettings.energy_kWhtotal_ph[1] = 0;
-  RtcSettings.energy_kWhtotal_ph[2] = 0;
-
   // set default energy parameters
   Energy->voltage_available = true;
   Energy->current_available = true;
@@ -1023,9 +1021,8 @@ void TeleinfoReceiveData ()
   char      str_donnee[TELEINFO_DATA_MAX];
   char      str_text[TELEINFO_DATA_MAX];
 
-  // discard reception before 5 seconds
-  if ((TasmotaGlobal.uptime < 5) || (teleinfo_meter.status_rx != TIC_SERIAL_ACTIVE))
-    while (teleinfo_serial->available()) teleinfo_serial->read (); 
+  // discard reception during energy setup time
+  if ((TasmotaGlobal.uptime < ENERGY_WATCHDOG) || (teleinfo_meter.status_rx != TIC_SERIAL_ACTIVE)) while (teleinfo_serial->available()) teleinfo_serial->read (); 
 
   // if serial port active, serial receive loop
   else while (teleinfo_serial->available()) 
@@ -1628,16 +1625,21 @@ void TeleinfoReceiveData ()
             else Energy->current[phase] = 0;
         } 
 
+        // if yesterday total has been reset, update it
+        if (Settings->energy_kWhyesterday_ph[0] == 0) Settings->energy_kWhyesterday_ph[0] = (int32_t)(teleinfo_meter.last_day_kwh * 100000);
+
         // update global active power counter
         total_kwh = (float)teleinfo_meter.total_wh / 1000;
 #ifdef ESP32
         // update main counter
-        if (Energy->total_sum > 0) Energy->daily_sum += total_kwh - Energy->total_sum;
-        Energy->total_sum = total_kwh;
+        if (Energy->total[0] > 0) Energy->daily_kWh[0] += total_kwh - Energy->total[0];
+        Energy->total[0] = total_kwh;
+        teleinfo_meter.last_day_kwh = Energy->daily_kWh[0];
 #else
         // update main counter
         if (Energy->total[0] > 0) Energy->daily[0] += total_kwh - Energy->total[0];
         Energy->total[0] = total_kwh;
+        teleinfo_meter.last_day_kwh = Energy->daily[0];
 #endif
 
         // declare received message
@@ -1663,8 +1665,8 @@ void TeleinfoReceiveData ()
 // Publish JSON if candidate (called 4 times per second)
 void TeleinfoEvery250ms ()
 {
-  // nothing during first 5 seconds
-  if (TasmotaGlobal.uptime < 5) return;
+  // do nothing during energy setup time
+  if (TasmotaGlobal.uptime < ENERGY_WATCHDOG) return;
 
   // if message should be sent, check which type to send
   if (teleinfo_message.publish_msg)
@@ -1682,24 +1684,8 @@ void TeleinfoEvery250ms ()
 // Calculate if some JSON should be published (called every second)
 void TeleinfoEverySecond ()
 {
-  char str_value[32];
-
-  // do nothing during first 5 seconds
-  if (TasmotaGlobal.uptime < 5) return;
-
-  // midnight calculation
-  if ((RtcTime.hour == 0) && (RtcTime.minute == 0) && (RtcTime.second == 0))
-  {
-#ifdef ESP32
-    // update main counter
-    Settings->energy_kWhyesterday_ph[0] = (int32_t)(Energy->today_sum * 100000);
-    Energy->today_sum = 0;
-#else
-    // update main counter
-    Settings->energy_kWhyesterday_ph[0] = (int32_t)(Energy->daily[0] * 100000);
-    Energy->daily[0] = 0;
-#endif
-  }
+  // do nothing during energy setup time
+  if (TasmotaGlobal.uptime < ENERGY_WATCHDOG) return;
 
   // check if message should be published for overload
   if (teleinfo_message.overload && (teleinfo_config.msg_policy != TELEINFO_POLICY_NEVER)) teleinfo_message.publish_msg = true;
@@ -1712,6 +1698,19 @@ void TeleinfoEverySecond ()
   // check if message should be published after percentage chnage
   if (teleinfo_message.percent  && (teleinfo_config.msg_policy == TELEINFO_POLICY_PERCENT)) teleinfo_message.publish_msg = true;
   teleinfo_message.percent  = false;
+
+  // if needed, init first meter total
+  if (teleinfo_meter.last_day_wh  == 0) teleinfo_meter.last_day_wh  = teleinfo_meter.total_wh;
+  if (teleinfo_meter.last_hour_wh == 0) teleinfo_meter.last_hour_wh = teleinfo_meter.total_wh;
+
+  // if hour change, save hourly increment
+  if (teleinfo_meter.last_hour == UINT8_MAX) teleinfo_meter.last_hour = RtcTime.hour;
+  if (teleinfo_meter.last_hour != RtcTime.hour)
+  {
+    teleinfo_meter.hour_wh[teleinfo_meter.last_hour] += (long)(teleinfo_meter.total_wh - teleinfo_meter.last_hour_wh);
+    teleinfo_meter.last_hour_wh = teleinfo_meter.total_wh;
+    teleinfo_meter.last_hour = RtcTime.hour;
+  }
 }
 
 // Generate JSON with TIC informations
@@ -1843,7 +1842,7 @@ void TeleinfoWebSensor ()
         {
           // calculate and display bar graph percentage
           percentage = 100 * teleinfo_phase[phase].papp / teleinfo_contract.ssousc;
-          GetTextIndexed (str_text, sizeof (str_text), phase, kTeleinfoGraphColorPhase);
+          GetTextIndexed (str_text, sizeof (str_text), phase, kTeleinfoColorPhase);
           WSContentSend_P (PSTR ("<div style='font-size:0.9rem;text-align:center;color:white;padding:1px;margin-bottom:4px;border-radius:4px;background-color:%s;width:%d%%;'>%d%%</div>\n"), str_text, percentage, percentage);
         }
 
