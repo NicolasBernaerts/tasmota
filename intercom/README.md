@@ -10,7 +10,11 @@ It connects directly to your 2 wires private intercom and is totally non intrusi
 
 It needs a small electronic interface board which is described in the **diagram.png**
 
-![Intercom adapter](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/intercom/diagram.png)
+![Intercom adapter](diagram.png)
+
+Once installed, you get a log of the last 8 activities (intercom activation and gate opening).
+
+![Intercom activity](intercom-activity.png)
 
 Pre-compiled versions are available in the [**binary**](https://github.com/NicolasBernaerts/tasmota/tree/master/intercom/binary) folder.
 
