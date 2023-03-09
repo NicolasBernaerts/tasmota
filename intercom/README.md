@@ -31,17 +31,17 @@ You may have to adjust settings according to your ring
 
 To enable Telegram notification in case of door opening, run these commands once in console :
 
+    # setoption132 1
     # tmtoken yourtelegramtoken
     # tmchatid yourtelegramchatid
     # tmstate 1
 
-When door opens, you'll receive a Telegram notification "DeviceName : Intercom Opened"
+When door opens, you'll receive a Telegram notification "DeviceName : Gate Opened"
 
-If LittleFS is enabled, settings are stored in /intercom.cfg
-Else, settings are stored using unused energy parameters :
-  - Settings->energy_power_calibration   = Global activation timeout (seconds)
-  - Settings->energy_kWhtoday            = Number of rings to open
-  - Settings->energy_current_calibration = Door opening duration (seconds)
+Settings are stored using unused parameters :
+  - Settings->free_ea6[0] = Global activation timeout (in 10mn slots)
+  - Settings->free_ea6[1] = Number of rings to open
+  - Settings->free_ea6[2] = Door opening duration (seconds)
 
 Compilation
 -----------
@@ -56,8 +56,6 @@ Here is where you should place different files from this repository and from **t
 * tasmota/**user_config_override.h**
 * tasmota/tasmota_drv_driver/**xdrv_01_9_webserver.ino**
 * tasmota/tasmota_drv_driver/**xdrv_40_telegram_extension.ino**
-* tasmota/tasmota_drv_driver/**xdrv_50_filesystem_cfg_csv.ino**
-* tasmota/tasmota_drv_driver/**xdrv_93_filesystem_log.ino**
 * tasmota/tasmota_drv_driver/**xdrv_94_ip_address.ino**
 * tasmota/tasmota_drv_driver/**xdrv_98_intercom.ino**
 * tasmota/tasmota_sns_sensor/**xsns_120_timezone.ino**
