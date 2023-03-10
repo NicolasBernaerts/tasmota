@@ -1,8 +1,6 @@
-Intercom Tasmota firmware
-=============
+# Intercom Tasmota firmware #
 
-Presentation
-------------
+## Presentation ##
 
 This evolution of **Tasmota 12** provide a simple way to control your building entrance door directly from your smartphone.
 
@@ -14,8 +12,7 @@ It needs a small electronic interface board which is described in the **diagram.
 
 Pre-compiled versions are available in the [**binary**](https://github.com/NicolasBernaerts/tasmota/tree/master/intercom/binary) folder.
 
-Configuration
--------------
+## Configuration ##
 
 Input devices should be configured as followed :
   - Counter 1 : connected to the intercom button circuit
@@ -39,16 +36,35 @@ To enable Telegram notification in case of door opening, run these commands once
 When door opens, you'll receive a Telegram notification "DeviceName : Gate Opened"
 
 Settings are stored using unused parameters :
-  - Settings->free_ea6[0] = Global activation timeout (in 10mn slots)
-  - Settings->free_ea6[1] = Number of rings to open
-  - Settings->free_ea6[2] = Door opening duration (seconds)
+
+| Settings   | Parameter |
+| ------     | -----     |
+| free_ea6[0] | Global activation timeout (in 10mn slots) |
+| free_ea6[1] | Number of rings to open                   |
+| free_ea6[2] | Door opening duration (seconds)           |
+| domoticz_relay_idx[] | Last 4 intercom activation |
+| domoticz_key_idx[]   | Last 4 gate opening |
+
 
 Once installed, you get a log of the last 8 activities (intercom activation and gate opening).
 
+## Commands ##
+
+    CMD: int_help
+    HLP: Intercom commands
+    - int_reset = reset event log
+    - int_timeout <120> = enabling timeout (mn) in 10mn slots
+    - int_ring <3> = number of rings
+    - int_latch <5> = gate open duration (sec)
+    - int_action <val> = action (0:disable, 1:enable, 2:open)
+    
+ ## History ##
+ 
+ You can get history log of last 4 events (activation and opening)
+  
 ![Intercom activity](intercom-activity.png)
 
-Compilation
------------
+## Compilation ##
 
 If you want to compile this firmware version, you just need to :
 1. install official tasmota sources
