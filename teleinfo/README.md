@@ -90,27 +90,28 @@ Every CSV file includes a header.
 
 These files are used to generate all graphs other than **Live** ones.
 
-## Commands
+## Configuration ##
 
-This Teleinfo firmware can be configured thru some  specific console commands :
+This Teleinfo firmware can be configured thru some **EnergyConfig** console commands :
 
-  * **tic_help** : list all available commands
-  * **tic_enable** [0/1] : disable / enable teleinfo messages reception
-  * **tic_rate** [rate] : set serial rate (1200, 9600 or 19200)
+    EnergyConfig Teleinfo parameters :
+      enable=1 (enable teleinfo : 0/1)
+      rate=9600 (serial rate)
+      percent=99 (maximum acceptable contract in %)
+      msgpol=2 (message policy : 0=Never, 1=Every TIC, 2=± 5% Power Fluctuation, 3=Telemetry only)
+      msgtype=1 (message type : 0=None, 1=METER only, 2=TIC only, 3=METER and TIC)
+      buffer=1 (log policy : 0=buffered, 1=immediate)
+      nbday=7 (number of daily logs)
+      nbweek=10 (number of weekly logs)
+      maxv=265 (graph max voltage, in V)
+      maxva=9000 (graph max power, in VA or W)
+      maxhour=8 (graph max total per hour, in Wh)
+      maxday=110 (graph max total per day, in Wh)
+      maxmonth=2000 (graph max total per month, in Wh)
 
-  * **tic_percent** [value] : maximum acceptable power according to contrat (in %). Used to calculate **PMAX**
-  * **tic_msgpol** [value] : message publish policy (0 - Never, 1 - Every TIC message, 2 - When Power fluctuates (± 5%), 3 - With Telemetry only)
-  * **tic_msgtype** [value] : message type publish policy (0 - None, 1 - METER only, 2 - TIC only, 3 - METER and TIC)
+You can use few commands at once :
 
-  * **tic_buffer** [0/1] : log policy (0:immediate, 1:buffered)
-  * **tic_nbday** [value] : number of daily logs
-  * **tic_nbweek** [value] : number of weekly logs
-
-  * **tic_maxv** [value] : maximum voltage (v) in graph display
-  * **tic_maxva** [value] : maximum power (va and w) in graph display
-  * **tic_maxhour** [value] : maximum total per hour (wh) in graph display
-  * **tic_maxday** [value] : maximum total per day (wh) in graph display
-  * **tic_maxmonth** [value] : maximum total per month (wh) in graph display
+      EnergyConfig percent=110 nbday=8 nbweek=12
 
 ## TCP server
 
