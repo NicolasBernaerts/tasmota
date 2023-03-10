@@ -79,17 +79,6 @@ MQTT result should look like that :
     compteur/tele/STATE = {"Time":"2021-03-13T09:25:26","Uptime":"0T13:25:12","UptimeSec":48312,"Heap":18,"SleepMode":"Dynamic","Sleep":50,"LoadAvg":19,"MqttCount":1,"Wifi":{"AP":1,"SSId":"hello-nantes","BSSId":"30:23:03:xx:xx:xx","Channel":5,"RSSI":64,"Signal":-68,"LinkCount":1,"Downtime":"0T00:00:05"}}
     compteur/tele/SENSOR = {"Time":"2021-03-13T09:25:26","ENERGY":{"TotalStartTime":"2021-03-13T09:25:26","Total":7970.950,"Yesterday":3.198,"Today":6.071,"Period":47,"Power":860,"Current":4.000},"TIC":{"ADCO":"061964xxxxxx","OPTARIF":"BASE","ISOUSC":"30","BASE":"007970950","PTEC":"TH..","IINST":"004","IMAX":"090","PAPP":"00860","HHPHC":"A","MOTDETAT":"000000","PHASE":1,"SSOUSC":"6000","IINST1":"4","SINSTS1":"860"},"IP":"192.168.xx.xx","MAC":"50:02:91:xx:xx:xx"}
 
-## Log files
-
-If you run this firmware on an ESP having a LittleFS partition, it will generate 3 types of energy logs :
-  * **teleinfo-day-nn.csv** : average values daily file with a record every ~5 mn. **00** is today's log, **01** yesterday's log, ...
-  * **teleinfo-week-nn.csv** : average values weekly file with a record every ~30 mn. **00** is current week's log, **01** is previous week's log, ...
-  * **teleinfo-year-yyyy.csv** : kWh total yearly file with a line per day and detail of hourly total for each day.
-
-Every CSV file includes a header.
-
-These files are used to generate all graphs other than **Live** ones.
-
 ## Configuration ##
 
 This Teleinfo firmware can be configured thru some **EnergyConfig** console commands :
@@ -113,7 +102,7 @@ You can use few commands at once :
 
       EnergyConfig percent=110 nbday=8 nbweek=12
 
-## TCP server
+## TCP server ##
 
 This firmware brings a minimal embedded TCP server.
 
@@ -138,7 +127,18 @@ When started, you can now receive your Linky teleinfo stream in real time on any
 
 Server allows only 1 concurrent connexion. Any new client will kill previous one.
 
-## FTP server
+## Log files ##
+
+If you run this firmware on an ESP having a LittleFS partition, it will generate 3 types of energy logs :
+  * **teleinfo-day-nn.csv** : average values daily file with a record every ~5 mn (**00** is today's log, **01** yesterday's log, ...)
+  * **teleinfo-week-nn.csv** : average values weekly file with a record every ~30 mn (**00** is current week's log, **01** is previous week's log, ...)
+  * **teleinfo-year-yyyy.csv** : kWh total yearly file with a line per day and detail of hourly total for each day.
+
+Every CSV file includes a header.
+
+These files are used to generate all graphs other than **Live** ones.
+
+## FTP server ##
 
 If you are using a build with a LittleFS partition, you can access the partition thru a very basic FTP server embedded in this firmware.
 
@@ -157,7 +157,7 @@ On the client side, credentials are :
 This embedded FTP server main limitation is that it can only one connexion at a time. \
 So you need to limit simultaneous connexions to **1** on your FTP client. Otherwise, connexion will fail.
 
-## Compilation
+## Compilation ##
 
 If you want to compile this firmware version, you just need to :
 1. install official tasmota sources
@@ -184,7 +184,7 @@ Here is where you should place different files from this repository and from **t
 
 If everything goes fine, you should be able to compile your own build.
 
-## Adapter
+## Adapter ##
 
 Between your Energy meter and your Tasmota device, you'll need an adapter to convert **Teleinfo** signal to **TTL serial**.
 
@@ -209,23 +209,23 @@ Finaly, in **Configure Teleinfo** you need to select your Teleinfo adapter baud 
   * **1200** (original white meter or green Linky in historic mode)
   * **9600** (green Linky in standard mode)
 
-## Screenshot
+## Screenshot ##
 
 ![Main page](./screen/tasmota-teleinfo-main-triphase.png)
 ![Config page](./screen/tasmota-teleinfo-config.png)
 
-### Realtime messages
+### Realtime messages ###
 
 ![Grah message](./screen/tasmota-teleinfo-message.png) 
 
-### Power, Voltage and Cos φ
+### Power, Voltage and Cos φ ###
 
 ![Grah monophase power](./screen/tasmota-teleinfo-graph-daily.png)
 ![Grah monophase power](./screen/tasmota-teleinfo-graph-weekly.png)
 ![Grah monophase voltage](./screen/tasmota-teleinfo-graph-voltage.png) 
 ![Grah monophase Cos phi](./screen/tasmota-teleinfo-graph-cosphi.png) 
  
-### Totals (kWh)
+### Totals (kWh) ###
 
 ![Yearly total](./screen/tasmota-teleinfo-total-year.png)
 ![Monthly total](./screen/tasmota-teleinfo-total-month.png)
