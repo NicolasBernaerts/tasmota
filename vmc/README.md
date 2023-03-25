@@ -38,9 +38,9 @@ Here is where you should place different files from this repository and from **t
 * tasmota/tasmota_drv_driver/**xdrv_50_filesystem_cfg_csv.ino**
 * tasmota/tasmota_drv_driver/**xdrv_94_ip_address.ino**
 * tasmota/tasmota_drv_driver/**xdrv_98_vmc.ino**
-* tasmota/tasmota_sns_sensor/**xsns_98_vmc.ino**
+* tasmota/tasmota_sns_sensor/**xsns_121_vmc.ino**
 * tasmota/tasmota_sns_sensor/**xsns_120_timezone.ino**
-* tasmota/tasmota_sns_sensor/**xsns_125_generic_sensor.ino**
+* tasmota/tasmota_sns_sensor/**xsns_99_generic_sensor.ino**
 
 If everything goes fine, you should be able to compile your own build.
 
