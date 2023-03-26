@@ -8,7 +8,8 @@ In **Auto** mode, VMC is :
   * stopped as soon as humidity goes below this target value.
 
 Humidity sensor can either be :
-  * a local SI7021 sensor connected to your Sonoff
+  * a local SI7021 sensor
+  * a local SHT30 sensor
   * a remote MQTT humidity sensor
   
 You'll get some extra Web pages on the device :
