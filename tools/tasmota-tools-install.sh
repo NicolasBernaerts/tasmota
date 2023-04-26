@@ -2,7 +2,7 @@
 # Tasmota tools installation script
 
 # install tools
-sudo apt -y install python3-pip
+sudo apt -y install fping python3-pip
 pip3 install --upgrade esptool
 
 # tasmota-discover
