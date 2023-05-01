@@ -575,7 +575,8 @@ void WebServer_on(const char * prefix, void (*func)(void), uint8_t method = HTTP
 #endif  // ESP32
 }
 
-void StartWebserver(int type, IPAddress ipweb)
+// Always listens to all interfaces, so we don't need an IP address anymore
+void StartWebserver(int type)
 {
   if (!Settings->web_refresh) { Settings->web_refresh = HTTP_REFRESH_TIME; }
   if (!Web.state) {
@@ -618,15 +619,15 @@ void StartWebserver(int type, IPAddress ipweb)
 #ifdef USE_IPV6
     String ipv6_addr = WifiGetIPv6();
     if (ipv6_addr!="") {
-      AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_HTTP D_WEBSERVER_ACTIVE_ON " %s%s " D_WITH_IP_ADDRESS " %_I and IPv6 global address %s "),
-        NetworkHostname(), (Mdns.begun) ? PSTR(".local") : "", (uint32_t)ipweb, ipv6_addr.c_str());
+      AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_HTTP D_WEBSERVER_ACTIVE_ON " %s%s " D_WITH_IP_ADDRESS " %s and IPv6 global address %s "),
+        NetworkHostname(), (Mdns.begun) ? PSTR(".local") : "", IPGetListeningAddressStr().c_str(), ipv6_addr.c_str());
     } else {
-      AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_HTTP D_WEBSERVER_ACTIVE_ON " %s%s " D_WITH_IP_ADDRESS " %_I"),
-        NetworkHostname(), (Mdns.begun) ? PSTR(".local") : "", (uint32_t)ipweb);
+      AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_HTTP D_WEBSERVER_ACTIVE_ON " %s%s " D_WITH_IP_ADDRESS " %s"),
+        NetworkHostname(), (Mdns.begun) ? PSTR(".local") : "", IPGetListeningAddressStr().c_str());
     }
 #else
-    AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_HTTP D_WEBSERVER_ACTIVE_ON " %s%s " D_WITH_IP_ADDRESS " %_I"),
-      NetworkHostname(), (Mdns.begun) ? PSTR(".local") : "", (uint32_t)ipweb);
+    AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_HTTP D_WEBSERVER_ACTIVE_ON " %s%s " D_WITH_IP_ADDRESS " %s"),
+      NetworkHostname(), (Mdns.begun) ? PSTR(".local") : "", IPGetListeningAddressStr().c_str());
 #endif // USE_IPV6
     TasmotaGlobal.rules_flag.http_init = 1;
     Web.state = type;
