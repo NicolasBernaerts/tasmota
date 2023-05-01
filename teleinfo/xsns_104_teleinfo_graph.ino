@@ -55,10 +55,6 @@ const long ARR_TELEINFO_PERIOD_FLUSH[]  = { 1, 3600, 21600 };                   
 enum TeleinfoGraphDisplay { TELEINFO_UNIT_VA, TELEINFO_UNIT_W, TELEINFO_UNIT_V, TELEINFO_UNIT_COSPHI, TELEINFO_UNIT_PEAK_VA, TELEINFO_UNIT_PEAK_V, TELEINFO_UNIT_WH, TELEINFO_UNIT_MAX };       // available graph units
 const char kTeleinfoGraphDisplay[] PROGMEM = "VA|W|V|cosφ|VA|V|Wh";                                                                                                                             // units labels
 
-// graph - colors for phase curves
-const char kTeleinfoGraphColorPhase[] PROGMEM = "#68c4fd|#ffc974|#0ebf65";
-const char kTeleinfoGraphColorPeak[] PROGMEM = "#5182a1|#a5824c|#227945";
-
 // month and week day names
 const char kTeleinfoYearMonth[] PROGMEM = "|Jan|Fév|Mar|Avr|Mai|Jun|Jui|Aoû|Sep|Oct|Nov|Déc";         // month name for selection
 const char kTeleinfoWeekDay[]   PROGMEM = "Lun|Mar|Mer|Jeu|Ven|Sam|Dim";                              // day name for selection
@@ -1981,7 +1977,7 @@ void TeleinfoSensorWebGraphPage ()
   WSContentSend_P (PSTR ("div.phase span.volt {font-size:0.8rem;font-style:italic;}\n"));
   for (phase = 0; phase < teleinfo_contract.phase; phase++)
   {
-    GetTextIndexed (str_text, sizeof (str_text), phase, kTeleinfoGraphColorPhase);
+    GetTextIndexed (str_text, sizeof (str_text), phase, kTeleinfoColorPhase);
     WSContentSend_P (PSTR ("div.ph%d {color:%s;border:1px %s solid;}\n"), phase, str_text, str_text);    
   }
   WSContentSend_P (PSTR ("div.disabled {color:#666;border-color:#666;}\n"));
@@ -2238,12 +2234,12 @@ void TeleinfoSensorWebGraphPage ()
   for (phase = 0; phase < teleinfo_contract.phase; phase++) 
   {
     // phase colors
-    GetTextIndexed (str_text, sizeof (str_text), phase, kTeleinfoGraphColorPhase);
+    GetTextIndexed (str_text, sizeof (str_text), phase, kTeleinfoColorPhase);
     WSContentSend_P (PSTR ("path.ph%d {stroke:%s;fill:%s;}\n"), phase, str_text, str_text);
     WSContentSend_P (PSTR ("path.ln%d {stroke:%s;fill:none;}\n"), phase, str_text);
 
     // peak colors
-    GetTextIndexed (str_text, sizeof (str_text), phase, kTeleinfoGraphColorPeak);
+    GetTextIndexed (str_text, sizeof (str_text), phase, kTeleinfoColorPeak);
     WSContentSend_P (PSTR ("path.pk%d {stroke:%s;fill:none;stroke-dasharray:1 3;}\n"), phase, str_text);
   }
 
