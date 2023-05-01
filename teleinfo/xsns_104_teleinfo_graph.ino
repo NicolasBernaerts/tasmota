@@ -55,6 +55,10 @@ const long ARR_TELEINFO_PERIOD_FLUSH[]  = { 1, 3600, 21600 };                   
 enum TeleinfoGraphDisplay { TELEINFO_UNIT_VA, TELEINFO_UNIT_W, TELEINFO_UNIT_V, TELEINFO_UNIT_COSPHI, TELEINFO_UNIT_PEAK_VA, TELEINFO_UNIT_PEAK_V, TELEINFO_UNIT_WH, TELEINFO_UNIT_MAX };       // available graph units
 const char kTeleinfoGraphDisplay[] PROGMEM = "VA|W|V|cosφ|VA|V|Wh";                                                                                                                             // units labels
 
+// graph - colors for phase curves
+const char kTeleinfoGraphColorPhase[] PROGMEM = "#68c4fd|#ffc974|#0ebf65";
+const char kTeleinfoGraphColorPeak[] PROGMEM = "#5182a1|#a5824c|#227945";
+
 // month and week day names
 const char kTeleinfoYearMonth[] PROGMEM = "|Jan|Fév|Mar|Avr|Mai|Jun|Jui|Aoû|Sep|Oct|Nov|Déc";         // month name for selection
 const char kTeleinfoWeekDay[]   PROGMEM = "Lun|Mar|Mer|Jeu|Ven|Sam|Dim";                              // day name for selection
@@ -551,12 +555,12 @@ void TeleinfoSensorSaveDailyTotal ()
   if ((teleinfo_meter.total_wh != 0) && (today_dst.year != 0))
   {
     // calculate daily ahd hourly delta
-    delta = teleinfo_meter.total_wh - teleinfo_meter.day_last_wh;
-    teleinfo_meter.hour_wh[RtcTime.hour] += (long)(teleinfo_meter.total_wh - teleinfo_meter.hour_last_wh);
+    delta = teleinfo_meter.total_wh - teleinfo_meter.last_day_wh;
+    teleinfo_meter.hour_wh[RtcTime.hour] += (long)(teleinfo_meter.total_wh - teleinfo_meter.last_hour_wh);
 
     // update last day and hour total
-    teleinfo_meter.day_last_wh = teleinfo_meter.total_wh;
-    teleinfo_meter.hour_last_wh = teleinfo_meter.total_wh;
+    teleinfo_meter.last_day_wh = teleinfo_meter.total_wh;
+    teleinfo_meter.last_hour_wh = teleinfo_meter.total_wh;
 
     // get filename
     sprintf_P (str_filename, D_TELEINFO_HISTO_FILE_YEAR, 1970 + today_dst.year);
@@ -861,15 +865,15 @@ void TeleinfoSensorEverySecond ()
   }
 
   // if needed, init first meter total
-  if (teleinfo_meter.day_last_wh  == 0) teleinfo_meter.day_last_wh  = teleinfo_meter.total_wh;
-  if (teleinfo_meter.hour_last_wh == 0) teleinfo_meter.hour_last_wh = teleinfo_meter.total_wh;
+  if (teleinfo_meter.last_day_wh  == 0) teleinfo_meter.last_day_wh  = teleinfo_meter.total_wh;
+  if (teleinfo_meter.last_hour_wh == 0) teleinfo_meter.last_hour_wh = teleinfo_meter.total_wh;
 
   // if hour change, save hourly increment
   if ((RtcTime.minute == 59) && (RtcTime.second == 59))
   {
     // save hourly total
-    teleinfo_meter.hour_wh[RtcTime.hour] += (long)(teleinfo_meter.total_wh - teleinfo_meter.hour_last_wh);
-    teleinfo_meter.hour_last_wh = teleinfo_meter.total_wh;
+    teleinfo_meter.hour_wh[RtcTime.hour] += (long)(teleinfo_meter.total_wh - teleinfo_meter.last_hour_wh);
+    teleinfo_meter.last_hour_wh = teleinfo_meter.total_wh;
 
 #ifdef USE_UFILESYS
     // save daily data
@@ -1540,8 +1544,8 @@ void TeleinfoSensorGraphDisplayBar (const uint8_t histo, const bool current)
   if ((histo == 0) && (teleinfo_graph.month == RtcTime.month) && (teleinfo_graph.day == RtcTime.day_of_month))
   {
     // update last hour increment
-    teleinfo_meter.hour_wh[RtcTime.hour] += (long)(teleinfo_meter.total_wh - teleinfo_meter.hour_last_wh);
-    teleinfo_meter.hour_last_wh = teleinfo_meter.total_wh;
+    teleinfo_meter.hour_wh[RtcTime.hour] += (long)(teleinfo_meter.total_wh - teleinfo_meter.last_hour_wh);
+    teleinfo_meter.last_hour_wh = teleinfo_meter.total_wh;
 
     // init hour slots from live values
     for (index = 0; index < 24; index ++) if (teleinfo_meter.hour_wh[index] > 0) arr_value[index] = teleinfo_meter.hour_wh[index];
