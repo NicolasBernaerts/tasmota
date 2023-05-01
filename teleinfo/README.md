@@ -31,7 +31,7 @@ It manages :
 
 This firmware provides some extra Web page on the device :
   * **/graph** : live, daily and weekly graphs (VA, W, V and Cos phi)
-  * **/msg** : real time display of last received Teleinfo message
+  * **/tic** : real time display of last received Teleinfo message
 
 It also provides :
   * a TCP server to stream teleinfo
