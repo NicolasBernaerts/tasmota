@@ -2,7 +2,7 @@
 
 ## Presentation
 
-This evolution of **Tasmota 12.4.0** firmware has been enhanced to handle France energy meters known as **Linky** using **Teleinfo** protocol.
+This evolution of **Tasmota 12.5.0** firmware has been enhanced to handle France energy meters known as **Linky** using **Teleinfo** protocol.
 
 This firmware has been developped and tested on  :
   * **Sagem Classic Monophase** with TIC **Historique**
