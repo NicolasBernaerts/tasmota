@@ -5,6 +5,10 @@
 
   It subscribes to MQTT topic from the server and make current and next slot availables.
 
+  Settings are stored in :
+    - Settings->sbflag1.spare31 : module enabled
+    - Settings text SET_ECOWATT_TOPIC : ecowatt server topic
+
   It also add today's ecowatt slots on the main page.
 
   Copyright (C) 2022  Nicolas Bernaerts
@@ -40,11 +44,12 @@
 
 // commands
 #define D_CMND_ECOWATT_HELP        "help"
+#define D_CMND_ECOWATT_ENABLE      "enable"
 #define D_CMND_ECOWATT_TOPIC       "topic"
 
 // MQTT commands
-const char kEcowattCommands[] PROGMEM = "eco_" "|" D_CMND_ECOWATT_HELP "|" D_CMND_ECOWATT_TOPIC;
-void (* const EcowattCommand[])(void) PROGMEM = { &CmndEcowattHelp, &CmndEcowattTopic };
+const char kEcowattCommands[] PROGMEM = "eco_" "|" D_CMND_ECOWATT_HELP "|" D_CMND_ECOWATT_ENABLE "|" D_CMND_ECOWATT_TOPIC;
+void (* const EcowattCommand[])(void) PROGMEM = { &CmndEcowattHelp, &CmndEcowattEnable, &CmndEcowattTopic };
 
 // ecowatt type of days
 enum EcowattDays { ECOWATT_DAY_TODAY, ECOWATT_DAY_TOMORROW, ECOWATT_DAY_DAYAFTER, ECOWATT_DAY_DAYAFTER2, ECOWATT_DAY_MAX };
@@ -59,6 +64,7 @@ const char kEcowattStateColor[] PROGMEM = "|#080|#E80|#D00";
 
 // Ecowatt configuration
 static struct {
+  uint8_t enabled = 1;                              // ecowatt client enabling flag
   String  str_topic;                                // topic where ecowatt server publishes data
 } ecowatt_config;
 
@@ -83,8 +89,22 @@ static struct {
 void CmndEcowattHelp ()
 {
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Ecowatt MQTT client commands :"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - eco_topic <topic> = set Ecowatt topic to subscribe"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - eco_enable <0/1>  = enable ecowatt client"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - eco_topic <topic> = Ecowatt topic"));
   ResponseCmndDone ();
+}
+
+// Ecowatt MQTT publication topic
+void CmndEcowattEnable ()
+{
+  if (XdrvMailbox.data_len > 0)
+  {
+    if (XdrvMailbox.payload != 0) ecowatt_config.enabled = 1;
+      else ecowatt_config.enabled = 0; 
+    EcowattSaveConfig ();
+  }
+  
+  ResponseCmndNumber (ecowatt_config.enabled);
 }
 
 // Ecowatt MQTT publication topic
@@ -93,7 +113,6 @@ void CmndEcowattTopic ()
   if (XdrvMailbox.data_len > 0)
   {
     ecowatt_config.str_topic = XdrvMailbox.data;
-    AddLog (LOG_LEVEL_INFO, PSTR ("ECO: Topic set to %s"), ecowatt_config.str_topic.c_str ());
     EcowattSaveConfig ();
   }
   
@@ -107,33 +126,15 @@ void CmndEcowattTopic ()
 // load configuration
 void EcowattLoadConfig () 
 {
-#ifdef USE_UFILESYS
-
-  // retrieve saved settings from flash filesystem
-  ecowatt_config.str_topic = UfsCfgLoadKey (D_ECOWATT_CFG, D_CMND_ECOWATT_TOPIC);
-
-#else       // No LittleFS
-
-  // mqtt config
+  ecowatt_config.enabled = Settings->sbflag1.spare31;
   ecowatt_config.str_topic = SettingsText (SET_ECOWATT_TOPIC);
-
-# endif     // USE_UFILESYS
 }
 
 // save configuration
 void EcowattSaveConfig () 
 {
-#ifdef USE_UFILESYS
-
-  // save settings into flash filesystem
-  UfsCfgSaveKey (D_ECOWATT_CFG, D_CMND_ECOWATT_TOPIC, ecowatt_config.str_topic.c_str (), true);
-
-#else       // No LittleFS
-
-  // mqtt config
+  Settings->sbflag1.spare31 = ecowatt_config.enabled;
   SettingsUpdateText (SET_ECOWATT_TOPIC, ecowatt_config.str_topic.c_str ());
-
-# endif     // USE_UFILESYS
 }
 
 /***********************************************************\
@@ -256,15 +257,16 @@ void EcowattWebSensor ()
   char    str_text[8];
   char    str_color[12];
 
+  // if topic is missing, nothing to display
+  if (ecowatt_config.str_topic.length () == 0) return;
+
+  // ecpwatt display style
   WSContentSend_PD (PSTR ("<div style='font-size:10px;text-align:center;margin-top:4px;padding:2px 6px;background:#333333;border-radius:8px;'>\n"));
   WSContentSend_PD (PSTR ("<div style='display:flex;padding:0px;'>\n"));
   WSContentSend_PD (PSTR ("<div style='width:28%%;padding:0px;margin-bottom:-4px;text-align:left;font-size:16px;font-weight:bold;'>Ecowatt</div>\n"));
 
-  // if topic is missing
-  if (ecowatt_config.str_topic.length () == 0) WSContentSend_PD (PSTR ("<div style='width:72%%;padding:3px 0px;'>Please configure topic</div>\n"));
-
-  // else if ecowatt signal has never been received
-  else if (ecowatt_status.hour == UINT8_MAX) WSContentSend_PD (PSTR ("<div style='width:72%%;padding:3px 0px;'>Waiting for 1st signal</div>\n"));
+  // if ecowatt signal has never been received
+  if (ecowatt_status.hour == UINT8_MAX) WSContentSend_PD (PSTR ("<div style='width:72%%;padding:3px 0px;'>Waiting for 1st signal</div>\n"));
 
   // else, display today ecowatt chart
   else
@@ -294,6 +296,7 @@ void EcowattWebSensor ()
   }
 
   WSContentSend_PD (PSTR ("</div>\n"));
+  WSContentSend_PD (PSTR ("</div>\n"));
 }
 
 #endif  // USE_WEBSERVER
@@ -316,15 +319,15 @@ bool Xdrv97 (uint32_t function)
       result = DecodeCommand (kEcowattCommands, EcowattCommand);
       break;
     case FUNC_MQTT_SUBSCRIBE:
-      EcowattMqttSubscribe ();
+      if (ecowatt_config.enabled) EcowattMqttSubscribe ();
       break;
     case FUNC_MQTT_DATA:
-      result = EcowattMqttData ();
+      if (ecowatt_config.enabled) result = EcowattMqttData ();
       break;
 
 #ifdef USE_WEBSERVER
     case FUNC_WEB_SENSOR:
-      EcowattWebSensor ();
+      if (ecowatt_config.enabled) EcowattWebSensor ();
       break;
 #endif  // USE_WEBSERVER
   }

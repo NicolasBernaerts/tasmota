@@ -7,9 +7,16 @@
     * GPIO1 (Tx) should be declared as Serial Tx and connected to HLK-LD2410 Rx
     * GPIO3 (Rx) should be declared as Serial Rx and connected to HLK-LD2410 Tx
 
+  Baud rate is forced at 256000.
+
+  Settings are stored using unused parameters :
+    - Settings->free_ea6[26] : Presence detection timeout (sec.)
+    - Settings->free_ea6[27] : Presence detection number of samples to average
+
   Version history :
     28/06/2022 - v1.0 - Creation
     15/01/2023 - v2.0 - Complete rewrite
+    03/04/2023 - v2.1 - Add trigger to avoid false detection
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -36,11 +43,14 @@
 
 // constant
 #define LD2410_START_DELAY              10       // sensor startup delay
-#define LD2410_DEFAULT_TIMEOUT          5        // inactivity after 5 sec
-
+#define LD2410_DEFAULT_TIMEOUT          5        // timeout to trigger inactivity (sec.)
+#define LD2410_DEFAULT_SAMPLE           10       // number of samples to average
 #define LD2410_GATE_MAX                 9        // number of sensor gates
-
 #define LD2410_MSG_SIZE_MAX             64       // maximum message size
+
+#define LD2410_TRIGGER_MIN              2000     // minimum activity to trigger detection (ms)
+#define LD2410_TRIGGER_MAX              4000     // maximum activity to trigger detection (ms)
+
 
 #define LD2410_COLOR_DISABLED           "none"
 #define LD2410_COLOR_NONE               "#555"
@@ -55,7 +65,8 @@ const char D_LD2410_NAME[] PROGMEM =    "HLK-LD2410";
 // ----------------
 
 enum LD2410StepCommand { LD2410_STEP_NONE, LD2410_STEP_BEFORE_START, LD2410_STEP_AFTER_START, LD2410_STEP_BEFORE_COMMAND, LD2410_STEP_AFTER_COMMAND, LD2410_STEP_BEFORE_STOP, LD2410_STEP_AFTER_STOP };       // steps to run a command
-enum LD2410ListCommand { LD2410_CMND_START, LD2410_CMND_STOP, LD2410_CMND_READ_PARAM, LD2410_CMND_DIST_TIMEOUT, LD2410_CMND_SENSITIVITY, LD2410_CMND_READ_FIRMWARE, LD2410_CMND_SERIAL_RATE, LD2410_CMND_RESET, LD2410_CMND_RESTART, LD2410_CMND_CLOSE_ENGINEER, LD2410_CMND_OPEN_ENGINEER, LD2410_CMND_DATA, LD2410_CMND_MAX };       // list of available commands
+enum LD2410ListCommand { LD2410_CMND_START, LD2410_CMND_STOP, LD2410_CMND_READ_PARAM, LD2410_CMND_DIST_TIMEOUT, LD2410_CMND_SENSITIVITY, LD2410_CMND_READ_FIRMWARE, LD2410_CMND_RESET, LD2410_CMND_RESTART, LD2410_CMND_CLOSE_ENGINEER, LD2410_CMND_OPEN_ENGINEER, LD2410_CMND_DATA, LD2410_CMND_MAX };       // list of available commands
+//enum LD2410ListCommand { LD2410_CMND_START, LD2410_CMND_STOP, LD2410_CMND_READ_PARAM, LD2410_CMND_DIST_TIMEOUT, LD2410_CMND_SENSITIVITY, LD2410_CMND_READ_FIRMWARE, LD2410_CMND_SERIAL_RATE, LD2410_CMND_RESET, LD2410_CMND_RESTART, LD2410_CMND_CLOSE_ENGINEER, LD2410_CMND_OPEN_ENGINEER, LD2410_CMND_DATA, LD2410_CMND_MAX };       // list of available commands
 
 // commands
 uint8_t ld2410_cmnd_header[]         PROGMEM = { 0xfd, 0xfc, 0xfb, 0xfa };
@@ -73,51 +84,57 @@ uint8_t ld2410_cmnd_open_engineer[]  PROGMEM = { 0x02, 0x00, 0x62, 0x00 };
 uint8_t ld2410_cmnd_close_engineer[] PROGMEM = { 0x02, 0x00, 0x63, 0x00 };
 
 // MQTT commands : ld_help and ld_send
-const char kHLKLD2410Commands[]         PROGMEM = "ld2410_|help|param|eng|rate|reset|restart|timeout|firmware|gate|max";
-void (* const HLKLD2410Command[])(void) PROGMEM = { &CmndLD2410Help, &CmndLD2410ReadParam, &CmndLD2410EngineeringMode, &CmndLD2410SerialRate, &CmndLD2410Reset, &CmndLD2410Restart, &CmndLD2410Timeout, &CmndLD2410Firmware, &CmndLD2410SetGateParam, &CmndLD2410SetGateMax };
+const char kHLKLD2410Commands[]         PROGMEM = "ld2410_|help|timeout|sample|param|eng|reset|restart|firmware|gate|max";
+void (* const HLKLD2410Command[])(void) PROGMEM = { &CmndLD2410Help, &CmndLD2410Timeout, &CmndLD2410Sample, &CmndLD2410ReadParam, &CmndLD2410EngineeringMode, &CmndLD2410Reset, &CmndLD2410Restart, &CmndLD2410Firmware, &CmndLD2410SetGateParam, &CmndLD2410SetGateMax };
 
 /****************************************\
  *                 Data
 \****************************************/
 
-// HLK-LD2410 sensor command
+// HLK-LD2410 configuration
+struct {
+  uint8_t sample  = LD2410_DEFAULT_SAMPLE;          // default running mode
+  uint8_t timeout = LD2410_DEFAULT_TIMEOUT;         // target humidity level
+} ld2410_config;
+
+// HLK-LD2410 commands queue
 static struct {
   uint8_t step = LD2410_STEP_NONE;
   uint8_t gate = 0;                                 // gate to handle
   String  str_queue;
 } ld2410_command; 
 
-// HLK-LD sensor general status
+// HLK-LD2410 received message
 static struct {    
-  uint32_t timestamp = UINT32_MAX;                  // timestamp of last received character
-  uint8_t  idx_body  = 0;                           // index of received body
-  uint8_t  arr_body[LD2410_MSG_SIZE_MAX];           // body of current received message
-  uint8_t  arr_last[4] = {0, 0, 0, 0};              // last received characters
+  uint32_t timestamp = UINT32_MAX;            // timestamp of last received character
+  uint8_t  idx_body  = 0;                     // index of received body
+  uint8_t  arr_body[LD2410_MSG_SIZE_MAX];     // body of current received message
+  uint8_t  arr_last[4] = {0, 0, 0, 0};        // last received characters
 } ld2410_received; 
 
-// HLK-LD sensor general status
+// HLK-LD2410 status
 struct ld2410_firmware
 {
-  uint8_t  major    = 0;                            // major version
-  uint8_t  minor    = 0;                            // minor version
-  uint32_t revision = 0;                            // revision
+  uint8_t  major    = 0;          // major version
+  uint8_t  minor    = 0;          // minor version
+  uint32_t revision = 0;          // revision
 };
 struct ld2410_sensor
 {
-  bool     detected;                                // activity detected
-  uint8_t  max_gate;                                // detection max gate
-  uint8_t  power;                                   // detection power
-  uint16_t distance;                                // detection distance
-  uint32_t timestamp;                               // timestamp of last detection
-  uint8_t  arr_sensitivity[LD2410_GATE_MAX];        // gates sensitivity
+  bool     active;
+  uint8_t  max_gate;                                    // detection max gate
+  uint8_t  power;                                       // detection power
+  uint8_t  avg_count;
+  uint16_t distance;                                    // detection distance
+  uint16_t avg_power;
+  uint16_t avg_distance;
+  uint8_t  arr_sensitivity[LD2410_GATE_MAX];            // gates sensitivity
 };
 static struct {
-  TasmotaSerial  *pserial     = nullptr;            // pointer to serial port
-  bool            enabled     = false;              // sensor enabled
-  bool            detected    = false;              // sensor global detection state
-  bool            engineering = false;              // data in engineering mode
-  uint8_t         timeout     = LD2410_DEFAULT_TIMEOUT;          // timeout of detection
-  uint32_t        serial_rate = UINT32_MAX;         // target serial rate
+  TasmotaSerial  *pserial   = nullptr;                  // pointer to serial port
+  bool            enabled   = false;                    // sensor enabled
+  bool            publish   = false;                    // publish sensor data
+  uint32_t        timestamp = 0;                        // timestamp of last detection
   ld2410_firmware firmware; 
   ld2410_sensor   motion; 
   ld2410_sensor   presence; 
@@ -131,17 +148,38 @@ static struct {
 void CmndLD2410Help ()
 {
   // help on command
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ld2410_param       = read sensor parameters"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ld2410_firmware    = get sensor firmware"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ld2410_eng <0/1>   = set engineering mode"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ld2410_rate <rate> = set serial rate"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ld2410_reset       = reset sensor"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ld2410_restart     = restart sensor"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ld2410_timeout <value> = set timeout (sec.)"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ld2410_sample <value>  = set number of sample"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ld2410_param      = read sensor parameters"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ld2410_firmware   = get sensor firmware"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ld2410_eng <0/1>  = set engineering mode"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ld2410_reset      = reset sensor"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ld2410_restart    = restart sensor"));
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ld2410_gate <gate,pres,motion> = set gate sensitivity"));
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ld2410_max <pres,motion>       = set detection max gate "));
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ld2410_timeout <value>         = set timeout"));
  
   ResponseCmndDone ();
+}
+
+void CmndLD2410Timeout ()
+{
+  if (XdrvMailbox.payload > 0)
+  {
+    ld2410_config.timeout = XdrvMailbox.payload;
+    LD2410SaveConfig ();
+    LD2410AppendCommand (LD2410_CMND_DIST_TIMEOUT);
+  }
+  ResponseCmndNumber (ld2410_config.timeout);
+}
+
+void CmndLD2410Sample ()
+{
+  if (XdrvMailbox.payload > 0)
+  {
+    ld2410_config.sample = XdrvMailbox.payload;
+    LD2410SaveConfig ();
+  }
+  ResponseCmndNumber (ld2410_config.sample);
 }
 
 void CmndLD2410ReadParam ()
@@ -173,33 +211,6 @@ void CmndLD2410Restart ()
 {
   LD2410AppendCommand (LD2410_CMND_RESTART);
   ResponseCmndDone ();
-}
-
-void CmndLD2410Timeout ()
-{
-  if (XdrvMailbox.payload > 0) ld2410_status.timeout = XdrvMailbox.payload;
-  LD2410AppendCommand (LD2410_CMND_DIST_TIMEOUT);
-  ResponseCmndNumber (ld2410_status.timeout);
-}
-
-void CmndLD2410SerialRate ()
-{
-  bool valid = false;
-
-  valid |= (XdrvMailbox.payload == 9600);
-  valid |= (XdrvMailbox.payload == 19200);
-  valid |= (XdrvMailbox.payload == 38400);
-  valid |= (XdrvMailbox.payload == 57600);
-  valid |= (XdrvMailbox.payload == 115200);
-  valid |= (XdrvMailbox.payload == 256000);
-
-  if (valid)
-  {
-    Settings->baudrate = XdrvMailbox.payload / 300;
-    LD2410AppendCommand (LD2410_CMND_SERIAL_RATE);
-  }
-
-  ResponseCmndNumber (Settings->baudrate * 300);
 }
 
 void CmndLD2410SetGateParam ()
@@ -304,74 +315,73 @@ void CmndLD2410SetGateMax ()
 }
 
 /**************************************************\
+ *                  Config
+\**************************************************/
+
+// Load configuration from flash memory
+void LD2410LoadConfig ()
+{
+  // read parameters
+  ld2410_config.timeout = Settings->free_ea6[26];
+  ld2410_config.sample  = Settings->free_ea6[27];
+
+  // check parameters
+  if (ld2410_config.timeout == 0) ld2410_config.timeout = LD2410_DEFAULT_TIMEOUT;
+  if (ld2410_config.sample  == 0) ld2410_config.sample  = LD2410_DEFAULT_SAMPLE;
+}
+
+// Save configuration into flash memory
+void LD2410SaveConfig ()
+{
+  Settings->free_ea6[26] = ld2410_config.timeout;
+  Settings->free_ea6[27] = ld2410_config.sample;
+}
+
+/**************************************************\
  *                  Functions
 \**************************************************/
 
-bool LD2410GetMotionDetectionStatus (uint32_t timeout)
+bool LD2410GetDetectionStatus (uint32_t timeout)
 {
   // if timestamp not defined, no detection
-  if (ld2410_status.motion.timestamp == 0) return false;
+  if (ld2410_status.timestamp == 0) return false;
   
   // if no timeout given, use default one
-  if ((timeout == 0) || (timeout == UINT32_MAX)) timeout = ld2410_status.timeout;
+  if ((timeout == 0) || (timeout == UINT32_MAX)) timeout = ld2410_config.timeout;
 
   // return timeout status
-  return (LocalTime () - ld2410_status.motion.timestamp <= timeout);
-}
-
-bool LD2410GetPresenceDetectionStatus (uint32_t timeout)
-{
-  // if timestamp not defined, no detection
-  if (ld2410_status.presence.timestamp == 0) return false;
-  
-  // if no timeout given, use default one
-  if ((timeout == 0) || (timeout == UINT32_MAX)) timeout = ld2410_status.timeout;
-
-  // return timeout status
-  return (LocalTime () - ld2410_status.presence.timestamp <= timeout);
-}
-
-bool LD2410GetGlobalDetectionStatus (uint32_t timeout)
-{
-   return (LD2410GetMotionDetectionStatus (timeout) || LD2410GetPresenceDetectionStatus (timeout));
+  return (ld2410_status.timestamp + timeout > LocalTime ());
 }
 
 // driver initialisation
-bool LD2410InitDevice (uint32_t timeout)
+bool LD2410InitDevice ()
 {
-  uint32_t serial_rate;
-
-  // set timeout
-  if ((timeout == 0) || (timeout == UINT32_MAX)) ld2410_status.timeout = LD2410_DEFAULT_TIMEOUT;
-    else ld2410_status.timeout = timeout;
-
   // if not done, init sensor state
   if (ld2410_status.pserial == nullptr)
   {
     // calculate serial rate
-    if (Settings->baudrate > 384) serial_rate = 256000;
-    else serial_rate = (uint32_t)Settings->baudrate * 300;
+    Settings->baudrate = 853;
 
 #ifdef ESP32
     // create serial port
     ld2410_status.pserial = new TasmotaSerial (Pin (GPIO_RXD), Pin (GPIO_TXD), 2);
 
     // initialise serial port
-    ld2410_status.enabled = ld2410_status.pserial->begin (serial_rate, SERIAL_8N1);
+    ld2410_status.enabled = ld2410_status.pserial->begin (256000, SERIAL_8N1);
 
 #else       // ESP8266
     // create serial port
     ld2410_status.pserial = new TasmotaSerial (Pin (GPIO_RXD), Pin (GPIO_TXD), 2);
 
     // initialise serial port
-    ld2410_status.enabled = ld2410_status.pserial->begin (serial_rate, SERIAL_8N1);
+    ld2410_status.enabled = ld2410_status.pserial->begin (256000, SERIAL_8N1);
 
     // force hardware configuration on ESP8266
     if (ld2410_status.enabled && ld2410_status.pserial->hardwareSerial ()) ClaimSerial ();
 #endif      // ESP32 & ESP8266
 
     // log
-    if (ld2410_status.enabled) AddLog (LOG_LEVEL_INFO, PSTR ("HLK: %s sensor init at %u"), D_LD2410_NAME, serial_rate);
+    if (ld2410_status.enabled) AddLog (LOG_LEVEL_INFO, PSTR ("HLK: %s sensor init at %u"), D_LD2410_NAME, 256000);
       else AddLog (LOG_LEVEL_INFO, PSTR ("HLK: %s sensor init failed"), D_LD2410_NAME);
   }
 
@@ -431,8 +441,8 @@ void LD2410SendCommand (const uint8_t command)
       memcpy_P (arr_buffer, ld2410_cmnd_dist_timeout, size_buffer);
       arr_buffer[6]  = ld2410_status.motion.max_gate;
       arr_buffer[12] = ld2410_status.presence.max_gate;
-      arr_buffer[18] = ld2410_status.timeout;
-      AddLog (LOG_LEVEL_INFO, PSTR ("HLK: cmnd set max gate pres %u, motion %u & timeout %u"), ld2410_status.presence.max_gate, ld2410_status.motion.max_gate, ld2410_status.timeout);
+      arr_buffer[18] = ld2410_config.timeout;
+      AddLog (LOG_LEVEL_INFO, PSTR ("HLK: cmnd set max gate pres %u, motion %u & timeout %u"), ld2410_status.presence.max_gate, ld2410_status.motion.max_gate, ld2410_config.timeout);
       break;
 
     case LD2410_CMND_SENSITIVITY:
@@ -448,19 +458,6 @@ void LD2410SendCommand (const uint8_t command)
       size_buffer = sizeof (ld2410_cmnd_read_firmware);
       memcpy_P (arr_buffer, ld2410_cmnd_read_firmware, size_buffer);
       AddLog (LOG_LEVEL_INFO, PSTR ("HLK: cmnd read firmware"));
-      break;
-
-    case LD2410_CMND_SERIAL_RATE:
-      size_buffer = sizeof (ld2410_cmnd_serial_rate);
-      memcpy_P (arr_buffer, ld2410_cmnd_serial_rate, size_buffer);
-      if (Settings->baudrate == 32) value = 0x0001;                     // 9600
-      else if (Settings->baudrate == 64) value = 0x0002;                // 19200
-      else if (Settings->baudrate == 128) value = 0x0003;               // 38400
-      else if (Settings->baudrate == 192) value = 0x0004;               // 57600
-      else if (Settings->baudrate == 384) value = 0x0005;               // 115200
-      else value = 0x0007;                                              // 256000
-      arr_buffer[4] = value;
-      AddLog (LOG_LEVEL_INFO, PSTR ("HLK: cmnd serial rate %u"), value);
       break;
 
     case LD2410_CMND_RESET:
@@ -505,8 +502,8 @@ void LD2410SendCommand (const uint8_t command)
 // Handling of received data
 void LD2410HandleReceivedMessage ()
 {
-  bool     detected;
   uint8_t  index;
+  uint16_t gate;
   uint16_t *pcommand;
   uint16_t *pvalue;
   uint32_t *pheader;
@@ -606,53 +603,58 @@ void LD2410HandleReceivedMessage ()
     // ---------------------
     case 0xf1f2f3f4:
 
-      // get data mode
-      ld2410_status.engineering = (ld2410_received.arr_body[6] == 0x01);
+      // motion : update average data
+      pvalue = (uint16_t*)(ld2410_received.arr_body + 9);
+      ld2410_status.motion.avg_distance += *pvalue;
+      ld2410_status.motion.avg_power    += (uint16_t)ld2410_received.arr_body[11];
+      ld2410_status.motion.avg_count++;
 
-      // read motion and presence detection
-      ld2410_status.motion.detected   = (ld2410_received.arr_body[8] && 0x01);
-      ld2410_status.presence.detected = (ld2410_received.arr_body[8] && 0x02);
-
-      // read motion and presence power
-      ld2410_status.motion.power   = ld2410_received.arr_body[11];
-      ld2410_status.presence.power = ld2410_received.arr_body[14];
-
-      // read data in engineering mode
-      if (ld2410_status.engineering)
+      // motion : number of samples reached
+      if (ld2410_status.motion.avg_count >= ld2410_config.sample)
       {
-        // retrieve motion distance
-        pvalue = (uint16_t*)(ld2410_received.arr_body + 9);
-        ld2410_status.motion.distance   = *pvalue;
-        ld2410_status.presence.distance = *pvalue;
+        // calculate distance and power
+        ld2410_status.motion.distance = ld2410_status.motion.avg_distance / ld2410_status.motion.avg_count;
+        ld2410_status.motion.power    = ld2410_status.motion.avg_power / ld2410_status.motion.avg_count;
+
+        // update detection status
+        gate = ld2410_status.motion.distance / 75;
+        if (gate < ld2410_status.motion.max_gate) ld2410_status.motion.active = (ld2410_status.motion.power >= ld2410_status.motion.arr_sensitivity[gate]);
+          else ld2410_status.motion.active = false;
+        if (ld2410_status.motion.active) ld2410_status.timestamp = LocalTime ();
+
+        // reset average counters
+        ld2410_status.motion.avg_count    = 0;
+        ld2410_status.motion.avg_distance = 0;
+        ld2410_status.motion.avg_power    = 0;
       }
 
-      // read data in normal mode
-      else
-      {
-        // retrieve motion distance
-        pvalue = (uint16_t*)(ld2410_received.arr_body + 9);
-        ld2410_status.motion.distance = *pvalue;
+      // presence : update average data
+      pvalue   = (uint16_t*)(ld2410_received.arr_body + 12);
+      ld2410_status.presence.avg_distance += *pvalue;
+      ld2410_status.presence.avg_power    += (uint16_t)ld2410_received.arr_body[14];
+      ld2410_status.presence.avg_count++;
 
-        // retrieve static distance
-        pvalue = (uint16_t*)(ld2410_received.arr_body + 12);
-        ld2410_status.presence.distance = *pvalue;
+      // presence : number of samples reached
+      if (ld2410_status.presence.avg_count >= ld2410_config.sample)
+      {
+        // calculate distance and power
+        ld2410_status.presence.distance = ld2410_status.presence.avg_distance / ld2410_status.presence.avg_count;
+        ld2410_status.presence.power    = ld2410_status.presence.avg_power / ld2410_status.presence.avg_count;
+
+        // update detection status
+        gate = ld2410_status.presence.distance / 75;
+        if (gate < ld2410_status.presence.max_gate) ld2410_status.presence.active = (ld2410_status.presence.power >= ld2410_status.presence.arr_sensitivity[gate]);
+          else ld2410_status.presence.active = false;
+        if (ld2410_status.presence.active) ld2410_status.timestamp = LocalTime ();
+
+        // reset average counters
+        ld2410_status.presence.avg_count    = 0;
+        ld2410_status.presence.avg_distance = 0;
+        ld2410_status.presence.avg_power    = 0;
       }
 
-      // adjust detection according to power
-      if (ld2410_status.motion.power == 0) ld2410_status.motion.detected = false;
-      if (ld2410_status.presence.power == 0) ld2410_status.presence.detected = false;
+      AddLog (LOG_LEVEL_DEBUG_MORE, PSTR ("SEN: pres %ucm/%u%% - motion %ucm/%u%%"), ld2410_status.presence.distance, ld2410_status.presence.power, ld2410_status.motion.distance, ld2410_status.motion.power);
 
-      // update timestamp
-      if (ld2410_status.motion.detected) ld2410_status.motion.timestamp = LocalTime ();
-      if (ld2410_status.presence.detected) ld2410_status.presence.timestamp = LocalTime ();
-
-      // check for MQTT update
-      detected = (ld2410_status.motion.detected || ld2410_status.presence.detected);
-      if (ld2410_status.detected != detected)
-      {
-        ld2410_status.detected = detected;
-        LD2410ShowJSON (false);
-      } 
       break;
   }
 }
@@ -666,32 +668,41 @@ void LD2410Init ()
 {
   uint8_t index;
 
-  // init gates power
-  for (index = 0; index < LD2410_GATE_MAX; index ++)
-  {
-    ld2410_status.motion.arr_sensitivity[index]   = UINT8_MAX;
-    ld2410_status.presence.arr_sensitivity[index] = UINT8_MAX;
-  }
+  // init motion sensor
+  ld2410_status.motion.max_gate     = LD2410_GATE_MAX;
+  ld2410_status.motion.distance     = UINT16_MAX;
+  ld2410_status.motion.active       = false;
+  ld2410_status.motion.power        = 0;
+  ld2410_status.motion.avg_count    = 0;
+  ld2410_status.motion.avg_distance = 0;
+  ld2410_status.motion.avg_power    = 0;
+  for (index = 0; index < LD2410_GATE_MAX; index ++) ld2410_status.motion.arr_sensitivity[index] = UINT8_MAX;
 
-  // init sensors
-  ld2410_status.motion.detected    = false;
-  ld2410_status.presence.detected  = false;
-  ld2410_status.motion.max_gate    = LD2410_GATE_MAX;
-  ld2410_status.presence.max_gate  = LD2410_GATE_MAX;
-  ld2410_status.motion.distance    = UINT16_MAX;
-  ld2410_status.presence.distance  = UINT16_MAX;
-  ld2410_status.motion.power       = UINT8_MAX;
-  ld2410_status.presence.power     = UINT8_MAX;
-  ld2410_status.motion.timestamp   = 0;
-  ld2410_status.presence.timestamp = 0;
+  // init presence sensor
+  ld2410_status.presence.max_gate     = LD2410_GATE_MAX;
+  ld2410_status.presence.distance     = UINT16_MAX;
+  ld2410_status.presence.active       = false;
+  ld2410_status.presence.power        = 0;
+  ld2410_status.presence.avg_count    = 0;
+  ld2410_status.presence.avg_distance = 0;
+  ld2410_status.presence.avg_power    = 0;
+  for (index = 0; index < LD2410_GATE_MAX; index ++) ld2410_status.presence.arr_sensitivity[index] = UINT8_MAX;
+
+  // load configuration
+  LD2410LoadConfig ();
 
   // log help command
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ld2410_help to get help on %s commands"), D_LD2410_NAME);
 }
 
-void LD2410Every250ms ()
+void LD2410Every100ms ()
 {
   int index;
+  uint32_t time_now;
+
+  // check validity
+  if (!ld2410_status.enabled) return;
+  if (TasmotaGlobal.uptime < LD2410_START_DELAY) return;
 
   // check if in command queue is not empty
   if (ld2410_command.str_queue.length () > 0)
@@ -726,26 +737,6 @@ void LD2410Every250ms ()
   }
 }
 
-void LD2410EverySecond ()
-{
-  bool     detected;
-  uint32_t time_now = LocalTime ();
-
-  // if presence timeout is reached, reset presence detection
-  ld2410_status.presence.detected = (time_now <= ld2410_status.presence.timestamp + ld2410_status.timeout);
-
-  // if motion timeout is reached, reset motion detection
-  ld2410_status.motion.detected = (time_now <= ld2410_status.motion.timestamp + ld2410_status.timeout);
-
-  // check for MQTT update
-  detected = (ld2410_status.motion.detected || ld2410_status.presence.detected);
-  if (ld2410_status.detected != detected)
-  {
-    ld2410_status.detected = detected;
-    LD2410ShowJSON (false);
-  }
-}
-
 void LD2410LogMessage (const uint8_t *parr_data, const size_t size_data, const bool send)
 {
   uint8_t index;
@@ -777,6 +768,7 @@ void LD2410ReceiveData ()
     
   // check sensor presence
   if (ld2410_status.pserial == nullptr) return;
+  if (!ld2410_status.enabled) return;
 
   // run serial receive loop
   while (ld2410_status.pserial->available ()) 
@@ -823,49 +815,41 @@ void LD2410ReceiveData ()
 }
 
 // Show JSON status (for MQTT)
-//   false : "HLK-LD2410":{"detect"=1}
-//   true  : "HLK-LD2410":{"detect"=1,"firmware"="04.02.26727272","timeout"=5,"motion":{"detect":1,"gate":8,"dist":126,"power":0},"presence":{"detect":1,"gate":8,"dist":120,"power":38}}
+//   "HLK-LD2410":{"detect"=1,"firmware"="04.02.26727272","timeout"=5,"motion":{"detect":1,"gate":8,"dist":126,"power":0},"presence":{"detect":1,"gate":8,"dist":120,"power":38}}
 void LD2410ShowJSON (bool append)
 {
+  bool detected;
+
   // check sensor presence
   if (ld2410_status.pserial == nullptr) return;
-
-  // add , in append mode or { in direct publish mode
-  if (append) ResponseAppend_P (PSTR (",")); else Response_P (PSTR ("{"));
-
-  // start of ld2410 section
-  ResponseAppend_P (PSTR ("\"%s\":{\"detect\":%u"), D_LD2410_NAME, ld2410_status.detected);
+  if (!ld2410_status.publish) return;
 
   if (append)
   {
+    // start of ld2410 section
+    detected = (ld2410_status.timestamp != 0);
+    ResponseAppend_P (PSTR (","));
+    ResponseAppend_P (PSTR ("\"%s\":{\"detect\":%u,"), D_LD2410_NAME, detected);
+
     // firmware
-    ResponseAppend_P (PSTR ("\"firmware\":\"%02u.%02u.%u\""), ld2410_status.firmware.major, ld2410_status.firmware.minor, ld2410_status.firmware.revision);
-    ResponseAppend_P (PSTR (",\"timeout\":%u"), ld2410_status.timeout);
+    ResponseAppend_P (PSTR ("\"firm\":\"%02u.%02u.%u\""), ld2410_status.firmware.major, ld2410_status.firmware.minor, ld2410_status.firmware.revision);
+    ResponseAppend_P (PSTR (",\"timeout\":%u"), ld2410_config.timeout);
 
     // motion
-    ResponseAppend_P (PSTR (",\"motion\":{"));
-    ResponseAppend_P (PSTR ("\"mdetect\":%u,"), ld2410_status.motion.detected);
+    ResponseAppend_P (PSTR (",\"move\":{"));
     ResponseAppend_P (PSTR ("\"mgate\":%u,"), ld2410_status.motion.max_gate);
     ResponseAppend_P (PSTR ("\"mdist\":%u,"), ld2410_status.motion.distance);
     ResponseAppend_P (PSTR ("\"mpower\":%u}"), ld2410_status.motion.power);
 
     // presence
-    ResponseAppend_P (PSTR (",\"presence\":{"));
-    ResponseAppend_P (PSTR ("\"pdetect\":%u,"), ld2410_status.presence.detected);
+    ResponseAppend_P (PSTR (",\"pres\":{"));
     ResponseAppend_P (PSTR ("\"pgate\":%u,"), ld2410_status.presence.max_gate);
     ResponseAppend_P (PSTR ("\"pdist\":%u,"), ld2410_status.presence.distance);
     ResponseAppend_P (PSTR ("\"ppower\":%u}"), ld2410_status.presence.power);
-  }
 
-  // end of ld2410 section
-  ResponseAppend_P (PSTR ("}"));
-
-  // publish it if not in append mode
-  if (!append)
-  {
+    // end of ld2410 section
     ResponseAppend_P (PSTR ("}"));
-    MqttPublishTeleSensor ();
-  } 
+  }
 }
 
 /*********************************************\
@@ -879,6 +863,12 @@ void LD2410WebSensor ()
 {
   uint8_t  index;
   uint16_t gate_index;
+  char     str_background[8];
+  char     str_color[8];
+  char     str_value[8];
+
+  // check if enabled
+  if (!ld2410_status.enabled) return;
 
   WSContentSend_PD (PSTR ("<div style='font-size:10px;text-align:center;margin-top:4px;padding:2px 6px;background:#333333;border-radius:8px;'>\n"));
 
@@ -891,10 +881,16 @@ void LD2410WebSensor ()
   WSContentSend_PD (PSTR ("<div style='width:6%%;padding:0px;text-align:right;'>%um</div>\n"), 6);
   WSContentSend_PD (PSTR ("</div>\n"));
 
-  // loop to display presence sensor
+  // presence sensor line
   gate_index = ld2410_status.presence.distance / 75;
-  WSContentSend_PD (PSTR ("<div style='display:flex;padding:1px 0px;color:grey;'>\n"));
-  WSContentSend_PD (PSTR ("<div style='width:28%%;padding:0px;text-align:left;color:white;'>&nbsp;&nbsp;Presence</div>\n"));
+  WSContentSend_P (PSTR ("<div style='display:flex;padding:1px 0px;color:grey;'>\n"));
+
+  // presence title
+  WSContentSend_P (PSTR ("<div style='width:28%%;padding:0px;text-align:left;"));
+  if (ld2410_status.presence.active) WSContentSend_PD (PSTR ("color:%s;font-weight:bold;"), LD2410_COLOR_PRESENCE); else WSContentSend_P (PSTR ("color:white;"));
+  WSContentSend_P (PSTR ("'>&nbsp;&nbsp;Presence</div>\n"));
+
+  // loop thru gates
   for (index = 0; index < LD2410_GATE_MAX; index ++)
   {
     // cell : start
@@ -902,20 +898,39 @@ void LD2410WebSensor ()
 
     // cell : first and last
     if (index == 0) WSContentSend_PD (PSTR ("border-top-left-radius:4px;border-bottom-left-radius:4px;"));
-    else if (index == ld2410_status.presence.max_gate - 1) WSContentSend_PD (PSTR ("border-top-right-radius:4px;border-bottom-right-radius:4px;"));
+      else if (index == ld2410_status.presence.max_gate - 1) WSContentSend_PD (PSTR ("border-top-right-radius:4px;border-bottom-right-radius:4px;"));
 
-    // cell : value and end
-    if (ld2410_status.presence.detected && (gate_index == index)) WSContentSend_PD (PSTR ("background:%s;color:white;'>%u</div>\n"), LD2410_COLOR_PRESENCE, ld2410_status.presence.power);
-      else if (index >= ld2410_status.presence.max_gate) WSContentSend_PD (PSTR ("background:%s;'>&nbsp;</div>\n"), LD2410_COLOR_DISABLED);
-      else if (ld2410_status.presence.arr_sensitivity[index] == UINT8_MAX) WSContentSend_PD (PSTR ("background:%s;'>&nbsp;</div>\n"), LD2410_COLOR_NONE);
-      else WSContentSend_PD (PSTR ("background:%s;'>%u</div>\n"), LD2410_COLOR_NONE, ld2410_status.presence.arr_sensitivity[index]);
+    // cell : value
+    if (index >= ld2410_status.presence.max_gate) strcpy (str_value, "&nbsp;");
+      else if (gate_index == index) sprintf (str_value, "%u", ld2410_status.presence.power);
+      else sprintf (str_value, "%u", ld2410_status.presence.arr_sensitivity[index]);
+
+    // cell : value color
+    if (gate_index == index) strcpy (str_color, "white");
+      else strcpy (str_color, LD2410_COLOR_DISABLED);
+
+    // cell : background
+    if (index >= ld2410_status.presence.max_gate) strcpy (str_background, LD2410_COLOR_DISABLED);
+      else if ((gate_index == index) && (ld2410_status.presence.power >= ld2410_status.presence.arr_sensitivity[index])) strcpy (str_background, LD2410_COLOR_PRESENCE);
+      else strcpy (str_background, LD2410_COLOR_NONE);
+
+    // display
+    WSContentSend_PD (PSTR ("background:%s;color:%s;'>%s</div>\n"), str_background, str_color, str_value);
   }
+
+  // end of presence
   WSContentSend_PD (PSTR ("</div>\n"));
 
-  // loop to display motion sensor
+  // motion sensor line
   gate_index = ld2410_status.motion.distance / 75;
   WSContentSend_PD (PSTR ("<div style='display:flex;padding:1px 0px;color:grey;'>\n"));
-  WSContentSend_PD (PSTR ("<div style='width:28%%;padding:0px;text-align:left;color:white;'>&nbsp;&nbsp;Motion</div>\n"));
+
+  // motion title
+  WSContentSend_PD (PSTR ("<div style='width:28%%;padding:0px;text-align:left;"));
+  if (ld2410_status.motion.active) WSContentSend_PD (PSTR ("color:%s;font-weight:bold;"), LD2410_COLOR_MOTION); else WSContentSend_PD (PSTR ("color:white;"));
+  WSContentSend_PD (PSTR ("'>&nbsp;&nbsp;Motion</div>\n"));
+
+  // loop thru gates
   for (index = 0; index < LD2410_GATE_MAX; index ++)
   {
     // cell : start
@@ -923,14 +938,27 @@ void LD2410WebSensor ()
 
     // cell : first and last
     if (index == 0) WSContentSend_PD (PSTR ("border-top-left-radius:4px;border-bottom-left-radius:4px;"));
-    else if (index == ld2410_status.motion.max_gate - 1) WSContentSend_PD (PSTR ("border-top-right-radius:4px;border-bottom-right-radius:4px;"));
+      else if (index == ld2410_status.motion.max_gate - 1) WSContentSend_PD (PSTR ("border-top-right-radius:4px;border-bottom-right-radius:4px;"));
 
-    // cell : value and end
-    if (ld2410_status.motion.detected && (gate_index == index)) WSContentSend_PD (PSTR ("background:%s;color:white;'>%u</div>\n"), LD2410_COLOR_MOTION, ld2410_status.motion.power);
-      else if (index >= ld2410_status.motion.max_gate) WSContentSend_PD (PSTR ("background:%s;'>&nbsp;</div>\n"), LD2410_COLOR_DISABLED);
-      else if (ld2410_status.motion.arr_sensitivity[index] == UINT8_MAX) WSContentSend_PD (PSTR ("background:%s;'>&nbsp;</div>\n"), LD2410_COLOR_NONE);
-      else WSContentSend_PD (PSTR ("background:%s;'>%u</div>\n"), LD2410_COLOR_NONE, ld2410_status.motion.arr_sensitivity[index]);
+    // cell : value
+    if (index >= ld2410_status.motion.max_gate) strcpy (str_value, "&nbsp;");
+      else if (gate_index == index) sprintf (str_value, "%u", ld2410_status.motion.power);
+      else sprintf (str_value, "%u", ld2410_status.motion.arr_sensitivity[index]);
+
+    // cell : value color
+    if (gate_index == index) strcpy (str_color, "white");
+      else strcpy (str_color, LD2410_COLOR_DISABLED);
+
+    // cell : background
+    if (index >= ld2410_status.motion.max_gate) strcpy (str_background, LD2410_COLOR_DISABLED);
+      else if ((gate_index == index) && (ld2410_status.motion.power >= ld2410_status.motion.arr_sensitivity[index])) strcpy (str_background, LD2410_COLOR_MOTION);
+      else strcpy (str_background, LD2410_COLOR_NONE);
+
+    // display
+    WSContentSend_PD (PSTR ("background:%s;color:%s;'>%s</div>\n"), str_background, str_color, str_value);
   }
+
+  // end of motion
   WSContentSend_PD (PSTR ("</div>\n"));
 
   WSContentSend_PD (PSTR ("</div>\n"));
@@ -956,22 +984,22 @@ bool Xsns102 (uint32_t function)
     case FUNC_COMMAND:
       result = DecodeCommand (kHLKLD2410Commands, HLKLD2410Command);
       break;
-    case FUNC_EVERY_100_MSECOND:
-      if (ld2410_status.enabled && (TasmotaGlobal.uptime > LD2410_START_DELAY)) LD2410Every250ms ();
+    case FUNC_SAVE_BEFORE_RESTART:
+      LD2410SaveConfig ();
       break;
-    case FUNC_EVERY_SECOND:
-      LD2410EverySecond ();
+    case FUNC_EVERY_100_MSECOND:
+      if (RtcTime.valid) LD2410Every100ms ();
       break;
     case FUNC_JSON_APPEND:
-      if (ld2410_status.enabled) LD2410ShowJSON (true);
+      LD2410ShowJSON (true);
       break;
     case FUNC_LOOP:
-      if (ld2410_status.enabled) LD2410ReceiveData ();
+      LD2410ReceiveData ();
       break;
 
 #ifdef USE_WEBSERVER
     case FUNC_WEB_SENSOR:
-      if (ld2410_status.enabled) LD2410WebSensor ();
+      LD2410WebSensor ();
       break;
 #endif  // USE_WEBSERVER
   }

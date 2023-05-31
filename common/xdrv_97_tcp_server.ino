@@ -29,7 +29,6 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef FIRMWARE_SAFEBOOT
 #ifdef USE_TCPSERVER
 
 #define XDRV_97                   97
@@ -262,5 +261,3 @@ bool Xdrv97 (uint32_t function)
 }
 
 #endif    // USE_TCPSERVER
-#endif    // FIRMWARE_SAFEBOOT
-

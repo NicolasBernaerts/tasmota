@@ -1,5 +1,5 @@
 /*
-  xsns_121_ld1125.ino - Driver for Presence and Movement sensor HLK-LD1125
+  xsns_123_ld1125.ino - Driver for Presence and Movement sensor HLK-LD1125
 
   Copyright (C) 2022  Nicolas Bernaerts
 
@@ -34,7 +34,7 @@
 \*************************************************/
 
 // declare teleinfo energy driver and sensor
-#define XSNS_121                   121
+#define XSNS_123                   123
 
 // constant
 #define LD1125_START_DELAY          15          // sensor answers after 15 seconds
@@ -738,7 +738,7 @@ void LD1125WebSensor ()
 \***************************************/
 
 // Teleinfo sensor
-bool Xsns121 (uint32_t function)
+bool Xsns123 (uint32_t function)
 {
   bool result = false;
 
@@ -752,13 +752,13 @@ bool Xsns121 (uint32_t function)
       result = DecodeCommand (kLD1125Commands, LD1125Command);
       break;
     case FUNC_EVERY_250_MSECOND:
-      if (ld1125_status.enabled && (TasmotaGlobal.uptime > LD1125_START_DELAY)) LD1125Every250ms ();
+      if (ld1125_status.enabled && RtcTime.valid) LD1125Every250ms ();
       break;
     case FUNC_EVERY_SECOND:
-      if (ld1125_status.enabled && (TasmotaGlobal.uptime > LD1125_START_DELAY)) LD1125EverySecond ();
+      if (ld1125_status.enabled && RtcTime.valid) LD1125EverySecond ();
       break;
     case FUNC_JSON_APPEND:
-      if (ld1125_status.enabled) LD1125ShowJSON (true);
+      LD1125ShowJSON (true);
       break;
     case FUNC_LOOP:
       if (ld1125_status.enabled) LD1125ReceiveData ();

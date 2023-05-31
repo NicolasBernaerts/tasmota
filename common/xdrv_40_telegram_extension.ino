@@ -1,7 +1,7 @@
 /*
   xdrv_40_telegram_extension.ino - Telegram message extension
 
-  Copyright (C) 2021  Nicolas Bernaerts
+  Copyright (C) 2021  Nicolas Bernaerts 
     12/07/2021 - v1.0 - Creation
     08/03/2022 - v1.1 - handle chatid as string to allow very big ids
                    
@@ -14,6 +14,9 @@
    - message update
    - message reply
 
+  Make sure to run this command in cosole to enable telegram messages :
+    SetOption132 1
+    
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
@@ -26,7 +29,6 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef FIRMWARE_SAFEBOOT
 #ifdef USE_TELEGRAM
 #ifdef USE_TELEGRAM_EXTENSION
 
@@ -190,5 +192,4 @@ long TelegramReplyMessage (const char* pstr_message, long message_id, const char
 
 #endif     // USE_TELEGRAM_EXTENSION
 #endif     // USE_TELEGRAM
-#endif     // FIRMWARE_SAFEBOOT
 

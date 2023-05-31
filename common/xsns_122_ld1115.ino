@@ -388,6 +388,9 @@ void LD1115Init ()
 // loop every 250 msecond
 void LD1115Every250ms ()
 {
+  // check status
+  if (!ld1115_status.enabled) return;
+
   // execute any command in the pipe
   LD1115ExecuteNextCommand ();
 }
@@ -422,6 +425,7 @@ void LD1115ReceiveData ()
 
   // check sensor presence
   if (ld1115_status.pserial == nullptr) return;
+  if (!ld1115_status.enabled) return;
 
   // init strings
   strcpy (str_key, "");
@@ -545,6 +549,7 @@ void LD1115ShowJSON (bool append)
 
   // check sensor presence
   if (ld1115_status.pserial == nullptr) return;
+  if (!ld1115_status.enabled) return;
 
   // add , in append mode or { in direct publish mode
   if (append) ResponseAppend_P (PSTR (",")); else Response_P (PSTR ("{"));
@@ -599,6 +604,9 @@ void LD1115WebSensor ()
   int  index;
   char str_value[16];
 
+  // check status
+  if (!ld1115_status.enabled) return;
+
   WSContentSend_P (PSTR ("<div style='font-size:10px;text-align:center;margin:0px;padding:1px;border:1px solid #666;border-radius:6px;'>\n"));
 
   // presence sensor
@@ -652,21 +660,21 @@ bool Xsns122 (uint32_t function)
       result = DecodeCommand (kLD1115Commands, LD1115Command);
       break;
     case FUNC_EVERY_250_MSECOND:
-      if (ld1115_status.enabled && (TasmotaGlobal.uptime > LD1115_START_DELAY)) LD1115Every250ms ();
+      if (RtcTime.valid) LD1115Every250ms ();
       break;
     case FUNC_EVERY_SECOND:
-      LD1115EverySecond ();
+      if (RtcTime.valid) LD1115EverySecond ();
       break;
     case FUNC_JSON_APPEND:
-      if (ld1115_status.enabled) LD1115ShowJSON (true);
+      LD1115ShowJSON (true);
       break;
     case FUNC_LOOP:
-      if (ld1115_status.enabled) LD1115ReceiveData ();
+      LD1115ReceiveData ();
       break;
 
 #ifdef USE_WEBSERVER
     case FUNC_WEB_SENSOR:
-      if (ld1115_status.enabled) LD1115WebSensor ();
+      LD1115WebSensor ();
       break;
 #endif  // USE_WEBSERVER
   }

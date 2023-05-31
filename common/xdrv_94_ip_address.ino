@@ -109,11 +109,11 @@ void IPAddressShowJSON ()
   ResponseAppend_P (PSTR (",\"Net\":\"%s\""), str_adapter);
 
   // wifi MAC
-  if (WiFi.getMode() != WIFI_OFF) ResponseAppend_P (PSTR (",\"Wifi-MAC\":\"%s\""), WiFi.macAddress ().c_str ());
+  if (WiFi.getMode() != WIFI_OFF) ResponseAppend_P (PSTR (",\"Wifi-mac\":\"%s\""), WiFi.macAddress ().c_str ());
 
 #ifdef USE_ETHERNET
   // ethenet MAC
-  if (Settings->flag4.network_ethernet == 1) ResponseAppend_P (PSTR (",\"Eth-MAC\":\"%s\""), EthernetMacAddress ().c_str ());
+  if (Settings->flag4.network_ethernet == 1) ResponseAppend_P (PSTR (",\"Eth-mac\":\"%s\""), EthernetMacAddress ().c_str ());
 #endif // USE_ETHERNET
 }
 
