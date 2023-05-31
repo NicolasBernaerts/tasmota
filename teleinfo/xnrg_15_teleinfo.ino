@@ -122,26 +122,11 @@ TasmotaSerial *teleinfo_serial = nullptr;
 #define TELEINFO_INDEX_MAX              12        // maximum number of total power counters
 #define TELEINFO_PERCENT_MIN            1         // minimum acceptable percentage of energy contract
 #define TELEINFO_PERCENT_MAX            200       // maximum acceptable percentage of energy contract
-#define TELEINFO_PERCENT_CHANGE         5         // 5% of power change to publish JSON
+#define TELEINFO_PERCENT_CHANGE         3         // 3% of power change to publish JSON
 #define TELEINFO_FILE_DAILY             7         // default number of daily files
 #define TELEINFO_FILE_WEEKLY            8         // default number of weekly files
 
-// string size
-#define TELEINFO_CONTRACTID_MAX         16        // max length of TIC contract ID
-#define TELEINFO_PART_MAX               4         // maximum number of parts in a line
-#define TELEINFO_LINE_QTY               74        // maximum number of lines handled in a TIC message
-#define TELEINFO_LINE_MAX               128       // maximum size of a received TIC line
-#define TELEINFO_KEY_MAX                12        // maximum size of a TIC etiquette
-
-// graph data
-#define TELEINFO_GRAPH_SAMPLE           300       // number of samples per graph data (should divide 3600)
-#define TELEINFO_GRAPH_WIDTH            1200      // graph width
-#define TELEINFO_GRAPH_HEIGHT           600       // default graph height
-#define TELEINFO_GRAPH_STEP             100       // graph height mofification step
-#define TELEINFO_GRAPH_PERCENT_START    5         // start position of graph window
-#define TELEINFO_GRAPH_PERCENT_STOP     95        // stop position of graph window
-#define TELEINFO_GRAPH_MAX_BARGRAPH     32        // maximum number of bar graph
-
+// data default and boundaries
 #define TELEINFO_GRAPH_INC_VOLTAGE      5
 #define TELEINFO_GRAPH_MIN_VOLTAGE      235
 #define TELEINFO_GRAPH_DEF_VOLTAGE      240       // default voltage maximum in graph
@@ -162,6 +147,13 @@ TasmotaSerial *teleinfo_serial = nullptr;
 #define TELEINFO_GRAPH_MIN_WH_MONTH     100
 #define TELEINFO_GRAPH_DEF_WH_MONTH     100       // default max monthly active power consumption in year graph
 #define TELEINFO_GRAPH_MAX_WH_MONTH     50000
+
+// string size
+#define TELEINFO_CONTRACTID_MAX         16        // max length of TIC contract ID
+#define TELEINFO_PART_MAX               4         // maximum number of parts in a line
+#define TELEINFO_LINE_QTY               74        // maximum number of lines handled in a TIC message
+#define TELEINFO_LINE_MAX               128       // maximum size of a received TIC line
+#define TELEINFO_KEY_MAX                12        // maximum size of a TIC etiquette
 
 // ESP8266/ESP32 specificities
 #ifdef ESP32
@@ -227,14 +219,12 @@ TasmotaSerial *teleinfo_serial = nullptr;
 
 // Historic data files
 #define D_TELEINFO_CFG                  "/teleinfo.cfg"
-#define TELEINFO_HISTO_BUFFER_MAX       2048      // log buffer
 #define TELEINFO_HISTO_DAY_MAX          31        // max number of daily histotisation files
 #define TELEINFO_HISTO_WEEK_MAX         52        // max number of weekly histotisation files
-#define TELEINFO_HISTO_LINE_LENGTH      256       // maximum line length in CSV files
 
 // MQTT commands : tic_help, tic_enable, tic_rate, tic_msgpol, tic_msgtype, tic_percent, tic_buffer, tic_nbday, tic_nbweek, tic_maxv, tic_maxva, tic_maxhour, tic_maxday and tic_maxmonth
-const char kTeleinfoCommands[]          PROGMEM = "tic_" "|" D_CMND_TELEINFO_HELP "|" D_CMND_TELEINFO_ENABLE "|" D_CMND_TELEINFO_RATE "|" D_CMND_TELEINFO_MSG_POLICY "|" D_CMND_TELEINFO_MSG_TYPE "|" D_CMND_TELEINFO_CONTRACT "|" D_CMND_TELEINFO_BUFFER "|" D_CMND_TELEINFO_LOG_DAY "|" D_CMND_TELEINFO_LOG_WEEK "|" D_CMND_TELEINFO_MAX_V "|" D_CMND_TELEINFO_MAX_VA "|" D_CMND_TELEINFO_MAX_KWH_HOUR "|" D_CMND_TELEINFO_MAX_KWH_DAY "|" D_CMND_TELEINFO_MAX_KWH_MONTH;
-void (* const TeleinfoCommand[])(void)  PROGMEM = { &CmndTeleinfoHelp, &CmndTeleinfoEnable, &CmndTeleinfoRate, &CmndTeleinfoMessagePolicy, &CmndTeleinfoMessageType, &CmndTeleinfoContractPercent, &CmndTeleinfoLogBuffer, &CmndTeleinfoLogNbDay, &CmndTeleinfoLogNbWeek, &CmndTeleinfoGraphMaxV, &CmndTeleinfoGraphMaxVA, &CmndTeleinfoGraphMaxKWhHour, &CmndTeleinfoGraphMaxKWhDay, &CmndTeleinfoGraphMaxKWhMonth};
+const char kTeleinfoCommands[] PROGMEM = D_CMND_TELEINFO_ENABLE "|" D_CMND_TELEINFO_RATE "|" D_CMND_TELEINFO_MSG_POLICY "|" D_CMND_TELEINFO_MSG_TYPE "|" D_CMND_TELEINFO_CONTRACT "|" D_CMND_TELEINFO_BUFFER "|" D_CMND_TELEINFO_LOG_DAY "|" D_CMND_TELEINFO_LOG_WEEK "|" D_CMND_TELEINFO_MAX_V "|" D_CMND_TELEINFO_MAX_VA "|" D_CMND_TELEINFO_MAX_KWH_HOUR "|" D_CMND_TELEINFO_MAX_KWH_DAY "|" D_CMND_TELEINFO_MAX_KWH_MONTH;
+enum TeleinfoCommand                   { TIC_CMND_ENABLE, TIC_CMND_RATE, TIC_CMND_MSG_POLICY, TIC_CMND_MSG_TYPE, TIC_CMND_CONTRACT, TIC_CMND_BUFFER, TIC_CMND_LOG_DAY, TIC_CMND_LOG_WEEK, TIC_CMND_MAX_V, TIC_CMND_MAX_VA, TIC_CMND_MAX_KWH_HOUR, TIC_CMND_MAX_KWH_DAY, TIC_CMND_MAX_KWH_MONTH };
 
 // Specific etiquettes
 enum TeleinfoEtiquette { TIC_NONE, TIC_ADCO, TIC_ADSC, TIC_PTEC, TIC_NGTF, TIC_EAIT, TIC_IINST, TIC_IINST1, TIC_IINST2, TIC_IINST3, TIC_ISOUSC, TIC_PS, TIC_PAPP, TIC_SINSTS, TIC_SINSTI, TIC_BASE, TIC_EAST, TIC_HCHC, TIC_HCHP, TIC_EJPHN, TIC_EJPHPM, TIC_BBRHCJB, TIC_BBRHPJB, TIC_BBRHCJW, TIC_BBRHPJW, TIC_BBRHCJR, TIC_BBRHPJR, TIC_ADPS, TIC_ADIR1, TIC_ADIR2, TIC_ADIR3, TIC_URMS1, TIC_URMS2, TIC_URMS3, TIC_UMOY1, TIC_UMOY2, TIC_UMOY3, TIC_IRMS1, TIC_IRMS2, TIC_IRMS3, TIC_SINSTS1, TIC_SINSTS2, TIC_SINSTS3, TIC_PTCOUR, TIC_PTCOUR1, TIC_PTCOUR2, TIC_PREF, TIC_PCOUP, TIC_LTARF, TIC_EASF01, TIC_EASF02, TIC_EASF03, TIC_EASF04, TIC_EASF05, TIC_EASF06, TIC_EASF07, TIC_EASF08, TIC_EASF09, TIC_EASF10, TIC_ADS, TIC_CONFIG, TIC_EAPS, TIC_EAS, TIC_EAPPS, TIC_PREAVIS, TIC_MAX };
@@ -255,8 +245,8 @@ const char kTeleinfoPeriod[] PROGMEM     = "TH..|HC..|HP..|HN..|PM..|HCJB|HCJW|H
 const char kTeleinfoPeriodName[] PROGMEM = "Toutes|Creuses|Pleines|Normales|Pointe Mobile|Creuses Bleu|Creuses Blanc|Creuses Rouge|Pleines Bleu|Pleines Blanc|Pleines Rouge|Pointe|Pointe Mobile|Hiver|Pleines|Creuses|Pleines Hiver|Creuses Hiver|Pleines Ete|Creuses Ete|Pleines Demi-saison|Creuses Demi-saison|Juillet-Aout|Pointe|Pleines Hiver|Creuses Hiver|Pleines Ete|Creuses Ete|Base|Pleines|Creuse|Creuses Bleu|Creuses Blanc|Creuses Rouge|Pleines Bleu|Pleines Blanc|Pleines Rouge|Normale|Pointe|Production";
 
 // Data diffusion policy
-enum TeleinfoMessagePolicy { TELEINFO_POLICY_NEVER, TELEINFO_POLICY_MESSAGE, TELEINFO_POLICY_PERCENT, TELEINFO_POLICY_TELEMETRY, TELEINFO_POLICY_MAX };
-const char kTeleinfoMessagePolicy[] PROGMEM = "Never|Every TIC|± 5% Power Fluctuation|Telemetry only";
+enum TeleinfoMessagePolicy { TELEINFO_POLICY_MESSAGE, TELEINFO_POLICY_PERCENT, TELEINFO_POLICY_TELEMETRY, TELEINFO_POLICY_MAX };
+const char kTeleinfoMessagePolicy[] PROGMEM = "Every TIC|± 3% Power Fluctuation|Telemetry only";
 enum TeleinfoMessageType { TELEINFO_MSG_NONE, TELEINFO_MSG_METER, TELEINFO_MSG_TIC, TELEINFO_MSG_BOTH, TELEINFO_MSG_MAX };
 const char kTeleinfoMessageType[] PROGMEM = "None|METER only|TIC only|METER and TIC";
 
@@ -312,7 +302,6 @@ static struct {
   bool     overload      = false;                   // overload has been detected
   bool     received      = false;                   // one full message has been received
   bool     percent       = false;                   // power has changed of more than 1% on one phase
-  bool     publish_msg   = false;                   // flag to ask to publish data
   bool     publish_tic   = false;                   // flag to ask to publish TIC JSON
   bool     publish_meter = false;                   // flag to ask to publish Meter JSON
   int      line_index    = 0;                       // index of current received message line
@@ -377,199 +366,175 @@ static tic_phase teleinfo_phase[ENERGY_MAX_PHASES];
  *                  Commands
 \**************************************************/
 
-// teleinfo help
-void CmndTeleinfoHelp ()
+bool TeleinfoHandleCommand ()
 {
-  uint8_t index;
-  char    str_label[32];
-  char    str_item[64];
-  String  str_line;
+  bool   serviced = true;
+  int    index;
+  char   *pstr_next, *pstr_key, *pstr_value;
+  char   str_label[32];
+  char   str_item[64];
+  String str_line;
 
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: TIC commands"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - tic_enable <0/1>  = enable teleinfo"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - tic_rate <rate>   = set serial rate"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - tic_percent <val> = maximum acceptable contract (in %%)"));
-
-  // publishing policy
-  AddLog (LOG_LEVEL_INFO, PSTR (" - tic_msgpol = message publish policy :"));
-  str_line = "     ";
-  for (index = 0; index < TELEINFO_POLICY_MAX; index++)
+  if (Energy->command_code == CMND_ENERGYCONFIG) 
   {
-    GetTextIndexed (str_label, sizeof (str_label), index, kTeleinfoMessagePolicy);
-    sprintf (str_item, "%u:%s  ", index, str_label);
-    str_line += str_item;
-  }
-  AddLog (LOG_LEVEL_INFO, PSTR ("%s"), str_line.c_str ());
+    // if no parameter, show configuration
+    if (XdrvMailbox.data_len == 0) 
+    {
+      AddLog (LOG_LEVEL_INFO, PSTR ("EnergyConfig Teleinfo parameters :"));
+      AddLog (LOG_LEVEL_INFO, PSTR ("  enable=%u (enable teleinfo : 0/1)"), (bool)(teleinfo_serial != nullptr));
+      AddLog (LOG_LEVEL_INFO, PSTR ("  rate=%d (serial rate)"), teleinfo_config.baud_rate);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  percent=%u (maximum acceptable contract in %%)"), teleinfo_config.percent);
 
-  // publishing type
-  AddLog (LOG_LEVEL_INFO, PSTR (" - tic_msgtype = message type publish policy :"));
-  str_line = "     ";
-  for (index = 0; index < TELEINFO_MSG_MAX; index++)
-  {
-    GetTextIndexed (str_label, sizeof (str_label), index, kTeleinfoMessageType);
-    sprintf (str_item, "%u:%s  ", index, str_label);
-    str_line += str_item;
-  }
-  AddLog (LOG_LEVEL_INFO, PSTR ("%s"), str_line.c_str ());
+      // publishing policy
+      str_line = "";
+      for (index = 0; index < TELEINFO_POLICY_MAX; index++)
+      {
+        GetTextIndexed (str_label, sizeof (str_label), index, kTeleinfoMessagePolicy);
+        sprintf (str_item, "%u=%s", index, str_label);
+        if (str_line.length () > 0) str_line += ", ";
+        str_line += str_item;
+      }
+      AddLog (LOG_LEVEL_INFO, PSTR ("  msgpol=%u (message policy : %s)"), teleinfo_config.msg_policy, str_line.c_str ());
 
-#ifdef USE_UFILESYS
+      // publishing type
+      str_line = "";
+      for (index = 0; index < TELEINFO_MSG_MAX; index++)
+      {
+        GetTextIndexed (str_label, sizeof (str_label), index, kTeleinfoMessageType);
+        sprintf (str_item, "%u=%s", index, str_label);
+        if (str_line.length () > 0) str_line += ", ";
+        str_line += str_item;
+      }
+      AddLog (LOG_LEVEL_INFO, PSTR ("  msgtype=%u (message type : %s)"), teleinfo_config.msg_type, str_line.c_str ());
+
 #ifdef USE_TELEINFO_GRAPH
-  AddLog (LOG_LEVEL_INFO, PSTR (" Logs :"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - tic_buffer <0/1>  = log policy (0:buffered, 1:immediate)"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - tic_nbday <val>   = number of daily logs"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - tic_nbweek <val>  = number of weekly logs"));
+      AddLog (LOG_LEVEL_INFO, PSTR ("  maxv=%u (graph max voltage, in V)"), teleinfo_config.max_volt);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  maxva=%u (graph max power, in VA or W)"), teleinfo_config.max_power);
 
-  AddLog (LOG_LEVEL_INFO, PSTR (" Graphs :"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - tic_maxv <val>     = maximum voltage (v)"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - tic_maxva <val>    = maximum power (va and w)"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - tic_maxhour <val>  = maximum total per hour (wh)"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - tic_maxday <val>   = maximum total per day (wh)"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - tic_maxmonth <val> = maximum total per month (wh)"));
-#endif        // USE_TELEINFO_GRAPH
-#endif        // USE_UFILESYS
+      AddLog (LOG_LEVEL_INFO, PSTR ("  buffer=%d (log policy : 0=buffered, 1=immediate)"), teleinfo_config.param[TELEINFO_CONFIG_BUFFER]);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  nbday=%d (number of daily logs)"), teleinfo_config.param[TELEINFO_CONFIG_NBDAY]);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  nbweek=%d (number of weekly logs)"), teleinfo_config.param[TELEINFO_CONFIG_NBWEEK]);
 
-  ResponseCmndDone();
-}
+      AddLog (LOG_LEVEL_INFO, PSTR ("  maxhour=%d (graph max total per hour, in Wh)"), teleinfo_config.param[TELEINFO_CONFIG_MAX_HOUR]);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  maxday=%d (graph max total per day, in Wh)"), teleinfo_config.param[TELEINFO_CONFIG_MAX_DAY]);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  maxmonth=%d (graph max total per month, in Wh)"), teleinfo_config.param[TELEINFO_CONFIG_MAX_MONTH]);
+#endif    // USE_TELEINFO_GRAPH
 
-// Start and stop Teleinfo serial reception
-void CmndTeleinfoEnable (void)
-{
-  bool result;
+      serviced = true;
+    }
 
-  // if parameter is provided
-  result = (XdrvMailbox.data_len > 0);
-  if (result)
-  {
-    // if serial enable
-    if ((strcasecmp (XdrvMailbox.data, MQTT_STATUS_ON) == 0)  || (XdrvMailbox.payload == 1)) result = TeleinfoEnableSerial ();
+    // else some configuration params are given
+    else
+    {
+      // loop thru parameters
+      pstr_next = XdrvMailbox.data;
+      do
+      {
+        // extract key, value and next param
+        pstr_key   = pstr_next;
+        pstr_value = strchr (pstr_next, '=');
+        pstr_next  = strchr (pstr_key, ' ');
 
-    // else if serial disabled
-    else if ((strcasecmp (XdrvMailbox.data, MQTT_STATUS_OFF) == 0) || (XdrvMailbox.payload == 0)) result = TeleinfoDisableSerial ();
-  } 
+        // split key, value and next param
+        if (pstr_value != nullptr) { *pstr_value = 0; pstr_value++; }
+        if (pstr_next != nullptr) { *pstr_next = 0; pstr_next++; }
 
-  // send response
-  if (result) ResponseCmndDone ();
-    else ResponseCmndFailed ();
-}
+        // if param is defined, handle it
+        if ((pstr_key != nullptr) && (pstr_value != nullptr)) serviced |= TeleinfoExecuteCommand (pstr_key, pstr_value);
+      } 
+      while (pstr_next != nullptr);
 
-void CmndTeleinfoRate (void)
-{
-  if (XdrvMailbox.data_len > 0) 
-  {
-    teleinfo_config.baud_rate = (uint16_t)XdrvMailbox.payload;
-    TeleinfoSaveConfig ();
+
+      // if needed, save confoguration
+      if (serviced) TeleinfoSaveConfig ();
+    }
   }
-  ResponseCmndNumber (teleinfo_config.baud_rate);
+
+  return serviced;
 }
 
-void CmndTeleinfoContractPercent (void)
+bool TeleinfoExecuteCommand (const char* pstr_command, const char* pstr_param)
 {
-  if ((XdrvMailbox.data_len > 0) && (XdrvMailbox.payload >= TELEINFO_PERCENT_MIN) && (XdrvMailbox.payload <= TELEINFO_PERCENT_MAX))
-  {
-    teleinfo_config.percent = (uint8_t)XdrvMailbox.payload;
-    TeleinfoSaveConfig ();
-  }
-  ResponseCmndNumber (teleinfo_config.percent);
-}
+  bool serviced = false;
+  int  index;
+  long value;
+  char str_buffer[32];
 
-void CmndTeleinfoMessagePolicy (void)
-{
-  if ((XdrvMailbox.data_len > 0) && (XdrvMailbox.payload >= 0) && (XdrvMailbox.payload < TELEINFO_POLICY_MAX))
-  {
-    teleinfo_config.msg_policy = (uint8_t)XdrvMailbox.payload;
-    TeleinfoSaveConfig ();
-  }
-  ResponseCmndNumber (teleinfo_config.msg_policy);
-}
+  // check for command and value
+  index = GetCommandCode (str_buffer, sizeof(str_buffer), pstr_command, kTeleinfoCommands);
+  value = atol (pstr_param);
 
-void CmndTeleinfoMessageType (void)
-{
-  if ((XdrvMailbox.data_len > 0) && (XdrvMailbox.payload >= 0) && (XdrvMailbox.payload < TELEINFO_MSG_MAX))
+  // handle command
+  switch (index)
   {
-    teleinfo_config.msg_type = (uint8_t)XdrvMailbox.payload;
-    TeleinfoSaveConfig ();
-  }
-  ResponseCmndNumber (teleinfo_config.msg_type);
-}
+    case TIC_CMND_ENABLE:
+      if ((strcasecmp (pstr_param, MQTT_STATUS_ON) == 0)  || (strcmp (pstr_param, "1") == 0)) serviced = TeleinfoEnableSerial ();
+      else if ((strcasecmp (pstr_param, MQTT_STATUS_OFF) == 0) || (strcmp (pstr_param, "0") == 0)) serviced = TeleinfoDisableSerial ();
+      break;
 
-void CmndTeleinfoLogBuffer (void)
-{
-  if (XdrvMailbox.data_len > 0)
-  {
-    teleinfo_config.param[TELEINFO_CONFIG_BUFFER] = (XdrvMailbox.payload != 0);
-    TeleinfoSaveConfig ();
-  }
-  ResponseCmndNumber (teleinfo_config.param[TELEINFO_CONFIG_BUFFER]);
-}
+    case TIC_CMND_RATE:
+      teleinfo_config.baud_rate = (uint16_t)value;
+      break;
 
-void CmndTeleinfoLogNbDay (void)
-{
-  if ((XdrvMailbox.payload > 0) && (XdrvMailbox.payload < 31))
-  {
-    teleinfo_config.param[TELEINFO_CONFIG_NBDAY] = (long)XdrvMailbox.payload;
-    TeleinfoSaveConfig ();
-  }
-  ResponseCmndNumber (teleinfo_config.param[TELEINFO_CONFIG_NBDAY]);
-}
+    case TIC_CMND_MSG_POLICY:
+      serviced = (value < TELEINFO_POLICY_MAX);
+      if (serviced) teleinfo_config.msg_policy = (uint8_t)value;
+      break;
 
-void CmndTeleinfoLogNbWeek (void)
-{
-  if ((XdrvMailbox.payload > 0) && (XdrvMailbox.payload < 52))
-  {
-    teleinfo_config.param[TELEINFO_CONFIG_NBWEEK] = (long)XdrvMailbox.payload;
-    TeleinfoSaveConfig ();
-  }
-  ResponseCmndNumber (teleinfo_config.param[TELEINFO_CONFIG_NBWEEK]);
-}
+    case TIC_CMND_MSG_TYPE:
+      serviced = (value < TELEINFO_MSG_MAX);
+      if (serviced) teleinfo_config.msg_type = (uint8_t)value;
+      break;
 
-void CmndTeleinfoGraphMaxV (void)
-{
-  if ((XdrvMailbox.payload >= TELEINFO_GRAPH_MIN_VOLTAGE) && (XdrvMailbox.payload <= TELEINFO_GRAPH_MAX_VOLTAGE))
-  {
-    teleinfo_config.max_volt = (long)XdrvMailbox.payload;
-    TeleinfoSaveConfig ();
-  }
-  ResponseCmndNumber (teleinfo_config.max_volt);
-}
+    case TIC_CMND_CONTRACT:
+      serviced = (value < TELEINFO_PERCENT_MAX);
+      if (serviced) teleinfo_config.percent = (uint8_t)value;
+      break;
 
-void CmndTeleinfoGraphMaxVA (void)
-{
-  if ((XdrvMailbox.payload >= TELEINFO_GRAPH_MIN_POWER) && (XdrvMailbox.payload <= TELEINFO_GRAPH_MAX_POWER))
-  {
-    teleinfo_config.max_power = (long)XdrvMailbox.payload;
-    TeleinfoSaveConfig ();
-  }
-  ResponseCmndNumber (teleinfo_config.max_power);
-}
+#ifdef USE_TELEINFO_GRAPH
+    case TIC_CMND_MAX_V:
+      serviced = ((value >= TELEINFO_GRAPH_MIN_VOLTAGE) && (value <= TELEINFO_GRAPH_MAX_VOLTAGE));
+      if (serviced) teleinfo_config.max_volt = value;
+      break;
 
-void CmndTeleinfoGraphMaxKWhHour (void)
-{
-  if ((XdrvMailbox.payload >= TELEINFO_GRAPH_MIN_WH_HOUR) && (XdrvMailbox.payload <= TELEINFO_GRAPH_MAX_WH_HOUR))
-  {
-    teleinfo_config.param[TELEINFO_CONFIG_MAX_HOUR] = (long)XdrvMailbox.payload;
-    TeleinfoSaveConfig ();
-  }
-  ResponseCmndNumber (teleinfo_config.param[TELEINFO_CONFIG_MAX_HOUR]);
-}
+    case TIC_CMND_MAX_VA:
+      serviced = ((value >= TELEINFO_GRAPH_MIN_POWER) && (value <= TELEINFO_GRAPH_MAX_POWER));
+      if (serviced) teleinfo_config.max_power = value;
+      break;
 
-void CmndTeleinfoGraphMaxKWhDay (void)
-{
-  if ((XdrvMailbox.payload >= TELEINFO_GRAPH_MIN_WH_DAY) && (XdrvMailbox.payload <= TELEINFO_GRAPH_MAX_WH_DAY))
-  {
-    teleinfo_config.param[TELEINFO_CONFIG_MAX_DAY] = (long)XdrvMailbox.payload;
-    TeleinfoSaveConfig ();
-  }
-  ResponseCmndNumber (teleinfo_config.param[TELEINFO_CONFIG_MAX_DAY]);
-}
+    case TIC_CMND_BUFFER:
+      serviced = true;
+      teleinfo_config.param[TELEINFO_CONFIG_BUFFER] = (value != 0);
+      break;
 
-void CmndTeleinfoGraphMaxKWhMonth (void)
-{
-  if ((XdrvMailbox.payload >= TELEINFO_GRAPH_MIN_WH_MONTH) && (XdrvMailbox.payload <= TELEINFO_GRAPH_MAX_WH_MONTH))
-  {
-    teleinfo_config.param[TELEINFO_CONFIG_MAX_MONTH] = (long)XdrvMailbox.payload;
-    TeleinfoSaveConfig ();
+    case TIC_CMND_LOG_DAY:
+      serviced = ((value > 0) && (value <= 31));
+      if (serviced) teleinfo_config.param[TELEINFO_CONFIG_NBDAY] = value;
+      break;
+
+    case TIC_CMND_LOG_WEEK:
+      serviced = ((value > 0) && (value <= 52));
+      if (serviced) teleinfo_config.param[TELEINFO_CONFIG_NBWEEK] = value;
+      break;
+
+    case TIC_CMND_MAX_KWH_HOUR:
+      serviced = ((value >= TELEINFO_GRAPH_MIN_WH_HOUR) && (value <= TELEINFO_GRAPH_MAX_WH_HOUR));
+      if (serviced) teleinfo_config.param[TELEINFO_CONFIG_MAX_HOUR] = value;
+      break;
+
+    case TIC_CMND_MAX_KWH_DAY:
+      serviced = ((value >= TELEINFO_GRAPH_MIN_WH_DAY) && (value <= TELEINFO_GRAPH_MAX_WH_DAY));
+      if (serviced) teleinfo_config.param[TELEINFO_CONFIG_MAX_DAY] = value;
+      break;
+
+    case TIC_CMND_MAX_KWH_MONTH:
+      serviced = ((value >= TELEINFO_GRAPH_MIN_WH_MONTH) && (value <= TELEINFO_GRAPH_MAX_WH_MONTH));
+      if (serviced) teleinfo_config.param[TELEINFO_CONFIG_MAX_MONTH] = value;
+      break;
+#endif    // USE_TELEINFO_GRAPH
   }
-  ResponseCmndNumber (teleinfo_config.param[TELEINFO_CONFIG_MAX_MONTH]);
+
+  return serviced;
 }
 
 /*********************************************\
@@ -647,12 +612,12 @@ bool TeleinfoEnableSerial ()
 
       // log action
       if (is_ready) AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Serial set to 7E1 %d bauds"), teleinfo_config.baud_rate);
-      else AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Serial port init failed"));
+        else AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Serial port init failed"));
     }
 
     // set serial port status
     if (is_ready) teleinfo_meter.status_rx = TIC_SERIAL_ACTIVE; 
-    else teleinfo_meter.status_rx = TIC_SERIAL_FAILED;
+      else teleinfo_meter.status_rx = TIC_SERIAL_FAILED;
   }
 
   // if Teleinfo En declared, enable it
@@ -712,9 +677,6 @@ void TeleinfoLoadConfig ()
       }
     }
   }
-
-  // log
-  AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Config loaded from LittleFS"));
 # endif     // USE_UFILESYS
 
   // validate boundaries
@@ -867,7 +829,7 @@ void TeleinfoSplitLine (char* pstr_line, char* pstr_etiquette, const int size_et
   int  index, length;
   char *pstr_token;
 
-  // if strings are not given
+  // check parameters
   if ((pstr_line == nullptr) || (pstr_etiquette == nullptr) || (pstr_donnee == nullptr)) return;
 
   // check line minimum size and remove checksum
@@ -1102,10 +1064,6 @@ void TeleinfoReceiveData ()
           checksum = TeleinfoCalculateChecksum (teleinfo_meter.str_line);
           if (checksum != 0)
           {
-            // init
-            strcpy (str_etiquette, "");
-            strcpy (str_donnee, "");
-            
             // extract etiquette and donnee from current line
             TeleinfoSplitLine (teleinfo_meter.str_line, str_etiquette, sizeof (str_etiquette), str_donnee, sizeof (str_donnee));
 
@@ -1361,11 +1319,11 @@ void TeleinfoReceiveData ()
               strlcpy (teleinfo_message.line[index].str_etiquette, str_etiquette, sizeof(teleinfo_message.line[index].str_etiquette));
               strlcpy (teleinfo_message.line[index].str_donnee, str_donnee, sizeof(teleinfo_message.line[index].str_donnee));
               teleinfo_message.line[index].checksum = checksum;
-
-              // increment line index
-              teleinfo_message.line_index++;
             }
           }
+
+          // increment line index
+          teleinfo_message.line_index++;
         }
         
         // init current line
@@ -1630,17 +1588,18 @@ void TeleinfoReceiveData ()
 
         // update global active power counter
         total_kwh = (float)teleinfo_meter.total_wh / 1000;
+
+        // update daily total
 #ifdef ESP32
-        // update main counter
         if (Energy->total[0] > 0) Energy->daily_kWh[0] += total_kwh - Energy->total[0];
-        Energy->total[0] = total_kwh;
         teleinfo_meter.last_day_kwh = Energy->daily_kWh[0];
 #else
-        // update main counter
         if (Energy->total[0] > 0) Energy->daily[0] += total_kwh - Energy->total[0];
-        Energy->total[0] = total_kwh;
         teleinfo_meter.last_day_kwh = Energy->daily[0];
 #endif
+
+        // update energy total
+        Energy->total[0] = total_kwh;
 
         // declare received message
         teleinfo_message.received = true;
@@ -1665,20 +1624,34 @@ void TeleinfoReceiveData ()
 // Publish JSON if candidate (called 4 times per second)
 void TeleinfoEvery250ms ()
 {
+  bool publish;
+
   // do nothing during energy setup time
   if (TasmotaGlobal.uptime < ENERGY_WATCHDOG) return;
 
-  // if message should be sent, check which type to send
-  if (teleinfo_message.publish_msg)
+  // if needed, init first meter total
+  if (teleinfo_meter.last_day_wh  == 0) teleinfo_meter.last_day_wh  = teleinfo_meter.total_wh;
+  if (teleinfo_meter.last_hour_wh == 0) teleinfo_meter.last_hour_wh = teleinfo_meter.total_wh;
+
+  // check if message should be published
+  publish  = teleinfo_message.overload;
+  publish |= (teleinfo_message.received && (teleinfo_config.msg_policy == TELEINFO_POLICY_MESSAGE));
+  publish |= (teleinfo_message.percent  && (teleinfo_config.msg_policy == TELEINFO_POLICY_PERCENT));
+  if (publish)
   {
+    // set publishing flags
     teleinfo_message.publish_meter = ((teleinfo_config.msg_type == TELEINFO_MSG_BOTH) || (teleinfo_config.msg_type == TELEINFO_MSG_METER));
     teleinfo_message.publish_tic   = ((teleinfo_config.msg_type == TELEINFO_MSG_BOTH) || (teleinfo_config.msg_type == TELEINFO_MSG_TIC));
-    teleinfo_message.publish_msg   = false;
+
+    // reset message flags
+    teleinfo_message.overload = false;
+    teleinfo_message.received = false;
+    teleinfo_message.percent  = false;
   }
 
   // if needed, publish meter or TIC JSON
   if (teleinfo_message.publish_meter) TeleinfoPublishJsonMeter ();
-  else if (teleinfo_message.publish_tic) TeleinfoPublishJsonTic ();
+    else if (teleinfo_message.publish_tic) TeleinfoPublishJsonTic ();
 }
 
 // Calculate if some JSON should be published (called every second)
@@ -1686,22 +1659,6 @@ void TeleinfoEverySecond ()
 {
   // do nothing during energy setup time
   if (TasmotaGlobal.uptime < ENERGY_WATCHDOG) return;
-
-  // check if message should be published for overload
-  if (teleinfo_message.overload && (teleinfo_config.msg_policy != TELEINFO_POLICY_NEVER)) teleinfo_message.publish_msg = true;
-  teleinfo_message.overload = false;
-
-  // check if message should be published after message was received
-  if (teleinfo_message.received && (teleinfo_config.msg_policy == TELEINFO_POLICY_MESSAGE)) teleinfo_message.publish_msg = true;
-  teleinfo_message.received = false;
-
-  // check if message should be published after percentage chnage
-  if (teleinfo_message.percent  && (teleinfo_config.msg_policy == TELEINFO_POLICY_PERCENT)) teleinfo_message.publish_msg = true;
-  teleinfo_message.percent  = false;
-
-  // if needed, init first meter total
-  if (teleinfo_meter.last_day_wh  == 0) teleinfo_meter.last_day_wh  = teleinfo_meter.total_wh;
-  if (teleinfo_meter.last_hour_wh == 0) teleinfo_meter.last_hour_wh = teleinfo_meter.total_wh;
 
   // if hour change, save hourly increment
   if (teleinfo_meter.last_hour == UINT8_MAX) teleinfo_meter.last_hour = RtcTime.hour;
@@ -1801,8 +1758,12 @@ void TeleinfoPublishJsonMeter ()
 // Show JSON status (for MQTT)
 void TeleinfoAfterTeleperiod ()
 {
-  // if telemetry call, check for JSON update according to update policy
-  if ((teleinfo_meter.status_rx == TIC_SERIAL_ACTIVE) && (teleinfo_config.msg_policy == TELEINFO_POLICY_TELEMETRY)) teleinfo_message.publish_msg = true;
+  // cancel if teleinfo is not active
+  if (teleinfo_meter.status_rx != TIC_SERIAL_ACTIVE) return;
+  
+  // check for JSON update according to update policy
+  teleinfo_message.publish_meter = ((teleinfo_config.msg_type == TELEINFO_MSG_BOTH) || (teleinfo_config.msg_type == TELEINFO_MSG_METER));
+  teleinfo_message.publish_tic   = ((teleinfo_config.msg_type == TELEINFO_MSG_BOTH) || (teleinfo_config.msg_type == TELEINFO_MSG_TIC));
 }
 
 /*********************************************\
@@ -1931,7 +1892,7 @@ bool Xnrg15 (uint32_t function)
       TeleinfoEnableSerial ();
       break;
     case FUNC_COMMAND:
-      result = DecodeCommand (kTeleinfoCommands, TeleinfoCommand);
+      result = TeleinfoHandleCommand ();
       break;
     case FUNC_LOOP:
       TeleinfoReceiveData ();
