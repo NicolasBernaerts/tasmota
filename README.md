@@ -17,4 +17,4 @@ In the **tools** folder you get 2 simple tools :
   * **tasmota-discover** to list all devices (tasmota and others) available on the same LAN.
   * **tasmota-flash** to erase and/or flash ESP8266 and ESP32 devices.
 
-These projects are explained in detail under http://www.bernaerts-nicolas.fr/iot/
+
