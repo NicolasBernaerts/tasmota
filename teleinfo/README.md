@@ -30,12 +30,12 @@ It manages :
   * Power Factor (**Cosφ**), calculated from Instant Power (VA) and meter Total (Wh)
 
 This firmware provides some extra Web page on the device :
-  * **/graph** : live, daily and weekly graphs (VA, W, V and Cos phi)
+  * **/graph** : live, daily and weekly and yearly graphs
   * **/msg** : real time display of last received Teleinfo message
 
 It also provides :
-  * a TCP server to stream teleinfo
-  * a FTP server to easily retrieve logs
+  * a TCP server to live stream teleinfo data
+  * a FTP server to easily retrieve graph data
 
 If you are using a LittleFS version, you'll also get peak apparent power and peak voltage on the graphs.
 
@@ -49,9 +49,15 @@ Teleinfo protocol is described in [this document](https://www.enedis.fr/sites/de
 
 ## MQTT data
 
-In the configuration page, you can ecide to publish Teleinfo data in a specific MQTT **TIC** section.
+Standard **ENERGY** section is published during **Telemetry**.
 
-You'll then retrieve all teleinfo keys :
+You can also publish energy data under 2 different sections :
+  * **TIC** : Teleinfo data are publish as is
+  * **METER** : Energy data are published in a condensed form
+
+These options can be enabled in **Configure Teleinfo** page.
+
+Here are some example of what you'll get if you publish **TIC** section :
   * **ADCO**, **ADCS** = contract number
   * **ISOUSC** = max contract current per phase 
   * **SSOUSC** = max contract power per phase
@@ -59,7 +65,7 @@ You'll then retrieve all teleinfo keys :
   * **ADIR1**, **ADIR2**, **ADIR3** = overload message
   * ...
 
-You can also retrieve all energy meter values under MQTT **METER** :
+Here are some example of what you'll get if you publish **METER** section :
   * **PH** = number of phases
   * **PSUB** = power per phase in the contract (VA) 
   * **ISUB** = current per phase in the contract 
@@ -157,12 +163,13 @@ So you need to limit simultaneous connexions to **1** on your FTP client. Otherw
 ## Compilation ##
 
 If you want to compile this firmware version, you just need to :
-1. install official tasmota sources
+1. install official tasmota sources (please get exact version given at the beginning of this page)
 2. place or replace files from this repository
 3. place specific files from **tasmota/common** repository
 4. install **FTPClientServer** library
 
-Here is where you should place different files from this repository and from **tasmota/common** :
+Here is where you should place different files.
+Files should be taken from this repository and from **tasmota/common** :
 * **platformio_override.ini**
 * tasmota/**user_config_override.h**
 * boards/**esp32_4M_FS.json**
