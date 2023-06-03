@@ -170,21 +170,23 @@ If you want to compile this firmware version, you just need to :
 
 Here is where you should place different files.
 Files should be taken from this repository and from **tasmota/common** :
-* **platformio_override.ini**
-* tasmota/**user_config_override.h**
-* boards/**esp32_4M_FS.json**
-* boards/**esp8266_16M14M.json**
-* boards/**esp32s3_lillygo_t7s3.json**
-* tasmota/include/**tasmota_type.h**
-* tasmota/tasmota_nrg_energy/**xnrg_15_teleinfo.ino**
-* tasmota/tasmota_drv_driver/**xdrv_01_9_webserver.ino**
-* tasmota/tasmota_drv_driver/**xdrv_94_ip_address.ino**
-* tasmota/tasmota_drv_driver/**xdrv_96_ftp_server.ino**
-* tasmota/tasmota_drv_driver/**xdrv_97_tcp_server.ino**
-* tasmota/tasmota_drv_driver/**xdrv_98_esp32_board.ino**
-* tasmota/tasmota_sns_sensor/**xsns_104_teleinfo_graph.ino**
-* tasmota/tasmota_sns_sensor/**xsns_120_timezone.ino**
-* lib/default/**FTPClientServer** (extract content of **FTPClientServer.zip**) 
+| File    |  Comment  |
+| --- | --- |
+| **platformio_override.ini** |    |
+| tasmota/**user_config_override.h**  |    |
+| boards/**esp32_4M_FS.json** |  Partitioning to get 1.3Mb FS on 4Mb ESP32  |
+| boards/**esp8266_16M14M.json** |  Partitioning to get 14Mb FS on 16Mb ESP32  |
+| boards/**esp32s3_lillygo_t7s3.json** |  Partitioning for 16Mb ESP32-S3  |
+| tasmota/include/**tasmota_type.h** | Redefinition of teleinfo structure |
+| tasmota/tasmota_nrg_energy/**xnrg_15_teleinfo.ino** | Teleinfo driver  |
+| tasmota/tasmota_drv_driver/**xdrv_01_9_webserver.ino** | Add compilation target in footer  |
+| tasmota/tasmota_drv_driver/**xdrv_94_ip_address.ino** | Fixed IP address Web configuration |
+| tasmota/tasmota_drv_driver/**xdrv_96_ftp_server.ino** | Embedded FTP server |
+| tasmota/tasmota_drv_driver/**xdrv_97_tcp_server.ino** | Embedded Teleinfo stream server |
+| tasmota/tasmota_drv_driver/**xdrv_98_esp32_board.ino** | Configuration of Ethernet ESP32 boards |
+| tasmota/tasmota_sns_sensor/**xsns_104_teleinfo_graph.ino** | Teleinfo Graphs |
+| tasmota/tasmota_sns_sensor/**xsns_120_timezone.ino** | Timezone Web configuration |
+| lib/default/**FTPClientServer** | FTP server library, extract content of **FTPClientServer.zip** |
 
 If everything goes fine, you should be able to compile your own build.
 
