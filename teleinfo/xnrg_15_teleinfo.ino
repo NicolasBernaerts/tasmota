@@ -80,6 +80,7 @@
     25/02/2023 - v11.0 - Split between xnrg and xsns
                          Use Settings->teleinfo to store configuration
                          Update today and yesterday totals
+    03/06/2023 - v11.1 - Energy Today saved between restart
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -343,10 +344,8 @@ static struct {
   long      hour_wh[24];                            // hourly increments
   long long last_hour_wh   = 0;                     // previous hour total
   long long last_day_wh    = 0;                     // previous daily total
-  float     last_day_kwh   = 0;                     // daily total used to supply yesterday at midnight
 
   char      sep_line = 0;                           // detected line separator
-  uint8_t   idx_line = 0;                           // caracter index of current line
   char      str_line[TELEINFO_LINE_MAX];            // reception buffer for current line
 } teleinfo_meter;
 
@@ -933,10 +932,10 @@ void TeleinfoInit ()
   for (phase = 0; phase < ENERGY_MAX_PHASES; phase++)
   {
     // tasmota energy counters
-    Energy->voltage[phase]           = TELEINFO_VOLTAGE;
-    Energy->current[phase]           = 0;
-    Energy->active_power[phase]      = 0;
-    Energy->apparent_power[phase]    = 0;
+    Energy->voltage[phase]        = TELEINFO_VOLTAGE;
+    Energy->current[phase]        = 0;
+    Energy->active_power[phase]   = 0;
+    Energy->apparent_power[phase] = 0;
 
     // initialise phase data
     teleinfo_phase[phase].volt_set  = false;
@@ -947,25 +946,30 @@ void TeleinfoInit ()
     teleinfo_phase[phase].papp_last = 0;
     teleinfo_phase[phase].cosphi    = 100;
 
-    // initialise power calculation structure
-    teleinfo_calc.papp_inc[phase]   = 0;
+    // initialise calculation data
+    teleinfo_calc.papp_inc[phase] = 0;
   }
 
-  // init all meter indexes
+  // initialise meter data
   for (index = 0; index < TELEINFO_INDEX_MAX; index ++) teleinfo_meter.index_wh[index] = 0;
-
-  // init hourly data
   for (index = 0; index < 24; index ++) teleinfo_meter.hour_wh[index] = 0;
+  teleinfo_meter.sep_line = ' ';
+  strcpy (teleinfo_meter.str_line, "");
 
-  // disable all message lines
+  // initialise message data
   for (index = 0; index < TELEINFO_LINE_QTY; index ++) teleinfo_message.line[index].checksum = 0;
 
-  // log default method
+  // log default method & help command
   AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Using default Global Counter method"));
-
-  // log help command
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tic_help to get help on Teleinfo TIC commands"));
 }
+
+/*
+void TeleinfoSaveBeforeRestart ()
+{
+
+}
+*/
 
 // Handling of received teleinfo data
 void TeleinfoReceiveData ()
@@ -977,8 +981,9 @@ void TeleinfoReceiveData ()
   long long counter, counter_wh, delta_wh;
   uint32_t  timeout, timestamp, message_ms;
   float     cosphi, papp_inc, total_kwh;
+  char      checksum;
   char*     pstr_match;
-  char      checksum, byte_recv;
+  char      str_byte[2] = {0, 0};
   char      str_etiquette[TELEINFO_KEY_MAX];
   char      str_donnee[TELEINFO_DATA_MAX];
   char      str_text[TELEINFO_DATA_MAX];
@@ -993,22 +998,23 @@ void TeleinfoReceiveData ()
     timestamp = millis ();
 
     // read caracter
-    byte_recv = (char)teleinfo_serial->read (); 
+    str_byte[0] = (char)teleinfo_serial->read (); 
     teleinfo_message.length++;
 
     // handle caracter
-    switch (byte_recv)
+    switch (str_byte[0])
     {
       // ---------------------------
       // 0x02 : Beginning of message 
       // ---------------------------
 
       case 0x02:
-        // reset current message line index
+        // reset message line index & message length
         teleinfo_message.line_index = 0;
-
-        // initialise message length
         teleinfo_message.length = 1;
+
+        // init current line
+        strcpy (teleinfo_meter.str_line, "");
 
         // reset voltage flags
         for (phase = 0; phase < teleinfo_contract.phase; phase++) teleinfo_phase[phase].volt_set = false;
@@ -1023,6 +1029,9 @@ void TeleinfoReceiveData ()
         teleinfo_meter.nb_reset++;
         teleinfo_message.line_index = 0;
 
+        // init current line
+        strcpy (teleinfo_meter.str_line, "");
+
         // log
         AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Message reset"));
         break;
@@ -1034,18 +1043,16 @@ void TeleinfoReceiveData ()
 
       case 0x0A:
       case 0x0E:
-        // init current line
-        teleinfo_meter.idx_line = 0;
+        strcpy (teleinfo_meter.str_line, "");
         break;
 
       // ------------------------------
-      // \t or SPACE : Line - New part
+      // \t : Line - Seperator
       // ------------------------------
 
       case 0x09:
-      case ' ':
-        if (teleinfo_meter.sep_line == 0) teleinfo_meter.sep_line = byte_recv;
-        if (teleinfo_meter.idx_line < sizeof (teleinfo_meter.str_line) - 1) teleinfo_meter.str_line[teleinfo_meter.idx_line++] = byte_recv;
+        teleinfo_meter.sep_line = str_byte[0];
+        strlcat (teleinfo_meter.str_line, str_byte, sizeof (teleinfo_meter.str_line));
         break;
         
       // ------------------
@@ -1060,7 +1067,6 @@ void TeleinfoReceiveData ()
         if (teleinfo_meter.nb_line > 1)
         {
           // if checksum is ok, handle the line
-          teleinfo_meter.str_line[teleinfo_meter.idx_line] = 0;
           checksum = TeleinfoCalculateChecksum (teleinfo_meter.str_line);
           if (checksum != 0)
           {
@@ -1327,7 +1333,7 @@ void TeleinfoReceiveData ()
         }
         
         // init current line
-        teleinfo_meter.idx_line = 0;
+        strcpy (teleinfo_meter.str_line, "");
         break;
 
       // ---------------------
@@ -1549,8 +1555,8 @@ void TeleinfoReceiveData ()
             break;
         }
 
-        // --------------
         //  update flags
+        // --------------
 
         // loop thru phases
         for (phase = 0; phase < teleinfo_contract.phase; phase++)
@@ -1564,8 +1570,8 @@ void TeleinfoReceiveData ()
           teleinfo_phase[phase].papp_last = teleinfo_phase[phase].papp;
         }
 
-        // ------------------------
         //  update energy counters
+        // ------------------------
 
         // loop thru phases
         for (phase = 0; phase < teleinfo_contract.phase; phase++)
@@ -1576,30 +1582,34 @@ void TeleinfoReceiveData ()
           // set apparent and active power
           Energy->apparent_power[phase] = (float)teleinfo_phase[phase].papp;
           Energy->active_power[phase]   = (float)teleinfo_phase[phase].pact;
-          Energy->power_factor[phase]   = teleinfo_phase[phase].cosphi / 100;
 
           // set current
           if (Energy->voltage[phase] > 0) Energy->current[phase] = Energy->apparent_power[phase] / Energy->voltage[phase];
             else Energy->current[phase] = 0;
         } 
 
-        // if yesterday total has been reset, update it
-        if (Settings->energy_kWhyesterday_ph[0] == 0) Settings->energy_kWhyesterday_ph[0] = (int32_t)(teleinfo_meter.last_day_kwh * 100000);
-
         // update global active power counter
         total_kwh = (float)teleinfo_meter.total_wh / 1000;
 
-        // update daily total
+        // if data are available, update daily total
+        if ((total_kwh > 0) && (Energy->total[0] > 0) && (total_kwh != Energy->total[0]))
 #ifdef ESP32
-        if (Energy->total[0] > 0) Energy->daily_kWh[0] += total_kwh - Energy->total[0];
-        teleinfo_meter.last_day_kwh = Energy->daily_kWh[0];
+        {
+          Energy->daily_kWh[0] += total_kwh - Energy->total[0];
+          Energy->kWhtoday[0] = (int32_t)(Energy->daily_kWh[0] * 100000);
+          RtcSettings.energy_kWhtoday_ph[0] = Energy->kWhtoday[0];
+        }
 #else
-        if (Energy->total[0] > 0) Energy->daily[0] += total_kwh - Energy->total[0];
-        teleinfo_meter.last_day_kwh = Energy->daily[0];
+        {
+          Energy->daily[0] += total_kwh - Energy->total[0];
+          Energy->kWhtoday[0] = (int32_t)(Energy->daily[0] * 100000);
+          RtcSettings.energy_kWhtoday_ph[0] = Energy->kWhtoday[0];
+        }
 #endif
 
         // update energy total
         Energy->total[0] = total_kwh;
+        RtcSettings.energy_kWhtotal_ph[0] = (int32_t)(Energy->total[0] * 1000);
 
         // declare received message
         teleinfo_message.received = true;
@@ -1607,13 +1617,13 @@ void TeleinfoReceiveData ()
 
       // add other caracters to current line
       default:
-        if (teleinfo_meter.idx_line < sizeof (teleinfo_meter.str_line) - 1) teleinfo_meter.str_line[teleinfo_meter.idx_line++] = byte_recv;
+          strlcat (teleinfo_meter.str_line, str_byte, sizeof (teleinfo_meter.str_line));
         break;
     }
 
 #ifdef USE_TCPSERVER
     // if TCP server is active, append character to TCP buffer
-    tcp_server.send (byte_recv); 
+    tcp_server.send (str_byte[0]); 
 #endif
 
     // give control back to system to avoid watchdog
