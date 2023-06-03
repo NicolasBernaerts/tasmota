@@ -74,6 +74,8 @@
     25/02/2023 - v11.0 - Split between xnrg and xsns
                          Use Settings->teleinfo to store configuration
                          Update today and yesterday totals
+    03/06/2023 - v11.1 - Graph curves live update
+                         Energy Today saved between restart
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -152,7 +154,7 @@
 // extension data
 #define EXTENSION_NAME    "Teleinfo"          // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
-#define EXTENSION_VERSION "11.0"              // version
+#define EXTENSION_VERSION "11.1"              // version
 
 // MQTT default
 #undef MQTT_HOST
