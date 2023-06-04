@@ -28,12 +28,6 @@
 #define MQTT_DATA_STRING                    // Use heap instead of fixed memory for TasmotaGlobal.mqtt_data
 
 /*********************************************************************************************\
- * Default image
-\*********************************************************************************************/
-
-#define CODE_IMAGE_STR "tasmota"
-
-/*********************************************************************************************\
  * Power Type
 \*********************************************************************************************/
 
@@ -45,20 +39,24 @@ const uint32_t POWER_SIZE = 32;             // Power (relay) bit count
  * Constants
 \*********************************************************************************************/
 
+// Why 28? Because in addition to relays there may be lights and uint32_t bitmap can hold up to 32 devices
 #ifdef ESP8266
-const uint8_t MAX_RELAYS = 8;               // Max number of relays (up to 28)
+const uint8_t MAX_RELAYS = 8;               // Max number of relays selectable on GPIO
 const uint8_t MAX_INTERLOCKS = 4;           // Max number of interlock groups (up to MAX_INTERLOCKS_SET)
-const uint8_t MAX_SWITCHES = 8;             // Max number of switches (up to MAX_SWITCHES_SET)
+const uint8_t MAX_SWITCHES = 8;             // Max number of switches selectable on GPIO
+const uint8_t MAX_KEYS = 8;                 // Max number of keys or buttons selectable on GPIO
 #endif  // ESP8266
 #ifdef ESP32
-const uint8_t MAX_RELAYS = 28;              // Max number of relays (up to 28)
+const uint8_t MAX_RELAYS = 28;              // Max number of relays selectable on GPIO
 const uint8_t MAX_INTERLOCKS = 14;          // Max number of interlock groups (up to MAX_INTERLOCKS_SET)
-const uint8_t MAX_SWITCHES = 28;            // Max number of switches (up to MAX_SWITCHES_SET)
+const uint8_t MAX_SWITCHES = 28;            // Max number of switches selectable on GPIO
+const uint8_t MAX_KEYS = 28;                // Max number of keys or buttons selectable on GPIO
 #endif  // ESP32
-const uint8_t MAX_KEYS = 8;                 // Max number of keys or buttons (up to 28)
+const uint8_t MAX_RELAYS_SET = 32;          // Max number of relays
+const uint8_t MAX_KEYS_SET = 32;            // Max number of keys
 
 // Changes to the following MAX_ defines will impact settings layout
-const uint8_t MAX_INTERLOCKS_SET = 14;      // Max number of interlock groups (MAX_RELAYS / 2)
+const uint8_t MAX_INTERLOCKS_SET = 14;      // Max number of interlock groups (MAX_RELAYS_SET / 2)
 const uint8_t MAX_SWITCHES_SET = 28;        // Max number of switches
 const uint8_t MAX_LEDS = 4;                 // Max number of leds
 const uint8_t MAX_PWMS_LEGACY = 5;          // Max number of PWM channels in first settings block - Legacy limit for ESP8266, but extended for ESP32 (see below)
@@ -195,7 +193,10 @@ const uint8_t OTA_ATTEMPTS = 10;            // Number of times to try fetching t
 const uint8_t OTA_ATTEMPTS = 5;             // Number of times to try fetching the new firmware
 #endif  // ESP8266
 
-const uint16_t INPUT_BUFFER_SIZE = 520;     // Max number of characters in serial command buffer
+//const uint16_t INPUT_BUFFER_SIZE = 520;     // Max number of characters in Tasmota serial command buffer
+const uint16_t INPUT_BUFFER_SIZE = 800;     // Max number of characters in Tasmota serial command buffer
+const uint16_t MIN_INPUT_BUFFER_SIZE = 256;  // Max number of characters in Tasmota serial command buffer
+const uint16_t MAX_INPUT_BUFFER_SIZE = 2048; // Max number of characters in Arduino serial command buffer
 const uint16_t FLOATSZ = 16;                // Max number of characters in float result from dtostrfd (max 32)
 const uint16_t CMDSZ = 24;                  // Max number of characters in command
 const uint16_t TOPSZ = 151;                 // Max number of characters in topic string
@@ -298,6 +299,7 @@ const uint32_t LOOP_SLEEP_DELAY = 50;       // Lowest number of milliseconds to 
 #define XPT2046_MAXX			3895
 #define XPT2046_MINY			346
 #define	XPT2046_MAXY			3870
+
 /*********************************************************************************************\
  * Enumeration
 \*********************************************************************************************/
@@ -306,7 +308,7 @@ enum WeekInMonthOptions {Last, First, Second, Third, Fourth};
 enum DayOfTheWeekOptions {Sun=1, Mon, Tue, Wed, Thu, Fri, Sat};
 enum MonthNamesOptions {Jan=1, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec};
 enum HemisphereOptions {North, South};
-enum GetDateAndTimeOptions { DT_LOCAL, DT_UTC, DT_LOCALNOTZ, DT_DST, DT_STD, DT_RESTART, DT_ENERGY, DT_BOOTCOUNT, DT_LOCAL_MILLIS };
+enum GetDateAndTimeOptions { DT_LOCAL, DT_UTC, DT_LOCALNOTZ, DT_DST, DT_STD, DT_RESTART, DT_BOOTCOUNT, DT_LOCAL_MILLIS };
 
 enum LoggingLevels {LOG_LEVEL_NONE, LOG_LEVEL_ERROR, LOG_LEVEL_INFO, LOG_LEVEL_DEBUG, LOG_LEVEL_DEBUG_MORE};
 
@@ -316,8 +318,17 @@ enum WifiConfigOptions {WIFI_RESTART, EX_WIFI_SMARTCONFIG, WIFI_MANAGER, EX_WIFI
 
 enum WifiTestOptions {WIFI_NOT_TESTING, WIFI_TESTING, WIFI_TEST_FINISHED, WIFI_TEST_FINISHED_BAD};
 
-enum SwitchModeOptions {TOGGLE, FOLLOW, FOLLOW_INV, PUSHBUTTON, PUSHBUTTON_INV, PUSHBUTTONHOLD, PUSHBUTTONHOLD_INV, PUSHBUTTON_TOGGLE, TOGGLEMULTI,
-                        FOLLOWMULTI, FOLLOWMULTI_INV, PUSHHOLDMULTI, PUSHHOLDMULTI_INV, PUSHON, PUSHON_INV, PUSH_IGNORE, MAX_SWITCH_OPTION};
+enum SwitchModeOptions {TOGGLE,                              // 0
+                        FOLLOW, FOLLOW_INV,                  // 1, 2   - Follow switch state
+                        PUSHBUTTON, PUSHBUTTON_INV,          // 3, 4   - Pushbutton (default 1, 0 = toggle)
+                        PUSHBUTTONHOLD, PUSHBUTTONHOLD_INV,  // 5, 6   - Pushbutton with hold (default 1, 0 = toggle, Hold = hold)
+                        PUSHBUTTON_TOGGLE,                   // 7      - = 0
+                        TOGGLEMULTI,                         // 8      - = 0 with multi toggle
+                        FOLLOWMULTI, FOLLOWMULTI_INV,        // 9, 10  - Multi change follow (0 = off, 1 = on, 2x change = hold)
+                        PUSHHOLDMULTI, PUSHHOLDMULTI_INV,    // 11, 12 - Pushbutton with dimmer mode
+                        PUSHON, PUSHON_INV,                  // 13, 14 - Pushon mode (1 = on, switch off using PulseTime)
+                        PUSH_IGNORE, PUSH_IGNORE_INV,        // 15, 16 - Send only MQTT message on switch change
+                        MAX_SWITCH_OPTION};
 
 enum LedStateOptions {LED_OFF, LED_POWER, LED_MQTTSUB, LED_POWER_MQTTSUB, LED_MQTTPUB, LED_POWER_MQTTPUB, LED_MQTT, LED_POWER_MQTT, MAX_LED_OPTION};
 
@@ -344,7 +355,7 @@ enum Shortcuts { SC_CLEAR, SC_DEFAULT, SC_USER };
 enum SO32_49Index { P_HOLD_TIME,              // SetOption32 - (Button/Switch) Key hold time detection in decaseconds (default 40)
                     P_MAX_POWER_RETRY,        // SetOption33 - (Energy) Maximum number of retries before deciding power limit overflow (default 5)
                     P_BACKLOG_DELAY,          // SetOption34 - (Backlog) Minimal delay in milliseconds between executing backlog commands (default 200)
-                    P_MDNS_DELAYED_START,     // SetOption35 - (mDNS) Number of seconds before mDNS is started (default 0) - Obsolete
+                    P_SERIAL_SKIP,            // SetOption35 - (SerialBridge) Skip number of serial messages received (default 0)
                     P_BOOT_LOOP_OFFSET,       // SetOption36 - (Restart) Number of restarts to start detecting boot loop (default 1)
                     P_RGB_REMAP,              // SetOption37 - (Light) RGB and White channel separation (default 0)
                     P_IR_UNKNOW_THRESHOLD,    // SetOption38 - (IR) Set the smallest sized "UNKNOWN" message packets we actually care about (default 6, max 255)
@@ -355,8 +366,8 @@ enum SO32_49Index { P_HOLD_TIME,              // SetOption32 - (Button/Switch) K
                     P_ROTARY_MAX_STEP,        // SetOption43 - (Rotary) Rotary step boundary (default 10)
                     P_IR_TOLERANCE,           // SetOption44 - (IR) Base tolerance percentage for matching incoming IR messages (default 25, max 100)
                     P_BISTABLE_PULSE,         // SetOption45 - (Bistable) Pulse time for two coil bistable latching relays (default 40)
-                    P_SO46_FREE,              // SetOption46
-                    P_SO47_FREE,              // SetOption47
+                    P_POWER_ON_DELAY,         // SetOption46 - (PowerOn) Add delay of 10 x value milliseconds at power on
+                    P_POWER_ON_DELAY2,        // SetOption47 - (PowerOn) Add delay of value seconds at power on before activating relays
                     P_SO48_FREE,              // SetOption48
                     P_SO49_FREE               // SetOption49
                   };  // Max is PARAM8_SIZE (18) - SetOption32 until SetOption49
@@ -371,17 +382,27 @@ enum LightSubtypes { LST_NONE, LST_SINGLE, LST_COLDWARM, LST_RGB,   LST_RGBW, LS
 enum LightTypes    { LT_BASIC, LT_PWM1,    LT_PWM2,      LT_PWM3,   LT_PWM4,  LT_PWM5,  LT_PWM6, LT_PWM7,
                      LT_NU8,   LT_SERIAL1, LT_SERIAL2,   LT_RGB,    LT_RGBW,  LT_RGBWC, LT_NU14, LT_NU15 };  // Do not insert new fields
 
-enum XsnsFunctions {FUNC_SETTINGS_OVERRIDE, FUNC_PIN_STATE, FUNC_I2C_INIT, FUNC_MODULE_INIT, FUNC_PRE_INIT, FUNC_INIT,
-                    FUNC_LOOP, FUNC_EVERY_50_MSECOND, FUNC_EVERY_100_MSECOND, FUNC_EVERY_200_MSECOND, FUNC_EVERY_250_MSECOND, FUNC_EVERY_SECOND,
-                    FUNC_SAVE_SETTINGS, FUNC_SAVE_AT_MIDNIGHT, FUNC_SAVE_BEFORE_RESTART,
-                    FUNC_AFTER_TELEPERIOD, FUNC_JSON_APPEND, FUNC_WEB_SENSOR, FUNC_WEB_COL_SENSOR, FUNC_COMMAND, FUNC_COMMAND_SENSOR, FUNC_COMMAND_DRIVER,
-                    FUNC_MQTT_SUBSCRIBE, FUNC_MQTT_INIT, FUNC_MQTT_DATA,
-                    FUNC_SET_POWER, FUNC_SET_DEVICE_POWER, FUNC_SHOW_SENSOR, FUNC_ANY_KEY,
-                    FUNC_ENERGY_EVERY_SECOND, FUNC_ENERGY_RESET,
-                    FUNC_RULES_PROCESS, FUNC_TELEPERIOD_RULES_PROCESS, FUNC_SERIAL, FUNC_FREE_MEM, FUNC_BUTTON_PRESSED, FUNC_BUTTON_MULTI_PRESSED,
-                    FUNC_WEB_ADD_BUTTON, FUNC_WEB_ADD_CONSOLE_BUTTON, FUNC_WEB_ADD_MANAGEMENT_BUTTON, FUNC_WEB_ADD_MAIN_BUTTON,
-                    FUNC_WEB_GET_ARG, FUNC_WEB_ADD_HANDLER, FUNC_SET_CHANNELS, FUNC_SET_SCHEME, FUNC_HOTPLUG_SCAN, FUNC_TIME_SYNCED,
-                    FUNC_DEVICE_GROUP_ITEM };
+enum XsnsFunctions { FUNC_SETTINGS_OVERRIDE, FUNC_SETUP_RING1, FUNC_SETUP_RING2, FUNC_PRE_INIT, FUNC_INIT,
+                     FUNC_LOOP, FUNC_SLEEP_LOOP, FUNC_EVERY_50_MSECOND, FUNC_EVERY_100_MSECOND, FUNC_EVERY_200_MSECOND, FUNC_EVERY_250_MSECOND, FUNC_EVERY_SECOND,
+                     FUNC_RESET_SETTINGS, FUNC_SAVE_SETTINGS, FUNC_SAVE_AT_MIDNIGHT, FUNC_SAVE_BEFORE_RESTART, FUNC_INTERRUPT_STOP, FUNC_INTERRUPT_START,
+                     FUNC_AFTER_TELEPERIOD, FUNC_JSON_APPEND, FUNC_WEB_SENSOR, FUNC_WEB_COL_SENSOR,
+                     FUNC_MQTT_SUBSCRIBE, FUNC_MQTT_INIT,
+                     FUNC_SET_POWER, FUNC_SHOW_SENSOR, FUNC_ANY_KEY, FUNC_LED_LINK,
+                     FUNC_ENERGY_EVERY_SECOND, FUNC_ENERGY_RESET,
+                     FUNC_TELEPERIOD_RULES_PROCESS, FUNC_FREE_MEM,
+                     FUNC_WEB_ADD_BUTTON, FUNC_WEB_ADD_CONSOLE_BUTTON, FUNC_WEB_ADD_MANAGEMENT_BUTTON, FUNC_WEB_ADD_MAIN_BUTTON,
+                     FUNC_WEB_GET_ARG, FUNC_WEB_ADD_HANDLER, FUNC_SET_SCHEME, FUNC_HOTPLUG_SCAN, FUNC_TIME_SYNCED,
+                     FUNC_DEVICE_GROUP_ITEM,
+                     FUNC_NETWORK_UP, FUNC_NETWORK_DOWN,
+                     FUNC_return_result = 200,  // Insert function WITHOUT return results before here. Following functions return results
+                     FUNC_PIN_STATE, FUNC_MODULE_INIT, FUNC_ADD_BUTTON, FUNC_ADD_SWITCH, FUNC_BUTTON_PRESSED, FUNC_BUTTON_MULTI_PRESSED,
+                     FUNC_SET_DEVICE_POWER,
+                     FUNC_MQTT_DATA, FUNC_SERIAL,
+                     FUNC_COMMAND, FUNC_COMMAND_SENSOR, FUNC_COMMAND_DRIVER,
+                     FUNC_RULES_PROCESS,
+                     FUNC_SET_CHANNELS,
+                     FUNC_last_function         // Insert functions WITH return results before here
+                     };
 
 enum AddressConfigSteps { ADDR_IDLE, ADDR_RECEIVE, ADDR_SEND };
 
@@ -423,23 +444,26 @@ enum SettingsTextIndex { SET_OTAURL,
                          SET_RGX_SSID, SET_RGX_PASSWORD,
                          SET_INFLUXDB_HOST, SET_INFLUXDB_PORT, SET_INFLUXDB_ORG, SET_INFLUXDB_TOKEN, SET_INFLUXDB_BUCKET, SET_INFLUXDB_RP,
 
-// offload
-#ifndef USE_UFILESYS
-                         SET_OFFLOAD_TOPIC, SET_OFFLOAD_KEY_INST, SET_OFFLOAD_KEY_MAX,
-#endif
+                         // sensor
+                         SET_SENSOR_TEMP_TOPIC, SET_SENSOR_TEMP_KEY,				  // remote temperature sensor
+                         SET_SENSOR_HUMI_TOPIC, SET_SENSOR_HUMI_KEY,          // remote humidity sensor
+                         SET_SENSOR_PRES_TOPIC, SET_SENSOR_PRES_KEY,          // remote presence sensor
+                         SET_SENSOR_TEMP_WEEKLY,  					                  // temperature weekly history string
+                         SET_SENSOR_HUMI_WEEKLY,  					                  // humidity weekly history string
+                         SET_SENSOR_PRES_WEEKLY,  					                  // presence weekly history string
+                         SET_SENSOR_ACTI_WEEKLY,  					                  // activity weekly history string
+                         SET_SENSOR_INAC_WEEKLY,  					                  // inactivity weekly history string
+                         SET_SENSOR_TEMP_YEARLY,  					                  // temperature yearly history string
 
-// sensors
-#ifndef USE_UFILESYS
-                         SET_SENSOR_TEMP_TOPIC, SET_SENSOR_TEMP_KEY,
-                         SET_SENSOR_HUMI_TOPIC, SET_SENSOR_HUMI_KEY,
-                         SET_SENSOR_MOVE_TOPIC, SET_SENSOR_MOVE_KEY,
-#endif
+                         // ecowatt
+                         SET_ECOWATT_TOPIC,							                                        // ecowatt topic
 
-// ecowatt client
-#ifndef USE_UFILESYS
-                         SET_ECOWATT_TOPIC,
-#endif
+                         // offload
+                         SET_OFFLOAD_TOPIC, SET_OFFLOAD_KEY_INST, SET_OFFLOAD_KEY_MAX,		      // offload
 
+                         // pilotwire
+                         SET_PILOTWIRE_ICON_URL,  					                                    // pilotwire room icon url
+                         
                          SET_MAX };
 
 enum SpiInterfaces { SPI_NONE, SPI_MOSI, SPI_MISO, SPI_MOSI_MISO };
@@ -471,10 +495,10 @@ enum DevGroupShareItem { DGR_SHARE_POWER = 1, DGR_SHARE_LIGHT_BRI = 2, DGR_SHARE
 
 enum CommandSource { SRC_IGNORE, SRC_MQTT, SRC_RESTART, SRC_BUTTON, SRC_SWITCH, SRC_BACKLOG, SRC_SERIAL, SRC_WEBGUI, SRC_WEBCOMMAND, SRC_WEBCONSOLE, SRC_PULSETIMER,
                      SRC_TIMER, SRC_RULE, SRC_MAXPOWER, SRC_MAXENERGY, SRC_OVERTEMP, SRC_LIGHT, SRC_KNX, SRC_DISPLAY, SRC_WEMO, SRC_HUE, SRC_RETRY, SRC_REMOTE, SRC_SHUTTER,
-                     SRC_THERMOSTAT, SRC_CHAT, SRC_TCL, SRC_BERRY, SRC_FILE, SRC_SSERIAL, SRC_USBCONSOLE, SRC_MAX };
+                     SRC_THERMOSTAT, SRC_CHAT, SRC_TCL, SRC_BERRY, SRC_FILE, SRC_SSERIAL, SRC_USBCONSOLE, SRC_SO47, SRC_MAX };
 const char kCommandSource[] PROGMEM = "I|MQTT|Restart|Button|Switch|Backlog|Serial|WebGui|WebCommand|WebConsole|PulseTimer|"
                                       "Timer|Rule|MaxPower|MaxEnergy|Overtemp|Light|Knx|Display|Wemo|Hue|Retry|Remote|Shutter|"
-                                      "Thermostat|Chat|TCL|Berry|File|SSerial|UsbConsole";
+                                      "Thermostat|Chat|TCL|Berry|File|SSerial|UsbConsole|SO47";
 
 const uint8_t kDefaultRfCode[9] PROGMEM = { 0x21, 0x16, 0x01, 0x0E, 0x03, 0x48, 0x2E, 0x1A, 0x00 };
 

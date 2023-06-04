@@ -49,6 +49,11 @@
                          Add HLK-LD1115H and HLK-LD1125H presence sensor support
     16/10/2022 - v10.0 - Add Ecowatt signal management
     03/12/2022 - v10.1 - Redesign of movement detection management
+    09/02/2023 - v10.2 - Disable wifi sleep to avoid latency
+                         Optimisation of graph generation 
+                         Handle external icon URL
+    12/05/2023 - v10.3 - Save history in Settings strings
+    12/05/2023 - v10.4 - Change auto-rearm to auto-on and auto-off 
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -94,12 +99,11 @@
 
 #define USE_IPADDRESS                         // Add fixed IP configuration page
 #define USE_TIMEZONE                          // Add support for Timezone management
-#define USE_COMMON_LOG                        // Use common log file library
-#define USE_OFFLOAD                           // Add support for MQTT maximum power offloading
+#define USE_LD1115                            // Add support for HLK-LD1115 presence & movement sensors
+#define USE_LD1125                            // Add support for HLK-LD1125 presence & movement sensors
+#define USE_LD2410                            // Add support for HLK-LD2410 presence & movement sensors
 #define USE_GENERIC_SENSOR                    // Add support for generic sensor management
-//#define USE_HLKLD2410                         // Add support for HLK-LD2410 presence & movement sensors
-#define USE_HLKLD11                           // Add support for HLK-LD11xx presence & movement sensors
-#define USE_HLKLD11_WEB_CONFIG                // Add graphical configuration for HLK-LD11xx sensors
+#define USE_OFFLOAD                           // Add support for MQTT maximum power offloading
 #define USE_ECOWATT_CLIENT                    // Add support for ecowatt client module
 //#define USE_PRESENCE_FORECAST                 // Add support for a presence forecast module
 
@@ -123,26 +127,8 @@
 #endif
 
 // extension data
-#define EXTENSION_VERSION "10.1"              // version
+#define EXTENSION_VERSION "10.4"              // version
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
-#ifdef USE_PILOTWIRE
-#define EXTENSION_NAME    "Pilotwire"         // name
-#else
-#define EXTENSION_NAME    "Offload"           // name
-#endif
-
-// Pilotwire and Offload templates
-#undef MQTT_TOPIC
-#undef FRIENDLY_NAME
-#ifdef USE_PILOTWIRE
-#define MQTT_TOPIC    "pilotwire_%06X"
-#define FRIENDLY_NAME "Fil Pilote"
-#define USER_TEMPLATE "{\"NAME\":\"Pilotwire\",\"GPIO\":[32,1,1,1312,1,0,0,0,224,288,1,0,0,0],\"FLAG\":0,\"BASE\":1}" 
-#else
-#define MQTT_TOPIC    "offload_%06X"
-#define FRIENDLY_NAME "Offload"
-#define USER_TEMPLATE "{\"NAME\":\"Athom PG01\",\"GPIO\":[0,0,0,32,2720,2656,0,0,2624,544,224,0,0,1],\"FLAG\":0,\"BASE\":18}"
-#endif
 
 // MQTT default
 #undef MQTT_HOST
@@ -155,6 +141,21 @@
 #define MQTT_PASS          ""
 #undef MQTT_FULLTOPIC
 #define MQTT_FULLTOPIC     "%topic%/%prefix%/"
+#undef MQTT_TOPIC
+
+// default name
+#undef FRIENDLY_NAME
+#if defined USE_PILOTWIRE
+#define EXTENSION_NAME    "Pilotwire"         // name
+#define MQTT_TOPIC    "pilotwire_%06X"
+#define FRIENDLY_NAME "Fil Pilote"
+#define USER_TEMPLATE "{\"NAME\":\"Pilotwire\",\"GPIO\":[32,1,1,1312,1,0,0,0,224,288,1,0,0,0],\"FLAG\":0,\"BASE\":1}" 
+#elif defined USE_OFFLOAD
+#define EXTENSION_NAME    "Offload"           // name
+#define MQTT_TOPIC    "offload_%06X"
+#define FRIENDLY_NAME "Offload"
+#define USER_TEMPLATE "{\"NAME\":\"Athom PG01\",\"GPIO\":[0,0,0,32,2720,2656,0,0,2624,544,224,0,0,1],\"FLAG\":0,\"BASE\":18}"
+#endif
 
 // disable serial log (as serial movement detector may be used)
 #undef SERIAL_LOG_LEVEL 
@@ -200,7 +201,7 @@
 #undef USE_SCRIPT                             // Add support for script (+17k code)
 
 #undef ROTARY_V1                              // Add support for Rotary Encoder as used in MI Desk Lamp (+0k8 code)
-#undef USE_SONOFF_RF                          // Add support for Sonoff Rf Bridge (+3k2 code)
+#undef USE_SONOFF_RF                          // Add support for Sonoff Rf Bridge (+3k2 code)option
 #undef USE_RF_FLASH                           // Add support for flashing the EFM8BB1 chip on the Sonoff RF Bridge.
 #undef USE_SONOFF_SC                          // Add support for Sonoff Sc (+1k1 code)
 #undef USE_TUYA_MCU                           // Add support for Tuya Serial MCU
@@ -232,12 +233,13 @@
 #undef USE_LIGHT_VIRTUAL_CT                   // Add support for Virtual White Color Temperature (+1.1k code)
 #undef USE_DGR_LIGHT_SEQUENCE                 // Add support for device group light sequencing (requires USE_DEVICE_GROUPS) (+0k2 code)
 
-#undef USE_COUNTER                            // Enable inputs as counter (+0k8 code)
+#define USE_COUNTER                            // Enable inputs as counter (+0k8 code)
 
 #define USE_DS18x20                            // Add support for DS18x20 sensors with id sort, single scan and read retry (+2k6 code)
 #define USE_DHT                                // Add support for internal DHT sensor
 
-#undef USE_I2C                                // Disable all I2C sensors and devices
+#define USE_I2C                               // Enable all I2C sensors and devices
+#define USE_SHT3X                             // Enable SHT30 and SHT40
 
 #undef USE_SPI                                // Disable all SPI devices
 
