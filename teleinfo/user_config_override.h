@@ -60,7 +60,7 @@
     01/04/2022 - v9.6  - Add software watchdog feed to avoid lock
     22/04/2022 - v9.7  - Option to minimise LittleFS writes (day:every 1h and week:every 6h)
                          Correction of EAIT bug
-    04/08/2022 - v9.8  - Based on Tasmota 12 , add ESP32S2 support
+    04/08/2022 - v9.8  - Based on Tasmota 12, add ESP32S2 support
                          Remove FTP server auto start
     18/08/2022 - v9.9  - Force GPIO_TELEINFO_RX as digital input
                          Correct bug littlefs config and graph data recording
@@ -75,7 +75,9 @@
                          Use Settings->teleinfo to store configuration
                          Update today and yesterday totals
     03/06/2023 - v11.1 - Graph curves live update
-                         Energy Today saved between restart
+                         Rewrite of Tasmota energy update
+                         Avoid 100ms rules teleperiod update
+    11/06/2023 - v11.2 - Change graph organisation & live display
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -116,6 +118,8 @@
 \********************************************/
 
 // complementary modules
+#define USE_ENERGY_SENSOR                     // Enable energy sensors
+
 #define USE_TELEINFO                          // Enable Teleinfo energy module
 #define USE_TELEINFO_GRAPH                    // Enable Teleinfo sensor module for graph display
 #define USE_IPADDRESS                         // Add fixed IP configuration page
@@ -154,7 +158,7 @@
 // extension data
 #define EXTENSION_NAME    "Teleinfo"          // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
-#define EXTENSION_VERSION "11.1"              // version
+#define EXTENSION_VERSION "11.2"              // version
 
 // MQTT default
 #undef MQTT_HOST
@@ -234,7 +238,7 @@
 #undef SHELLY_FW_UPGRADE                      // Add firmware upgrade option for co-processor (+3k4 code)
 
 #undef USE_LIGHT                              // Add support for light control
-#undef USE_WS2812                             // WS2812 Led string using library NeoPixelBus (+5k code, +1k mem, 232 iram) - Disable by //
+//#undef USE_WS2812                             // WS2812 Led string using library NeoPixelBus (+5k code, +1k mem, 232 iram) - Disable by //
 #undef USE_MY92X1                             // Add support for MY92X1 RGBCW led controller as used in Sonoff B1, Ailight and Lohas
 #undef USE_SM16716                            // Add support for SM16716 RGB LED controller (+0k7 code)
 #undef USE_SM2135                             // Add support for SM2135 RGBCW led control as used in Action LSC (+0k6 code)
