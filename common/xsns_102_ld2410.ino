@@ -133,7 +133,7 @@ struct ld2410_sensor
 static struct {
   TasmotaSerial  *pserial   = nullptr;                  // pointer to serial port
   bool            enabled   = false;                    // sensor enabled
-  bool            publish   = false;                    // publish sensor data
+//  bool            publish   = false;                    // publish sensor data
   uint32_t        timestamp = 0;                        // timestamp of last detection
   ld2410_firmware firmware; 
   ld2410_sensor   motion; 
@@ -822,7 +822,7 @@ void LD2410ShowJSON (bool append)
 
   // check sensor presence
   if (ld2410_status.pserial == nullptr) return;
-  if (!ld2410_status.publish) return;
+//  if (!ld2410_status.publish) return;
 
   if (append)
   {

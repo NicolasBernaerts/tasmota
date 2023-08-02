@@ -266,7 +266,7 @@ void EcowattWebSensor ()
   WSContentSend_PD (PSTR ("<div style='width:28%%;padding:0px;margin-bottom:-4px;text-align:left;font-size:16px;font-weight:bold;'>Ecowatt</div>\n"));
 
   // if ecowatt signal has never been received
-  if (ecowatt_status.hour == UINT8_MAX) WSContentSend_PD (PSTR ("<div style='width:72%%;padding:3px 0px;'>Waiting for 1st signal</div>\n"));
+  if (ecowatt_status.hour == UINT8_MAX) WSContentSend_PD (PSTR ("<div style='width:72%%;padding:3px 0px;'>Waiting for %s</div>\n"), ecowatt_config.str_topic.c_str ());
 
   // else, display today ecowatt chart
   else
