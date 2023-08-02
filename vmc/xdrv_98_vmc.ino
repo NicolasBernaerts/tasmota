@@ -24,6 +24,14 @@
 
 #define XDRV_98                 98
 
+// initialisation
+void VmcPreInit ()
+{
+  // Disable serial logging
+  Settings->seriallog_level = 0;
+  Settings->flag.mqtt_serial = 0;  
+}
+
 /*******************************************************\
  *                      Interface
 \*******************************************************/
@@ -35,14 +43,11 @@ bool Xdrv98 (uint32_t function)
   // main callback switch
   switch (function)
   {
-   case FUNC_SET_DEVICE_POWER:
+    case FUNC_PRE_INIT:
+      VmcPreInit();
+      break;
+    case FUNC_SET_DEVICE_POWER:
       result = VmcSetDevicePower ();
-      break;
-    case FUNC_MQTT_SUBSCRIBE:
-      SensorMqttSubscribe ();
-      break;
-    case FUNC_MQTT_DATA:
-      result = SensorMqttData ();
       break;
   }
   return result;
