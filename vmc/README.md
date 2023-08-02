@@ -1,4 +1,4 @@
-Tasmota firmware modified to Sensors & VMC control
+Tasmota firmware extension for Sensors & VMC control
 =============
 
 This evolution of Tasmota firmware is bsed on **Tasmota v12.5.0** and has been enhanced to handle :
@@ -45,6 +45,8 @@ Here are the commands available to handle sensors history :
     Activity :
       - acti_week <0/1>    = weekly histo. of activity (48 bytes)
       - inac_week <0/1>    = weekly histo. of inactivity (48 bytes)
+
+![Weekly temperature](./screen/tasmota-sensor-temp-weekly.png) 
 
 VMC
 ----
