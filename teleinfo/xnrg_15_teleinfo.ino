@@ -66,7 +66,7 @@
     01/04/2022 - v9.6  - Add software watchdog feed to avoid lock
     22/04/2022 - v9.7  - Option to minimise LittleFS writes (day:every 1h and week:every 6h)
                          Correction of EAIT bug
-    04/08/2022 - v9.8  - Based on Tasmota 12 , add ESP32S2 support
+    04/08/2022 - v9.8  - Based on Tasmota 12, add ESP32S2 support
                          Remove FTP server auto start
     18/08/2022 - v9.9  - Force GPIO_TELEINFO_RX as digital input
                          Correct bug littlefs config and graph data recording
@@ -80,7 +80,8 @@
     25/02/2023 - v11.0 - Split between xnrg and xsns
                          Use Settings->teleinfo to store configuration
                          Update today and yesterday totals
-    03/06/2023 - v11.1 - Energy Today saved between restart
+    03/06/2023 - v11.1 - Rewrite of Tasmota energy update
+                         Avoid 100ms rules teleperiod update
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -233,9 +234,9 @@ const char kTeleinfoEtiquetteName[]     PROGMEM = "|ADCO|ADSC|PTEC|NGTF|EAIT|IIN
 
 // TIC - modes and rates
 enum TeleinfoType { TIC_TYPE_UNDEFINED, TIC_TYPE_CONSO, TIC_TYPE_PROD, TIC_TYPE_MAX };
-const char kTeleinfoTypeName[] PROGMEM = "|Consommateur|Producteur";
+const char kTeleinfoTypeName[] PROGMEM = "Non déterminé|Consommateur|Producteur";
 enum TeleinfoMode { TIC_MODE_UNDEFINED, TIC_MODE_HISTORIC, TIC_MODE_STANDARD, TIC_MODE_PME, TIC_MODE_MAX };
-const char kTeleinfoModeName[] PROGMEM = "Inconnu|Historique|Standard|PME";
+const char kTeleinfoModeName[] PROGMEM = "|Historique|Standard|PME";
 const uint16_t ARR_TELEINFO_RATE[] = { 1200, 9600, 19200 }; 
 
 // Tarifs                                  [  Toutes   ]   [ Creuses       Pleines   ] [ Normales   PointeMobile ] [CreusesBleu  CreusesBlanc  CreusesRouge  PleinesBleu   PleinesBlanc  PleinesRouge] [ Pointe   PointeMobile  Hiver      Pleines     Creuses    PleinesHiver CreusesHiver PleinesEte   CreusesEte   Pleines1/2S  Creuses1/2S  JuilletAout] [Pointe PleinesHiver CreusesHiver PleinesEte CreusesEte] [ Base  ]  [ Pleines    Creuses   ]  [ Creuses bleu     Creuse Blanc       Creuse Rouge      Pleine Bleu     Pleine Blanc      Pleine Rouge ]  [ Normale      Pointe  ]  [Production]
@@ -316,7 +317,7 @@ static struct {
 static struct {
   uint8_t   phase      = 1;                         // number of phases
   uint8_t   mode       = TIC_MODE_UNDEFINED;        // meter mode (historic, standard)
-  uint8_t   type       = TIC_TYPE_CONSO;            // meter running type (conso or prod)
+  uint8_t   type       = TIC_TYPE_UNDEFINED;        // meter running type (conso or prod)
   int       period     = -1;                        // current tarif period
   int       nb_indexes = -1;                        // number of indexes in current contract      
   long      voltage    = TELEINFO_VOLTAGE;          // contract reference voltage
@@ -683,6 +684,9 @@ void TeleinfoLoadConfig ()
   if ((teleinfo_config.msg_policy < 0) || (teleinfo_config.msg_policy >= TELEINFO_POLICY_MAX)) teleinfo_config.msg_policy = TELEINFO_POLICY_TELEMETRY;
   if (teleinfo_config.msg_type >= TELEINFO_MSG_MAX) teleinfo_config.msg_type = TELEINFO_MSG_METER;
   if ((teleinfo_config.percent < TELEINFO_PERCENT_MIN) || (teleinfo_config.percent > TELEINFO_PERCENT_MAX)) teleinfo_config.percent = 100;
+
+  // log
+  AddLog (LOG_LEVEL_DEBUG, PSTR ("TIC: Loading config"));
 }
 
 // Save configuration to Settings or to LittleFS
@@ -722,6 +726,9 @@ void TeleinfoSaveConfig ()
 
   file.close ();
 # endif     // USE_UFILESYS
+
+  // log
+  AddLog (LOG_LEVEL_DEBUG, PSTR ("TIC: Saving config"));
 }
 
 // calculate line checksum
@@ -857,11 +864,11 @@ void TeleinfoSplitLine (char* pstr_line, char* pstr_etiquette, const int size_et
     if (index == 0) strlcpy (pstr_etiquette, pstr_token, size_etiquette);
 
     // else append to donnee
-    else
-    {
-      if (pstr_donnee[0] != 0) strlcat (pstr_donnee, " ", size_donnee);
-      strlcat (pstr_donnee, pstr_token, size_donnee);
-    }
+    else if (strlen (pstr_token) > 0) strlcpy (pstr_donnee, pstr_token, size_donnee);
+//    {
+//      if (pstr_donnee[0] != 0) strlcat (pstr_donnee, " ", size_donnee);
+//      strlcat (pstr_donnee, pstr_token, size_donnee);
+//    }
 
     // switch to next token
     pstr_token = strtok (nullptr, " ");
@@ -911,6 +918,9 @@ void TeleinfoInit ()
   if (ufs_type) AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Partition mounted"));
   else AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Partition could not be mounted"));
 #endif  // USE_UFILESYS
+
+  // set measure resolution
+  Settings->flag2.current_resolution = 1;
 
   // disable fast cycle power recovery (SetOption65)
   Settings->flag3.fast_power_cycle_disable = true;
@@ -964,13 +974,6 @@ void TeleinfoInit ()
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tic_help to get help on Teleinfo TIC commands"));
 }
 
-/*
-void TeleinfoSaveBeforeRestart ()
-{
-
-}
-*/
-
 // Handling of received teleinfo data
 void TeleinfoReceiveData ()
 {
@@ -980,7 +983,7 @@ void TeleinfoReceiveData ()
   long      value, total_current, increment;
   long long counter, counter_wh, delta_wh;
   uint32_t  timeout, timestamp, message_ms;
-  float     cosphi, papp_inc, total_kwh;
+  float     cosphi, papp_inc, daily_kwh;
   char      checksum;
   char*     pstr_match;
   char      str_byte[2] = {0, 0};
@@ -989,8 +992,11 @@ void TeleinfoReceiveData ()
   char      str_text[TELEINFO_DATA_MAX];
 
   // discard reception during energy setup time
-  if ((TasmotaGlobal.uptime < ENERGY_WATCHDOG) || (teleinfo_meter.status_rx != TIC_SERIAL_ACTIVE)) while (teleinfo_serial->available()) teleinfo_serial->read (); 
-
+  if ((TasmotaGlobal.uptime < ENERGY_WATCHDOG) || (teleinfo_meter.status_rx != TIC_SERIAL_ACTIVE)) 
+  {
+    while (teleinfo_serial->available()) teleinfo_serial->read (); 
+  }
+  
   // if serial port active, serial receive loop
   else while (teleinfo_serial->available()) 
   {
@@ -1047,7 +1053,7 @@ void TeleinfoReceiveData ()
         break;
 
       // ------------------------------
-      // \t : Line - Seperator
+      // \t : Line - Separator
       // ------------------------------
 
       case 0x09:
@@ -1359,6 +1365,9 @@ void TeleinfoReceiveData ()
         teleinfo_message.line_max   = teleinfo_message.line_index;
         teleinfo_message.line_index = 0;
 
+        // if needed, default to CONSO mode
+        if (teleinfo_contract.type == TIC_TYPE_UNDEFINED) teleinfo_contract.type = TIC_TYPE_CONSO;
+
         // if needed, calculate max contract power from max phase current
         if ((teleinfo_contract.ssousc == 0) && (teleinfo_contract.isousc != 0)) teleinfo_contract.ssousc = teleinfo_contract.isousc * TELEINFO_VOLTAGE_REF;
 
@@ -1588,29 +1597,6 @@ void TeleinfoReceiveData ()
             else Energy->current[phase] = 0;
         } 
 
-        // update global active power counter
-        total_kwh = (float)teleinfo_meter.total_wh / 1000;
-
-        // if data are available, update daily total
-        if ((total_kwh > 0) && (Energy->total[0] > 0) && (total_kwh != Energy->total[0]))
-#ifdef ESP32
-        {
-          Energy->daily_kWh[0] += total_kwh - Energy->total[0];
-          Energy->kWhtoday[0] = (int32_t)(Energy->daily_kWh[0] * 100000);
-          RtcSettings.energy_kWhtoday_ph[0] = Energy->kWhtoday[0];
-        }
-#else
-        {
-          Energy->daily[0] += total_kwh - Energy->total[0];
-          Energy->kWhtoday[0] = (int32_t)(Energy->daily[0] * 100000);
-          RtcSettings.energy_kWhtoday_ph[0] = Energy->kWhtoday[0];
-        }
-#endif
-
-        // update energy total
-        Energy->total[0] = total_kwh;
-        RtcSettings.energy_kWhtotal_ph[0] = (int32_t)(Energy->total[0] * 1000);
-
         // declare received message
         teleinfo_message.received = true;
         break;
@@ -1667,6 +1653,8 @@ void TeleinfoEvery250ms ()
 // Calculate if some JSON should be published (called every second)
 void TeleinfoEverySecond ()
 {
+  uint8_t phase;
+
   // do nothing during energy setup time
   if (TasmotaGlobal.uptime < ENERGY_WATCHDOG) return;
 
@@ -1678,6 +1666,16 @@ void TeleinfoEverySecond ()
     teleinfo_meter.last_hour_wh = teleinfo_meter.total_wh;
     teleinfo_meter.last_hour = RtcTime.hour;
   }
+
+  // update today and total calculation
+  for (phase = 0; phase < teleinfo_contract.phase; phase++) Energy->kWhtoday_delta[phase] += (int32_t)(Energy->active_power[phase] * 1000 / 36);
+  EnergyUpdateToday ();
+
+  // force meter grand total on phase 1 energy total
+  Energy->total[0] = (float)teleinfo_meter.total_wh / 1000;
+  for (phase = 1; phase < teleinfo_contract.phase; phase++) Energy->total[phase] = 0;
+  RtcSettings.energy_kWhtotal_ph[0] = teleinfo_meter.total_wh / 100000;
+  for (phase = 1; phase < teleinfo_contract.phase; phase++) RtcSettings.energy_kWhtotal_ph[phase] = 0;
 }
 
 // Generate JSON with TIC informations
@@ -1711,7 +1709,7 @@ void TeleinfoPublishJsonMeter ()
   uint8_t phase;
   int   value;
   long  power_max, power_app, power_act;
-  float current;
+  float f_value;
   char  str_text[16];
 
   // Start METER section    {"Time":"xxxxxxxx","METER":{
@@ -1744,14 +1742,18 @@ void TeleinfoPublishJsonMeter ()
     // current
     if (teleinfo_phase[phase].voltage > 0)
     {
-      current = teleinfo_phase[phase].papp / teleinfo_phase[phase].voltage;
-      ext_snprintf_P (str_text, sizeof(str_text), PSTR ("%1_f"), &current);
+      f_value = teleinfo_phase[phase].papp / teleinfo_phase[phase].voltage;
+      ext_snprintf_P (str_text, sizeof(str_text), PSTR ("%1_f"), &f_value);
       ResponseAppend_P (PSTR (",\"I%d\":%s"), value, str_text);
     }
 
     // cos phi
-    ext_snprintf_P (str_text, sizeof(str_text), PSTR ("%2_f"), &Energy->power_factor[phase]);
-    ResponseAppend_P (PSTR (",\"C%d\":%s"), value, str_text);
+    if (!isnan (teleinfo_phase[phase].cosphi))
+    {
+      f_value = teleinfo_phase[phase].cosphi / 100;
+      ext_snprintf_P (str_text, sizeof(str_text), PSTR ("%2_f"), &f_value);
+      ResponseAppend_P (PSTR (",\"C%d\":%s"), value, str_text);
+    }
   } 
 
   // Total Papp and Pact
@@ -1766,11 +1768,14 @@ void TeleinfoPublishJsonMeter ()
 }
 
 // Show JSON status (for MQTT)
-void TeleinfoAfterTeleperiod ()
+void TeleinfoJSONTeleperiod ()
 {
-  // cancel if teleinfo is not active
+  // if teleinfo is not active, ignore
   if (teleinfo_meter.status_rx != TIC_SERIAL_ACTIVE) return;
-  
+
+  // if teleperiod timer not reached, ignore (to avoid rules update every 100ms)
+  if (TasmotaGlobal.tele_period > 0) return;
+
   // check for JSON update according to update policy
   teleinfo_message.publish_meter = ((teleinfo_config.msg_type == TELEINFO_MSG_BOTH) || (teleinfo_config.msg_type == TELEINFO_MSG_METER));
   teleinfo_message.publish_tic   = ((teleinfo_config.msg_type == TELEINFO_MSG_BOTH) || (teleinfo_config.msg_type == TELEINFO_MSG_TIC));
@@ -1914,7 +1919,7 @@ bool Xnrg15 (uint32_t function)
       TeleinfoEverySecond ();
       break;
     case FUNC_JSON_APPEND:
-      TeleinfoAfterTeleperiod ();
+      TeleinfoJSONTeleperiod ();
       break;
 
 #ifdef USE_WEBSERVER
