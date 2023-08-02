@@ -1,8 +1,53 @@
-Tasmota firmware modified to control VMC
+Tasmota firmware modified to Sensors & VMC control
 =============
 
-This evolution of Tasmota firmware is bsed on **Tasmota v12.3.1** and has been enhanced to handle a Motor Controled Ventilator according to current humidity level.
+This evolution of Tasmota firmware is bsed on **Tasmota v12.5.0** and has been enhanced to handle :
+  * some generic sensors with history
+  * a Motor Controled Ventilator according to current humidity level
 
+Sensors
+-------
+According to the type of sensor you've connected to your Tasmota (temperature, humidity, presence, ...) you'll be able to keep history of the sensors activity.
+
+2 activity periods are handled :
+  * weekly
+  * yearly
+
+This history can be saved in 2 different locations :
+  * String Settings
+  * CSV files (if LittleFS is available)
+
+As String Settings capacity is quite limited, you may not be able to save any type of history.
+
+Here are the commands available to handle sensors history :
+
+    HLP: Sensor commands :
+     - sens_init <w/y>    = reset data (w:current week, y:current year)
+     - sens_rand <w/y>    = random data (w:current week, y:current year)
+    Temperature :
+      - temp_topic <topic> = topic of remote sensor
+      - temp_key <key>     = key of remote sensor
+      - temp_drift <value> = correction (in 1/10 of °C)
+      - temp_time <value>  = remote sensor timeout
+      - temp_week <0/1>    = weekly histo. (86 bytes)
+      - temp_year <0/1>    = yearly histo. (126 bytes)
+    Humidity :
+      - humi_topic <topic> = topic of remote sensor
+      - humi_key <key>     = key of remote sensor
+      - humi_time <value>  = remote sensor timeout
+      - humi_week <0/1>    = weekly histo. (85 bytes)
+    Presence :
+      - pres_topic <topic> = topic of remote sensor
+      - pres_key <key>     = key of remote sensor
+      - pres_time <value>  = sensor timeout
+      - pres_week <0/1>    = weekly histo. (48 bytes)
+      - pres_year <0/1>    = yearly histo. (54 bytes)
+    Activity :
+      - acti_week <0/1>    = weekly histo. of activity (48 bytes)
+      - inac_week <0/1>    = weekly histo. of inactivity (48 bytes)
+
+VMC
+----
 In **Auto** mode, VMC is :
   * started as soon as humidity goes beyond a target value
   * stopped as soon as humidity goes below this target value.
