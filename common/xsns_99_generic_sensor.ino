@@ -19,6 +19,7 @@
     29/04/2023 - v4.1 - Add activity history and graph
     12/05/2023 - v4.2 - Save history in Settings strings
                         Add tweaked timing for SI7021
+    17/07/2023 - v4.3 - Add yearly graph
 
   Configuration values are stored in :
     - Settings->free_73A[0]  : temperature validity timeout (x10 in sec.)
@@ -41,6 +42,7 @@
     * SET_SENSOR_ACTI_WEEKLY  				// activity weekly history
     * SET_SENSOR_INAC_WEEKLY  				// inactivity weekly history
     * SET_SENSOR_TEMP_YEARLY  				// temperature yearly history
+    * SET_SENSOR_PRES_YEARLY  				// presence yearly history
 
   Handled local sensor are :
     * Temperature = DHT11, AM2301, SI7021, SHT30 or DS18x20
@@ -79,12 +81,13 @@
 
 #define SENSOR_PRESENCE_INDEX         0             // default presence counter index (0=Counter 1 ... 7=Counter 8)
 
-#define SENSOR_YEAR_DAYS              366           // max number of days in year array
+#define SENSOR_HISTO_DEFAULT          8             // default number of weeks historisation
 
 #define D_SENSOR_PAGE_CONFIG          "sconf"
-#define D_SENSOR_PAGE_MEASURE         "cweek"
-#define D_SENSOR_PAGE_PRESENCE        "pweek"
-#define D_SENSOR_PAGE_YEARLY          "tyear"
+#define D_SENSOR_PAGE_WEEK_MEASURE    "wmeas"
+#define D_SENSOR_PAGE_WEEK_PRESENCE   "wpres"
+#define D_SENSOR_PAGE_YEAR_MEASURE    "ymeas"
+#define D_SENSOR_PAGE_YEAR_PRESENCE   "ypres"
 
 #define D_CMND_SENSOR_SENS            "sens"
 #define D_CMND_SENSOR_TEMP            "temp"
@@ -100,11 +103,10 @@
 #define D_CMND_SENSOR_WEEKLY          "week"
 #define D_CMND_SENSOR_YEARLY          "year"
 #define D_CMND_SENSOR_MAX             "max"
-#define D_CMND_SENSOR_RESET           "reset"
 #define D_CMND_SENSOR_DRIFT           "drift"
 #define D_CMND_SENSOR_TYPE            "type"
-#define D_CMND_SENSOR_LOAD            "load"
-#define D_CMND_SENSOR_SAVE            "save"
+#define D_CMND_SENSOR_WEEK            "week"
+#define D_CMND_SENSOR_RESET           "reset"
 #define D_CMND_SENSOR_RANDOM          "random"
 
 #define D_SENSOR                      "Sensor"
@@ -122,17 +124,15 @@
 #define D_SENSOR_LOCAL                "Local"
 #define D_SENSOR_REMOTE               "Remote"
 
-#define SENSOR_COLOR_NONE             "#444"
-#define SENSOR_COLOR_MOTION           "#F44"
-
 // graph colors
 #define SENSOR_COLOR_HUMI             "#6bc4ff"
 #define SENSOR_COLOR_TEMP             "#f39c12"
 #define SENSOR_COLOR_TEMP_MAX         "#f39c12"
 #define SENSOR_COLOR_TEMP_MIN         "#5dade2"
 #define SENSOR_COLOR_PRES             "#080"
-#define SENSOR_COLOR_ACTI             "#fff"
-#define SENSOR_COLOR_INAC             "#800"
+#define SENSOR_COLOR_NONE             "#fff"
+#define SENSOR_COLOR_ACTI             "#f00"
+#define SENSOR_COLOR_INAC             "#fff"
 #define SENSOR_COLOR_TIME             "#aaa"
 #define SENSOR_COLOR_TODAY            "#fff"
 #define SENSOR_COLOR_LINE             "#888"
@@ -146,38 +146,48 @@
 #define SENSOR_GRAPH_ACTI             50  
 #define SENSOR_GRAPH_INAC             50  
 
+#define SENSOR_GRAPH_WIDTH_HEAD       100
+#define SENSOR_GRAPH_WIDTH_LINE       1100
+#define SENSOR_GRAPH_HEIGHT_HEAD      20
+#define SENSOR_GRAPH_HEIGHT_INTER     25
+#define SENSOR_GRAPH_HEIGHT_LINE      20
+
 #define SENSOR_SIZE_FS                2  
 
 #ifdef USE_UFILESYS
-const uint8_t sensor_size_year_temp = SENSOR_SIZE_FS;      
-const uint8_t sensor_size_week_temp = SENSOR_SIZE_FS;   
-const uint8_t sensor_size_week_humi = SENSOR_SIZE_FS;   
-const uint8_t sensor_size_week_pres = SENSOR_SIZE_FS;   
-const uint8_t sensor_size_week_acti = SENSOR_SIZE_FS;   
-const uint8_t sensor_size_week_inac = SENSOR_SIZE_FS;   
+const uint8_t SENSOR_SIZE_WEEK_TEMP = SENSOR_SIZE_FS;   
+const uint8_t SENSOR_SIZE_WEEK_HUMI = SENSOR_SIZE_FS;   
+const uint8_t SENSOR_SIZE_WEEK_PRES = SENSOR_SIZE_FS;   
+const uint8_t SENSOR_SIZE_WEEK_ACTI = SENSOR_SIZE_FS;   
+const uint8_t SENSOR_SIZE_WEEK_INAC = SENSOR_SIZE_FS;   
+const uint8_t SENSOR_SIZE_YEAR_TEMP = SENSOR_SIZE_FS;      
+const uint8_t SENSOR_SIZE_YEAR_PRES = SENSOR_SIZE_FS;      
 #else
-const uint8_t sensor_size_year_temp = 126;      
-const uint8_t sensor_size_week_temp = 86;   
-const uint8_t sensor_size_week_humi = 85;   
-const uint8_t sensor_size_week_pres = 48;   
-const uint8_t sensor_size_week_acti = 48;   
-const uint8_t sensor_size_week_inac = 48;   
+const uint8_t SENSOR_SIZE_WEEK_TEMP = 86;   
+const uint8_t SENSOR_SIZE_WEEK_HUMI = 85;   
+const uint8_t SENSOR_SIZE_WEEK_PRES = 48;   
+const uint8_t SENSOR_SIZE_WEEK_ACTI = 48;   
+const uint8_t SENSOR_SIZE_WEEK_INAC = 48;   
+const uint8_t SENSOR_SIZE_YEAR_TEMP = 126;      
+const uint8_t SENSOR_SIZE_YEAR_PRES = 54;      
 #endif    // USE_UFILESYS
 
+// number of days in months
+uint8_t days_in_month[12] = {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
 // sensor family type
 enum SensorFamilyType { SENSOR_TYPE_TEMP, SENSOR_TYPE_HUMI, SENSOR_TYPE_PRES, SENSOR_TYPE_MAX };
 
 // presence serial sensor type
-enum SensorPresenceModel { SENSOR_PRESENCE_NONE, SENSOR_PRESENCE_REMOTE, SENSOR_PRESENCE_RCWL0516, SENSOR_PRESENCE_HWMS03, SENSOR_PRESENCE_LD1115, SENSOR_PRESENCE_LD1125, SENSOR_PRESENCE_LD2410, SENSOR_PRESENCE_MAX };
-const char kSensorPresenceModel[] PROGMEM = "None|Remote|RCWL-0516|HW-MS03|HLK-LD1115|HLK-LD1125|HLK-LD2410|";
+enum SensorPresenceModel { SENSOR_PRESENCE_NONE, SENSOR_PRESENCE_REMOTE, SENSOR_PRESENCE_SWITCH, SENSOR_PRESENCE_RCWL0516, SENSOR_PRESENCE_HWMS03, SENSOR_PRESENCE_LD1115, SENSOR_PRESENCE_LD1125, SENSOR_PRESENCE_LD2410, SENSOR_PRESENCE_MAX };
+const char kSensorPresenceModel[] PROGMEM = "None|Remote|Dry switch|RCWL-0516|HW-MS03|HLK-LD1115|HLK-LD1125|HLK-LD2410|";
 
 // remote sensor sources
 enum SensorSource { SENSOR_SOURCE_DSB, SENSOR_SOURCE_DHT, SENSOR_SOURCE_SHT, SENSOR_SOURCE_COUNTER, SENSOR_SOURCE_SERIAL, SENSOR_SOURCE_REMOTE, SENSOR_SOURCE_NONE };
 
 // remote sensor commands
-const char kSensorCommands[] PROGMEM = D_CMND_SENSOR_SENS "_" "|" D_CMND_SENSOR_HELP "|" D_CMND_SENSOR_RESET "|" D_CMND_SENSOR_LOAD "|" D_CMND_SENSOR_SAVE "|" D_CMND_SENSOR_RANDOM;
-void (* const SensorCommand[])(void) PROGMEM = { &CmndSensorHelp, &CmndSensorReset, &CmndSensorLoad, &CmndSensorSave, &CmndSensorRandom };
+const char kSensorCommands[] PROGMEM = D_CMND_SENSOR_SENS "_" "|" D_CMND_SENSOR_HELP "|" D_CMND_SENSOR_RESET "|" D_CMND_SENSOR_RANDOM "|" D_CMND_SENSOR_WEEK;
+void (* const SensorCommand[])(void) PROGMEM = { &CmndSensorHelp, &CmndSensorReset, &CmndSensorRandom, &CmndSensorWeek };
 
 const char kTempCommands[] PROGMEM = D_CMND_SENSOR_TEMP "_" "|" D_CMND_SENSOR_TOPIC "|" D_CMND_SENSOR_KEY "|" D_CMND_SENSOR_TIMEOUT "|" D_CMND_SENSOR_WEEKLY "|" D_CMND_SENSOR_YEARLY "|" D_CMND_SENSOR_DRIFT;
 void (* const TempCommand[])(void) PROGMEM = { &CmndSensorTemperatureTopic, &CmndSensorTemperatureKey, &CmndSensorTemperatureTimeout, &CmndSensorTemperatureWeekly, &CmndSensorTemperatureYearly, &CmndSensorTemperatureDrift };
@@ -185,8 +195,8 @@ void (* const TempCommand[])(void) PROGMEM = { &CmndSensorTemperatureTopic, &Cmn
 const char kHumiCommands[] PROGMEM = D_CMND_SENSOR_HUMI "_" "|" D_CMND_SENSOR_TOPIC "|" D_CMND_SENSOR_KEY "|" D_CMND_SENSOR_TIMEOUT "|" D_CMND_SENSOR_WEEKLY;
 void (* const HumiCommand[])(void) PROGMEM = { &CmndSensorHumidityTopic, &CmndSensorHumidityKey, &CmndSensorHumidityTimeout, &CmndSensorHumidityWeekly };
 
-const char kPresCommands[] PROGMEM = D_CMND_SENSOR_PRES "_" "|" D_CMND_SENSOR_TOPIC "|" D_CMND_SENSOR_KEY "|" D_CMND_SENSOR_TIMEOUT "|" D_CMND_SENSOR_WEEKLY;
-void (* const PresCommand[])(void) PROGMEM = { &CmndSensorPresenceTopic, &CmndSensorPresenceKey, &CmndSensorPresenceTimeout, &CmndSensorPresenceWeekly };
+const char kPresCommands[] PROGMEM = D_CMND_SENSOR_PRES "_" "|" D_CMND_SENSOR_TOPIC "|" D_CMND_SENSOR_KEY "|" D_CMND_SENSOR_TIMEOUT "|" D_CMND_SENSOR_WEEKLY "|" D_CMND_SENSOR_YEARLY;
+void (* const PresCommand[])(void) PROGMEM = { &CmndSensorPresenceTopic, &CmndSensorPresenceKey, &CmndSensorPresenceTimeout, &CmndSensorPresenceWeekly, &CmndSensorPresenceYearly };
 
 const char kActiCommands[] PROGMEM = D_CMND_SENSOR_ACTI "_" "|" D_CMND_SENSOR_WEEKLY;
 void (* const ActiCommand[])(void) PROGMEM = { &CmndSensorActivityWeekly };
@@ -204,76 +214,83 @@ const char SENSOR_FIELD_CONFIG[]   PROGMEM = "<p>%s (%s)<span class='key'>%s</sp
 static const char kWeekdayNames[] = D_DAY3LIST;
 
 #ifdef USE_UFILESYS
-const char D_SENSOR_FILENAME_WEEK[] PROGMEM = "/sensor-week%02u.csv";           // sensor weekly history files
-const char D_SENSOR_FILENAME_YEAR[] PROGMEM = "/sensor-year.csv";               // sensor yearly history file
+const char D_SENSOR_FILENAME_WEEK[] PROGMEM = "/sensor-week-%02u.csv";           // sensor weekly history files
+const char D_SENSOR_FILENAME_YEAR[] PROGMEM = "/sensor-%04u.csv";                // sensor yearly history file
 #endif    // USE_UFILESYS
 
 /*************************************************\
  *               Variables
 \*************************************************/
 
-// configuration
-struct sensor_remote
-{
-  uint16_t validity;                          // remote sensor data validity (in sec.)
-  String   topic;                             // remote sensor topic
-  String   key;                               // remote sensor key
-};
-struct {
-  sensor_remote temp;                         // remote temperature mqtt
-  sensor_remote humi;                         // remote humidity mqtt
-  sensor_remote pres;                         // remote presence mqtt
-  uint8_t presence = SENSOR_PRESENCE_NONE;    // presence sensor type
-} sensor_config;
-
-// current status
 typedef struct
 {
-  uint8_t  weekly;                            // flag to enable weekly historisation
-} sensor_flag;
-typedef struct
-{
-  uint8_t  weekly;                            // flag to enable weekly historisation
   uint8_t  source;                            // source of data (local sensor type)
   uint32_t timestamp;                         // last time sensor was updated
   int16_t  value;                             // current sensor value
   int16_t  last;                              // last published sensor value
 } sensor_data;
+
+typedef struct
+{
+  uint16_t validity;                          // remote sensor data validity (in sec.)
+  String   topic;                             // remote sensor topic
+  String   key;                               // remote sensor key
+} sensor_remote;
+
+typedef union {                               // Restricted by MISRA-C Rule 18.4 but so useful...
+  uint8_t data;                               // Allow bit manipulation
+  struct {
+    uint8_t pres : 1;                         // presence detected
+    uint8_t acti : 1;                         // activity declared
+    uint8_t inac : 1;                         // inactivity declared
+    uint8_t none : 5;
+  };
+} sensor_event;
+
+typedef struct
+{
+  int16_t      temp;                          // temperature
+  int8_t       humi;                          // humidity
+  sensor_event event;                         // event : presence, activity and inactivity
+} sensor_weekly;
+
+typedef struct {
+  int16_t  temp_min;                          // minimum temperature
+  int16_t  temp_max;                          // maximum temperature
+  uint8_t  pres;                              // daily presence (one bit per 3h slot)
+} sensor_yearly;
+
+// configuration
 struct {
-  uint8_t  yearly      = false;               // flag to enable yearly historisation
+  uint8_t weekly_acti = 0;                    // activity weekly historisation flag
+  uint8_t weekly_inac = 0;                    // inactivity weekly historisation flag
+  uint8_t weekly_pres = 0;                    // presence weekly historisation flag
+  uint8_t weekly_temp = 0;                    // temperature weekly historisation flag
+  uint8_t weekly_humi = 0;                    // humidity weekly historisation flag
+  uint8_t yearly_temp = 0;                    // temperature yearly historisation flag
+  uint8_t yearly_pres = 0;                    // presence yearly historisation flag
+  uint8_t type_pres  = SENSOR_PRESENCE_NONE;  // presence sensor type
+  uint8_t week_histo = SENSOR_HISTO_DEFAULT;  // number of weeks historisation
+  sensor_remote temp;                         // remote temperature mqtt
+  sensor_remote humi;                         // remote humidity mqtt
+  sensor_remote pres;                         // remote presence mqtt
+} sensor_config;
+
+// current status
+struct {
   uint8_t  counter     = 0;                   // measure update counter
   uint32_t time_ignore = UINT32_MAX;          // timestamp to ignore sensor update
   uint32_t time_json   = UINT32_MAX;          // timestamp of next JSON update
   sensor_data temp;                           // temperature sensor data
   sensor_data humi;                           // humidity sensor data
   sensor_data pres;                           // presence sensor data
-  sensor_flag acti;                           // activity sensor flag
-  sensor_flag inac;                           // inactivity sensor flag
+  sensor_weekly hour_slot[6];                 // sensor value for current hour (every 10mn)
+  sensor_yearly day_slot;                     // sensor value for current day
 } sensor_status;
 
 // history
-typedef union {                               // Restricted by MISRA-C Rule 18.4 but so useful...
-  uint8_t data;                               // Allow bit manipulation
-  struct {
-    uint8_t presence : 1;                     // presence detected
-    uint8_t activity : 1;                     // activity declared
-    uint8_t inactivity : 1;                   // inactivitydeclared
-    uint8_t unused : 5;
-  };
-} sensor_event;
-typedef struct
-{
-  int16_t      temp[7][24][6];                // temperature slots (every 10mn)
-  int8_t       humi[7][24][6];                // humidity slots (every 10mn)
-  sensor_event event[7][24][6];               // event slots : presence, activity and inactivity (every 10mn)
-} sensor_histo;
-sensor_histo sensor_week;                  
-sensor_histo sensor_graph;
-
-struct {
-  int16_t temp_min[SENSOR_YEAR_DAYS];         // minimum daily temperature
-  int16_t temp_max[SENSOR_YEAR_DAYS];         // maximum daily temperature
-} sensor_year;
+sensor_weekly sensor_week[7][24][6];          // sensor weekly values (4.03k)
+sensor_yearly sensor_year[12][31];            // sensor yearly range (1.86k)
 
 /***********************************************\
  *                  Commands
@@ -284,96 +301,71 @@ void CmndSensorHelp ()
 {
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Sensor commands :"));
 
-  AddLog (LOG_LEVEL_INFO, PSTR (" - sens_reset <w/y>   = reset history  (w:last week, y:last year)"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - sens_load <w/y>    = load history   (w:last week, y:last year)"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - sens_save <w/y>    = save history   (w:last week, y:last year)"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - sens_random <w/y>  = random history (w:last week, y:last year)"));
+#ifdef USE_UFILESYS
+  AddLog (LOG_LEVEL_INFO, PSTR (" - sens_week <value>  = number of weeks of historisation"));
+#endif      // USE_UFILESYS
+  AddLog (LOG_LEVEL_INFO, PSTR (" - sens_reset <w/y>   = reset data (w:current week, y:current year)"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - sens_rand <w/y>    = random data (w:current week, y:current year)"));
 
   AddLog (LOG_LEVEL_INFO, PSTR (" Temperature :"));
   AddLog (LOG_LEVEL_INFO, PSTR (" - temp_topic <topic> = topic of remote sensor"));
   AddLog (LOG_LEVEL_INFO, PSTR (" - temp_key <key>     = key of remote sensor"));
   AddLog (LOG_LEVEL_INFO, PSTR (" - temp_drift <value> = correction (in 1/10 of °C)"));
   AddLog (LOG_LEVEL_INFO, PSTR (" - temp_time <value>  = remote sensor timeout"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - temp_week <0/1>    = weekly histo. (%u bytes)"), sensor_size_week_temp);
-  AddLog (LOG_LEVEL_INFO, PSTR (" - temp_year <0/1>    = yearly histo. (%u bytes)"), sensor_size_year_temp);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - temp_week <0/1>    = weekly histo. (%u bytes)"), SENSOR_SIZE_WEEK_TEMP);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - temp_year <0/1>    = yearly histo. (%u bytes)"), SENSOR_SIZE_YEAR_TEMP);
 
   AddLog (LOG_LEVEL_INFO, PSTR (" Humidity :"));
   AddLog (LOG_LEVEL_INFO, PSTR (" - humi_topic <topic> = topic of remote sensor"));
   AddLog (LOG_LEVEL_INFO, PSTR (" - humi_key <key>     = key of remote sensor"));
   AddLog (LOG_LEVEL_INFO, PSTR (" - humi_time <value>  = remote sensor timeout"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - humi_week <0/1>    = weekly histo. (%u bytes)"), sensor_size_week_humi);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - humi_week <0/1>    = weekly histo. (%u bytes)"), SENSOR_SIZE_WEEK_HUMI);
 
   AddLog (LOG_LEVEL_INFO, PSTR (" Presence :"));
   AddLog (LOG_LEVEL_INFO, PSTR (" - pres_topic <topic> = topic of remote sensor"));
   AddLog (LOG_LEVEL_INFO, PSTR (" - pres_key <key>     = key of remote sensor"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - pres_time <value>  = remote sensor timeout"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - pres_week <0/1>    = weekly histo. (%u bytes)"), sensor_size_week_pres);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - pres_time <value>  = sensor timeout"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - pres_week <0/1>    = weekly histo. (%u bytes)"), SENSOR_SIZE_WEEK_PRES);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - pres_year <0/1>    = yearly histo. (%u bytes)"), SENSOR_SIZE_YEAR_PRES);
 
   AddLog (LOG_LEVEL_INFO, PSTR (" Activity :"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - acti_week <0/1>    = weekly histo. of activity (%u bytes)"), sensor_size_week_acti);
-  AddLog (LOG_LEVEL_INFO, PSTR (" - inac_week <0/1>    = weekly histo. of inactivity (%u bytes)"), sensor_size_week_inac);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - acti_week <0/1>    = weekly histo. of activity (%u bytes)"), SENSOR_SIZE_WEEK_ACTI);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - inac_week <0/1>    = weekly histo. of inactivity (%u bytes)"), SENSOR_SIZE_WEEK_INAC);
 
   ResponseCmndDone();
 }
 
 void CmndSensorReset ()
 {
-  uint16_t day;
+  uint8_t month, day, hour, slot;
 
   switch (XdrvMailbox.data[0])
   {
     // week
     case 'w':
-      for (day = 0; day < 7; day++) SensorResetWeekDay (day);
+      for (day = 0; day < 7; day ++)
+        for (hour = 0; hour < 24; hour ++)
+          for (slot = 0; slot < 6; slot ++)
+          {
+            sensor_week[day][hour][slot].temp = INT16_MAX;
+            sensor_week[day][hour][slot].humi = INT8_MAX;
+            sensor_week[day][hour][slot].event.data = 0;
+          }
       ResponseCmndDone ();
       break;
-    // year
-    case 'y':
-      for (day = 0; day < SENSOR_YEAR_DAYS; day++) SensorResetYearDay (day);
-      ResponseCmndDone ();
-      break;
-    // error
-    default:
-      ResponseCmndFailed ();
-      break;
-  }
-}
 
-void CmndSensorLoad ()
-{
-  switch (XdrvMailbox.data[0])
-  {
-    // week
-    case 'w':
-      SensorLoadWeek ();
-      ResponseCmndDone ();
-      break;
     // year
     case 'y':
-      SensorLoadYear ();
+      for (month = 0; month < 12; month++)
+        for (day = 0; day < 31; day ++)
+        {
+          sensor_year[month][day].temp_max = INT16_MAX;
+          sensor_year[month][day].temp_min = INT16_MAX;
+          sensor_year[month][day].pres     = UINT8_MAX;
+        }
       ResponseCmndDone ();
       break;
-    // error
-    default:
-      ResponseCmndFailed ();
-      break;
-  }
-}
 
-void CmndSensorSave ()
-{
-  switch (XdrvMailbox.data[0])
-  {
-    // week
-    case 'w':
-      SensorSaveWeek (true);
-      ResponseCmndDone ();
-      break;
-    // year
-    case 'y':
-      SensorSaveYear ();
-      ResponseCmndDone ();
-      break;
     // error
     default:
       ResponseCmndFailed ();
@@ -383,50 +375,68 @@ void CmndSensorSave ()
 
 void CmndSensorRandom ()
 {
-  uint16_t day, hour, slot;
-  int8_t   ref_humi;
-  int16_t  ref_min, ref_max;
+  uint8_t month, day, hour, slot;
+  int8_t  humidity;
+  int16_t temperature;
 
   switch (XdrvMailbox.data[0])
   {
     // week
     case 'w':
-      ref_max  = 180;
-      ref_humi = 70;
+      temperature = 180;
+      humidity    = 70;
       for (day = 0; day < 7; day ++)
         for (hour = 0; hour < 24; hour ++)
           for (slot = 0; slot < 6; slot ++)
           {
             // temperature
-            ref_max += 3 - random (7); 
-            sensor_week.temp[day][hour][slot] = ref_max;
+            temperature += 3 - (int16_t)random (7);
+            sensor_week[day][hour][slot].temp = temperature;
 
             // humidity
-            ref_humi += 2 - (int8_t)random (5); 
-            if (ref_humi>100) ref_humi=100; 
-            if (ref_humi<0) ref_humi=0; 
-            sensor_week.humi[day][hour][slot] = ref_humi;
+            humidity += 2 - (int8_t)random (5);
+            if (humidity < 0) humidity = 0; 
+            if (humidity > 100) humidity = 100; 
+            sensor_week[day][hour][slot].humi = humidity;
+
+            // presence
+            sensor_week[day][hour][slot].event.data = (uint8_t)random (256);
           }
       ResponseCmndDone ();
       break;
+
     // year
     case 'y':
-      ref_max = 180;
-      ref_min = 160;
-      for (day = 0; day < SENSOR_YEAR_DAYS; day ++)
-      {
-        ref_max += 3 - random (7);
-        ref_min = min (ref_max - 20, ref_min + 20 - (int16_t)random (40));
-        sensor_year.temp_max[day] = ref_max;
-        sensor_year.temp_min[day] = ref_min;
-      }
+      temperature = 180;
+      for (month = 0; month < 12; month++)
+        for (day = 0; day < 31; day ++)
+        {
+          // temperature
+          temperature += 3 - (int16_t)random (7);
+          sensor_year[month][day].temp_max = temperature;
+          sensor_year[month][day].temp_min = temperature - 30 + (int16_t)random (7);
+
+          // presence
+          sensor_year[month][day].pres = (uint8_t)random (256);
+        }
       ResponseCmndDone ();
       break;
+
     // error
     default:
       ResponseCmndFailed ();
       break;
   }
+}
+
+void CmndSensorWeek ()
+{
+  if ((XdrvMailbox.payload > 0) && (XdrvMailbox.payload < 54))
+  {
+    sensor_config.week_histo = (uint8_t)XdrvMailbox.payload;
+    SensorSaveConfig ();
+  }
+  ResponseCmndNumber (sensor_config.week_histo);
 }
 
 void CmndSensorTemperatureDrift ()
@@ -479,24 +489,24 @@ void CmndSensorTemperatureWeekly ()
 {
   if (XdrvMailbox.data_len > 0)
   {
-    sensor_status.temp.weekly = (uint8_t)XdrvMailbox.payload; 
-    SensorTemperatureSaveWeek ();
+    sensor_config.weekly_temp = (uint8_t)XdrvMailbox.payload; 
+    SensorTemperatureSaveWeekToSettings ();
   }
   AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Size is %u/%u"), GetSettingsTextLen (), settings_text_size);
-  AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Histo takes %u bytes"), sensor_size_week_temp);
-  ResponseCmndNumber (sensor_status.temp.weekly);
+  AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Histo takes %u bytes"), SENSOR_SIZE_WEEK_TEMP);
+  ResponseCmndNumber (sensor_config.weekly_temp);
 }
 
 void CmndSensorTemperatureYearly ()
 {
   if (XdrvMailbox.data_len > 0)
   {
-    sensor_status.yearly = (uint8_t)XdrvMailbox.payload; 
-    SensorSaveYear ();
+    sensor_config.yearly_temp = (uint8_t)XdrvMailbox.payload; 
+    SensorTemperatureSaveYearToSettings ();
   }
   AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Size is %u/%u"), GetSettingsTextLen (), settings_text_size);
-  AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Histo takes %u bytes"), sensor_size_year_temp);
-  ResponseCmndNumber (sensor_status.yearly);
+  AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Histo takes %u bytes"), SENSOR_SIZE_YEAR_TEMP);
+  ResponseCmndNumber (sensor_config.yearly_temp);
 }
 
 void CmndSensorHumidityTopic ()
@@ -536,12 +546,12 @@ void CmndSensorHumidityWeekly ()
 {
   if (XdrvMailbox.data_len > 0)
   {
-    sensor_status.humi.weekly = (uint8_t)XdrvMailbox.payload; 
-    SensorHumiditySaveWeek ();
+    sensor_config.weekly_humi = (uint8_t)XdrvMailbox.payload; 
+    SensorHumiditySaveWeekToSettings ();
   }
   AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Size is %u/%u"), GetSettingsTextLen (), settings_text_size);
-  AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Histo takes %u bytes"), sensor_size_week_humi);
-  ResponseCmndNumber (sensor_status.humi.weekly);
+  AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Histo takes %u bytes"), SENSOR_SIZE_WEEK_HUMI);
+  ResponseCmndNumber (sensor_config.weekly_humi);
 }
 
 void CmndSensorPresenceTopic ()
@@ -581,56 +591,56 @@ void CmndSensorPresenceWeekly ()
 {
   if (XdrvMailbox.data_len > 0)
   {
-    sensor_status.pres.weekly = (uint8_t)XdrvMailbox.payload; 
-    SensorPresenceSaveWeek ();
+    sensor_config.weekly_pres = (uint8_t)XdrvMailbox.payload; 
+    SensorPresenceSaveWeekToSettings ();
   }
   AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Size is %u/%u"), GetSettingsTextLen (), settings_text_size);
-  AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Histo takes %u bytes"), sensor_size_week_pres);
-  ResponseCmndNumber (sensor_status.pres.weekly);
+  AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Histo takes %u bytes"), SENSOR_SIZE_WEEK_PRES);
+  ResponseCmndNumber (sensor_config.weekly_pres);
+}
+
+void CmndSensorPresenceYearly ()
+{
+  if (XdrvMailbox.data_len > 0)
+  {
+    sensor_config.yearly_pres = (uint8_t)XdrvMailbox.payload; 
+    SensorPresenceSaveYearToSettings ();
+  }
+  AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Size is %u/%u"), GetSettingsTextLen (), settings_text_size);
+  AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Histo takes %u bytes"), SENSOR_SIZE_YEAR_PRES);
+  ResponseCmndNumber (sensor_config.yearly_pres);
 }
 
 void CmndSensorActivityWeekly ()
 {
   if (XdrvMailbox.data_len > 0)
   {
-    sensor_status.acti.weekly = (uint8_t)XdrvMailbox.payload; 
-    SensorActivitySaveWeek ();
+    sensor_config.weekly_acti = (uint8_t)XdrvMailbox.payload; 
+    SensorActivitySaveWeekToSettings ();
   }
   AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Size is %u/%u"), GetSettingsTextLen (), settings_text_size);
-  AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Histo takes %u bytes"), sensor_size_week_acti);
-  ResponseCmndNumber (sensor_status.acti.weekly);
+  AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Histo takes %u bytes"), SENSOR_SIZE_WEEK_ACTI);
+  ResponseCmndNumber (sensor_config.weekly_acti);
 }
 
 void CmndSensorInactivityWeekly ()
 {
   if (XdrvMailbox.data_len > 0)
   {
-    sensor_status.inac.weekly = (uint8_t)XdrvMailbox.payload; 
-    SensorInactivitySaveWeek ();
+    sensor_config.weekly_inac = (uint8_t)XdrvMailbox.payload; 
+    SensorInactivitySaveWeekToSettings ();
   }
   AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Size is %u/%u"), GetSettingsTextLen (), settings_text_size);
-  AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Histo takes %u bytes"), sensor_size_week_inac);
-  ResponseCmndNumber (sensor_status.inac.weekly);
+  AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Histo takes %u bytes"), SENSOR_SIZE_WEEK_INAC);
+  ResponseCmndNumber (sensor_config.weekly_inac);
 }
 
 /**************************************************\
  *                  Functions
 \**************************************************/
 
-// get current week number (1 to 52, week starting on monday)
-uint16_t SensorGetCurrentWeek ()
-{
-  uint16_t shift, week;
-
-  shift = (8 - RtcTime.day_of_week + (RtcTime.day_of_year % 7)) % 7;
-  week  = (6 + RtcTime.day_of_year - shift) / 7;
-  if (week == 0) week = 52;
-
-  return week;
-}
-
-// get current week label dd/mm - dd/mm
-void SensorGetWeekLabel (const uint32_t shift_week, char* pstr_label, size_t size_label)
+// get current week label dd/mm - dd/mm (0 is current week)
+void SensorGetWeekLabel (const uint8_t shift_week, char* pstr_label, size_t size_label)
 {
   uint16_t day_shift;
   uint32_t day_time;
@@ -640,24 +650,23 @@ void SensorGetWeekLabel (const uint32_t shift_week, char* pstr_label, size_t siz
   if (pstr_label == nullptr) return;
   if (size_label < 16) return;
 
-  // if current week
-  if (shift_week == 0) strcpy (pstr_label, "Last 7 days");
+#ifdef USE_UFILESYS
+  // calculate start day
+  day_shift = (7 + RtcTime.day_of_week - 2) % 7;
+  day_time = LocalTime () - day_shift * 86400 - shift_week * 604800;
+  BreakTime (day_time, start_dst);
 
-  // else calculate week boundaries
-  else
-  {
-    // calculate start day
-    day_shift = (7 + RtcTime.day_of_week - 2) % 7;
-    day_time = LocalTime () - day_shift * 86400 - shift_week * 604800;
-    BreakTime (day_time, start_dst);
+  // calculate stop day
+  day_time += 6 * 86400;
+  BreakTime(day_time, stop_dst);
 
-    // calculate stop day
-    day_time += 6 * 86400;
-    BreakTime(day_time, stop_dst);
+  // generate string
+  sprintf_P (pstr_label, PSTR("%02u/%02u - %02u/%02u"), start_dst.day_of_month, start_dst.month, stop_dst.day_of_month, stop_dst.month);
 
-    // generate string
-    sprintf_P (pstr_label, PSTR("%02u/%02u - %02u/%02u"), start_dst.day_of_month, start_dst.month, stop_dst.day_of_month, stop_dst.month);
-  }
+#else
+  // 7 days shift
+  strcpy (pstr_label, "Last 7 days");
+#endif      // USE_UFILESYS
 }
 
 void SensorGetDelayText (const uint32_t timestamp, char* pstr_result, size_t size_result)
@@ -720,31 +729,6 @@ void SensorTemperatureSet (const float temperature)
 
   // log
   AddLog (LOG_LEVEL_DEBUG, PSTR ("SEN: Temperature %u.%u°C"), sensor_status.temp.value / 10, sensor_status.temp.value % 10);
-
-  if (!RtcTime.valid) return;
-
-  // update weekly slot
-  day  = RtcTime.day_of_week - 1;
-  hour = RtcTime.hour;
-  slot = RtcTime.minute / 10; 
-  if ((day < 7) && (hour < 24) && (slot < 6))
-  {
-    if (sensor_week.temp[day][hour][slot] == INT16_MAX) sensor_week.temp[day][hour][slot] = sensor_status.temp.value;
-      else sensor_week.temp[day][hour][slot] = max (sensor_week.temp[day][hour][slot], sensor_status.temp.value);
-  }
-
-  // update yearly slot
-  index = RtcTime.day_of_year - 1;
-  if (index < SENSOR_YEAR_DAYS)
-  {
-    // maximum value
-    if (sensor_year.temp_max[index] == INT16_MAX) sensor_year.temp_max[index] = sensor_status.temp.value;
-      else sensor_year.temp_max[index] = max (sensor_year.temp_max[index], sensor_status.temp.value);
-
-    // minimum value
-    if (sensor_year.temp_min[index] == INT16_MAX) sensor_year.temp_min[index] = sensor_status.temp.value;
-      else sensor_year.temp_min[index] = min (sensor_year.temp_min[index], sensor_status.temp.value);
-  }
 }
 
 // calculate new temperature from a delta coded on 4 bits : N/A, -5, -3, -2, -1.5, -1, -0.5, 0, +0.5, +1, +1.5, +2, N/A, +3, +5, NAN
@@ -808,7 +792,7 @@ void SensorTemperatureResetWeekDay (const uint8_t day)
 
   // reset daily slots
   for (hour = 0; hour < 24; hour ++)
-    for (slot = 0; slot < 6; slot ++) sensor_week.temp[day][hour][slot] = INT16_MAX;
+    for (slot = 0; slot < 6; slot ++) sensor_week[day][hour][slot].temp = INT16_MAX;
 
   // log
   strlcpy (str_day, kWeekdayNames + day * 3, 4);
@@ -819,23 +803,23 @@ void SensorTemperatureResetWeekDay (const uint8_t day)
 //   byte 0       = if first temperature is negative, abs (temperature) else 0xFF
 //   byte 1       = if first temperature is positive, temperature else 0xFF
 //   byte 2..85   = delta per hour on 4 bits (N/A, -5, -3, -2, -1.5, -1, -0.5, 0, +0.5, +1, +1.5, +2, N/A, +3, +5, NAN)
-bool SensorTemperatureLoadWeek ()
+bool SensorTemperatureLoadWeekFromSettings ()
 {
   uint8_t index, day, hour, slot, value;
   int16_t temp_hour, temp_ref;
-  char    str_history[88];
+  char    str_history[SENSOR_SIZE_WEEK_TEMP+1];
 
   // reset temperature data to N/A
   for (day = 0; day < 7; day ++)
     for (hour = 0; hour < 24; hour ++)
-      for (slot = 0; slot < 6; slot ++) sensor_week.temp[day][hour][slot] = INT16_MAX;
+      for (slot = 0; slot < 6; slot ++) sensor_week[day][hour][slot].temp = INT16_MAX;
 
   // check if history is available
   strlcpy (str_history, SettingsText (SET_SENSOR_TEMP_WEEKLY), sizeof (str_history));
   value = strlen (str_history);
-  if ( value > 0) sensor_status.temp.weekly = 1;
-    else sensor_status.temp.weekly = 0;
-  if ((value == SENSOR_SIZE_FS) || (value != sensor_size_week_temp)) return false;
+  if ( value > 0) sensor_config.weekly_temp = 1;
+    else sensor_config.weekly_temp = 0;
+  if ((value == SENSOR_SIZE_FS) || (value != SENSOR_SIZE_WEEK_TEMP)) return false;
 
   // calculate reference temperature
   temp_ref = INT16_MAX;
@@ -856,7 +840,7 @@ bool SensorTemperatureLoadWeek ()
       temp_hour = SensorTemperatureCalculateFromDelta (temp_ref, value);
 
       // update hour slots
-      for (slot = 0; slot < 6; slot ++) sensor_week.temp[day][hour][slot] = temp_hour;
+      for (slot = 0; slot < 6; slot ++) sensor_week[day][hour][slot].temp = temp_hour;
 
       // update reference value
       if (temp_hour != INT16_MAX) temp_ref = temp_hour;
@@ -872,73 +856,78 @@ bool SensorTemperatureLoadWeek ()
 //   byte 0       = if first temperature is negative, abs (temperature) else 0xFF
 //   byte 1       = if first temperature is positive, temperature else 0xFF
 //   byte 2..85   = delta per hour on 4 bits (N/A, -5, -3, -2, -1.5, -1, -0.5, 0, +0.5, +1, +1.5, +2, N/A, +3, +5, NAN)
-void SensorTemperatureSaveWeek ()
+void SensorTemperatureSaveWeekToSettings ()
 {
   uint8_t index, part, day, hour, slot, value;
-  char    str_history[88];
+  char    str_history[SENSOR_SIZE_WEEK_TEMP+1];
   int16_t delta, ref_temp, hour_temp;
 
   // if no temperature weekly history
   SettingsUpdateText (SET_SENSOR_TEMP_WEEKLY, "");
-  if (sensor_status.temp.weekly == 0) return;
+
+  // if weekly history should be saved
+  if (sensor_config.weekly_temp == 1)
 
 #ifdef USE_UFILESYS
-  // if weekly history saved on filesystem
-  SettingsUpdateText (SET_SENSOR_TEMP_WEEKLY, "fs");
-  return;
+    SettingsUpdateText (SET_SENSOR_TEMP_WEEKLY, "fs");
 
 #else
-  // check settings size availability
-  if (settings_text_size - GetSettingsTextLen () < sensor_size_week_temp)
   {
-    AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Temperature - No space to save to settings"));
-    sensor_status.temp.weekly = 0;
-    return;
+    // if settings size availability is not enough, disable data saving
+    if (settings_text_size - GetSettingsTextLen () < SENSOR_SIZE_WEEK_TEMP)
+    {
+      sensor_config.weekly_temp = 0;
+      AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Week Temp. - No space to save"));
+    }
+
+    // else, save data to settings
+    else
+    {
+      // loop thru temperature slots to get first reference temperature
+      ref_temp = INT16_MAX;  
+      for (day = 0; day < 7; day ++)
+        for (hour = 0; hour < 24; hour ++)
+          for (slot = 0; slot < 6; slot ++) if (ref_temp == INT16_MAX) ref_temp = sensor_week[day][hour][slot].temp;
+
+      // init history string
+      for (index = 0; index < SENSOR_SIZE_WEEK_TEMP; index ++) str_history[index] = 0xFF;
+
+      // write reference temperature
+      if (ref_temp < 0) str_history[0] = (uint8_t)((0 - ref_temp) / 5);
+        else if (ref_temp != INT16_MAX) str_history[1] = (uint8_t)(ref_temp / 5) + 1;
+
+      // loop thru temperature slots
+      index = 2;
+      if (ref_temp != INT16_MAX) 
+        for (day = 0; day < 7; day ++)
+          for (hour = 0; hour < 24; hour ++)
+          {
+            // get max temperature in the hour slots
+            hour_temp = sensor_week[day][hour][0].temp;
+            for (slot = 1; slot < 6; slot ++)
+              if (hour_temp == INT16_MAX) hour_temp = sensor_week[day][hour][slot].temp;
+                else if ((sensor_week[day][hour][slot].temp != INT16_MAX) && (hour_temp < sensor_week[day][hour][slot].temp)) hour_temp = sensor_week[day][hour][slot].temp;
+
+            // define increment of decrement
+            if (hour_temp == INT16_MAX) delta = INT16_MAX;
+              else delta = hour_temp - ref_temp;
+            
+            // calculate delta according to temperature difference
+            value = SensorTemperatureCalculateDelta (ref_temp, delta);
+
+            // update history string
+            if (hour % 2 == 0) str_history[index] = value;
+              else str_history[index] = str_history[index++] | (value << 4);
+          }
+
+      // save history string
+      str_history[SENSOR_SIZE_WEEK_TEMP] = 0;
+      SettingsUpdateText (SET_SENSOR_TEMP_WEEKLY, str_history);
+
+      // log
+      AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Week temp. - Saved to settings"));
+    }
   }
-
-  // loop thru temperature slots to get first reference temperature
-  ref_temp = INT16_MAX;  
-  for (day = 0; day < 7; day ++)
-    for (hour = 0; hour < 24; hour ++)
-      for (slot = 0; slot < 6; slot ++) if (ref_temp == INT16_MAX) ref_temp = sensor_week.temp[day][hour][slot];
-
-  // init history string
-  for (index = 0; index < 86; index ++) str_history[index] = 0xFF;
-
-  // write reference temperature
-  if (ref_temp < 0) str_history[0] = (uint8_t)((0 - ref_temp) / 5);
-    else if (ref_temp != INT16_MAX) str_history[1] = (uint8_t)(ref_temp / 5) + 1;
-
-  // loop thru temperature slots
-  index = 2;
-  if (ref_temp != INT16_MAX) 
-    for (day = 0; day < 7; day ++)
-      for (hour = 0; hour < 24; hour ++)
-      {
-        // get max temperature in the hour slots
-        hour_temp = sensor_week.temp[day][hour][0];
-        for (slot = 1; slot < 6; slot ++)
-          if (hour_temp == INT16_MAX) hour_temp = sensor_week.temp[day][hour][slot];
-            else if ((sensor_week.temp[day][hour][slot] != INT16_MAX) && (hour_temp < sensor_week.temp[day][hour][slot])) hour_temp = sensor_week.temp[day][hour][slot];
-
-        // define increment of decrement
-        if (hour_temp == INT16_MAX) delta = INT16_MAX;
-          else delta = hour_temp - ref_temp;
-        
-        // calculate delta according to temperature difference
-        value = SensorTemperatureCalculateDelta (ref_temp, delta);
-
-        // update history string
-        if (hour % 2 == 0) str_history[index] = value;
-          else str_history[index] = str_history[index++] | (value << 4);
-      }
-
-  // save history string
-  str_history[sensor_size_week_temp] = 0;
-  SettingsUpdateText (SET_SENSOR_TEMP_WEEKLY, str_history);
-
-  // log
-  AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Temperature - Saved to settings"));
 #endif    // USE_UFILESYS
 }
 
@@ -950,56 +939,70 @@ void SensorTemperatureSaveWeek ()
 //   byte 4..125  = delta per every 3 days on 4 bits
 //                  first half byte is min temperature evolution
 //                  second half byte is max temperature evolution
-bool SensorTemperatureLoadYear ()
+void SensorTemperatureLoadYearFromSettings ()
 {
   uint8_t  value;
-  uint16_t index, day;
-  int16_t  temp_min, temp_max, temp_ref;
-  char     str_history[128];
+  uint8_t  month, day;
+  uint16_t index, curr_shift, last_shift;
+  int16_t  temp_min, temp_max, temp_ref_min, temp_ref_max;
+  char     str_history[SENSOR_SIZE_YEAR_TEMP+1];
 
   // reset temperature data to N/A
-  for (day = 0; day < SENSOR_YEAR_DAYS; day ++)
-  {
-    sensor_year.temp_min[day] = INT16_MAX;
-    sensor_year.temp_max[day] = INT16_MAX;
-  }
+  for (month = 0; month < 12; month ++)
+    for (day = 0; day < 31; day ++)
+    {
+      sensor_year[month][day].temp_min = INT16_MAX;
+      sensor_year[month][day].temp_max = INT16_MAX;
+    }
 
   // check if history is available
   strlcpy (str_history, SettingsText (SET_SENSOR_TEMP_YEARLY), sizeof (str_history));
   value = strlen (str_history);
-  if (value > 0) sensor_status.yearly = 1;
-    else sensor_status.yearly = 0;
-  if ((value == SENSOR_SIZE_FS) || (value != sensor_size_year_temp)) return false;
+  if (value > 0) sensor_config.yearly_temp = 1; else sensor_config.yearly_temp = 0;
+  if ((value == SENSOR_SIZE_FS) || (value != SENSOR_SIZE_YEAR_TEMP)) return;
 
   // calculate reference minimum temperature
   temp_min = INT16_MAX;
   if (str_history[0] != 0xFF) temp_min = 0 - (int16_t)str_history[0] * 5;
     else if (str_history[1] != 0xFF) temp_min = (int16_t)(str_history[1] - 1) * 5;
-  if (temp_min == INT16_MAX) return false;
+  if (temp_min == INT16_MAX) return;
 
   // calculate reference maximum temperature
   temp_max = INT16_MAX;
   if (str_history[2] != 0xFF) temp_max = 0 - (int16_t)str_history[2] * 5;
     else if (str_history[3] != 0xFF) temp_max = (int16_t)(str_history[3] - 1) * 5;
-  if (temp_max == INT16_MAX) return false;
+  if (temp_max == INT16_MAX) return;
 
-  // update sensor history string
-  for (index = 0; index < 122; index ++)
-  {
-    // calculate minimum temperature evolution
-    value = str_history[index + 4] & 0x0F;
-    temp_ref = SensorTemperatureCalculateFromDelta (temp_min, value);
-    for (day = index * 3; day < index * 3 + 3; day ++) sensor_year.temp_min[day] = temp_ref;
-    if (temp_ref != INT16_MAX) temp_min = temp_ref;
+  // update sensor values from string (one value every 3 days)
+  index = 0;
+  last_shift = UINT16_MAX;
+  curr_shift = 0;
+  temp_ref_min = temp_ref_max = INT16_MAX;
+  for (month = 0; month < 12; month ++)
+    for (day = 0; day < days_in_month[month]; day ++)
+    {
+      // if changing block of 3 days
+      curr_shift = index++ / 3;
+      if (curr_shift != last_shift)
+      {
+        // calculate minimum temperature evolution
+        value = str_history[curr_shift + 4] & 0x0F;
+        temp_ref_min = SensorTemperatureCalculateFromDelta (temp_min, value);
+        if (temp_ref_min != INT16_MAX) temp_min = temp_ref_min;
 
-    // calculate maximum temperature evolution
-    value = str_history[index + 4] >> 4;
-    temp_ref = SensorTemperatureCalculateFromDelta (temp_max, value);
-    for (day = index * 3; day < index * 3 + 3; day ++) sensor_year.temp_max[day] = temp_ref;
-    if (temp_ref != INT16_MAX) temp_max = temp_ref;
-  }
+        // calculate maximum temperature evolution
+        value = str_history[curr_shift + 4] >> 4;
+        temp_ref_max = SensorTemperatureCalculateFromDelta (temp_max, value);
+        if (temp_ref_max != INT16_MAX) temp_max = temp_ref_max;
 
-  return true;
+        // set last shift
+        last_shift = curr_shift;
+      }
+
+      // set min and max temperature
+      sensor_year[month][day].temp_min = temp_ref_min;
+      sensor_year[month][day].temp_max = temp_ref_max;
+    }
 }
 
 // save yearly temperature history to settings string
@@ -1010,89 +1013,103 @@ bool SensorTemperatureLoadYear ()
 //   byte 4..125  = delta per every 3 days on 4 bits
 //                  first half byte is min temperature evolution
 //                  second half byte is max temperature evolution
-void SensorTemperatureSaveYear ()
+void SensorTemperatureSaveYearToSettings ()
 {
-  uint8_t  value;
-  uint16_t index, day;
-  int16_t  temp_min, temp_max, temp_ref, delta;
-  char     str_history[128];
+  uint8_t  month, day, value;
+  uint16_t index, last_shift, curr_shift;
+  int16_t  temp_min, temp_max, temp_ref_min, temp_ref_max, delta;
+  char     str_history[SENSOR_SIZE_YEAR_TEMP+1];
 
   // if no temperature weekly history
   SettingsUpdateText (SET_SENSOR_TEMP_YEARLY, "");
-  if (sensor_status.yearly == 0) return;
+
+  // if data should be saved
+  if (sensor_config.yearly_temp == 1)
 
 #ifdef USE_UFILESYS
-
-  // if weekly history saved on filesystem
-  SettingsUpdateText (SET_SENSOR_TEMP_YEARLY, "fs");
+    SettingsUpdateText (SET_SENSOR_TEMP_YEARLY, "fs");
 
 #else
-
-  // check settings size availability
-  if (settings_text_size - GetSettingsTextLen () < sensor_size_year_temp)
   {
-    AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Temperature - No space to save to settings"));
-    sensor_status.yearly = 0;
-    return;
+    // if settings size availability is not enough, disable data saving
+    if (settings_text_size - GetSettingsTextLen () < SENSOR_SIZE_YEAR_TEMP)
+    {
+      sensor_config.yearly_temp = 0;
+      AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Year temp. - No space to save"));
+    }
+
+    // else save data to settings
+    else
+    {
+      // loop thru temperature slots to get first minimum and maximum temperature
+      temp_min = temp_max = INT16_MAX;  
+      for (month = 0; month < 12; month ++)
+        for (day = 0; day < days_in_month[month]; day ++)
+        {
+          if (temp_min == INT16_MAX) temp_min = sensor_year[month][day].temp_min;
+          if (temp_max == INT16_MAX) temp_max = sensor_year[month][day].temp_max;
+        }
+
+      // init history string
+      for (index = 0; index < SENSOR_SIZE_YEAR_TEMP; index ++) str_history[index] = 0xFF;
+
+      // write first minimum and maximum temperature
+      if (temp_min < 0) str_history[0] = (uint8_t)((0 - temp_min) / 5);
+        else if (temp_min != INT16_MAX) str_history[1] = (uint8_t)(temp_min / 5) + 1;
+      if (temp_max < 0) str_history[2] = (uint8_t)((0 - temp_max) / 5);
+        else if (temp_max != INT16_MAX) str_history[3] = (uint8_t)(temp_max / 5) + 1;
+
+      // update sensor history string
+      index = 0;
+      last_shift = curr_shift = 0;
+      temp_ref_min = temp_ref_max = INT16_MAX;
+      for (month = 0; month < 12; month ++)
+        for (day = 0; day < days_in_month[month]; day ++)
+        {
+          // calculate minimum temperature evolution
+          if (temp_ref_min == INT16_MAX) temp_ref_min = sensor_year[month][day].temp_min;
+            else if ((sensor_year[month][day].temp_min != INT16_MAX) && (sensor_year[month][day].temp_min < temp_ref_min)) temp_ref_min = sensor_year[month][day].temp_min;
+
+          // calculate maximum temperature evolution
+          if (temp_ref_max == INT16_MAX) temp_ref_max = sensor_year[month][day].temp_max;
+            else if ((sensor_year[month][day].temp_max != INT16_MAX) && (sensor_year[month][day].temp_max > temp_ref_max)) temp_ref_max = sensor_year[month][day].temp_max;
+
+          // if changing block of 3 days
+          curr_shift = index++ / 3;
+          if (curr_shift != last_shift)
+          {
+            // define evolution of minimum temperature
+            if (temp_ref_min == INT16_MAX) delta = INT16_MAX;
+              else delta = temp_ref_min - temp_min;
+
+            // calculate delta according to temperature difference
+            value = SensorTemperatureCalculateDelta (temp_min, delta);
+            str_history[last_shift + 4] = value;
+
+            // define evolution of maximum temperature
+            if (temp_ref_max == INT16_MAX) delta = INT16_MAX;
+              else delta = temp_ref_max - temp_max;
+            
+            // calculate delta according to temperature difference
+            value = SensorTemperatureCalculateDelta (temp_max, delta);
+            str_history[last_shift + 4] = str_history[last_shift + 4] | (value << 4);
+
+            // update references
+            if (temp_ref_min != INT16_MAX) temp_min = temp_ref_min;
+            if (temp_ref_max != INT16_MAX) temp_max = temp_ref_max;
+            temp_ref_min = temp_ref_max = INT16_MAX;
+            last_shift = curr_shift;
+          }
+        }
+
+      // save history string
+      str_history[SENSOR_SIZE_YEAR_TEMP] = 0;
+      SettingsUpdateText (SET_SENSOR_TEMP_YEARLY, str_history);
+
+      // log
+      AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Year temp. - Saved to settings")); 
+    }
   }
-
-
-  // loop thru temperature slots to get first minimum and maximum temperature
-  temp_min = temp_max = INT16_MAX;  
-  for (index = 0; index < SENSOR_YEAR_DAYS; index ++)
-  {
-    if (temp_min == INT16_MAX) temp_min = sensor_year.temp_min[index];
-    if (temp_max == INT16_MAX) temp_max = sensor_year.temp_max[index];
-  }
-
-  // init history string
-  for (index = 0; index < 126; index ++) str_history[index] = 0xFF;
-
-  // write first minimum and maximum temperature
-  if (temp_min < 0) str_history[0] = (uint8_t)((0 - temp_min) / 5);
-    else if (temp_min != INT16_MAX) str_history[1] = (uint8_t)(temp_min / 5) + 1;
-  if (temp_max < 0) str_history[2] = (uint8_t)((0 - temp_max) / 5);
-    else if (temp_max != INT16_MAX) str_history[3] = (uint8_t)(temp_max / 5) + 1;
-
-  // update sensor history string
-  for (index = 0; index < 122; index ++)
-  {
-    // calculate minimum temperature evolution
-    temp_ref = INT16_MAX;
-    for (day = index * 3; day < index * 3 + 3; day ++)
-      if (temp_ref == INT16_MAX) temp_ref = sensor_year.temp_min[day];
-        else if ((sensor_year.temp_min[day] != INT16_MAX) && (temp_ref > sensor_year.temp_min[day])) temp_ref = sensor_year.temp_min[day];
-
-    // define evolution
-    if (temp_ref == INT16_MAX) delta = INT16_MAX;
-      else delta = temp_ref - temp_min;
-    
-    // calculate delta according to temperature difference
-    value = SensorTemperatureCalculateDelta (temp_min, delta);
-    str_history[index + 4] = value;
-
-    // calculate maximum temperature evolution
-    temp_ref = INT16_MAX;
-    for (day = index * 3; day < index * 3 + 3; day ++)
-      if (temp_ref == INT16_MAX) temp_ref = sensor_year.temp_max[day];
-        else if ((sensor_year.temp_max[day] != INT16_MAX) && (temp_ref < sensor_year.temp_max[day])) temp_ref = sensor_year.temp_max[day];
-
-    // define increment of decrement
-    if (temp_ref == INT16_MAX) delta = INT16_MAX;
-      else delta = temp_ref - temp_max;
-    
-    // calculate delta according to temperature difference
-    value = SensorTemperatureCalculateDelta (temp_max, delta);
-    str_history[index + 4] = str_history[index + 4] | (value << 4);
-  }
-
-  // save history string
-  str_history[sensor_size_year_temp] = 0;
-  SettingsUpdateText (SET_SENSOR_TEMP_YEARLY, str_history);
-
-  // log
-  AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Temperature - Saved to settings"));
-
 #endif    // USE_UFILESYS
 }
 
@@ -1131,47 +1148,33 @@ void SensorHumiditySet (float humidity)
 
   // log
   AddLog (LOG_LEVEL_DEBUG, PSTR ("SEN: humidity %d.%d%%"), sensor_status.humi.value / 10, sensor_status.humi.value % 10);
-
-  // update weekly data
-  if (!RtcTime.valid) return;
-
-  // check slot validity
-  day  = RtcTime.day_of_week - 1;
-  hour = RtcTime.hour;
-  slot = RtcTime.minute / 10; 
-  if ((day >= 7) || (hour >= 24) || (slot >= 6)) return;
-
-  // update slot
-  value = (int8_t)(sensor_status.humi.value / 10);
-  if (sensor_week.humi[day][hour][slot] == INT8_MAX) sensor_week.humi[day][hour][slot] = value;
-    else sensor_week.humi[day][hour][slot] = max (sensor_week.humi[day][hour][slot], value);
 }
 
 // load weekly humidity history from settings string
 //   byte 0     = first humidity value else 0xFF
 //   byte 1..84 = delta per hour on 4 bits (N/A, -30, -20, -10, -5, -3, -1, 0, +1, +3, +5, +10, N/A, +20, +30, N/A)
-bool SensorHumidityLoadWeek ()
+void SensorHumidityLoadWeekFromSettings ()
 {
   int8_t  humi_ref, humi_hour;
   uint8_t day, hour, slot, index, value;
-  char    str_history[86];
+  char    str_history[SENSOR_SIZE_WEEK_HUMI+1];
 
   // init slots to N/A
   for (day = 0; day < 7; day ++)
     for (hour = 0; hour < 24; hour ++)
-      for (slot = 0; slot < 6; slot ++) sensor_week.humi[day][hour][slot] = INT8_MAX;
+      for (slot = 0; slot < 6; slot ++) sensor_week[day][hour][slot].humi = INT8_MAX;
 
   // check if history is available
   strlcpy (str_history, SettingsText (SET_SENSOR_HUMI_WEEKLY), sizeof (str_history));
   value = strlen (str_history);
-  if ( value > 0) sensor_status.humi.weekly = 1;
-    else sensor_status.humi.weekly = 0;
-  if ((value == SENSOR_SIZE_FS) || (value != sensor_size_week_humi)) return false;
+  if ( value > 0) sensor_config.weekly_humi = 1;
+    else sensor_config.weekly_humi = 0;
+  if ((value == SENSOR_SIZE_FS) || (value != SENSOR_SIZE_WEEK_HUMI)) return;
 
   // calculate reference humidity
   humi_ref = INT8_MAX;
   if (str_history[0] != 0xFF) humi_ref = (int8_t)str_history[0] - 1;
-  if (humi_ref == INT8_MAX) return false;
+  if (humi_ref == INT8_MAX) return;
 
   // update sensor history string
   index = 1;
@@ -1213,103 +1216,105 @@ bool SensorHumidityLoadWeek ()
       } 
 
       // update hour slots
-      for (slot = 0; slot < 6; slot ++) sensor_week.humi[day][hour][slot] = humi_hour;
+      for (slot = 0; slot < 6; slot ++) sensor_week[day][hour][slot].humi = humi_hour;
     }
 
   // log
   AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Humidity - Loaded from settings"));
-
-  return true;
 }
 
 // save weekly humidity history as settings string
 //   byte 0     = first humidity value else 0xFF
 //   byte 1..84 = delta per hour on 4 bits (N/A, -30, -20, -10, -5, -3, -1, 0, +1, +3, +5, +10, N/A, +20, +30, N/A)
-void SensorHumiditySaveWeek ()
+void SensorHumiditySaveWeekToSettings ()
 {
   uint8_t index, part, day, hour, slot, value;
   int8_t  humi_ref, humi_hour, humi_delta;
-  char    str_history[86];
+  char    str_history[SENSOR_SIZE_WEEK_HUMI+1];
 
   // if no humidity sensor declared, nothing to do
   SettingsUpdateText (SET_SENSOR_HUMI_WEEKLY, "");
-  if (sensor_status.humi.weekly == 0) return;
+
+  // if weekly history should be saved
+  if (sensor_config.weekly_humi == 1)
 
 #ifdef USE_UFILESYS
-  // if weekly history saved on filesystem
-  SettingsUpdateText (SET_SENSOR_HUMI_WEEKLY, "fs");
+    SettingsUpdateText (SET_SENSOR_HUMI_WEEKLY, "fs");
 
 #else
-  // check settings size availability
-  if (settings_text_size - GetSettingsTextLen () < sensor_size_week_humi)
   {
-    AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Humidity - No space to save to settings"));
-    sensor_status.humi.weekly = 0;
-    return;
-  }
+    // if settings size availability is not enough, disable data saving
+    if (settings_text_size - GetSettingsTextLen () < SENSOR_SIZE_WEEK_HUMI)
+    {
+      sensor_config.weekly_humi = 0;
+      AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Week humi. - No space to save"));
+    }
 
+    else
+    {
+      // loop thru humiditu slots to get first reference humidity
+      humi_ref = INT8_MAX;  
+      for (day = 0; day < 7; day ++)
+        for (hour = 0; hour < 24; hour ++)
+          for (slot = 0; slot < 6; slot ++) if (humi_ref == INT8_MAX) humi_ref = sensor_week[day][hour][slot].humi;
 
-  // loop thru humiditu slots to get first reference humidity
-  humi_ref = INT8_MAX;  
-  for (day = 0; day < 7; day ++)
-    for (hour = 0; hour < 24; hour ++)
-      for (slot = 0; slot < 6; slot ++) if (humi_ref == INT8_MAX) humi_ref = sensor_week.humi[day][hour][slot];
+      // init history string
+      for (index = 0; index < SENSOR_SIZE_WEEK_HUMI; index ++) str_history[index] = 0xFF;
 
-  // init history string
-  for (index = 0; index < 85; index ++) str_history[index] = 0xFF;
+      // write reference humidity
+      if (humi_ref != INT8_MAX) str_history[0] = (uint8_t)humi_ref + 1;
 
-  // write reference humidity
-  if (humi_ref != INT8_MAX) str_history[0] = (uint8_t)humi_ref + 1;
-
-  // update sensor history string
-  index = 1;
-  if (humi_ref != INT8_MAX) 
-    for (day = 0; day < 7; day ++)
-      for (hour = 0; hour < 24; hour ++)
-      {
-          // get max humidity in the hour slots
-          humi_hour = sensor_week.humi[day][hour][0];
-          for (slot = 1; slot < 6; slot ++)
+      // update sensor history string
+      index = 1;
+      if (humi_ref != INT8_MAX) 
+        for (day = 0; day < 7; day ++)
+          for (hour = 0; hour < 24; hour ++)
           {
-            if (humi_hour == INT8_MAX) humi_hour = sensor_week.humi[day][hour][slot];
-              else if ((sensor_week.humi[day][hour][slot] != INT8_MAX) && (humi_hour < sensor_week.humi[day][hour][slot])) humi_hour = sensor_week.humi[day][hour][slot];
-          }
+              // get max humidity in the hour slots
+              humi_hour = sensor_week[day][hour][0].humi;
+              for (slot = 1; slot < 6; slot ++)
+              {
+                if (humi_hour == INT8_MAX) humi_hour = sensor_week[day][hour][slot].humi;
+                  else if ((sensor_week[day][hour][slot].humi != INT8_MAX) && (humi_hour < sensor_week[day][hour][slot].humi)) humi_hour = sensor_week[day][hour][slot].humi;
+              }
 
-          // define increment of decrement
-          if (humi_hour == INT8_MAX) humi_delta = INT8_MAX;
-            else humi_delta = humi_hour - humi_ref;
+              // define increment of decrement
+              if (humi_hour == INT8_MAX) humi_delta = INT8_MAX;
+                else humi_delta = humi_hour - humi_ref;
 
-          // set value according to delta
-          if (humi_delta == INT8_MAX)   value = 15;                        // N/A
-          else if (humi_delta >= 30)  { value = 14; humi_ref += 30; }      // +30%
-          else if (humi_delta >= 20)  { value = 13; humi_ref += 20; }      // +20%
-          else if (humi_delta >= 10)  { value = 11; humi_ref += 10; }      // +10%
-          else if (humi_delta >= 5)   { value = 10; humi_ref += 5;  }      // +5%
-          else if (humi_delta >= 2)   { value = 9;  humi_ref += 2;  }      // +3%
-          else if (humi_delta >= 1)   { value = 8;  humi_ref += 1;  }      // +1%
-          else if (humi_delta == 0)     value = 7;                         // +0%
-          else if (humi_delta == 1)   { value = 6;  humi_ref -= 1;  }      // +1%
-          else if (humi_delta == -2)  { value = 5;  humi_ref -= 2;  }      // +3%
-          else if (humi_delta >= -5)  { value = 4;  humi_ref -= 5;  }      // +5%
-          else if (humi_delta >= -10) { value = 3;  humi_ref -= 10; }      // +10%
-          else if (humi_delta >= -20) { value = 2;  humi_ref -= 20; }      // +20%
-          else                        { value = 1;  humi_ref -= 30; }      // +30%
+              // set value according to delta
+              if (humi_delta == INT8_MAX)   value = 15;                        // N/A
+              else if (humi_delta >= 30)  { value = 14; humi_ref += 30; }      // +30%
+              else if (humi_delta >= 20)  { value = 13; humi_ref += 20; }      // +20%
+              else if (humi_delta >= 10)  { value = 11; humi_ref += 10; }      // +10%
+              else if (humi_delta >= 5)   { value = 10; humi_ref += 5;  }      // +5%
+              else if (humi_delta >= 2)   { value = 9;  humi_ref += 2;  }      // +3%
+              else if (humi_delta >= 1)   { value = 8;  humi_ref += 1;  }      // +1%
+              else if (humi_delta == 0)     value = 7;                         // +0%
+              else if (humi_delta == 1)   { value = 6;  humi_ref -= 1;  }      // +1%
+              else if (humi_delta == -2)  { value = 5;  humi_ref -= 2;  }      // +3%
+              else if (humi_delta >= -5)  { value = 4;  humi_ref -= 5;  }      // +5%
+              else if (humi_delta >= -10) { value = 3;  humi_ref -= 10; }      // +10%
+              else if (humi_delta >= -20) { value = 2;  humi_ref -= 20; }      // +20%
+              else                        { value = 1;  humi_ref -= 30; }      // +30%
 
-          // check boundaries
-          humi_ref = max (humi_ref, (int8_t)0);
-          humi_ref = min (humi_ref, (int8_t)100);
-          
-          // update history string
-          if (hour % 2 == 0) str_history[index] = value;
-            else str_history[index] = str_history[index++] | (value << 4);
-        }
+              // check boundaries
+              humi_ref = max (humi_ref, (int8_t)0);
+              humi_ref = min (humi_ref, (int8_t)100);
+              
+              // update history string
+              if (hour % 2 == 0) str_history[index] = value;
+                else str_history[index] = str_history[index++] | (value << 4);
+            }
 
-  // save history string
-  str_history[sensor_size_week_humi] = 0;
-  SettingsUpdateText (SET_SENSOR_HUMI_WEEKLY, str_history);
+      // save history string
+      str_history[SENSOR_SIZE_WEEK_HUMI] = 0;
+      SettingsUpdateText (SET_SENSOR_HUMI_WEEKLY, str_history);
 
-  // log
-  AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Humidity - Saved to settings"));
+      // log
+      AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Week humi. - Saved to settings"));
+    }
+  }
 #endif    // USE_UFILESYS
 }
 
@@ -1332,31 +1337,37 @@ bool SensorPresenceGet (uint32_t timeout)
 }
 
 // set current presence
-void SensorPresenceSet ()
+bool SensorPresenceSet ()
 {
-  uint8_t  day, hour, slot;
   uint32_t time_now = LocalTime ();
 
   // check validity
-  if (!RtcTime.valid) return;
+  if (!RtcTime.valid) return false;
 
   // check ignore time frame
   if ((sensor_status.time_ignore != UINT32_MAX) && (sensor_status.time_ignore < time_now)) sensor_status.time_ignore = UINT32_MAX;
-  if (sensor_status.time_ignore != UINT32_MAX) return;
+  if (sensor_status.time_ignore != UINT32_MAX) return false;
+
+  // if new detection, log
+  if (sensor_status.pres.value != 1) AddLog (LOG_LEVEL_DEBUG, PSTR ("SEN: Presence detected"));
 
   // update value and timestamp
   sensor_status.pres.value     = 1;
-  sensor_status.pres.timestamp = LocalTime ();
+  sensor_status.pres.timestamp = time_now;
 
-  // update history slot
-  day  = RtcTime.day_of_week - 1;
-  hour = RtcTime.hour;
-  slot = RtcTime.minute / 10; 
-  if ((day >= 7) || (hour >= 24) || (slot >= 6)) return;
-  sensor_week.event[day][hour][slot].presence = 1;
+  return true;
+}
+
+// reset current presence
+bool SensorPresenceReset ()
+{
+  // update presence status
+  sensor_status.pres.value = 0;
 
   // log
-  AddLog (LOG_LEVEL_DEBUG, PSTR ("SEN: Presence - Detected (%u, %u, %u)"), day, hour, slot);
+  AddLog (LOG_LEVEL_DEBUG, PSTR ("SEN: Presence released"));
+
+  return true;
 }
 
 // get delay since last movement was detected
@@ -1377,24 +1388,23 @@ void SensorPresenceSuspendDetection (const uint32_t duration)
 }
 
 // load weekly presence history from settings string
-bool SensorPresenceLoadWeek ()
+void SensorPresenceLoadWeekFromSettings ()
 {
-  bool    history;
   uint8_t day, hour, slot, index, value, presence;
   size_t  length;
-  char    str_history[50];
+  char    str_history[SENSOR_SIZE_WEEK_PRES+1];
 
   // init slots to no presence
   for (day = 0; day < 7; day ++)
     for (hour = 0; hour < 24; hour ++)
-      for (slot = 0; slot < 6; slot ++) sensor_week.event[day][hour][slot].presence = 0;
+      for (slot = 0; slot < 6; slot ++) sensor_week[day][hour][slot].event.pres = 0;
 
   // check if history is available
   strlcpy (str_history, SettingsText (SET_SENSOR_PRES_WEEKLY), sizeof (str_history));
   value = strlen (str_history);
-  if ( value > 0) sensor_status.pres.weekly = 1;
-    else sensor_status.pres.weekly = 0;
-  if ((value == SENSOR_SIZE_FS) || (value != sensor_size_week_pres)) return false;
+  if ( value > 0) sensor_config.weekly_pres = 1;
+    else sensor_config.weekly_pres = 0;
+  if ((value == SENSOR_SIZE_FS) || (value != SENSOR_SIZE_WEEK_PRES)) return;
 
   // loop to load slots
   for (day = 0; day < 7; day ++)
@@ -1405,62 +1415,164 @@ bool SensorPresenceLoadWeek ()
       {
         index = hour * 2 + slot / 3;
         presence = str_history[index] & value;
-        if (presence != 0) sensor_week.event[day][hour][slot].presence = 1;
+        if (presence != 0) sensor_week[day][hour][slot].event.pres = 1;
       }
   }
 
   // log
-  AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Presence - Loaded from settings"));
-
-  return true;
+  AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Week pres. - Loaded from settings"));
 }
 
 // save weekly presence history in settings string
-void SensorPresenceSaveWeek ()
+void SensorPresenceSaveWeekToSettings ()
 {
   uint8_t day, hour, slot, index, value;
-  char    str_history[50];
+  char    str_history[SENSOR_SIZE_WEEK_PRES+1];
 
   // if presence detection not enabled, nothing to save
   SettingsUpdateText (SET_SENSOR_PRES_WEEKLY, "");
-  if (sensor_status.pres.weekly == 0) return;
+
+  // if weekly history should be saved
+  if (sensor_config.weekly_pres == 1)
 
 #ifdef USE_UFILESYS
-  // if weekly history saved on filesystem
-  SettingsUpdateText (SET_SENSOR_PRES_WEEKLY, "fs");
+    SettingsUpdateText (SET_SENSOR_PRES_WEEKLY, "fs");
 
 #else
-  // if settings size is not enough, nothing to save
-  if (settings_text_size - GetSettingsTextLen () < sensor_size_week_pres)
   {
-    AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Presence - No space to save to settings"));
-    sensor_status.pres.weekly = 0;
-    return;
-  }
+    // if settings size availability is not enough, disable data saving
+    if (settings_text_size - GetSettingsTextLen () < SENSOR_SIZE_WEEK_PRES)
+    {
+      sensor_config.weekly_pres = 0;
+      AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Week pres. - No space to save"));
+    }
 
+    // else save data
+    else
+    {
+      // init sensor history string
+      for (slot = 0; slot < SENSOR_SIZE_WEEK_PRES; slot ++) str_history[slot] = 128;
 
-  // init sensor history string
-  for (slot = 0; slot < 48; slot ++) str_history[slot] = 128;
+      // update sensor history string
+      for (day = 0; day < 7; day ++)
+      {
+        value = 0x01 << day;
+        for (hour = 0; hour < 24; hour ++)
+          for (slot = 0; slot < 6; slot ++)
+            if (sensor_week[day][hour][slot].event.pres == 1)
+            {
+              index = hour * 2 + slot / 3;
+              str_history[index] = str_history[index] | value;
+            }
+      }
 
-  // update sensor history string
-  for (day = 0; day < 7; day ++)
-  {
-    value = 0x01 << day;
-    for (hour = 0; hour < 24; hour ++)
-      for (slot = 0; slot < 6; slot ++)
-        if (sensor_week.event[day][hour][slot].presence == 1)
-        {
-          index = hour * 2 + slot / 3;
-          str_history[index] = str_history[index] | value;
-        }
-  }
+      // save history string
+      str_history[SENSOR_SIZE_WEEK_PRES] = 0;
+      SettingsUpdateText (SET_SENSOR_PRES_WEEKLY, str_history);
 
-  // save history string
-  str_history[sensor_size_week_pres] = 0;
-  SettingsUpdateText (SET_SENSOR_PRES_WEEKLY, str_history);
+      // log
+      AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Week pres. - Saved to settings"));
+    }
+  } 
+#endif    // USE_UFILESYS
+}
+
+// load yearly presence history from settings string
+void SensorPresenceLoadYearFromSettings ()
+{
+  uint8_t  value, presence;
+  uint8_t  month, day;
+  uint16_t index, shift, slot;
+  char     str_history[SENSOR_SIZE_YEAR_PRES+1];
+
+  // init slots to no presence
+  for (month = 0; month < 12; month ++)
+    for (day = 0; day < 31; day ++) sensor_year[month][day].pres = 0;
+
+  // check if history is available
+  strlcpy (str_history, SettingsText (SET_SENSOR_PRES_YEARLY), sizeof (str_history));
+  value = strlen (str_history);
+  if ( value > 0) sensor_config.yearly_pres = 1; else sensor_config.yearly_pres = 0;
+  if ((value == SENSOR_SIZE_FS) || (value != SENSOR_SIZE_YEAR_PRES)) return;
+
+  // loop to load slots
+  index = 0;
+  for (month = 0; month < 12; month ++)
+    for (day = 0; day < days_in_month[month]; day ++)
+    {
+      // get presence
+      shift = index / 7;
+      slot  = index % 7;
+      value = 0x01 << slot;
+      presence = str_history[shift] & value;
+      if (presence != 0) sensor_year[month][day].pres = 255;
+
+      // increment
+      index ++;
+    }
 
   // log
-  AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Presence - Saved to settings"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Year pres. - Loaded from settings"));
+}
+
+// save yearly presence history in settings string
+void SensorPresenceSaveYearToSettings ()
+{
+  uint8_t  value;
+  uint8_t  month, day;
+  uint16_t index, shift, slot;
+  char     str_history[SENSOR_SIZE_YEAR_PRES+1];
+
+  // if presence detection not enabled, nothing to save
+  SettingsUpdateText (SET_SENSOR_PRES_YEARLY, "");
+
+  // if history should be saved
+  if (sensor_config.yearly_pres == 1)
+
+#ifdef USE_UFILESYS
+    SettingsUpdateText (SET_SENSOR_PRES_YEARLY, "fs");
+
+#else
+  {
+    // if settings size availability is not enough, disable data saving
+    if (settings_text_size - GetSettingsTextLen () < SENSOR_SIZE_YEAR_PRES)
+    {
+      sensor_config.yearly_pres = 0;
+      AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Year pres. - No space to save"));
+    }
+
+    // else save data
+    else
+    {
+      // init sensor history string
+      for (slot = 0; slot < SENSOR_SIZE_YEAR_PRES; slot ++) str_history[slot] = 128;
+
+      // update sensor history string
+      index = 0;
+      for (month = 0; month < 12; month ++)
+        for (day = 0; day < days_in_month[month]; day ++)
+        {
+          // save presence
+          if (sensor_year[month][day].pres > 0) 
+          {
+            shift = index / 7;
+            slot  = index % 7;
+            value = 0x01 << slot;
+            str_history[shift] = str_history[shift] | value;
+          }
+
+          // increment
+          index ++;
+        }
+
+      // save history string
+      str_history[53] = 0;
+      SettingsUpdateText (SET_SENSOR_PRES_YEARLY, str_history);
+
+      // log
+      AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Year pres. - Saved to settings"));
+    }
+  } 
 #endif    // USE_UFILESYS
 }
 
@@ -1471,41 +1583,39 @@ void SensorPresenceSaveWeek ()
 // set current activity
 void SensorActivitySet ()
 {
-  uint8_t day, hour, slot;
+  uint8_t slot;
 
   // check validity
   if (!RtcTime.valid) return;
 
-  // update history slot
-  day  = RtcTime.day_of_week - 1;
-  hour = RtcTime.hour;
+  // update current slot
   slot = RtcTime.minute / 10; 
-  if ((day >= 7) || (hour >= 24) || (slot >= 6)) return;
-  sensor_week.event[day][hour][slot].activity = 1;
-
-  // log
-  AddLog (LOG_LEVEL_DEBUG, PSTR ("SEN: Activity - Declared (%u, %u, %u)"), day, hour, slot);
+  if (slot < 6)
+  {
+    sensor_status.hour_slot[slot].event.acti = 1;
+    AddLog (LOG_LEVEL_DEBUG, PSTR ("SEN: Activity - Declared slot %u"), slot);
+  }
 }
 
 // load weekly activity history from settings string
-bool SensorActivityLoadWeek ()
+void SensorActivityLoadWeekFromSettings ()
 {
   bool    history;
   uint8_t day, hour, slot, index, value, action;
   size_t  length;
-  char    str_history[50];
+  char    str_history[SENSOR_SIZE_WEEK_ACTI+1];
 
   // init slots to no presence
   for (day = 0; day < 7; day ++)
     for (hour = 0; hour < 24; hour ++)
-      for (slot = 0; slot < 6; slot ++) sensor_week.event[day][hour][slot].activity = 0;
+      for (slot = 0; slot < 6; slot ++) sensor_week[day][hour][slot].event.acti = 0;
 
   // check if history is available
   strlcpy (str_history, SettingsText (SET_SENSOR_ACTI_WEEKLY), sizeof (str_history));
   value = strlen (str_history);
-  if ( value > 0) sensor_status.acti.weekly = 1;
-    else sensor_status.acti.weekly = 0;
-  if ((value == SENSOR_SIZE_FS) || (value != sensor_size_week_acti)) return false;
+  if ( value > 0) sensor_config.weekly_acti = 1;
+    else sensor_config.weekly_acti = 0;
+  if ((value == SENSOR_SIZE_FS) || (value != SENSOR_SIZE_WEEK_ACTI)) return;
 
   // loop to load slots
   for (day = 0; day < 7; day ++)
@@ -1516,62 +1626,66 @@ bool SensorActivityLoadWeek ()
       {
         index = hour * 2 + slot / 3;
         action = str_history[index] & value;
-        if (action != 0) sensor_week.event[day][hour][slot].activity = 1;
+        if (action != 0) sensor_week[day][hour][slot].event.acti = 1;
       }
   }
 
   // log
   AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Activity - Loaded from settings"));
-
-  return true;
 }
 
 // save weekly activity history in configuration strings
-void SensorActivitySaveWeek ()
+void SensorActivitySaveWeekToSettings ()
 {
   uint8_t day, hour, slot, index, value;
-  char    str_history[50];
+  char    str_history[SENSOR_SIZE_WEEK_ACTI+1];
 
   // if presence detection not enabled, nothing to save
   SettingsUpdateText (SET_SENSOR_ACTI_WEEKLY, "");
-  if (sensor_status.acti.weekly == 0) return;
+
+  // if  history should be saved
+  if (sensor_config.weekly_acti == 1)
 
 #ifdef USE_UFILESYS
-  // if weekly history saved on filesystem
-  SettingsUpdateText (SET_SENSOR_ACTI_WEEKLY, "fs");
+    SettingsUpdateText (SET_SENSOR_ACTI_WEEKLY, "fs");
 
 #else
-  // if settings size is not enough, nothing to save
-  if (settings_text_size - GetSettingsTextLen () < sensor_size_week_acti)
   {
-    AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Activity - No space to save to settings"));
-    sensor_status.acti.weekly = 0;
-    return;
+    // if settings size availability is not enough, disable data saving
+    if (settings_text_size - GetSettingsTextLen () < SENSOR_SIZE_WEEK_ACTI)
+    {
+      AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Week acti. - No space to save"));
+      sensor_config.weekly_acti = 0;
+      return;
+    }
+
+    // else save data
+    else
+    {
+      // init sensor history string
+      for (slot = 0; slot < SENSOR_SIZE_WEEK_ACTI; slot ++) str_history[slot] = 128;
+
+      // update sensor history string
+      for (day = 0; day < 7; day ++)
+      {
+        value = 0x01 << day;
+        for (hour = 0; hour < 24; hour ++)
+          for (slot = 0; slot < 6; slot ++)
+            if (sensor_week[day][hour][slot].event.acti == 1)
+            {
+              index = hour * 2 + slot / 3;
+              str_history[index] = str_history[index] | value;
+            }
+      }
+
+      // save history string
+      str_history[SENSOR_SIZE_WEEK_ACTI] = 0;
+      SettingsUpdateText (SET_SENSOR_ACTI_WEEKLY, str_history);
+
+      // log
+      AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Week acti. - Saved to settings"));
+    }
   }
-
-
-  // init sensor history string
-  for (slot = 0; slot < 48; slot ++) str_history[slot] = 128;
-
-  // update sensor history string
-  for (day = 0; day < 7; day ++)
-  {
-    value = 0x01 << day;
-    for (hour = 0; hour < 24; hour ++)
-      for (slot = 0; slot < 6; slot ++)
-        if (sensor_week.event[day][hour][slot].activity == 1)
-        {
-          index = hour * 2 + slot / 3;
-          str_history[index] = str_history[index] | value;
-        }
-  }
-
-  // save history string
-  str_history[sensor_size_week_acti] = 0;
-  SettingsUpdateText (SET_SENSOR_ACTI_WEEKLY, str_history);
-
-  // log
-  AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Activity - Saved to settings"));
 #endif    // USE_UFILESYS
 }
 
@@ -1582,41 +1696,39 @@ void SensorActivitySaveWeek ()
 // set current inactivity
 void SensorInactivitySet ()
 {
-  uint8_t day, hour, slot;
+  uint8_t slot;
 
   // check validity
   if (!RtcTime.valid) return;
   
   // update history slot
-  day  = RtcTime.day_of_week - 1;
-  hour = RtcTime.hour;
   slot = RtcTime.minute / 10; 
-  if ((day >= 7) || (hour >= 24) || (slot >= 6)) return;
-  sensor_week.event[day][hour][slot].inactivity = 1;
-
-  // log
-  AddLog (LOG_LEVEL_DEBUG, PSTR ("SEN: Inactivity declared"));
+  if (slot < 6)
+  {
+    sensor_status.hour_slot[slot].event.inac = 1;
+    AddLog (LOG_LEVEL_DEBUG, PSTR ("SEN: Inactivity declared slot %u"), slot);
+  }
 }
 
 // load weekly inactivity history from settings string
-bool SensorInactivityLoadWeek ()
+void SensorInactivityLoadWeekFromSettings ()
 {
   bool    history;
   uint8_t day, hour, slot, index, value, detected;
   size_t  length;
-  char    str_history[50];
+  char    str_history[SENSOR_SIZE_WEEK_INAC+1];
 
   // init slots to no presence
   for (day = 0; day < 7; day ++)
     for (hour = 0; hour < 24; hour ++)
-      for (slot = 0; slot < 6; slot ++) sensor_week.event[day][hour][slot].inactivity = 0;
+      for (slot = 0; slot < 6; slot ++) sensor_week[day][hour][slot].event.inac = 0;
 
   // check if history is available
   strlcpy (str_history, SettingsText (SET_SENSOR_INAC_WEEKLY), sizeof (str_history));
   value = strlen (str_history);
-  if ( value > 0) sensor_status.inac.weekly = 1;
-    else sensor_status.inac.weekly = 0;
-  if ((value == SENSOR_SIZE_FS) || (value != sensor_size_week_inac)) return false;
+  if ( value > 0) sensor_config.weekly_inac = 1;
+    else sensor_config.weekly_inac = 0;
+  if ((value == SENSOR_SIZE_FS) || (value != SENSOR_SIZE_WEEK_INAC)) return;
 
   // loop to load slots
   for (day = 0; day < 7; day ++)
@@ -1627,62 +1739,64 @@ bool SensorInactivityLoadWeek ()
       {
         index = hour * 2 + slot / 3;
         detected = str_history[index] & value;
-        if (detected != 0) sensor_week.event[day][hour][slot].inactivity = 1;
+        if (detected != 0) sensor_week[day][hour][slot].event.inac = 1;
       }
   }
 
   // log
   AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Inactivity - Loaded from settings"));
-
-  return true;
 }
 
 // save weekly inactivity history in settings string
-void SensorInactivitySaveWeek ()
+void SensorInactivitySaveWeekToSettings ()
 {
   uint8_t day, hour, slot, index, value;
-  char    str_history[50];
+  char    str_history[SENSOR_SIZE_WEEK_INAC+1];
 
   // if presence detection not enabled, nothing to save
   SettingsUpdateText (SET_SENSOR_INAC_WEEKLY, "");
-  if (sensor_status.inac.weekly == 0) return;
+
+  // if history should be saved
+  if (sensor_config.weekly_inac == 1)
 
 #ifdef USE_UFILESYS
-  // if weekly history saved on filesystem
-  SettingsUpdateText (SET_SENSOR_INAC_WEEKLY, "fs");
+    SettingsUpdateText (SET_SENSOR_INAC_WEEKLY, "fs");
 
 #else
-  // if settings size is not enough, nothing to save
-  if (settings_text_size - GetSettingsTextLen () < sensor_size_week_inac)
   {
-    AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Inactivity - No space to save to settings"));
-    sensor_status.inac.weekly = 0;
-    return;
+    // if settings size is not enough, nothing to save
+    if (settings_text_size - GetSettingsTextLen () < SENSOR_SIZE_WEEK_INAC)
+    {
+      sensor_config.weekly_inac = 0;
+      AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Week inac. - No space to save"));
+    }
+
+    // else save data
+    {
+      // init sensor history string
+      for (slot = 0; slot < SENSOR_SIZE_WEEK_INAC; slot ++) str_history[slot] = 128;
+
+      // update sensor history string
+      for (day = 0; day < 7; day ++)
+      {
+        value = 0x01 << day;
+        for (hour = 0; hour < 24; hour ++)
+          for (slot = 0; slot < 6; slot ++)
+            if (sensor_week[day][hour][slot].event.inac == 1)
+            {
+              index = hour * 2 + slot / 3;
+              str_history[index] = str_history[index] | value;
+            }
+      }
+
+      // save history string
+      str_history[SENSOR_SIZE_WEEK_INAC] = 0;
+      SettingsUpdateText (SET_SENSOR_INAC_WEEKLY, str_history);
+
+      // log
+      AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Week inac. - Saved to settings"));
+    }
   }
-
-
-  // init sensor history string
-  for (slot = 0; slot < 48; slot ++) str_history[slot] = 128;
-
-  // update sensor history string
-  for (day = 0; day < 7; day ++)
-  {
-    value = 0x01 << day;
-    for (hour = 0; hour < 24; hour ++)
-      for (slot = 0; slot < 6; slot ++)
-        if (sensor_week.event[day][hour][slot].inactivity == 1)
-        {
-          index = hour * 2 + slot / 3;
-          str_history[index] = str_history[index] | value;
-        }
-  }
-
-  // save history string
-  str_history[sensor_size_week_inac] = 0;
-  SettingsUpdateText (SET_SENSOR_INAC_WEEKLY, str_history);
-
-  // log
-  AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Inactivity - Saved to settings"));
 #endif    // USE_UFILESYS
 }
 
@@ -1702,7 +1816,8 @@ void SensorLoadConfig ()
   sensor_config.pres.validity = (uint16_t)Settings->free_73A[2] * 10;
 
   // load presence detection flag
-  sensor_config.presence = Settings->free_ea6[31];
+  sensor_config.week_histo = Settings->free_ea6[30];
+  sensor_config.type_pres = Settings->free_ea6[31];
 
   // retrieve MQTT topics
   sensor_config.temp.topic = SettingsText (SET_SENSOR_TEMP_TOPIC);
@@ -1723,7 +1838,8 @@ void SensorLoadConfig ()
   if (sensor_config.temp.validity == 0) sensor_config.temp.validity = SENSOR_TEMP_TIMEOUT;
   if (sensor_config.humi.validity == 0) sensor_config.humi.validity = SENSOR_HUMI_TIMEOUT;
   if (sensor_config.pres.validity == 0) sensor_config.pres.validity = SENSOR_PRES_TIMEOUT;
-  if (sensor_config.presence >= SENSOR_PRESENCE_MAX) sensor_config.presence = SENSOR_PRESENCE_NONE;
+  if (sensor_config.week_histo == 0) sensor_config.week_histo = SENSOR_HISTO_DEFAULT;
+  if (sensor_config.type_pres >= SENSOR_PRESENCE_MAX) sensor_config.type_pres = SENSOR_PRESENCE_NONE;
 }
 
 // save configuration parameters
@@ -1735,7 +1851,8 @@ void SensorSaveConfig ()
   Settings->free_73A[2] = (uint8_t)(sensor_config.pres.validity / 10);
 
   // save presence detection flag
-  Settings->free_ea6[31] = sensor_config.presence;
+  Settings->free_ea6[30] = sensor_config.week_histo;
+  Settings->free_ea6[31] = sensor_config.type_pres;
 
   // save MQTT topics
   SettingsUpdateText (SET_SENSOR_TEMP_TOPIC, sensor_config.temp.topic.c_str ());
@@ -1751,110 +1868,35 @@ void SensorSaveConfig ()
     else SettingsUpdateText (SET_SENSOR_PRES_KEY, sensor_config.pres.key.c_str ());
 }
 
-// reset sensor history for specific week day (0=sunday ... 6=saturday)
-void SensorResetWeekDay (const uint8_t day)
+// load current data history
+void SensorLoadData () 
 {
-  uint8_t hour, slot;
-  char    str_day[4];
-
-  // check parameters
-  if (day >= 7) return;
-
-  // reset daily slots
-  for (hour = 0; hour < 24; hour ++)
-    for (slot = 0; slot < 6; slot ++)
-    {
-      sensor_week.temp[day][hour][slot] = INT16_MAX;
-      sensor_week.humi[day][hour][slot] = INT8_MAX;
-      sensor_week.event[day][hour][slot].data = 0;
-    }
-
-  // log
-  strlcpy (str_day, kWeekdayNames + day * 3, 4);
-  AddLog (LOG_LEVEL_INFO, PSTR ("SEN: reset %s"), str_day);
-}
-
-// load weekly data history
-void SensorLoadWeek () 
-{
-  bool done;
-
   // load from settings
-  done  = SensorTemperatureLoadWeek ();
-  done |= SensorHumidityLoadWeek ();
-  done |= SensorPresenceLoadWeek ();
-  done |= SensorActivityLoadWeek ();
-  done |= SensorInactivityLoadWeek ();
-
-#ifdef USE_UFILESYS
-  if (!done) SensorFileLoadWeek (0);
-#endif    //  USE_UFILESYS
+  SensorTemperatureLoadWeekFromSettings ();
+  SensorHumidityLoadWeekFromSettings ();
+  SensorPresenceLoadWeekFromSettings ();
+  SensorActivityLoadWeekFromSettings ();
+  SensorInactivityLoadWeekFromSettings ();
+  SensorTemperatureLoadYearFromSettings ();
+  SensorPresenceLoadYearFromSettings ();
 }
 
-// save weekly data history
-void SensorSaveWeek (const bool current) 
+// save data
+void SensorSaveData ()
 {
-  uint8_t week;
+  // save data to settings
+  SensorTemperatureSaveWeekToSettings ();
+  SensorHumiditySaveWeekToSettings ();
+  SensorPresenceSaveWeekToSettings ();
+  SensorActivitySaveWeekToSettings ();
+  SensorInactivitySaveWeekToSettings ();
+  SensorTemperatureSaveYearToSettings ();
+  SensorPresenceSaveYearToSettings ();
 
-  // save to settings
-  if (current)
-  {
-    SensorTemperatureSaveWeek ();
-    SensorHumiditySaveWeek ();
-    SensorPresenceSaveWeek ();
-    SensorActivitySaveWeek ();
-    SensorInactivitySaveWeek ();
-  }
-
+  // if available, append append data to files
 #ifdef USE_UFILESYS
-  // set weekly file index
-  if (current) week = 0;
-  else
-  {
-    week = SensorGetCurrentWeek () - 1;
-    if (week == 0) week = 52;
-  }
-
-  // save weekly file
-  SensorFileSaveWeek (week);
-#endif    //  USE_UFILESYS
-}
-
-// reset temperature for specific year day (0 to 365)
-void SensorResetYearDay (const uint16_t index)
-{
-  // check parameters
-  if (index >= SENSOR_YEAR_DAYS) return;
-
-  // reset yearly slot
-  sensor_year.temp_min[index] = INT16_MAX;
-  sensor_year.temp_max[index] = INT16_MAX;
-}
-
-// load yearly data history
-void SensorLoadYear ()
-{
-  bool done;
-
-  // load from settings
-  done = SensorTemperatureLoadYear ();
-
-#ifdef USE_UFILESYS
-  if (!done) SensorFileLoadYear ();
-#endif    //  USE_UFILESYS
-}
-
-// save yearly data history
-void SensorSaveYear () 
-{
-  uint8_t week;
-
-  // save to settings
-  SensorTemperatureSaveYear ();
-
-#ifdef USE_UFILESYS
-  // save yearly file
-  SensorFileSaveYear ();
+  SensorFileWeekAppend ();
+  SensorFileYearAppend ();
 #endif    //  USE_UFILESYS
 }
 
@@ -1864,174 +1906,324 @@ void SensorSaveYear ()
 
 #ifdef USE_UFILESYS
 
-// load week file to graph data
-bool SensorFileExist (const uint8_t week)
+// test presence of weekly file
+bool SensorFileWeekExist (const uint8_t week)
 {
-  bool exist;
+  char str_file[32];
+
+  // check file existence
+  sprintf_P (str_file, D_SENSOR_FILENAME_WEEK, week);
+  return TfsFileExists (str_file);
+}
+
+// shift weekly file
+bool SensorFileWeekShift (const uint8_t week)
+{
+  char str_file_org[32];
+  char str_file_dest[32];
+
+  // calculate file names
+  sprintf_P (str_file_org, D_SENSOR_FILENAME_WEEK, week);
+  sprintf_P (str_file_dest, D_SENSOR_FILENAME_WEEK, week + 1);
+
+  // if exists, rename
+  if (TfsFileExists (str_file_org)) return TfsRenameFile (str_file_org, str_file_dest);
+    else return false;  
+}
+
+// delete weekly file if exists
+void SensorFileWeekDelete (const uint8_t week)
+{
   char str_file[32];
 
   // check file
-  sprintf (str_file, D_SENSOR_FILENAME_WEEK, week);
-  exist = ffsp->exists (str_file);
-
-  return exist;
-}
-
-// save current week to file
-bool SensorFileSaveWeek (const uint8_t week)
-{
-  uint8_t day, hour, slot;
-  char    str_value[32];
-  String  str_buffer;
-  File    file;
-
-  // check filesystem
-  if (ufs_type == 0) return false;
-
-  // create file and write header
-  sprintf (str_value, D_SENSOR_FILENAME_WEEK, week);
-  file = ffsp->open (str_value, "w");
-  file.print ("Day;Hour;Slot;Temp;Humi;Pres;Acti;Inac\n");
-
-  // loop to write data
-  str_buffer = "";
-  for (day = 0; day < 7; day ++)
-    for (hour = 0; hour < 24; hour ++)
-      for (slot = 0; slot < 6; slot ++)
-      {
-        // day, hour, slot
-        sprintf_P (str_value, PSTR ("%u;%u;%u;"), day, hour, slot);
-        str_buffer += str_value;
-
-        // temperature
-        if (sensor_week.temp[day][hour][slot] == INT16_MAX) strcpy (str_value, "*;");
-          else sprintf_P (str_value, PSTR ("%d;"), sensor_week.temp[day][hour][slot]);
-        str_buffer += str_value;
-
-        // humidity
-        if (sensor_week.humi[day][hour][slot] == INT8_MAX) strcpy (str_value, "*;");
-          else sprintf_P (str_value, PSTR ("%d;"), sensor_week.humi[day][hour][slot]);
-        str_buffer += str_value;
-
-        // presence, activity and inactivity
-        sprintf_P (str_value, PSTR ("%u;%u;%u\n"), sensor_week.event[day][hour][slot].presence, sensor_week.event[day][hour][slot].activity, sensor_week.event[day][hour][slot].inactivity);
-        str_buffer += str_value;
-
-        // if needed, append line to file
-        if (str_buffer.length () > 256) { file.print (str_buffer.c_str ()); str_buffer = ""; }
-      }
-
-  // write and close
-  if (str_buffer.length () > 0) file.print (str_buffer.c_str ());
-  file.close ();
-
-  // log
-  AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Last week saved to file"));
-
-  return true;
+  sprintf_P (str_file, D_SENSOR_FILENAME_WEEK, week);
+  TfsDeleteFile (str_file);
 }
 
 // load week file to graph data
-bool SensorFileLoadWeek (const uint8_t week)
+void SensorFileWeekLoad (const uint8_t week)
 {
   uint8_t  token, day, hour, slot;
   uint32_t len_buffer, size_buffer;
+  int      value;
   char     *pstr_token, *pstr_buffer, *pstr_line;
   char     str_buffer[512];
   File     file;
 
   // check filesystem
-  if (ufs_type == 0) return false;
+  if (ufs_type == 0) return;
 
-  // check file
+  // init
   pstr_buffer = str_buffer;
-  sprintf (str_buffer, D_SENSOR_FILENAME_WEEK, week);
-  if (!ffsp->exists (str_buffer)) return false;
 
-  // init graph data
+  // init values
   for (day = 0; day < 7; day++)
     for (hour = 0; hour < 24; hour++)
       for (slot = 0; slot < 6; slot++)
       {
-        sensor_graph.temp[day][hour][slot] = INT16_MAX;
-        sensor_graph.humi[day][hour][slot] = INT8_MAX;
-        sensor_graph.event[day][hour][slot].data = 0;
+        sensor_week[day][hour][slot].temp  = INT16_MAX;
+        sensor_week[day][hour][slot].humi  = UINT8_MAX;
+        sensor_week[day][hour][slot].event.data = 0;
       }
 
   // loop to read file
-  file = ffsp->open (str_buffer, "r");
-  strcpy(str_buffer, "");
-  while (file.available ())
+  sprintf_P (str_buffer, D_SENSOR_FILENAME_WEEK, week);
+  if (TfsFileExists (str_buffer))
   {
-    // read next block
-    size_buffer = strlen (str_buffer);
-    len_buffer = file.readBytes (str_buffer + size_buffer, sizeof (str_buffer) - size_buffer - 1);
-    str_buffer[size_buffer + len_buffer] = 0;
-
-    // loop to read lines
-    pstr_buffer = str_buffer;
-    pstr_line = strchr (pstr_buffer, '\n');
-    while (pstr_line)
+    file = ffsp->open (str_buffer, "r");
+    strcpy (str_buffer, "");
+    while (file.available ())
     {
-      // extract line
-      token = 0;
-      day = hour = slot = UINT8_MAX;
-      *pstr_line = 0;
-      pstr_token = strtok (pstr_buffer, ";");
-      while (pstr_token != nullptr)
+      // read next block
+      size_buffer = strlen (str_buffer);
+      len_buffer = file.readBytes (str_buffer + size_buffer, sizeof (str_buffer) - size_buffer - 1);
+      str_buffer[size_buffer + len_buffer] = 0;
+
+      // loop to read lines
+      pstr_buffer = str_buffer;
+      pstr_line = strchr (pstr_buffer, '\n');
+      while (pstr_line)
       {
-        // if value is a numerical one
-        if (isdigit (pstr_token[0]) || (pstr_token[0] == '-')) switch (token)
+        // extract line
+        token = 0;
+        day = hour = slot = UINT8_MAX;
+        *pstr_line = 0;
+        pstr_token = strtok (pstr_buffer, ";");
+        while (pstr_token != nullptr)
         {
-          case 0: day  = atoi (pstr_token); break;
-          case 1: hour = atoi (pstr_token); break;
-          case 2: slot = atoi (pstr_token); break;
-          case 3: if ((day < 7) && (hour < 24) && (slot < 6)) sensor_graph.temp[day][hour][slot] = (int16_t)atoi (pstr_token); break;
-          case 4: if ((day < 7) && (hour < 24) && (slot < 6)) sensor_graph.humi[day][hour][slot] = (int16_t)atoi (pstr_token); break;
-          case 5: if ((day < 7) && (hour < 24) && (slot < 6)) sensor_graph.event[day][hour][slot].presence   = (uint8_t)atoi (pstr_token); break;
-          case 6: if ((day < 7) && (hour < 24) && (slot < 6)) sensor_graph.event[day][hour][slot].activity   = (uint8_t)atoi (pstr_token); break;
-          case 7: if ((day < 7) && (hour < 24) && (slot < 6)) sensor_graph.event[day][hour][slot].inactivity = (uint8_t)atoi (pstr_token); break;
+          // if value is a numerical one
+          if (isdigit (pstr_token[0]) || (pstr_token[0] == '-')) 
+          {
+            value = atoi (pstr_token);
+            switch (token)
+            {
+              case 0: 
+                day = (value + 1) % 7;
+                break;
+              case 1:
+                hour = value;
+                break;
+              case 2:
+                slot = value;
+                break;
+              case 3:
+                if ((day < 7) && (hour < 24) && (slot < 6)) 
+                  if (sensor_week[day][hour][slot].temp == INT16_MAX) sensor_week[day][hour][slot].temp = (int16_t)value;
+                    else if (sensor_week[day][hour][slot].temp < value) sensor_week[day][hour][slot].temp = (int16_t)value;
+                break;
+              case 4:
+                if ((day < 7) && (hour < 24) && (slot < 6))
+                  if (sensor_week[day][hour][slot].humi == UINT8_MAX) sensor_week[day][hour][slot].humi = (uint8_t)value;
+                    else if (sensor_week[day][hour][slot].humi < value) sensor_week[day][hour][slot].humi = (uint8_t)value;
+                break;
+              case 5:
+                if ((day < 7) && (hour < 24) && (slot < 6) && (value > 0)) sensor_week[day][hour][slot].event.pres = 1;
+                break;
+              case 6:
+                if ((day < 7) && (hour < 24) && (slot < 6) && (value > 0)) sensor_week[day][hour][slot].event.acti = 1;
+                break;
+              case 7:
+                if ((day < 7) && (hour < 24) && (slot < 6) && (value > 0)) sensor_week[day][hour][slot].event.inac = 1;
+                break;
+            }
+          }
+
+          // next token in the line
+          token++;
+          pstr_token = strtok (nullptr, ";");
         }
 
-        // next token in the line
-        token++;
-        pstr_token = strtok (nullptr, ";");
+        // look for next line
+        pstr_buffer = pstr_line + 1;
+        pstr_line = strchr (pstr_buffer, '\n');
       }
 
-      // look for next line
-      pstr_buffer = pstr_line + 1;
-      pstr_line = strchr (pstr_buffer, '\n');
+      // deal with remaining string
+      if (pstr_buffer != str_buffer) strcpy(str_buffer, pstr_buffer);
+        else strcpy(str_buffer, "");
     }
 
-    // deal with remaining string
-    if (pstr_buffer != str_buffer) strcpy(str_buffer, pstr_buffer);
-      else strcpy(str_buffer, "");
-  }
-
-  // close file
-  file.close ();
-
-  // if dealing with current week, load main data
-  if (week == 0)
-  {
-    for (day = 0; day < 7; day ++)
-      for (hour = 0; hour < 24; hour ++)
-        for (slot = 0; slot < 6; slot ++)
-        {
-          sensor_week.temp[day][hour][slot] = sensor_graph.temp[day][hour][slot];
-          sensor_week.humi[day][hour][slot] = sensor_graph.humi[day][hour][slot];
-          sensor_week.event[day][hour][slot].data = sensor_graph.event[day][hour][slot].data;
-        }
+    // close file
+    file.close ();
 
     // log
-    AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Last week loaded from file"));
+    AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Week %02u loaded from file"), week);
   }
-
-  return true;
 }
 
-// save current week to file
-bool SensorFileSaveYear ()
+// save current weekly data to file
+void SensorFileWeekAppend ()
+{
+  uint8_t  day, hour, slot;
+  char     str_value[32];
+  String   str_buffer;
+  File     file;
+
+  // init
+  str_buffer = "";
+
+  // check filesystem
+  if (ufs_type == 0) return;
+
+  // calculate file name
+  sprintf_P (str_value, D_SENSOR_FILENAME_WEEK, 0);
+
+  // if file doesn't exist, create it and append header
+  if (!TfsFileExists (str_value))
+  {
+    file = ffsp->open (str_value, "w");
+    file.print ("Day;Hour;Slot;Temp;Humi;Pres;Acti;Inac\n");
+  }
+
+  // else, file exists, open in append mode
+  else file = ffsp->open (str_value, "a");
+
+  // loop to write all slots
+  day  = (7 + RtcTime.day_of_week - 2) % 7;           // monday is 0
+  hour = RtcTime.hour;
+  for (slot = 0; slot < 6; slot ++)
+  {
+    // day, hour, slot
+    sprintf_P (str_value, PSTR ("%u;%u;%u;"), day, hour, slot);
+    str_buffer += str_value;
+
+    // temperature
+    if (sensor_status.hour_slot[slot].temp == INT16_MAX) strcpy (str_value, "*;");
+      else sprintf_P (str_value, PSTR ("%d;"), sensor_status.hour_slot[slot].temp);
+    str_buffer += str_value;
+
+    // humidity
+    if (sensor_status.hour_slot[slot].humi == INT8_MAX) strcpy (str_value, "*;");
+      else sprintf_P (str_value, PSTR ("%d;"), sensor_status.hour_slot[slot].humi);
+    str_buffer += str_value;
+
+    // presence, activity and inactivity
+    sprintf_P (str_value, PSTR ("%u;%u;%u\n"), sensor_status.hour_slot[slot].event.pres, sensor_status.hour_slot[slot].event.acti, sensor_status.hour_slot[slot].event.inac);
+    str_buffer += str_value;
+  }
+
+  // write and close
+  file.print (str_buffer.c_str ());
+  file.close ();
+
+  // log
+  AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Last week data saved"));
+}
+
+// test presence of yearly file
+bool SensorFileYearExist (const uint16_t year)
+{
+  char str_file[32];
+
+  // check file existence
+  sprintf_P (str_file, D_SENSOR_FILENAME_YEAR, year);
+  return TfsFileExists (str_file);
+}
+
+// load year data from file
+void SensorFileYearLoad (const uint16_t year)
+{
+  uint8_t  token;
+  uint8_t  month, day;
+  uint32_t len_buffer, size_buffer;
+  int      value;
+  char     *pstr_token, *pstr_buffer, *pstr_line;
+  char     str_value[32];
+  char     str_buffer[512];
+  File     file;
+
+  // check filesystem
+  if (ufs_type == 0) return;
+
+  // init data
+  for (month = 0; month < 12; month ++)
+    for (day = 0; day < 31; day ++)
+    {
+      sensor_year[month][day].temp_max = INT16_MAX;
+      sensor_year[month][day].temp_min = INT16_MAX;
+      sensor_year[month][day].pres     = 0;
+    }
+
+  // loop to read file
+  pstr_buffer = str_buffer;
+  sprintf_P (str_value, D_SENSOR_FILENAME_YEAR, year);
+  if (TfsFileExists (str_value))
+  {
+    file = ffsp->open (str_value, "r");
+    strcpy(str_buffer, "");
+    while (file.available ())
+    {
+      // read next block
+      size_buffer = strlen (str_buffer);
+      len_buffer = file.readBytes (str_buffer + size_buffer, sizeof (str_buffer) - size_buffer - 1);
+      str_buffer[size_buffer + len_buffer] = 0;
+
+      // loop to read lines
+      pstr_buffer = str_buffer;
+      pstr_line = strchr (pstr_buffer, '\n');
+      while (pstr_line)
+      {
+        // extract line
+        token = 0;
+        month = day = UINT8_MAX;
+        *pstr_line = 0;
+        pstr_token = strtok (pstr_buffer, ";");
+        while (pstr_token != nullptr)
+        {
+          // if value is a numerical one
+          if (isdigit (pstr_token[0]) || (pstr_token[0] == '-')) 
+          {
+            value = atoi (pstr_token);
+            switch (token)
+            {
+              case 1: 
+                month = value - 1;
+                break;
+              case 2:
+                day = value - 1; 
+                break;
+              case 3: 
+                if ((month < 12) && (day < 31)) 
+                  if (sensor_year[month][day].temp_max == INT16_MAX) sensor_year[month][day].temp_max = value;
+                    else if (sensor_year[month][day].temp_max < value) sensor_year[month][day].temp_max = value;
+                break;
+              case 4: 
+                if ((month < 12) && (day < 31)) 
+                  if (sensor_year[month][day].temp_min == INT16_MAX) sensor_year[month][day].temp_min = value;
+                    else if (sensor_year[month][day].temp_min > value) sensor_year[month][day].temp_min = value;
+                break;
+              case 7: 
+                if ((month < 12) && (day < 31)) sensor_year[month][day].pres |= (uint8_t)value;
+                break;
+            }
+          }
+
+          // next token in the line
+          token++;
+          pstr_token = strtok (nullptr, ";");
+        }
+
+        // look for next line
+        pstr_buffer = pstr_line + 1;
+        pstr_line = strchr (pstr_buffer, '\n');
+      }
+
+      // deal with remaining string
+      if (pstr_buffer != str_buffer) strcpy (str_buffer, pstr_buffer);
+        else strcpy (str_buffer, "");
+    }
+
+    // close file
+    file.close ();
+
+    // log
+    AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Year %u loaded from file"), year);
+  }
+}
+
+// save current day to file
+void SensorFileYearAppend ()
 {
   uint16_t day;
   char     str_value[32];
@@ -2039,117 +2231,46 @@ bool SensorFileSaveYear ()
   File     file;
 
   // check filesystem
-  if (ufs_type == 0) return false;
+  if (ufs_type == 0) return;
 
-  // create file and write header
-  file = ffsp->open (D_SENSOR_FILENAME_YEAR, "w");
-  file.print ("Day;Tmax;Tmin\n");
-
-  // loop to write data
-  str_buffer = "";
-  for (day = 0; day < SENSOR_YEAR_DAYS; day ++)
+  // if file doesn't exist, create it and append header
+  sprintf_P (str_value, D_SENSOR_FILENAME_YEAR, RtcTime.year);
+  if (!TfsFileExists (str_value))
   {
-    // day
-    sprintf (str_value, "%u;", day);
-    str_buffer += str_value;
-
-    // temperature max
-    if (sensor_year.temp_max[day] == INT16_MAX) strcpy (str_value, "*;");
-      else sprintf (str_value, "%d;", sensor_year.temp_max[day]);
-    str_buffer += str_value;
-
-    // temperature min
-    if (sensor_year.temp_min[day] == INT16_MAX) strcpy (str_value, "*\n");
-      else sprintf (str_value, "%d\n", sensor_year.temp_min[day]);
-    str_buffer += str_value;
-
-    // if needed, append line to file
-    if (str_buffer.length () > 256) { file.print (str_buffer.c_str ()); str_buffer = ""; }
+    file = ffsp->open (str_value, "w");
+    file.print ("DayOfYear;Month;DayOfMonth;Tmax;Tmin;Hmax;Hmin;Pres\n");
   }
+
+  // else, file exists, open in append mode
+  else file = ffsp->open (str_value, "a");
+
+  // day
+  sprintf (str_value, "%u;%u;%u;", RtcTime.day_of_year, RtcTime.month, RtcTime.day_of_month);
+  str_buffer = str_value;
+
+  // temperature max
+  if (sensor_status.day_slot.temp_max == INT16_MAX) strcpy (str_value, "*;");
+    else sprintf (str_value, "%d;", sensor_status.day_slot.temp_max);
+  str_buffer += str_value;
+
+  // temperature min
+  if (sensor_status.day_slot.temp_min == INT16_MAX) strcpy (str_value, "*;");
+    else sprintf (str_value, "%d;", sensor_status.day_slot.temp_min);
+  str_buffer += str_value;
+
+  // humidity
+  str_buffer += "*;*;";
+
+  // presence
+  sprintf (str_value, "%u\n", sensor_status.day_slot.pres);
+  str_buffer += str_value;
 
   // write and close
-  if (str_buffer.length () > 0) file.print (str_buffer.c_str ());
-  file.close ();
-
-  return true;
-}
-
-// load year data from file
-bool SensorFileLoadYear ()
-{
-  uint8_t  token;
-  uint16_t day;
-  uint32_t len_buffer, size_buffer;
-  char     *pstr_token, *pstr_buffer, *pstr_line;
-  char     str_buffer[512];
-  File     file;
-
-  // check filesystem
-  if (ufs_type == 0) return false;
-
-  // check file
-  pstr_buffer = str_buffer;
-  if (!ffsp->exists (D_SENSOR_FILENAME_YEAR)) return false;
-
-  // init graph data
-  for (day = 0; day < SENSOR_YEAR_DAYS; day++)
-  {
-    sensor_year.temp_max[day] = INT16_MAX;
-    sensor_year.temp_min[day] = INT16_MAX;
-  }
-
-  // loop to read file
-  file = ffsp->open (D_SENSOR_FILENAME_YEAR, "r");
-  strcpy(str_buffer, "");
-  while (file.available ())
-  {
-    // read next block
-    size_buffer = strlen (str_buffer);
-    len_buffer = file.readBytes (str_buffer + size_buffer, sizeof (str_buffer) - size_buffer - 1);
-    str_buffer[size_buffer + len_buffer] = 0;
-
-    // loop to read lines
-    pstr_buffer = str_buffer;
-    pstr_line = strchr (pstr_buffer, '\n');
-    while (pstr_line)
-    {
-      // extract line
-      token = 0;
-      day = UINT16_MAX;
-      *pstr_line = 0;
-      pstr_token = strtok (pstr_buffer, ";");
-      while (pstr_token != nullptr)
-      {
-        // if value is a numerical one
-        if (isdigit (pstr_token[0]) || (pstr_token[0] == '-')) switch (token)
-        {
-          case 0: day  = atoi (pstr_token); break;
-          case 1: if (day < SENSOR_YEAR_DAYS) sensor_year.temp_max[day] = atoi (pstr_token); break;
-          case 2: if (day < SENSOR_YEAR_DAYS) sensor_year.temp_min[day] = atoi (pstr_token); break;
-        }
-
-        // next token in the line
-        token++;
-        pstr_token = strtok (nullptr, ";");
-      }
-
-      // look for next line
-      pstr_buffer = pstr_line + 1;
-      pstr_line = strchr (pstr_buffer, '\n');
-    }
-
-    // deal with remaining string
-    if (pstr_buffer != str_buffer) strcpy(str_buffer, pstr_buffer);
-      else strcpy(str_buffer, "");
-  }
-
-  // close file
+  file.print (str_buffer.c_str ());
   file.close ();
 
   // log
-  AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Last year loaded from file"));
-
-  return true;
+  AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Latest year data saved"));
 }
 
 #endif      // USE_UFILESYS
@@ -2160,8 +2281,8 @@ bool SensorFileLoadYear ()
 
 void SensorInit () 
 {
-  uint16_t day, hour, slot;
-  char     str_type[16];
+  uint8_t index;
+  char    str_type[16];
 
   // init sensor values
   sensor_status.temp.source    = SENSOR_SOURCE_NONE;
@@ -2177,10 +2298,19 @@ void SensorInit ()
   sensor_status.pres.last      = INT16_MAX;
   sensor_status.pres.timestamp = UINT32_MAX;
 
-  // init sensors history
-  for (day = 0; day < 7; day++)   SensorResetWeekDay (day);
-  for (day = 0; day < SENSOR_YEAR_DAYS; day++) SensorResetYearDay (day);
+  // init hourly data
+  for (index = 0; index < 6; index ++)
+  {
+    sensor_status.hour_slot[index].temp = INT16_MAX;
+    sensor_status.hour_slot[index].humi = INT8_MAX;
+    sensor_status.hour_slot[index].event.data = 0;     // pres, acti & inac
+  }
 
+  // init daily data
+  sensor_status.day_slot.temp_max = INT16_MAX;
+  sensor_status.day_slot.temp_min = INT16_MAX;
+  sensor_status.day_slot.pres     = 0;
+  
   // check for DHT11 sensor
   if (PinUsed (GPIO_DHT11))
   {
@@ -2222,25 +2352,18 @@ void SensorInit ()
   {
     sensor_status.temp.source = SENSOR_SOURCE_DSB;
     AddLog (LOG_LEVEL_INFO, PSTR ("SEN: %s temperature sensor"), "DS18B20");
-
-    // force pullup for single DS18B20
-    Settings->flag3.ds18x20_internal_pullup = 1;
   }
 
   // presence : check for generic sensor
   if (PinUsed (GPIO_CNTR1, SENSOR_PRESENCE_INDEX))
   {
-    switch (sensor_config.presence)
+    switch (sensor_config.type_pres)
     {
+      case SENSOR_PRESENCE_SWITCH:
       case SENSOR_PRESENCE_RCWL0516:
-        GetTextIndexed (str_type, sizeof (str_type), SENSOR_PRESENCE_RCWL0516, kSensorPresenceModel);
-        sensor_status.pres.source = SENSOR_SOURCE_COUNTER;
-        AddLog (LOG_LEVEL_INFO, PSTR ("SEN: %s motion sensor"), str_type);
-        break;
-
       case SENSOR_PRESENCE_HWMS03:
-        GetTextIndexed (str_type, sizeof (str_type), SENSOR_PRESENCE_HWMS03, kSensorPresenceModel);
         sensor_status.pres.source = SENSOR_SOURCE_COUNTER;
+        GetTextIndexed (str_type, sizeof (str_type), sensor_config.type_pres, kSensorPresenceModel);
         AddLog (LOG_LEVEL_INFO, PSTR ("SEN: %s motion sensor"), str_type);
         break;
     }
@@ -2249,7 +2372,7 @@ void SensorInit ()
   // movement : serial sensors
   else if (PinUsed (GPIO_TXD) && PinUsed (GPIO_RXD))
   {
-    switch (sensor_config.presence)
+    switch (sensor_config.type_pres)
     {
       case SENSOR_PRESENCE_NONE:
         break;
@@ -2275,20 +2398,31 @@ void SensorInit ()
   }
 
   // log help command
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: sn_help to get help on Sensor commands"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: sens_help to get help on Sensor commands"));
 }
 
 // update sensor condition every second
 void SensorEverySecond ()
 {
-  bool     presence = true;
+  bool     presence = true;                   // if no presence sensor, presence triggered by default
   bool     publish  = false;
-  uint32_t sensor, index;
+  int8_t   value;
+  uint8_t  month, day_month, day_week, hour, minute, second, mask;
+  uint8_t  day_slot, hour_slot;
+  uint16_t day_year;
+  uint32_t sensor, index, slot;
   float    temperature = NAN;
   float    humidity    = NAN;
 
-  // check time init
-  if (!RtcTime.valid) return;
+  // get current time
+  month     = RtcTime.month - 1;
+  day_month = RtcTime.day_of_month - 1;
+  day_week  = RtcTime.day_of_week - 1;
+  hour      = RtcTime.hour;
+  minute    = RtcTime.minute;
+  second    = RtcTime.second;
+  day_slot  = hour / 3; 
+  hour_slot = minute / 10; 
 
   // ---------------------------------
   //   temperature & humidity sensor
@@ -2327,17 +2461,17 @@ void SensorEverySecond ()
     // check if temperature needs JSON update
     if (sensor_status.temp.value != INT16_MAX)
     {
-      publish |= (sensor_status.temp.last == INT16_MAX);
-      publish |= ((sensor_status.temp.last != INT16_MAX) && (sensor_status.temp.last > sensor_status.temp.value + 1));
-      publish |= ((sensor_status.temp.last != INT16_MAX) && (sensor_status.temp.last < sensor_status.temp.value - 1));
+      if (sensor_status.temp.last == INT16_MAX) publish = true;
+      if ((sensor_status.temp.last != INT16_MAX) && (sensor_status.temp.last > sensor_status.temp.value + 1)) publish = true;
+      if ((sensor_status.temp.last != INT16_MAX) && (sensor_status.temp.last < sensor_status.temp.value - 1)) publish = true;
     }
     
     // check if humidity needs JSON update
     if (sensor_status.humi.value != INT16_MAX)
     {
-      publish |= (sensor_status.humi.last == INT16_MAX);
-      publish |= ((sensor_status.humi.last != INT16_MAX) && (sensor_status.humi.last > sensor_status.humi.value + 4));
-      publish |= ((sensor_status.humi.last != INT16_MAX) && (sensor_status.humi.last < sensor_status.humi.value - 4));
+      if (sensor_status.humi.last == INT16_MAX) publish = true;
+      if ((sensor_status.humi.last != INT16_MAX) && (sensor_status.humi.last > sensor_status.humi.value + 4)) publish = true;
+      if ((sensor_status.humi.last != INT16_MAX) && (sensor_status.humi.last < sensor_status.humi.value - 4)) publish = true;
     }
   }
 
@@ -2350,7 +2484,7 @@ void SensorEverySecond ()
   else if (sensor_status.pres.source == SENSOR_SOURCE_SERIAL)
   {
     // check according to serial sensor
-    switch (sensor_config.presence)
+    switch (sensor_config.type_pres)
     {
 #ifdef USE_LD1115
       case SENSOR_PRESENCE_LD1115:
@@ -2372,17 +2506,171 @@ void SensorEverySecond ()
     }
   }
 
-  // if presence detected
-  if (presence)
-  {
-    // update detection
-    SensorPresenceSet ();
+  // if presence newly detected
+  if (presence && (sensor_status.pres.value != 1)) publish = SensorPresenceSet ();
 
+  // if presence detectection is active
+  else if (sensor_status.pres.value == 1)
+  {
     // if needed, ask for a JSON update
-    publish |= (Rtc.local_time > sensor_status.time_json);
+    if (Rtc.local_time > sensor_status.time_json) publish = true;
+
+    // check if presence should be reset
+    if (LocalTime () > sensor_status.pres.timestamp + SENSOR_PRES_TIMEOUT) publish = SensorPresenceReset ();
   }
 
-  // if needed, publish JSON
+  // ------------------------
+  //    START OF EVERY HOUR
+  //    reset hourly data
+  // ------------------------
+
+  if ((minute == 0) && (second == 0))
+  {
+    for (index = 0; index < 6; index ++)
+    {
+      sensor_status.hour_slot[index].temp = INT16_MAX;
+      sensor_status.hour_slot[index].humi = INT8_MAX;
+      sensor_status.hour_slot[index].event.data = 0;     // pres, acti & inac
+    }
+  }
+
+  // -----------------------------------------------------
+  //    AT MIDNIGHT
+  //    reset daily data and current day in weekly data
+  // -----------------------------------------------------
+
+  if ((hour == 0) && (minute == 0) && (second == 0) && (day_week < 7))
+  {
+    // reset daily data
+    sensor_status.day_slot.temp_max  = INT16_MAX;
+    sensor_status.day_slot.temp_min  = INT16_MAX;
+    sensor_status.day_slot.pres      = 0;
+
+    // reset current day in weekly data
+    for (index = 0; index < 24; index ++)
+      for (slot = 0; slot < 6; slot ++)
+      {
+        sensor_week[day_week][index][slot].temp = INT16_MAX;
+        sensor_week[day_week][index][slot].humi = INT8_MAX;
+        sensor_week[day_week][index][slot].event.data = 0;
+      }
+  }
+
+  // ----------------------------------------
+  //   EVERY 1ST OF MONTH AT MIDNIGHT
+  //   erase current month in yearly data
+  // ----------------------------------------
+
+  if ((day_month == 0) && (hour == 0) && (minute == 0) && (second == 0) && (month < 12))
+  {
+    // reset daily data
+    for (index = 0; index < 31; index ++)
+    {
+      sensor_year[month][index].temp_max = INT16_MAX;
+      sensor_year[month][index].temp_min = INT16_MAX;
+      sensor_year[month][index].pres     = 0;
+    }
+  }
+
+  // -----------------------------------------------
+  //    EVERY SECOND
+  //    update hourly data and current weekly data
+  // -----------------------------------------------
+
+  // update current hour records
+  if ((day_week < 7) && (hour < 24) && (hour_slot < 6))
+  {
+    // update current temperature slot
+    if (sensor_status.temp.value != INT16_MAX)
+    {
+      if (sensor_status.hour_slot[hour_slot].temp == INT16_MAX) sensor_status.hour_slot[hour_slot].temp = sensor_status.temp.value;
+        else if (sensor_status.hour_slot[hour_slot].temp < sensor_status.temp.value) sensor_status.hour_slot[hour_slot].temp = sensor_status.temp.value;
+    }
+ 
+    // update current humidity slot
+    if (sensor_status.humi.value != INT16_MAX)
+    {
+      value = (int8_t)(sensor_status.humi.value / 10);
+      if (sensor_status.hour_slot[hour_slot].humi == INT8_MAX) sensor_status.hour_slot[hour_slot].humi = value;
+        else if (sensor_status.hour_slot[hour_slot].humi < value) sensor_status.hour_slot[hour_slot].humi = value;
+    }
+
+    // update current presence slot
+    if (sensor_status.pres.value == 1) sensor_status.hour_slot[hour_slot].event.pres = 1;
+
+    // update current weekly data
+    sensor_week[day_week][hour][hour_slot].temp       = sensor_status.hour_slot[hour_slot].temp;
+    sensor_week[day_week][hour][hour_slot].humi       = sensor_status.hour_slot[hour_slot].humi;
+    sensor_week[day_week][hour][hour_slot].event.data = sensor_status.hour_slot[hour_slot].event.data;
+  }
+
+  // -----------------------------------------------
+  //    EVERY SECOND
+  //    update daily data and current yearly data
+  // -----------------------------------------------
+
+  if ((month < 12) && (day_month < 31))
+  {
+    // if temperature is available
+    if (sensor_status.temp.value != INT16_MAX)
+    {
+      // update minimum daily temperature
+      if (sensor_status.day_slot.temp_min == INT16_MAX) sensor_status.day_slot.temp_min = sensor_status.temp.value;
+        else if (sensor_status.day_slot.temp_min > sensor_status.temp.value) sensor_status.day_slot.temp_min = sensor_status.temp.value;
+
+      // update maximum daily temperature
+      if (sensor_status.day_slot.temp_max == INT16_MAX) sensor_status.day_slot.temp_max = sensor_status.temp.value;
+        else if (sensor_status.day_slot.temp_max < sensor_status.temp.value) sensor_status.day_slot.temp_max = sensor_status.temp.value;
+    }
+
+    // update daily presence in 3h slots
+    if (sensor_status.pres.value == 1)
+    {
+      mask = 1;
+      for (index = 0; index < day_slot; index ++) mask = mask << 1;
+      sensor_status.day_slot.pres = sensor_status.day_slot.pres | mask;
+    }
+
+    // current yearly data
+    sensor_year[month][day_month].temp_max = sensor_status.day_slot.temp_max;
+    sensor_year[month][day_month].temp_min = sensor_status.day_slot.temp_min;
+    sensor_year[month][day_month].pres     = sensor_status.day_slot.pres;
+  }
+
+#ifdef USE_UFILESYS
+
+  // --------------------------------------
+  //    END OF EVERY HOUR 
+  //    save current hour in weekly data
+  // --------------------------------------
+
+  if ((minute == 59) && (second == 59)) SensorFileWeekAppend ();
+
+  // ------------------------------------
+  //   JUST BEFORE MIDNIGHT
+  //   save current day in yearly data
+  // ------------------------------------
+
+  if ((hour == 23) && (minute == 59) && (second == 59)) SensorFileYearAppend ();
+
+  // ---------------------------------------
+  //   EVERY SUNDAY NIMUTE BEFORE MIDNIGHT
+  //   shift and clenup weekly files
+  // ----------------------------------
+
+  if ((day_week == 0) && (hour == 23) && (minute == 59))
+  {
+    index = 59 - second;
+    if (index > sensor_config.week_histo) SensorFileWeekDelete (index);
+      else SensorFileWeekShift (index);
+  }
+
+#endif      // USE_UFILESYS
+
+  // ---------
+  //   JSON
+  // ---------
+
   if (publish) SensorShowJSON (false);
 }
 
@@ -2524,9 +2812,6 @@ bool SensorMqttData ()
       // read presence detection
       detected = ((strcmp (str_value, "1") == 0) || (strcmp (str_value, "on") == 0) || (strcmp (str_value, "ON") == 0));
       if (detected) SensorPresenceSet ();
-
-      // log
-      AddLog (LOG_LEVEL_INFO, PSTR ("SEN: Remote pres %u"), detected);
     }
   }
 
@@ -2555,7 +2840,7 @@ void SensorShowJSON (bool append)
   is_first = true;
   is_temp  = ((sensor_status.temp.source < SENSOR_SOURCE_REMOTE) && (sensor_status.temp.value != INT16_MAX));
   is_humi  = ((sensor_status.humi.source < SENSOR_SOURCE_REMOTE) && (sensor_status.humi.value != INT16_MAX));
-  is_pres  = ((sensor_status.pres.source < SENSOR_SOURCE_REMOTE) && (sensor_status.pres.value != INT16_MAX));
+  is_pres  = (sensor_status.pres.source < SENSOR_SOURCE_REMOTE);
   if (is_temp || is_humi || is_pres)
   {
     // add , in append mode or { in direct publish mode
@@ -2582,10 +2867,10 @@ void SensorShowJSON (bool append)
     if (is_pres)
     {
       if (!is_first) ResponseAppend_P (PSTR (","));
-      ResponseAppend_P (PSTR ("\"Pres\":%d"), sensor_status.pres.value);
-      if (sensor_status.pres.timestamp != 0) ResponseAppend_P (PSTR (",\"Since\":%u"), LocalTime () - sensor_status.pres.timestamp);
+      if (sensor_status.pres.value != UINT16_MAX) ResponseAppend_P (PSTR ("\"Pres\":%d,"), sensor_status.pres.value);
+      if (sensor_status.pres.timestamp != UINT32_MAX) ResponseAppend_P (PSTR ("\"Since\":%u,"), LocalTime () - sensor_status.pres.timestamp);
       SensorGetDelayText (sensor_status.pres.timestamp, str_value, sizeof (str_value));
-      ResponseAppend_P (PSTR (",\"Delay\":\"%s\""), str_value);
+      ResponseAppend_P (PSTR ("\"Delay\":\"%s\""), str_value);
     }
 
     ResponseAppend_P (PSTR ("}"));
@@ -2604,22 +2889,6 @@ void SensorShowJSON (bool append)
 \***********************************************/
 
 #ifdef USE_WEBSERVER
-
-// measure graph main button
-void SensorWebMainButtonMeasure ()
-{
-  // display yearly button
-  if (sensor_status.yearly) WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>📉 Year measure</button></form></p>\n"), D_SENSOR_PAGE_YEARLY);
-
-  // display weekly button
-  if (sensor_status.temp.weekly || sensor_status.humi.weekly) WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>📈 Week measure</button></form></p>\n"), D_SENSOR_PAGE_MEASURE);
-}
-
-// presence graph main button
-void SensorWebMainButtonPresence ()
-{
-  if (sensor_status.pres.source != SENSOR_SOURCE_NONE) WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>👋 Week detection</button></form></p>\n"), D_SENSOR_PAGE_PRESENCE);
-}
 
 // append remote sensor to main page
 void SensorWebSensor ()
@@ -2640,20 +2909,18 @@ void SensorWebSensor ()
   // calculate last presence detection delay
   SensorGetDelayText (sensor_status.pres.timestamp, str_time, sizeof (str_time));
 
-  // if local RCWL-0516 presence sensor
-  if ((sensor_status.pres.source == SENSOR_SOURCE_COUNTER) && (sensor_config.presence == SENSOR_PRESENCE_RCWL0516))
+  // if local presence sensor
+  if (sensor_status.pres.source == SENSOR_SOURCE_COUNTER)
   {
-    GetTextIndexed (str_type, sizeof (str_type), SENSOR_PRESENCE_RCWL0516, kSensorPresenceModel);
-    strcpy (str_value, "0 - 7m");
+    GetTextIndexed (str_type, sizeof (str_type), sensor_config.type_pres, kSensorPresenceModel);
+    switch (sensor_config.type_pres)
+    {
+      case SENSOR_PRESENCE_SWITCH: strcpy (str_value, "contact"); break;
+      case SENSOR_PRESENCE_RCWL0516: strcpy (str_value, "0 - 7m"); break;
+      case SENSOR_PRESENCE_HWMS03: strcpy (str_value, "0.5 - 10m"); break;
+    }
   }
 
-  // else if local HWMS-03 presence sensor
-  else if ((sensor_status.pres.source == SENSOR_SOURCE_COUNTER) && (sensor_config.presence == SENSOR_PRESENCE_HWMS03))
-  {
-    GetTextIndexed (str_type, sizeof (str_type), SENSOR_PRESENCE_HWMS03, kSensorPresenceModel);
-    strcpy (str_value, "0.5 - 10m");
-  }
-  
   // else if remote presence sensor
   else if ((sensor_status.pres.source == SENSOR_SOURCE_REMOTE))
   {
@@ -2675,7 +2942,7 @@ void SensorWebSensor ()
   }
 
   // display last presence detection
-  if (sensor_status.pres.source != SENSOR_SOURCE_NONE) WSContentSend_PD (PSTR ("{s}Last presence{m}%s{e}"), str_time);
+  else if (sensor_status.pres.source != SENSOR_SOURCE_NONE) WSContentSend_PD (PSTR ("{s}Last presence{m}%s{e}"), str_time);
 }
 
 // remote sensor configuration web page
@@ -2738,7 +3005,7 @@ void SensorWebConfigure ()
 
     // set sensor type according to 'prestype' parameter
     WebGetArg (D_CMND_SENSOR_PRES D_CMND_SENSOR_TYPE, str_text, sizeof (str_text));
-    sensor_config.presence = (uint8_t)atoi (str_text);
+    sensor_config.type_pres = (uint8_t)atoi (str_text);
 
     // save config
     SensorSaveConfig ();
@@ -2836,7 +3103,7 @@ void SensorWebConfigure ()
   for (index = 0; index < SENSOR_PRESENCE_MAX; index ++)
   {
     GetTextIndexed (str_text, sizeof (str_text), index, kSensorPresenceModel);
-    if (sensor_config.presence == index) strcpy_P (str_value, PSTR ("checked")); else strcpy (str_value, "");
+    if (sensor_config.type_pres == index) strcpy_P (str_value, PSTR ("checked")); else strcpy (str_value, "");
     WSContentSend_P (PSTR ("<p><input type='radio' name='%s' value='%d' %s>%s</p>\n"), D_CMND_SENSOR_PRES D_CMND_SENSOR_TYPE, index, str_value, str_text);
   }
 
@@ -2871,15 +3138,29 @@ void SensorWebGraphSwipe ()
 // --------------------
 
 // Sensor graph style
-void SensorWebGraphWeeklyCurveStyle ()
+void SensorWebGraphWeeklyMeasureStyle ()
 {
+  WSContentSend_P (PSTR ("body {color:white;background-color:#252525;font-family:Arial, Helvetica, sans-serif;}\n"));
+
+  WSContentSend_P (PSTR ("a {color:white;}\n"));
+  WSContentSend_P (PSTR ("a:link {text-decoration:none;}\n"));
+
+  WSContentSend_P (PSTR ("div {padding:0px;margin:0px;text-align:center;}\n"));
+  WSContentSend_P (PSTR ("div.title {font-size:4vh;font-weight:bold;}\n"));
+  WSContentSend_P (PSTR ("div.header {font-size:3vh;margin:1vh auto;}\n"));
+
+  WSContentSend_P (PSTR ("div.value {font-size:4vh;padding-bottom:1vh;}\n"));
+  WSContentSend_P (PSTR ("div.value span {margin:0px 2vw;}\n"));
+  WSContentSend_P (PSTR ("div.value span#humi {color:%s;}\n"), SENSOR_COLOR_HUMI);
+  WSContentSend_P (PSTR ("div.value span#temp {color:%s;}\n"), SENSOR_COLOR_TEMP);
+
   WSContentSend_P (PSTR("button {padding:2px 12px;font-size:2.5vh;background:none;color:#fff;border:1px #666 solid;border-radius:6px;}\n"));
   WSContentSend_P (PSTR("button:hover {background:#aaa;}\n"));
   WSContentSend_P (PSTR("button:disabled {color:#252525;background:#252525;border:1px #252525 solid;}\n"));
 
-  WSContentSend_P (PSTR("div.banner {width:88%%;}\n"));
+  WSContentSend_P (PSTR("div.banner {width:88%%;margin:auto;}\n"));
   WSContentSend_P (PSTR("div.banner div {display:inline-block;}\n"));
-  WSContentSend_P (PSTR("div.date {font-size:2vh;}\n"));
+  WSContentSend_P (PSTR("div.date {font-size:3vh;}\n"));
   WSContentSend_P (PSTR("div.prev {float:left;}\n"));
   WSContentSend_P (PSTR("div.next {float:right;}\n"));
 
@@ -2888,55 +3169,54 @@ void SensorWebGraphWeeklyCurveStyle ()
 }
 
 // Sensor graph curve display
-void SensorWebGraphWeeklyCurve (const uint16_t week, const char* pstr_url)
+void SensorWebGraphWeeklyMeasureCurve (const uint8_t week, const char* pstr_url)
 {
-  bool     data_ok = true;
-  uint8_t  day, hour, slot, counter, value;
+//  bool     data_ok = true;
+  uint8_t  day, hour, slot, value;
+  uint8_t  count, count_start, count_stop;
+  uint8_t  prev_week, next_week;
   int16_t  scale, temp_range, temp_incr, temp_min, temp_max;
-  uint16_t act_week, ref_week, prev_week, next_week, shift_week;
-  uint32_t index, unit, graph_width, graph_x, prev_x, graph_y, prev_y;
-  char     str_type[8];
+  uint32_t index, unit, graph_width, graph_x, prev_x, graph_y, prev_y, last_x;
+  char     str_type[16];
   char     str_text[48];
   String   str_result;
 
-  // data in memory
-  if (week == 0) 
-    for (day = 0; day < 7; day++)
-      for (hour = 0; hour < 24; hour++)
-        for (slot = 0; slot < 6; slot++)
-        {
-          sensor_graph.temp[day][hour][slot] = sensor_week.temp[day][hour][slot];
-          sensor_graph.humi[day][hour][slot] = sensor_week.humi[day][hour][slot];
-          sensor_graph.event[day][hour][slot].data = sensor_week.event[day][hour][slot].data;
-        }
+  // check parameters
+  if (week > 52) return;
+  if (pstr_url == nullptr) return;
 
 #ifdef USE_UFILESYS
-  // load data from file
-  else data_ok = SensorFileLoadWeek (week);
+  // set display sequence
+  count_start = 1;
+  count_stop  = 8;
+
+  // load weekly data
+  SensorFileWeekLoad (week);
+#else
+  // set display sequence
+  count_start = RtcTime.day_of_week;
+  count_stop  = count_start + 7;
 #endif      // USE_UFILESYS
 
-  // if data is not loaded, return
-  if (!data_ok) return;
-
   // boundaries of SVG graph
+  last_x = SENSOR_GRAPH_START;
   graph_width = SENSOR_GRAPH_STOP - SENSOR_GRAPH_START;
 
   // loop to calculate minimum and maximum temperature for the graph
-  if (sensor_status.temp.weekly)
+  if (sensor_config.weekly_temp)
   {
-    temp_min = INT16_MAX;
-    temp_max = INT16_MAX;
+    temp_min = temp_max = INT16_MAX;
     for (day = 0; day < 7; day++)
       for (hour = 0; hour < 24; hour++)
         for (slot = 0; slot < 6; slot++)
         {
           // minimum temperature
-          if (temp_min == INT16_MAX) temp_min = sensor_graph.temp[day][hour][slot];
-            else if (sensor_graph.temp[day][hour][slot] != INT16_MAX) temp_min = min (temp_min, sensor_graph.temp[day][hour][slot]);
+          if (temp_min == INT16_MAX) temp_min = sensor_week[day][hour][slot].temp;
+            else if (sensor_week[day][hour][slot].temp != INT16_MAX) temp_min = min (temp_min, sensor_week[day][hour][slot].temp);
 
           // maximum temperature
-          if (temp_max == INT16_MAX) temp_max = sensor_graph.temp[day][hour][slot];
-            else if (sensor_graph.temp[day][hour][slot] != INT16_MAX) temp_max = max (temp_max, sensor_graph.temp[day][hour][slot]);
+          if (temp_max == INT16_MAX) temp_max = sensor_week[day][hour][slot].temp;
+            else if (sensor_week[day][hour][slot].temp != INT16_MAX) temp_max = max (temp_max, sensor_week[day][hour][slot].temp);
         }
 
     // set upper and lower range according to min and max temperature
@@ -2950,44 +3230,31 @@ void SensorWebGraphWeeklyCurve (const uint16_t week, const char* pstr_url)
 
 #ifdef USE_UFILESYS
  
-  // calculate actual week (week start on monday)
-  act_week = SensorGetCurrentWeek ();
-  if (week == 0) ref_week = act_week;
-    else ref_week = week;
-
-  // previous week
-  prev_week = (ref_week + 52 - 1) % 52;
-  if (prev_week == 0) prev_week = 52;
-
-  // next week
-  next_week = (ref_week + 1) % 52;
-  if (next_week == 0) next_week = 52;
-  if (ref_week == act_week - 1) next_week = 0;
+  // calculate previous and next week
+  if (week > 0) next_week = week - 1; else next_week = UINT8_MAX;
+  prev_week = week + 1;
 
   // start of form
   WSContentSend_P(PSTR("<form method='get' action='/%s'>\n"), pstr_url);
+  WSContentSend_P (PSTR("<div class='banner'>\n"));
 
   // date
-  WSContentSend_P (PSTR("<div class='banner'>\n"));
-  if (ref_week <= act_week) shift_week = act_week - ref_week;
-    else shift_week = 53 - ref_week + act_week;
-  SensorGetWeekLabel (shift_week, str_text, sizeof (str_text));
+  SensorGetWeekLabel (week, str_text, sizeof (str_text));
   WSContentSend_P (PSTR("<div class='date'>%s</div>\n"), str_text);
 
   // if exist, navigation to previous week
-  if (SensorFileExist (prev_week)) strcpy (str_text, "");
-    else strcpy (str_text, "disabled");
-  WSContentSend_P (PSTR("<div class='prev'><button name='week' value=%u id='prev' %s>&lt;&lt;</button></div>\n"), prev_week, str_text);
+  SensorGetWeekLabel (prev_week, str_text, sizeof (str_text));
+  if (SensorFileWeekExist (prev_week)) strcpy (str_type, ""); else strcpy (str_type, "disabled");
+  WSContentSend_P (PSTR("<div class='prev'><button name='week' title='%s' value=%u id='prev' %s>&lt;&lt;</button></div>\n"), str_text, prev_week, str_type);
 
   // if exist, navigation to next week or to live values
-  if (next_week == 0) strcpy (str_text, "");
-    else if (SensorFileExist (next_week)) strcpy (str_text, ""); 
-    else strcpy (str_text, "disabled");
-  WSContentSend_P (PSTR("<div class='next'><button name='week' value=%u id='next' %s>&gt;&gt;</button></div>\n"), next_week, str_text);
-  WSContentSend_P (PSTR("</div>\n"));     // banner
+  SensorGetWeekLabel (next_week, str_text, sizeof (str_text));
+  if (SensorFileWeekExist (next_week)) strcpy (str_type, ""); else strcpy (str_type, "disabled");
+  WSContentSend_P (PSTR("<div class='next'><button name='week' title='%s' value=%u id='next' %s>&gt;&gt;</button></div>\n"), str_text, next_week, str_type);
 
   // end of form
-  WSContentSend_P(PSTR("<form method='get' action='/%s'>\n"), D_SENSOR_PAGE_MEASURE);
+  WSContentSend_P (PSTR("</div>\n"));     // banner
+  WSContentSend_P(PSTR("<form method='get' action='/%s'>\n"), D_SENSOR_PAGE_WEEK_MEASURE);
 
 #endif    // USE_UFILESYS
 
@@ -3003,10 +3270,10 @@ void SensorWebGraphWeeklyCurve (const uint16_t week, const char* pstr_url)
   WSContentSend_P (PSTR ("polyline.temp {stroke:%s;fill:none;stroke-width:2;}\n"), SENSOR_COLOR_TEMP);
   WSContentSend_P (PSTR ("path.humi {stroke:%s;fill:%s;opacity:1;fill-opacity:0.5;}\n"), SENSOR_COLOR_HUMI, SENSOR_COLOR_HUMI);
 
-  WSContentSend_P (PSTR ("rect {opacity:0.8;}\n"));
-  WSContentSend_P (PSTR ("rect.acti {fill:%s;}\n"), SENSOR_COLOR_ACTI);
-  WSContentSend_P (PSTR ("rect.inac {fill:%s;}\n"), SENSOR_COLOR_INAC);
-  WSContentSend_P (PSTR ("rect.frame {stroke:white;fill:none;}\n"));
+  WSContentSend_P (PSTR ("rect.frame {fill:none;stroke:#aaa;}\n"));
+  WSContentSend_P (PSTR ("rect.none {fill:%s;opacity:0.8;}\n"), SENSOR_COLOR_NONE);
+  WSContentSend_P (PSTR ("rect.acti {fill:%s;opacity:0.8;}\n"), SENSOR_COLOR_ACTI);
+  WSContentSend_P (PSTR ("rect.inac {fill:%s;opacity:0.8;}\n"), SENSOR_COLOR_INAC);
 
   WSContentSend_P (PSTR ("line {stroke-dasharray:1 2;stroke-width:0.5;}\n"));
   WSContentSend_P (PSTR ("line.time {stroke:%s;}\n"), SENSOR_COLOR_LINE);
@@ -3022,7 +3289,7 @@ void SensorWebGraphWeeklyCurve (const uint16_t week, const char* pstr_url)
 
   // ------  Humidity  ---------
 
-  if (sensor_status.humi.weekly)
+  if (sensor_config.weekly_humi)
   {
     // init
     index   = 0;
@@ -3031,9 +3298,9 @@ void SensorWebGraphWeeklyCurve (const uint16_t week, const char* pstr_url)
     str_result = "";
 
     // loop thru points
-    for (counter = 0; counter < 7; counter++)
+    for (count = count_start; count < count_stop; count++)
     {
-      day = ((RtcTime.day_of_week + counter) % 7);
+      day = count % 7;
       for (hour = 0; hour < 24; hour++)
         for (slot = 0; slot < 6; slot++)
         {
@@ -3041,7 +3308,7 @@ void SensorWebGraphWeeklyCurve (const uint16_t week, const char* pstr_url)
           graph_x = SENSOR_GRAPH_START + (index * graph_width / 1008);
 
           // calculate y coordinate
-          if (sensor_graph.humi[day][hour][slot] != INT8_MAX) graph_y = SENSOR_GRAPH_HEIGHT - SENSOR_GRAPH_HEIGHT * (uint32_t)sensor_graph.humi[day][hour][slot] / 100;
+          if (sensor_week[day][hour][slot].humi != INT8_MAX) graph_y = SENSOR_GRAPH_HEIGHT - SENSOR_GRAPH_HEIGHT * (uint32_t)sensor_week[day][hour][slot].humi / 100;
             else graph_y = UINT32_MAX;
 
           // if needed, start path
@@ -3054,6 +3321,7 @@ void SensorWebGraphWeeklyCurve (const uint16_t week, const char* pstr_url)
           else if (graph_y != UINT32_MAX) { sprintf (str_text, "L%u %u ", graph_x, graph_y); str_result += str_text; }
 
           // save previous values
+          if (graph_y != UINT32_MAX) last_x = max (last_x, graph_x);
           prev_x = graph_x;
           prev_y = graph_y;
           index++;
@@ -3070,7 +3338,7 @@ void SensorWebGraphWeeklyCurve (const uint16_t week, const char* pstr_url)
 
   // ---------  Temperature  ---------
 
-  if (sensor_status.temp.weekly)
+  if (sensor_config.weekly_temp)
   {
     // init
     index   = 0;
@@ -3079,10 +3347,9 @@ void SensorWebGraphWeeklyCurve (const uint16_t week, const char* pstr_url)
     str_result = "";
 
     // loop thru points
-    for (counter = 0; counter < 7; counter++)
+    for (count = count_start; count < count_stop; count++)
     {
-      if (week == 0) day = ((RtcTime.day_of_week + counter) % 7);
-        else day = (counter + 1) % 7;
+      day = count % 7;
       for (hour = 0; hour < 24; hour++)
         for (slot = 0; slot < 6; slot++)
         {
@@ -3090,8 +3357,8 @@ void SensorWebGraphWeeklyCurve (const uint16_t week, const char* pstr_url)
           graph_x = SENSOR_GRAPH_START + (index * graph_width / 1008);
 
           // calculate y coordinate
-          if (sensor_graph.temp[day][hour][slot] == INT16_MAX) graph_y = UINT32_MAX;
-            else graph_y = SENSOR_GRAPH_HEIGHT - SENSOR_GRAPH_HEIGHT * (uint32_t)(sensor_graph.temp[day][hour][slot] - temp_min) / (uint32_t)temp_range;
+          if (sensor_week[day][hour][slot].temp == INT16_MAX) graph_y = UINT32_MAX;
+            else graph_y = SENSOR_GRAPH_HEIGHT - SENSOR_GRAPH_HEIGHT * (uint32_t)(sensor_week[day][hour][slot].temp - temp_min) / (uint32_t)temp_range;
 
           // if needed, start polyline
           if ((graph_y != UINT32_MAX) && (prev_y == UINT32_MAX)) str_result += "<polyline class='temp' points='";
@@ -3103,6 +3370,7 @@ void SensorWebGraphWeeklyCurve (const uint16_t week, const char* pstr_url)
           if (graph_y != UINT32_MAX) { sprintf (str_text, "%u,%u ", graph_x, graph_y); str_result += str_text; }
 
           // save previous values
+          if (graph_y != UINT32_MAX) last_x = max (last_x, graph_x);
           prev_x = graph_x;
           prev_y = graph_y;
           index++;
@@ -3118,7 +3386,7 @@ void SensorWebGraphWeeklyCurve (const uint16_t week, const char* pstr_url)
 
   // ---------  Activity  ---------
 
-  if (sensor_status.acti.weekly)
+  if (sensor_config.weekly_acti)
   {
     // init
     index   = 0;
@@ -3126,14 +3394,14 @@ void SensorWebGraphWeeklyCurve (const uint16_t week, const char* pstr_url)
     graph_y = prev_y = SENSOR_GRAPH_HEIGHT - SENSOR_GRAPH_ACTI;
 
     // loop thru points
-    for (counter = 0; counter < 7; counter++)
+    for (count = count_start; count < count_stop; count++)
     {
-      day = ((RtcTime.day_of_week + counter) % 7);
+      day = count % 7;
       for (hour = 0; hour < 24; hour++)
         for (slot = 0; slot < 6; slot++)
         {
           // read slot status
-          value = sensor_graph.event[day][hour][slot].activity;
+          value = sensor_week[day][hour][slot].event.acti;
 
           // start and end of activity
           if ((prev_x == UINT32_MAX) && (value == 1)) prev_x = SENSOR_GRAPH_START + index * graph_width / 1008;
@@ -3156,7 +3424,7 @@ void SensorWebGraphWeeklyCurve (const uint16_t week, const char* pstr_url)
 
   // ---------  Inactivity  ---------
 
-  if (sensor_status.inac.weekly)
+  if (sensor_config.weekly_inac)
   {
     // init
     index   = 1;
@@ -3164,14 +3432,14 @@ void SensorWebGraphWeeklyCurve (const uint16_t week, const char* pstr_url)
     graph_y = prev_y = SENSOR_GRAPH_HEIGHT - SENSOR_GRAPH_INAC;
 
     // loop thru points
-    for (counter = 0; counter < 7; counter++)
+    for (count = count_start; count < count_stop; count++)
     {
-      day = ((RtcTime.day_of_week + counter) % 7);
+      day = count % 7;
       for (hour = 0; hour < 24; hour++)
         for (slot = 0; slot < 6; slot++)
         {
           // read slot status
-          value = sensor_graph.event[day][hour][slot].inactivity;
+          value = sensor_week[day][hour][slot].event.inac;
 
           // start and end of activity
           if ((prev_x == UINT32_MAX) && (value == 1)) prev_x = SENSOR_GRAPH_START + (index * graph_width / 1008);
@@ -3199,17 +3467,15 @@ void SensorWebGraphWeeklyCurve (const uint16_t week, const char* pstr_url)
   // -------  Time line  --------
 
   // display week days
-  for (counter = 0; counter < 7; counter++)
+  for (count = count_start; count < count_stop; count++)
   {
     // get day label
-    if (week == 0) day = ((RtcTime.day_of_week + counter) % 7);
-      else day = (counter + 1) % 7;
+    day = count % 7;
     strlcpy (str_text, kWeekdayNames + day * 3, 4);
-    if ((week == 0) && (counter == 6)) strcpy (str_type, "today");
-      else strcpy (str_type, "day");
+    strcpy (str_type, "day");
 
     // display day
-    graph_x = SENSOR_GRAPH_START + (counter * 2 + 1) * graph_width / 14 - 10;
+    graph_x = SENSOR_GRAPH_START + ((count - count_start) * 2 + 1) * graph_width / 14 - 10;
     WSContentSend_P (PSTR ("<text class='%s' x=%u y=%u>%s</text>\n"), str_type, graph_x, 20, str_text);
   }
 
@@ -3223,7 +3489,7 @@ void SensorWebGraphWeeklyCurve (const uint16_t week, const char* pstr_url)
   // -------  Units  -------
 
   // temperature units
-  if (sensor_status.temp.weekly)
+  if (sensor_config.weekly_temp)
   {
     unit = max (temp_range / temp_incr + 1, 2);
     for (index = 0; index < unit; index ++)
@@ -3243,7 +3509,7 @@ void SensorWebGraphWeeklyCurve (const uint16_t week, const char* pstr_url)
   }
 
   // humidity units
-  if (sensor_status.humi.weekly)
+  if (sensor_config.weekly_humi)
   {
     for (index = 0; index < 5; index ++)
     {
@@ -3268,15 +3534,16 @@ void SensorWebGraphWeeklyCurve (const uint16_t week, const char* pstr_url)
 // Temperature and humidity weekly page
 void SensorWebWeeklyMeasure ()
 {
-  uint16_t week = 0;
-  char     str_value[4];
+  uint8_t week;
+  char    str_value[4];
 
   // if target temperature has been changed
   if (Webserver->hasArg ("week"))
   {
     WebGetArg ("week", str_value, sizeof(str_value));
-    if (strlen(str_value) > 0) week = atoi (str_value);
+    if (strlen(str_value) > 0) week = (uint8_t)atoi (str_value);
   }
+  else week = 0;
 
   // set page label
   WSContentStart_P ("Weekly Measure", false);
@@ -3293,23 +3560,7 @@ void SensorWebWeeklyMeasure ()
 
   // page style
   WSContentSend_P (PSTR ("<style>\n"));
-  WSContentSend_P (PSTR ("body {color:white;background-color:#252525;font-family:Arial, Helvetica, sans-serif;}\n"));
-
-  WSContentSend_P (PSTR ("div {margin:0.25rem auto;padding:0.1rem 0px;text-align:center;}\n"));
-
-  WSContentSend_P (PSTR ("div.title {font-size:3.5vh;font-weight:bold;}\n"));
-  WSContentSend_P (PSTR ("div.header {font-size:2.5vh;margin:2vh auto;}\n"));
-
-  WSContentSend_P (PSTR ("a {color:white;}\n"));
-  WSContentSend_P (PSTR ("a:link {text-decoration:none;}\n"));
-
-  WSContentSend_P (PSTR ("span {font-size:4vh;padding:0vh 3vh;}\n"));
-  WSContentSend_P (PSTR ("span#humi {color:%s;}\n"), SENSOR_COLOR_HUMI);
-  WSContentSend_P (PSTR ("span#temp {color:%s;}\n"), SENSOR_COLOR_TEMP);
-
-  // graph section style
-  SensorWebGraphWeeklyCurveStyle ();
-
+  SensorWebGraphWeeklyMeasureStyle ();
   WSContentSend_P (PSTR ("</style>\n"));
 
   WSContentSend_P (PSTR ("</head>\n"));
@@ -3329,12 +3580,12 @@ void SensorWebWeeklyMeasure ()
   WSContentSend_P (PSTR ("<div class='value'><a href='/'>"));
 
   // temperature
-  if (sensor_status.temp.weekly)
+  if (sensor_config.weekly_temp)
     if (sensor_status.temp.value != INT16_MAX) WSContentSend_P (PSTR ("<span id='temp'>%d.%d °C</span>"), sensor_status.temp.value / 10, sensor_status.temp.value % 10);
       else WSContentSend_P (PSTR ("<span id='temp'>--- °C</span>"));
 
   // humidity
-  if (sensor_status.humi.weekly)
+  if (sensor_config.weekly_humi)
     if (sensor_status.humi.value != INT16_MAX) WSContentSend_P (PSTR ("<span id='humi'>%d.%d %%</span>"), sensor_status.humi.value / 10, sensor_status.humi.value % 10);
       else WSContentSend_P (PSTR ("<span id='humi'>--- %%</span>"));
 
@@ -3342,7 +3593,7 @@ void SensorWebWeeklyMeasure ()
 
   // ------- Graph --------
 
-  SensorWebGraphWeeklyCurve (week, D_SENSOR_PAGE_MEASURE);
+  SensorWebGraphWeeklyMeasureCurve (week, D_SENSOR_PAGE_WEEK_MEASURE);
 
   // end of page
   WSContentStop ();
@@ -3350,38 +3601,97 @@ void SensorWebWeeklyMeasure ()
 
 
 // Sensor graph style
-void SensorWebGraphYearlyCurveStyle ()
+void SensorWebGraphYearlyMeasureStyle ()
 {
+  WSContentSend_P (PSTR ("body {color:white;background-color:#252525;font-family:Arial, Helvetica, sans-serif;}\n"));
+
+  WSContentSend_P (PSTR ("div {margin:0.25rem auto;padding:0.1rem 0px;text-align:center;}\n"));
+  WSContentSend_P (PSTR ("div.title {font-size:3.5vh;font-weight:bold;}\n"));
+  WSContentSend_P (PSTR ("div.header {font-size:2.5vh;margin:2vh auto;}\n"));
+
+  WSContentSend_P (PSTR ("a {color:white;}\n"));
+  WSContentSend_P (PSTR ("a:link {text-decoration:none;}\n"));
+
+  WSContentSend_P (PSTR ("span {font-size:4vh;padding:0vh 3vh;}\n"));
+  WSContentSend_P (PSTR ("span#temp {color:%s;}\n"), SENSOR_COLOR_TEMP);
+
+  // navigation buttons
+  WSContentSend_P (PSTR ("button {padding:2px 12px;font-size:2.5vh;background:none;color:#fff;border:1px #666 solid;border-radius:6px;}\n"));
+  WSContentSend_P (PSTR ("button:hover {background:#aaa;}\n"));
+  WSContentSend_P (PSTR ("button:disabled {color:#252525;background:#252525;border:1px #252525 solid;}\n"));
+
+  // banner
+  WSContentSend_P (PSTR ("div.banner {width:88%%;margin:auto;}\n"));
+  WSContentSend_P (PSTR ("div.banner div {display:inline-block;}\n"));
+  WSContentSend_P (PSTR ("div.date {font-size:3vh;}\n"));
+  WSContentSend_P (PSTR ("div.prev {float:left;}\n"));
+  WSContentSend_P (PSTR ("div.next {float:right;}\n"));
+
   WSContentSend_P (PSTR("div.graph {width:100%%;margin:1vh auto;}\n"));
   WSContentSend_P (PSTR("svg.graph {width:100%%;height:50vh;}\n"));
 }
 
-// Sensor graph curve display
-void SensorWebGraphYearlyCurve ()
+// Sensor year graph curve display
+void SensorWebGraphYearlyMeasureCurve (const uint16_t year, const char* pstr_url)
 {
+  uint8_t  month, month_start, month_stop, day, counter;
   int16_t  temp_min, temp_max, temp_range, temp_incr, scale;
-  uint32_t counter, index, day, month, start;
-  uint32_t unit, graph_width, graph_x, prev_x, graph_y, prev_y;
-//  char     str_type[8];
+  uint32_t index, unit, graph_width, graph_x, prev_x, graph_y, prev_y;
   char     str_text[48];
   String   str_result;
+
+#ifdef USE_UFILESYS
+
+  // load data from file
+  SensorFileYearLoad (year);
+
+  // start of form
+  WSContentSend_P (PSTR("<form method='get' action='/%s'>\n"), pstr_url);
+  WSContentSend_P (PSTR("<div class='banner'>\n"));
+
+  // date
+  WSContentSend_P (PSTR("<div class='date'>%u</div>\n"), year);
+
+  // if exist, navigation to previous year
+  if (SensorFileYearExist (year - 1)) strcpy (str_text, ""); else strcpy (str_text, "disabled");
+  WSContentSend_P (PSTR("<div class='prev'><button name='year' title='%u' value=%u id='prev' %s>&lt;&lt;</button></div>\n"), year - 1, year - 1, str_text);
+
+  // if exist, navigation to next year
+  if (SensorFileYearExist (year + 1)) strcpy (str_text, ""); else strcpy (str_text, "disabled");
+  WSContentSend_P (PSTR("<div class='next'><button name='year' title='%u' value=%u id='next' %s>&gt;&gt;</button></div>\n"), year + 1, year + 1, str_text);
+
+  // end of form
+  WSContentSend_P (PSTR("</div>\n"));     // banner
+  WSContentSend_P (PSTR("<form method='get' action='/%s'>\n"), D_SENSOR_PAGE_YEAR_MEASURE);
+
+  // set month window
+  month_start = 0;
+  month_stop  = 12;
+
+#else
+
+  // set month window
+  month_start = RtcTime.month;
+  month_stop  = month_start + 12;
+
+#endif    // USE_UFILESYS
 
   // boundaries of SVG graph
   graph_width = SENSOR_GRAPH_STOP - SENSOR_GRAPH_START;
 
   // loop to calculate minimum and maximum temperature for the graph
-  temp_min = INT16_MAX;
-  temp_max = INT16_MAX;
-  for (index = 0; index < SENSOR_YEAR_DAYS; index++)
-  {
-    // minimum temperature
-    if (temp_min == INT16_MAX) temp_min = sensor_year.temp_min[index];
-      else if (sensor_year.temp_min[index] != INT16_MAX) temp_min = min (temp_min, sensor_year.temp_min[index]);
+  temp_min = temp_max = INT16_MAX;
+  for (month = 0; month < 12; month ++)
+    for (day = 0; day < 31; day++)
+    {
+      // minimum temperature
+      if (temp_min == INT16_MAX) temp_min = sensor_year[month][day].temp_min;
+        else if (sensor_year[month][day].temp_min != INT16_MAX) temp_min = min (temp_min, sensor_year[month][day].temp_min);
 
-    // maximum temperature
-    if (temp_max == INT16_MAX) temp_max = sensor_year.temp_max[index];
-      else if (sensor_year.temp_max[index] != INT16_MAX) temp_max = max (temp_max, sensor_year.temp_max[index]);
-  }
+      // maximum temperature
+      if (temp_max == INT16_MAX) temp_max = sensor_year[month][day].temp_max;
+        else if (sensor_year[month][day].temp_max != INT16_MAX) temp_max = max (temp_max, sensor_year[month][day].temp_max);
+    }
 
   // set upper and lower range according to min and max temperature
   if (temp_min != INT16_MAX) temp_min = (temp_min / 10 - 2) * 10;
@@ -3390,7 +3700,6 @@ void SensorWebGraphYearlyCurve ()
   // calculate temperature range and increment
   temp_range = temp_max - temp_min;
   temp_incr  = max (temp_range / 40 * 10, 10);
-  start      = RtcTime.day_of_year;
 
   // start of SVG graph
   WSContentSend_P (PSTR("<div class='graph'>\n"));
@@ -3417,134 +3726,117 @@ void SensorWebGraphYearlyCurve ()
 
   WSContentSend_P(PSTR("</style>\n"));
 
-  // ---------  Maximum Temperature  ---------
+  // --- Maximum temperature curve ---
 
-  // loop thru points
+  // loop thru months and days
   str_result = "";
   graph_x = prev_x = UINT32_MAX;
   graph_y = prev_y = UINT32_MAX;
   index = 0;
-  for (counter = start; counter < start + SENSOR_YEAR_DAYS; counter++)
+  for (counter = month_start; counter < month_stop; counter ++)
   {
-        // calculate day in array and x coordinate
-        day = counter % SENSOR_YEAR_DAYS;
-        graph_x = SENSOR_GRAPH_START + (index * graph_width / SENSOR_YEAR_DAYS);
+    // loop thru days
+    month = counter % 12;
+    for (day = 0; day < days_in_month[month]; day ++)
+    {
+      // calculate x coordinate
+      graph_x = SENSOR_GRAPH_START + (index * graph_width / 366);
 
-        // calculate y coordinate
-        if (sensor_year.temp_max[day] == INT16_MAX) graph_y = UINT32_MAX;
-          else graph_y = SENSOR_GRAPH_HEIGHT - SENSOR_GRAPH_HEIGHT * (uint32_t)(sensor_year.temp_max[day] - temp_min) / (uint32_t)temp_range;
+      // calculate y coordinate
+      if (sensor_year[month][day].temp_max == INT16_MAX) graph_y = UINT32_MAX;
+        else graph_y = SENSOR_GRAPH_HEIGHT - SENSOR_GRAPH_HEIGHT * (uint32_t)(sensor_year[month][day].temp_max - temp_min) / (uint32_t)temp_range;
 
-        // if curve restart from beginning
-        if ((graph_x < prev_x) && (prev_x != UINT32_MAX)) str_result += "'/>\n<polyline class='max' points='";
+      // if curve restart from beginning
+      if ((graph_x < prev_x) && (prev_x != UINT32_MAX)) str_result += "'/>\n<polyline class='max' points='";
 
-        // if needed, start polyline
-        else if ((graph_y != UINT32_MAX) && (prev_y == UINT32_MAX)) str_result += "<polyline class='max' points='";
+      // if needed, start polyline
+      else if ((graph_y != UINT32_MAX) && (prev_y == UINT32_MAX)) str_result += "<polyline class='max' points='";
 
-        // else if needed, stop polyline
-        else if ((graph_y == UINT32_MAX) && (prev_y != UINT32_MAX)) str_result += "'/>\n";
+      // else if needed, stop polyline
+      else if ((graph_y == UINT32_MAX) && (prev_y != UINT32_MAX)) str_result += "'/>\n";
 
-        // if needed, draw point
-        if (graph_y != UINT32_MAX) { sprintf (str_text, "%u,%u ", graph_x, graph_y); str_result += str_text; }
+      // if needed, draw point
+      if (graph_y != UINT32_MAX) { sprintf (str_text, "%u,%u ", graph_x, graph_y); str_result += str_text; }
 
-        // save previous values
-        prev_x = graph_x;
-        prev_y = graph_y;
-        index ++;
+      // save previous values
+      prev_x = graph_x;
+      prev_y = graph_y;
+      index ++;
 
-        // if needed, publish result
-        if (str_result.length () > 256) { WSContentSend_P (str_result.c_str ()); str_result = ""; }
+      // if needed, publish result
+      if (str_result.length () > 256) { WSContentSend_P (str_result.c_str ()); str_result = ""; }
+    }
   }
   if (graph_y != UINT32_MAX) str_result += "'/>\n";
   WSContentSend_P (str_result.c_str ());
 
-  // ---------  Minimum Temperature  ---------
+  // ---  Minimum temperature curve  ---
 
-  // loop thru points
+  // loop thru months and days
   str_result = "";
   graph_x = prev_x = UINT32_MAX;
   graph_y = prev_y = UINT32_MAX;
   index = 0;
-  for (counter = start; counter < start + SENSOR_YEAR_DAYS; counter++)
+  for (counter = month_start; counter < month_stop; counter ++)
   {
-        // calculate day in array and x coordinate
-        day = counter % SENSOR_YEAR_DAYS;
-        graph_x = SENSOR_GRAPH_START + (index * graph_width / SENSOR_YEAR_DAYS);
+    // loop thru days
+    month = counter % 12;
+    for (day = 0; day < days_in_month[month]; day ++)
+    {
+      // calculate day in array and x coordinate
+      graph_x = SENSOR_GRAPH_START + (index * graph_width / 366);
 
-        // calculate y coordinate
-        if (sensor_year.temp_min[day] == INT16_MAX) graph_y = UINT32_MAX;
-          else graph_y = SENSOR_GRAPH_HEIGHT - SENSOR_GRAPH_HEIGHT * (uint32_t)(sensor_year.temp_min[day] - temp_min) / (uint32_t)temp_range;
+      // calculate y coordinate
+      if (sensor_year[month][day].temp_min == INT16_MAX) graph_y = UINT32_MAX;
+        else graph_y = SENSOR_GRAPH_HEIGHT - SENSOR_GRAPH_HEIGHT * (uint32_t)(sensor_year[month][day].temp_min - temp_min) / (uint32_t)temp_range;
 
-        // if curve restart from beginning
-        if ((graph_x < prev_x) && (prev_x != UINT32_MAX)) str_result += "'/>\n<polyline class='min' points='";
+      // if curve restart from beginning
+      if ((graph_x < prev_x) && (prev_x != UINT32_MAX)) str_result += "'/>\n<polyline class='min' points='";
 
-        // if needed, start polyline
-        else if ((graph_y != UINT32_MAX) && (prev_y == UINT32_MAX)) str_result += "<polyline class='min' points='";
+      // if needed, start polyline
+      else if ((graph_y != UINT32_MAX) && (prev_y == UINT32_MAX)) str_result += "<polyline class='min' points='";
 
-        // else if needed, stop polyline
-        else if ((graph_y == UINT32_MAX) && (prev_y != UINT32_MAX)) str_result += "'/>\n";
+      // else if needed, stop polyline
+      else if ((graph_y == UINT32_MAX) && (prev_y != UINT32_MAX)) str_result += "'/>\n";
 
-        // if needed, draw point
-        if (graph_y != UINT32_MAX) { sprintf (str_text, "%u,%u ", graph_x, graph_y); str_result += str_text; }
+      // if needed, draw point
+      if (graph_y != UINT32_MAX) { sprintf (str_text, "%u,%u ", graph_x, graph_y); str_result += str_text; }
 
-        // save previous values
-        prev_x = graph_x;
-        prev_y = graph_y;
-        index++;
+      // save previous values
+      prev_x = graph_x;
+      prev_y = graph_y;
+      index ++;
 
-        // if needed, publish result
-        if (str_result.length () > 256) { WSContentSend_P (str_result.c_str ()); str_result = ""; }
+      // if needed, publish result
+      if (str_result.length () > 256) { WSContentSend_P (str_result.c_str ()); str_result = ""; }
+    }
   }
   if (graph_y != UINT32_MAX) str_result += "'/>\n";
   WSContentSend_P (str_result.c_str ());
 
-  // -------  Frame  -------
+  // ---  Frame  ---
 
   WSContentSend_P (PSTR ("<rect class='frame' x=%u y=%u width=%u height=%u rx=4 />\n"), SENSOR_GRAPH_START, 0, SENSOR_GRAPH_STOP - SENSOR_GRAPH_START, SENSOR_GRAPH_HEIGHT + 1);
 
-  // -------  Time line  --------
+  // ---  Time line  ---
 
-  // display months
-  day   = RtcTime.day_of_month;
-  month = RtcTime.month - 1;
-  if (day > 15) { month++; start = 30 - day + 15; }
-    else { start = 15 - day; }
-  for (counter = 0; counter < 12; counter++)
+  // display month names
+  index = 15;
+  for (counter = month_start; counter < month_stop; counter ++)
   {
     // get month name
-    month = month % 12;
+    month = counter % 12;
     strlcpy (str_text, kMonthNames + month * 3, 4);
 
     // display month
-    if ((start > 3) && (start < 363))
-    {
-      graph_x = SENSOR_GRAPH_START + start * graph_width / SENSOR_YEAR_DAYS;
-      WSContentSend_P (PSTR ("<text class='month' text-anchor='middle' x=%u y=%u>%s</text>\n"), graph_x, 20, str_text);
-    } 
+    graph_x = SENSOR_GRAPH_START + (index * graph_width / 366);
+    WSContentSend_P (PSTR ("<text class='month' text-anchor='middle' x=%u y=%u>%s</text>\n"), graph_x, 20, str_text);
 
-    // increment next position
-    if (month % 2 == 0) start += 31; else start += 30;
-    month ++;
+    // increment to next position
+    index += days_in_month[month];
   }
-/*
-  for (month = 0; month < 12; month++)
-  {
-    // index of first day of month
-    index = ((month * 61 / 2) + 366 - RtcTime.day_of_year) % 366 + 10;
 
-    // if possible, display month label
-    if (index < 356)
-    {
-      // get month name
-      strlcpy (str_text, kMonthNames + month * 3, 4);
-
-      // display month
-      graph_x = SENSOR_GRAPH_START + index * graph_width / 366;
-      WSContentSend_P (PSTR ("<text class='month' x=%u y=%u>%s</text>\n"), graph_x, 20, str_text);
-    } 
-  }
-*/
-
-  // -------  Units  -------
+  // ---  Units  ---
 
   unit = max (temp_range / temp_incr + 1, 2);
   for (index = 0; index < unit; index ++)
@@ -3562,16 +3854,25 @@ void SensorWebGraphYearlyCurve ()
     if ((index > 0) && (index < unit - 1)) WSContentSend_P (PSTR ("<line class='temp' x1=%u y1=%u x2=%u y2=%u />\n"), SENSOR_GRAPH_START, graph_y, SENSOR_GRAPH_STOP, graph_y);
   }
 
-  // --------  End  ---------
+  // ---  End  ---
 
   WSContentSend_P(PSTR("</svg>\n"));      // graph
   WSContentSend_P(PSTR("</div>\n"));      // graph
 }
 
 // Temperature yearly page
-void SensorWebYearlyTemperature ()
+void SensorWebYearlyMeasure ()
 {
-  char str_value[4];
+  uint16_t year;
+  char     str_value[8];
+
+  // if target temperature has been changed
+  if (Webserver->hasArg ("year"))
+  {
+    WebGetArg ("year", str_value, sizeof(str_value));
+    if (strlen(str_value) > 0) year = atoi (str_value);
+  }
+  else year = RtcTime.year;
 
   // set page label
   WSContentStart_P (D_SENSOR_TEMPERATURE, false);
@@ -3582,22 +3883,7 @@ void SensorWebYearlyTemperature ()
 
   // page style
   WSContentSend_P (PSTR ("<style>\n"));
-  WSContentSend_P (PSTR ("body {color:white;background-color:#252525;font-family:Arial, Helvetica, sans-serif;}\n"));
-
-  WSContentSend_P (PSTR ("div {margin:0.25rem auto;padding:0.1rem 0px;text-align:center;}\n"));
-
-  WSContentSend_P (PSTR ("div.title {font-size:3.5vh;font-weight:bold;}\n"));
-  WSContentSend_P (PSTR ("div.header {font-size:2.5vh;margin:2vh auto;}\n"));
-
-  WSContentSend_P (PSTR ("a {color:white;}\n"));
-  WSContentSend_P (PSTR ("a:link {text-decoration:none;}\n"));
-
-  WSContentSend_P (PSTR ("span {font-size:4vh;padding:0vh 3vh;}\n"));
-  WSContentSend_P (PSTR ("span#temp {color:%s;}\n"), SENSOR_COLOR_TEMP);
-
-  // graph section style
-  SensorWebGraphYearlyCurveStyle ();
-
+  SensorWebGraphYearlyMeasureStyle ();
   WSContentSend_P (PSTR ("</style>\n"));
 
   WSContentSend_P (PSTR ("</head>\n"));
@@ -3621,7 +3907,7 @@ void SensorWebYearlyTemperature ()
 
   // ------- Graph --------
 
-  SensorWebGraphYearlyCurve ();
+  SensorWebGraphYearlyMeasureCurve (year, D_SENSOR_PAGE_YEAR_MEASURE);
 
   // end of page
   WSContentStop ();
@@ -3634,182 +3920,196 @@ void SensorWebYearlyTemperature ()
 // Presence page style
 void SensorWebGraphPresenceStyle ()
 {
+  WSContentSend_P (PSTR ("body {color:white;background-color:#252525;font-family:Arial, Helvetica, sans-serif;}\n"));
+
+  WSContentSend_P (PSTR ("div {margin:0.25rem auto;padding:0.1rem 0px;text-align:center;}\n"));
+  WSContentSend_P (PSTR ("div.title {font-size:3.5vh;font-weight:bold;}\n"));
+  WSContentSend_P (PSTR ("div.header {font-size:2.5vh;margin:2vh auto;}\n"));
+
+  WSContentSend_P (PSTR ("a {color:white;}\n")); 
+  WSContentSend_P (PSTR ("a:link {text-decoration:none;}\n"));
+
+  // navigation button
   WSContentSend_P (PSTR("button {padding:2px 12px;font-size:2.5vh;background:none;color:#fff;border:1px #666 solid;border-radius:6px;}\n"));
   WSContentSend_P (PSTR("button:hover {background:#aaa;}\n"));
   WSContentSend_P (PSTR("button:disabled {color:#252525;background:#252525;border:1px #252525 solid;}\n"));
 
+  // banner
   WSContentSend_P (PSTR("div.banner {width:88%%;}\n"));
   WSContentSend_P (PSTR("div.banner div {display:inline-block;}\n"));
-  WSContentSend_P (PSTR("div.date {font-size:2vh;}\n"));
+  WSContentSend_P (PSTR("div.date {font-size:2.5vh;}\n"));
   WSContentSend_P (PSTR("div.prev {float:left;}\n"));
   WSContentSend_P (PSTR("div.next {float:right;}\n"));
 
-  WSContentSend_P (PSTR ("table {width:88%%;margin:0px auto;border:none;color:#fff;border-collapse:separate;border-spacing:0 8px;}\n"));
-  WSContentSend_P (PSTR ("th {text-align:center;font-size:0.8rem;}\n"));
-  WSContentSend_P (PSTR ("th.first {text-align:left;}\n"));
-  WSContentSend_P (PSTR ("th.last {text-align:right;}\n"));
-  WSContentSend_P (PSTR ("td {height:32px;}\n"));
-  WSContentSend_P (PSTR ("td.day {text-align:left;font-size:0.8rem;color:#aaa;}\n"));
-  WSContentSend_P (PSTR ("td.today {text-align:left;font-size:0.8rem;font-weight:bold;color:white;}\n"));
-  WSContentSend_P (PSTR ("td.on {background:%s;}\n"), SENSOR_COLOR_PRES);
-  WSContentSend_P (PSTR ("td.off {background:#333;}\n"));
-  WSContentSend_P (PSTR ("td.sep {border-right:1px dashed #888;}\n"));
+  WSContentSend_P (PSTR("div.graph {width:96%%;}\n"));
+}
+
+// Presence SVG style
+void SensorWebGraphPresenceSVGStyle ()
+{
+  WSContentSend_P (PSTR("<style type='text/css'>\n"));
+
+  WSContentSend_P (PSTR ("text {font-size:3vh;fill:%s;}\n"), SENSOR_COLOR_TIME);
+  WSContentSend_P (PSTR ("text.time {}\n"));
+  WSContentSend_P (PSTR ("text.head {}\n"));
+  WSContentSend_P (PSTR ("text.today {font-weight:bold;}\n"));
+
+  WSContentSend_P (PSTR ("rect {opacity:0.8;}\n"));
+  WSContentSend_P (PSTR ("rect.s0 {stroke:none;fill:%s;}\n"), "#333");
+  WSContentSend_P (PSTR ("rect.s1 {stroke:none;fill:%s;}\n"), SENSOR_COLOR_PRES);
+
+  WSContentSend_P (PSTR ("line {stroke:#aaa;stroke-dasharray:2 6;}\n"));
+
+  WSContentSend_P (PSTR("</style>\n"));
 }
 
 // Presence history page
-void SensorWebGraphPresenceCurve (const uint16_t week, const char* pstr_url)
+void SensorWebGraphWeeklyPresenceCurve (const uint8_t week, const char* pstr_url)
 {
-  bool     data_ok = true;
-  bool     change_slot;
-  uint8_t  curr_slot, new_slot, curr_span, day_span;
-  uint8_t  index, day, hour, slot;
-  uint16_t act_week, ref_week, prev_week, next_week, shift_week;
-  char     str_text[64];
-  char     str_type[12];
+  uint8_t  slot_state, slot_new;
+  uint8_t  prev_week, next_week;
+  uint32_t index, day, hour, slot;
+  uint32_t count, count_start, count_stop;
+  uint32_t last_x, graph_x, graph_y, line_height, bar_height;
   char     str_day[8];
+  char     str_style[16];
+  char     str_text[64];
   String   str_result;
 
-  // data in memory
-  if (week == 0) 
-    for (day = 0; day < 7; day++)
-      for (hour = 0; hour < 24; hour++)
-        for (slot = 0; slot < 6; slot++)
-          sensor_graph.event[day][hour][slot].data = sensor_week.event[day][hour][slot].data;
+  // check parameters
+  if (pstr_url == nullptr) return;
 
 #ifdef USE_UFILESYS
-  // load data from file
-  else data_ok = SensorFileLoadWeek (week);
-#endif      // USE_UFILESYS
-
-  // if data is not loaded, return
-  if (!data_ok) return;
-
-#ifdef USE_UFILESYS
- 
-  // calculate actual week (week start on monday)
-  act_week = SensorGetCurrentWeek ();
-  if (week == 0) ref_week = act_week;
-    else ref_week = week;
-
-  // previous week
-  prev_week = (ref_week + 52 - 1) % 52;
-  if (prev_week == 0) prev_week = 52;
-
-  // next week
-  next_week = (ref_week + 1) % 52;
-  if (next_week == 0) next_week = 52;
-  if (ref_week == act_week - 1) next_week = 0;
+  // calculate previous and next week
+  if (week > 0) next_week = week - 1; else next_week = UINT8_MAX;
+  prev_week = week + 1;
 
   // start of form
   WSContentSend_P(PSTR("<form method='get' action='/%s'>\n"), pstr_url);
+  WSContentSend_P (PSTR("<div class='banner'>\n"));
 
   // date
-  WSContentSend_P (PSTR("<div class='banner'>\n"));
-  if (ref_week <= act_week) shift_week = act_week - ref_week;
-    else shift_week = 53 - ref_week + act_week;
-  SensorGetWeekLabel (shift_week, str_text, sizeof (str_text));
+  SensorGetWeekLabel (week, str_text, sizeof (str_text));
   WSContentSend_P (PSTR("<div class='date'>%s</div>\n"), str_text);
 
   // if exist, navigation to previous week
-  if (SensorFileExist (prev_week)) strcpy (str_text, "");
-    else strcpy (str_text, "disabled");
-  WSContentSend_P (PSTR("<div class='prev'><button name='week' value=%u id='prev' %s>&lt;&lt;</button></div>\n"), prev_week, str_text);
+  SensorGetWeekLabel (prev_week, str_text, sizeof (str_text));
+  if (SensorFileWeekExist (prev_week)) strcpy (str_style, ""); else strcpy (str_style, "disabled");
+  WSContentSend_P (PSTR("<div class='prev'><button name='week' title='%s' value=%u id='prev' %s>&lt;&lt;</button></div>\n"), str_text, prev_week, str_style);
 
-  // if exist, navigation to next week or to live values
-  if (next_week == 0) strcpy (str_text, "");
-    else if (SensorFileExist (next_week)) strcpy (str_text, ""); 
-    else strcpy (str_text, "disabled");
-  WSContentSend_P (PSTR("<div class='next'><button name='week' value=%u id='next' %s>&gt;&gt;</button></div>\n"), next_week, str_text);
-  WSContentSend_P (PSTR("</div>\n"));     // banner
+  // if exist, navigation to next week
+  SensorGetWeekLabel (next_week, str_text, sizeof (str_text));
+  if (SensorFileWeekExist (next_week)) strcpy (str_style, ""); else strcpy (str_style, "disabled");
+  WSContentSend_P (PSTR("<div class='next'><button name='week' title='%s' value=%u id='next' %s>&gt;&gt;</button></div>\n"), str_text, next_week, str_style);
 
   // end of form
-  WSContentSend_P(PSTR("<form method='get' action='/%s'>\n"), D_SENSOR_PAGE_PRESENCE);
+  WSContentSend_P (PSTR("</div>\n"));     // banner
+  WSContentSend_P(PSTR("<form method='get' action='/%s'>\n"), D_SENSOR_PAGE_WEEK_PRESENCE);
 
-#endif    // USE_UFILESYS
+  // load weekly data
+  SensorFileWeekLoad (week);
 
-  // display table with header
-  WSContentSend_P (PSTR ("<div><table cellspacing=0>\n"));
+  // set display sequence
+  count_start = 1;
+  if (week != 0) count_stop = 8;                            // previous weeks
+    else if (RtcTime.day_of_week == 1) count_stop = 8;      // current week on sunday
+    else count_stop = RtcTime.day_of_week;                  // current week other days
+#else
+  // set display sequence
+  count_start = RtcTime.day_of_week;
+  count_stop = count_start + 7;
+#endif      // USE_UFILESYS
+
+  // calculate line height and bar height
+  line_height = SENSOR_GRAPH_HEIGHT / 8;
+  bar_height  = line_height - 5;
+
+  // start of SVG graph
+  WSContentSend_P (PSTR("<div class='graph'>\n"));
+  WSContentSend_P (PSTR("<svg class='graph' viewBox='%d %d %d %d' preserveAspectRatio='none'>\n"), 0, 0, SENSOR_GRAPH_WIDTH, SENSOR_GRAPH_HEIGHT + 1);
+
+  // SVG style
+  SensorWebGraphPresenceSVGStyle ();
 
   // display header
-  WSContentSend_P (PSTR ("<tr><th colspan=12></th>"));
-  WSContentSend_P (PSTR ("<th colspan=12 class='first'>0h</th>"));
-  WSContentSend_P (PSTR ("<th colspan=24>04h</th><th colspan=24>08h</th><th colspan=24>12h</th><th colspan=24>16h</th><th colspan=24>20h</th>"));
-  WSContentSend_P (PSTR ("<th colspan=12 class='last'>24h</th></tr>\n"));
+  WSContentSend_P (PSTR ("<text class='time' text-anchor='start' x=%u y=%u>%s</text>\n"), SENSOR_GRAPH_WIDTH_HEAD, bar_height - 10, "0h");
+  for (index = 1; index < 6;index ++) WSContentSend_P (PSTR ("<text class='time' text-anchor='middle' x=%u y=%u>%02uh</text>\n"), SENSOR_GRAPH_WIDTH_HEAD + index * SENSOR_GRAPH_WIDTH_LINE / 6, bar_height - 10, index * 4);
+  WSContentSend_P (PSTR ("<text class='time' text-anchor='end' x=%u y=%u>%s</text>\n"), SENSOR_GRAPH_WIDTH_HEAD + SENSOR_GRAPH_WIDTH_LINE, bar_height - 10, "24h");
 
   // loop thru days
   str_result = "";
-  for (index = 0; index < 7; index++)
+  index = 1;
+  for (count = count_start; count < count_stop; count++)
   {
-    // shift day according to current day
-    if (week == 0) day = (RtcTime.day_of_week + index) % 7;
-      else day = (index + 1) % 7;
+    // convert to current day
+    day = count % 7;
 
-    // line start and display week day
+    // get upper line position
+    graph_y = index * line_height;
+
+    // display week day
     strlcpy (str_day, kWeekdayNames + day * 3, 4);
-
-    if ((week == 0) && (index == 6)) strcpy (str_type, "today");
-      else strcpy (str_type, "day");
-    sprintf_P (str_text, PSTR ("<tr><td colspan=12 class='%s'>%s</td>"), str_type, str_day);
+    if ((week == 0) && (day == RtcTime.day_of_week - 1)) strcpy (str_style, "today"); else strcpy (str_style, "head");
+    sprintf_P (str_text, PSTR ("<text class='%s' text-anchor='start' x=%u y=%u>%s</text>\n"), str_style, 20, graph_y + bar_height - 25, str_day);
     str_result += str_text;
 
     // loop to display slots of current day
-    curr_slot = false;
-    day_span  = curr_span = 0;
+    slot_state = sensor_week[day][0][0].event.pres;
+    last_x = SENSOR_GRAPH_WIDTH_HEAD;
     for (hour = 0; hour < 24; hour++)
       for (slot = 0; slot < 6; slot++)
       {
         // read slot status
-        new_slot = sensor_graph.event[day][hour][slot].presence;
+        slot_new = sensor_week[day][hour][slot].event.pres;
 
-        // check if slot change is needed
-        if (curr_span == 0) change_slot = false;
-        else if (day_span % 12 == 0) change_slot = true;
-        else if (curr_slot != new_slot) change_slot = true;
-        else change_slot = false;
-
-        // if no slot change, increase width, else change slot
-        if (!change_slot) curr_span++;
-        else
+        // last cell
+        if ((hour == 23) && (slot == 5))
         {
-          // set slot class (on/off and separation line)
-          if (curr_slot) strcpy (str_type, "on"); else strcpy (str_type, "off");
-          if (day_span % 12 == 0) strcat (str_type, " sep");
-
-          // display slot
-          if (curr_span == 1) sprintf_P (str_text, PSTR ("<td class='%s'></td>"), str_type);
-            else if (curr_span > 1) sprintf_P (str_text, PSTR ("<td colspan=%u class='%s'></td>"), curr_span, str_type);
+          graph_x = SENSOR_GRAPH_WIDTH_HEAD + SENSOR_GRAPH_WIDTH_LINE;
+          sprintf_P (str_text, PSTR ("<rect class='s%u' x=%u y=%u width=%u height=%u />\n"), slot_state, last_x, graph_y, graph_x - last_x, bar_height);
           str_result += str_text;
-          
-          // reset slot data
-          curr_slot = new_slot;
-          curr_span = 1;
         }
 
-        // increase day slot counter
-        day_span++;
+        // else if presence has changed
+        else if (slot_state != slot_new)
+        {
+          graph_x = SENSOR_GRAPH_WIDTH_HEAD + SENSOR_GRAPH_WIDTH_LINE * (6 * hour + slot) / 144;
+          sprintf_P (str_text, PSTR ("<rect class='s%u' x=%u y=%u width=%u height=%u />\n"), slot_state, last_x, graph_y, graph_x - last_x, bar_height);
+          str_result += str_text;
+          last_x = graph_x;
+          slot_state = slot_new;
+        }
+
+        // if needed, publish result
+        if (str_result.length () > 256) { WSContentSend_P (str_result.c_str ()); str_result = ""; }
       }
 
-    // display last slot and line stop
-    if (curr_slot) strcpy (str_type, "on"); else strcpy (str_type, "off");
-    sprintf_P (str_text, PSTR ("<td colspan=%u class='%s'></td></tr>\n"), curr_span, str_type);
-    str_result += str_text;
+    // loop to display separation lines
+    last_x = SENSOR_GRAPH_WIDTH_HEAD;
+    for (hour = 1; hour < 12; hour++)
+    {
+      // draw line
+      graph_x = SENSOR_GRAPH_WIDTH_HEAD + SENSOR_GRAPH_WIDTH_LINE * hour / 12;
+      sprintf_P (str_text, PSTR ("<line x1=%u y1=%u x2=%u y2=%u />\n"), graph_x, graph_y, graph_x, graph_y + bar_height);
+      str_result += str_text;
 
-    // if needed, publish result
-    if (str_result.length () > 256) { WSContentSend_P (str_result.c_str ()); str_result = ""; }
+      // if needed, publish result
+      if (str_result.length () > 256) { WSContentSend_P (str_result.c_str ()); str_result = ""; }
+    }
+
+    // increment
+    index++;
   }
 
-  // last line
-  str_result += "<tr>";
-  for (slot = 0; slot < 12; slot++) str_result += "<td></td>";
-  for (hour = 0; hour < 24; hour++) for (slot = 0; slot < 6; slot++) str_result += "<td></td>";
-  str_result += "</tr>\n";
+  // publish last part
+  if (str_result.length () > 0) WSContentSend_P (str_result.c_str ());
 
-  // end of table and end of page
-  str_result += "</table></div>\n";
-  WSContentSend_P (str_result.c_str ());
+  // ---  End  ---
+  WSContentSend_P (PSTR("</svg>\n"));      // graph
+  WSContentSend_P (PSTR("</div>\n"));      // graph
 }
 
-// Presence history page
+// Presence weekly history page
 void SensorWebWeeklyPresence ()
 {
   uint16_t week;
@@ -3824,9 +4124,10 @@ void SensorWebWeeklyPresence ()
     WebGetArg ("week", str_value, sizeof(str_value));
     if (strlen(str_value) > 0) week = atoi (str_value);
   }
+  else week = 0;
 
   // beginning page without authentification
-  WSContentStart_P (PSTR ("Measure history"), false);
+  WSContentStart_P (PSTR ("Presence history"), false);
 
   // graph swipe section script
   SensorWebGraphSwipe ();
@@ -3835,24 +4136,12 @@ void SensorWebWeeklyPresence ()
   // set page as scalable
   WSContentSend_P (PSTR ("<meta name='viewport' content='width=device-width,initial-scale=1,user-scalable=yes'/>\n"));
 
-  // refresh every 1 mn
-  WSContentSend_P (PSTR ("<meta http-equiv='refresh' content='%u'/>\n"), 60);
+  // refresh every 10 mn
+  WSContentSend_P (PSTR ("<meta http-equiv='refresh' content='%u'/>\n"), 600);
 
   // page style
   WSContentSend_P (PSTR ("<style>\n"));
-  WSContentSend_P (PSTR ("body {color:white;background-color:#252525;font-family:Arial, Helvetica, sans-serif;}\n"));
-
-  WSContentSend_P (PSTR ("div {margin:0.25rem auto;padding:0.1rem 0px;text-align:center;}\n"));
-
-  WSContentSend_P (PSTR ("div.title {font-size:3.5vh;font-weight:bold;}\n"));
-  WSContentSend_P (PSTR ("div.header {font-size:2.5vh;margin:2vh auto;}\n"));
-
-  WSContentSend_P (PSTR ("a {color:white;}\n"));
-  WSContentSend_P (PSTR ("a:link {text-decoration:none;}\n"));
-
-  // graph section style
   SensorWebGraphPresenceStyle ();
-
   WSContentSend_P (PSTR ("</style>\n"));
 
   WSContentSend_P (PSTR ("</head>\n"));
@@ -3869,7 +4158,192 @@ void SensorWebWeeklyPresence ()
   //     Graph
   // ---------------
 
-  SensorWebGraphPresenceCurve (week, D_SENSOR_PAGE_PRESENCE);
+  SensorWebGraphWeeklyPresenceCurve (week, D_SENSOR_PAGE_WEEK_PRESENCE);
+
+  // end of page
+  WSContentStop ();
+}
+
+
+// Presence yearly history page
+void SensorWebGraphYearlyPresenceCurve (const uint16_t year, const char* pstr_url)
+{
+  uint8_t  slot_state, slot_new;
+  uint32_t month, month_start, month_stop, day;
+  uint32_t index, count;
+  uint32_t last_x, graph_x, graph_y, line_height, bar_height;
+  char     str_name[4];
+  char     str_text[64];
+  String   str_result;
+
+  // check parameters
+  if (pstr_url == nullptr) return;
+
+#ifdef USE_UFILESYS
+  // start of form
+  WSContentSend_P (PSTR("<form method='get' action='/%s'>\n"), pstr_url);
+  WSContentSend_P (PSTR("<div class='banner'>\n"));
+
+  // date
+  WSContentSend_P (PSTR("<div class='date'>%u</div>\n"), year);
+
+  // if exist, navigation to previous year
+  if (SensorFileYearExist (year - 1)) strcpy (str_text, ""); else strcpy (str_text, "disabled");
+  WSContentSend_P (PSTR("<div class='prev'><button name='year' title='%u' value=%u id='prev' %s>&lt;&lt;</button></div>\n"), year - 1, year - 1, str_text);
+
+  // if exist, navigation to next year
+  if (SensorFileYearExist (year + 1)) strcpy (str_text, ""); else strcpy (str_text, "disabled");
+  WSContentSend_P (PSTR("<div class='next'><button name='year' title='%u' value=%u id='next' %s>&gt;&gt;</button></div>\n"), year + 1, year + 1, str_text);
+
+  // end of form
+  WSContentSend_P (PSTR("</div>\n"));     // banner
+  WSContentSend_P (PSTR("<form method='get' action='/%s'>\n"), D_SENSOR_PAGE_YEAR_PRESENCE);
+
+  // load data from file
+  SensorFileYearLoad (year);
+
+  // set month window
+  month_start = 0;
+  if (year != RtcTime.year) month_stop = 12;          // previous years
+    else month_stop = RtcTime.month;                  // current year
+#else
+  // set month window
+  month_start = RtcTime.month;
+  month_stop  = month_start + 12;
+#endif    // USE_UFILESYS
+
+  // calculate line height and bar height
+  line_height = SENSOR_GRAPH_HEIGHT / 13;
+  bar_height  = line_height - 5;
+
+  // start of SVG graph
+  WSContentSend_P (PSTR("<div class='graph'>\n"));
+  WSContentSend_P (PSTR("<svg class='graph' viewBox='%d %d %d %d' preserveAspectRatio='none'>\n"), 0, 0, SENSOR_GRAPH_WIDTH, SENSOR_GRAPH_HEIGHT + 1);
+
+  // SVG style
+  SensorWebGraphPresenceSVGStyle ();
+
+  // display header
+  WSContentSend_P (PSTR ("<text class='time' text-anchor='start' x=%u y=%u>%s</text>\n"), SENSOR_GRAPH_WIDTH_HEAD, line_height - 10, "01");
+  for (index = 1; index < 7;index ++) WSContentSend_P (PSTR ("<text class='time' text-anchor='middle' x=%u y=%u>%02u</text>\n"), SENSOR_GRAPH_WIDTH_HEAD + 5 * index * SENSOR_GRAPH_WIDTH_LINE / 31, line_height - 10, index * 5);
+
+  // loop thru days
+  str_result = "";
+  index = 1;
+  for (count = month_start; count < month_stop; count ++)
+  {
+    // convert to current month
+    month = count % 12;
+
+    // get upper line position
+    graph_y = index * line_height;
+
+    // month name
+    strlcpy (str_name, kMonthNames + month * 3, 4);
+    sprintf_P (str_text, PSTR ("<text class='head' text-anchor='start' x=%u y=%u>%s</text>\n"), 20, graph_y + bar_height - 15, str_name);
+    str_result += str_text;
+
+    // loop to display slots of days
+    last_x = SENSOR_GRAPH_WIDTH_HEAD;
+    if (sensor_year[month][0].pres > 0) slot_state = 1; else slot_state = 0;
+    for (day = 0; day < days_in_month[month]; day ++)
+    {
+      // read slot status
+      if (sensor_year[month][day].pres > 0) slot_new = 1; else slot_new = 0;
+
+      // last cell
+      if (day == days_in_month[month] - 1)
+      {
+        graph_x = SENSOR_GRAPH_WIDTH_HEAD + SENSOR_GRAPH_WIDTH_LINE * (day + 1) / 31;
+        sprintf_P (str_text, PSTR ("<rect class='s%u' x=%u y=%u width=%u height=%u />\n"), slot_state, last_x, graph_y, graph_x - last_x, bar_height);
+        str_result += str_text;
+      }
+
+      // else if presence has changed
+      else if (slot_state != slot_new)
+      {
+        graph_x = SENSOR_GRAPH_WIDTH_HEAD + SENSOR_GRAPH_WIDTH_LINE * day / 31;
+        sprintf_P (str_text, PSTR ("<rect class='s%u' x=%u y=%u width=%u height=%u />\n"), slot_state, last_x, graph_y, graph_x - last_x, bar_height);
+        str_result += str_text;
+        last_x = graph_x;
+        slot_state = slot_new;
+      }
+
+      // if needed, publish result
+      if (str_result.length () > 256) { WSContentSend_P (str_result.c_str ()); str_result = ""; }
+    }
+
+    // loop to display separation lines
+    for (day = 1; day < 7; day++)
+    {
+      // draw line
+      graph_x = SENSOR_GRAPH_WIDTH_HEAD + SENSOR_GRAPH_WIDTH_LINE * 5 * day / 31;
+      sprintf_P (str_text, PSTR ("<line x1=%u y1=%u x2=%u y2=%u />\n"), graph_x, graph_y, graph_x, graph_y + bar_height);
+      str_result += str_text;
+
+      // if needed, publish result
+      if (str_result.length () > 256) { WSContentSend_P (str_result.c_str ()); str_result = ""; }
+    }
+
+    // increment
+    index++;
+  }
+
+  // publish last part
+  if (str_result.length () > 0) WSContentSend_P (str_result.c_str ());
+
+  // ---  End  ---
+  WSContentSend_P (PSTR("</svg>\n"));      // graph
+  WSContentSend_P (PSTR("</div>\n"));      // graph
+}
+
+// Presence yearly history page
+void SensorWebYearlyPresence ()
+{
+  uint16_t year;
+  char     str_value[8];
+
+  // if access not allowed, close
+  if (!HttpCheckPriviledgedAccess()) return;
+
+  // if target temperature has been changed
+  if (Webserver->hasArg ("year"))
+  {
+    WebGetArg ("year", str_value, sizeof(str_value));
+    if (strlen(str_value) > 0) year = atoi (str_value);
+  }
+  else year = RtcTime.year;
+
+  // beginning page without authentification
+  WSContentStart_P (PSTR ("Presence history"), false);
+
+  // graph swipe section script
+  SensorWebGraphSwipe ();
+  WSContentSend_P (PSTR ("</script>\n"));
+
+  // set page as scalable
+  WSContentSend_P (PSTR ("<meta name='viewport' content='width=device-width,initial-scale=1,user-scalable=yes'/>\n"));
+
+  // page style
+  WSContentSend_P (PSTR ("<style>\n"));
+  SensorWebGraphPresenceStyle ();
+  WSContentSend_P (PSTR ("</style>\n"));
+
+  WSContentSend_P (PSTR ("</head>\n"));
+
+  // page body
+  WSContentSend_P (PSTR ("<body>\n"));
+  WSContentSend_P (PSTR ("<div class='main'>\n"));
+
+  // room name and header
+  WSContentSend_P (PSTR ("<div class='title'><a href='/'>%s</a></div>\n"), SettingsText(SET_DEVICENAME));
+  WSContentSend_P (PSTR ("<div class='header'>Presence</div>\n"));
+
+  // ---------------
+  //     Graph
+  // ---------------
+
+  SensorWebGraphYearlyPresenceCurve (year, D_SENSOR_PAGE_YEAR_PRESENCE);
 
   // end of page
   WSContentStop ();
@@ -3889,10 +4363,9 @@ bool Xsns99 (uint32_t function)
   switch (function)
   { 
    case FUNC_INIT:
-      SensorLoadConfig ();
-      SensorInit ();
-      SensorLoadWeek ();
-      SensorLoadYear ();
+      SensorLoadConfig ();    // load configuration
+      SensorInit ();          // init variables
+      SensorLoadData ();      // load data from settings
       break;
 
     case FUNC_COMMAND:
@@ -3904,28 +4377,13 @@ bool Xsns99 (uint32_t function)
       result |= DecodeCommand (kInacCommands,   InacCommand);
       break;
 
-    case FUNC_SAVE_AT_MIDNIGHT:
-      // monday morning, save previous week in indexed file
-      if (RtcTime.day_of_week == 2) SensorSaveWeek (false);
-
-      // save yearly data
-      SensorResetYearDay (RtcTime.day_of_year - 1);
-      SensorSaveYear ();
-
-      // reset current day and save current history
-      SensorResetWeekDay (RtcTime.day_of_week - 1);
-      SensorSaveWeek (true);
-      SensorSaveYear ();
-      break;
-
     case FUNC_SAVE_BEFORE_RESTART:
-      SensorSaveConfig ();
-      SensorSaveWeek (true);
-      SensorSaveYear ();
+      SensorSaveConfig ();    // save configuration
+      SensorSaveData ();      // save full data
       break;
 
     case FUNC_EVERY_SECOND:
-      SensorEverySecond ();
+      if (RtcTime.valid) SensorEverySecond ();
       break;
 
     case FUNC_JSON_APPEND:
@@ -3961,15 +4419,18 @@ bool Xdrv99 (uint32_t function)
       break;
 
     case FUNC_WEB_ADD_HANDLER:
-      Webserver->on ("/" D_SENSOR_PAGE_CONFIG,   SensorWebConfigure);
-      Webserver->on ("/" D_SENSOR_PAGE_PRESENCE, SensorWebWeeklyPresence);
-      Webserver->on ("/" D_SENSOR_PAGE_MEASURE,  SensorWebWeeklyMeasure);
-      Webserver->on ("/" D_SENSOR_PAGE_YEARLY,   SensorWebYearlyTemperature);
+      Webserver->on ("/" D_SENSOR_PAGE_CONFIG,        SensorWebConfigure);
+      Webserver->on ("/" D_SENSOR_PAGE_WEEK_MEASURE,  SensorWebWeeklyMeasure);
+      Webserver->on ("/" D_SENSOR_PAGE_YEAR_MEASURE,  SensorWebYearlyMeasure);
+      Webserver->on ("/" D_SENSOR_PAGE_WEEK_PRESENCE, SensorWebWeeklyPresence);
+      Webserver->on ("/" D_SENSOR_PAGE_YEAR_PRESENCE, SensorWebYearlyPresence);
       break;
 
     case FUNC_WEB_ADD_MAIN_BUTTON:
-      if ((sensor_status.temp.source != SENSOR_SOURCE_NONE) || (sensor_status.humi.source != SENSOR_SOURCE_NONE)) SensorWebMainButtonMeasure ();
-      if (sensor_status.pres.source != SENSOR_SOURCE_NONE) SensorWebMainButtonPresence ();
+      if (sensor_config.weekly_temp || sensor_config.weekly_humi) WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>Weekly Measure</button></form></p>\n"), D_SENSOR_PAGE_WEEK_MEASURE);
+      if (sensor_config.weekly_pres) WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>Weekly Presence</button></form></p>\n"), D_SENSOR_PAGE_WEEK_PRESENCE);
+      if (sensor_config.yearly_temp) WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>Yearly Measure</button></form></p>\n"), D_SENSOR_PAGE_YEAR_MEASURE);
+      if (sensor_config.yearly_pres) WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>Yearly Presence</button></form></p>\n"), D_SENSOR_PAGE_YEAR_PRESENCE);
       break;
 #endif      // USE_WEBSERVER
   }
