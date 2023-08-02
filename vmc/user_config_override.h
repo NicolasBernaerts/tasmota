@@ -25,6 +25,10 @@
     22/08/2022 - v3.9 - Tasmota 12 & use generic sensor
     03/02/2023 - v4.0 - Tasmota 12.3 compatibility
                         Graph redesign with auto update
+    25/04/2023 - v4.1 - Tasmota 12.4 based
+                        Add tasmota-sensor release
+    12/05/2023 - v4.2 - Save history in Settings strings
+    17/07/2023 - v4.3 - Add yearly graph and ESP32 target
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -70,8 +74,10 @@
 
 #define USE_IPADDRESS                         // Add fixed IP configuration page
 #define USE_TIMEZONE                          // Add support for Timezone management
+#define USE_LD1115                            // Add support for HLK-LD1115 presence & movement sensors
+#define USE_LD1125                            // Add support for HLK-LD1125 presence & movement sensors
+#define USE_LD2410                            // Add support for HLK-LD2410 presence & movement sensors
 #define USE_GENERIC_SENSOR                    // Add support for generic sensors (local and remote)
-#define USE_VMC                               // Add support for Ventilator Motor Controled
 
 // build
 #if defined BUILD_ESP32_4M
@@ -87,13 +93,13 @@
 #elif defined BUILD_1M64K
 #define EXTENSION_BUILD   "esp-1m64k"
 #else
-#define EXTENSION_BUILD   "esp-nofs"
+#define EXTENSION_BUILD   "esp8266"
 #endif
 
 // extension data
-#define EXTENSION_NAME    "VMC"               // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
-#define EXTENSION_VERSION "4.0"               // version
+#define EXTENSION_VERSION "4.3"               // version
+
 
 // MQTT default
 #undef MQTT_HOST
@@ -104,12 +110,21 @@
 #define MQTT_USER          ""
 #undef MQTT_PASS
 #define MQTT_PASS          ""
-#undef MQTT_TOPIC
-#define MQTT_TOPIC         "vmc_%06X"
 #undef MQTT_FULLTOPIC
 #define MQTT_FULLTOPIC     "%topic%/%prefix%/"
+#undef MQTT_TOPIC
 #undef FRIENDLY_NAME
-#define FRIENDLY_NAME      "VMC"
+
+// default name
+#if defined USE_VMC
+#define EXTENSION_NAME    "VMC"               // name
+#define FRIENDLY_NAME     "VMC"
+#define MQTT_TOPIC        "vmc_%06X"
+#else
+#define EXTENSION_NAME    "Sensor"            // name
+#define FRIENDLY_NAME     "Sensor"
+#define MQTT_TOPIC        "sensor_%06X"
+#endif
 
 #undef USE_ARDUINO_OTA                        // support for Arduino OTA
 #undef USE_WPS                                // support for WPS as initial wifi configuration tool
@@ -144,8 +159,12 @@
 //#undef USE_SUNRISE                            // support for Sunrise and sunset tools
 
 //#undef USE_UNISHOX_COMPRESSION                // Add support for string compression in Rules or Scripts
-//#undef USE_RULES                              // Disable support for rules
+
 #undef USE_SCRIPT                             // Add support for script (+17k code)
+
+#define USE_RULES                             // Support for rules
+  #define USE_EXPRESSION                      // Add support for expression evaluation in rules (+3k2 code, +64 bytes mem)  
+    #define SUPPORT_IF_STATEMENT              // Add support for IF statement in rules (+4k2 code, -332 bytes mem)  
 
 #undef ROTARY_V1                              // Add support for Rotary Encoder as used in MI Desk Lamp (+0k8 code)
 #undef USE_SONOFF_RF                          // Add support for Sonoff Rf Bridge (+3k2 code)
@@ -180,7 +199,7 @@
 #undef USE_LIGHT_VIRTUAL_CT                   // Add support for Virtual White Color Temperature (+1.1k code)
 #undef USE_DGR_LIGHT_SEQUENCE                 // Add support for device group light sequencing (requires USE_DEVICE_GROUPS) (+0k2 code)
 
-#undef USE_COUNTER                            // Enable inputs as counter (+0k8 code)
+#define USE_COUNTER                            // Enable inputs as counter (+0k8 code)
 
 #define USE_DS18x20                            // Add support for DS18x20 sensors with id sort, single scan and read retry (+2k6 code)
 #define USE_DHT                                // Add support for internal DHT sensor
@@ -259,6 +278,46 @@
 #ifndef SUPPORT_MQTT_EVENT
 #define SUPPORT_MQTT_EVENT
 #endif
+
+// ----------------------
+//    ESP32 specific
+// ----------------------
+
+
+#ifdef ESP32
+
+//#undef USE_ESP32_SENSORS
+
+#define USE_TLS                               // for safeboot and BearSSL
+
+#undef USE_BLE_ESP32
+#undef USE_MI_ESP32
+#undef USE_IBEACON
+
+#undef USE_AUTOCONF                           // Disable Esp32 autoconf feature
+#undef USE_BERRY
+
+#undef USE_DISPLAY
+#undef USE_SR04
+#undef USE_LVGL
+
+#undef USE_ADC                                // Add support for ADC on GPIO32 to GPIO39
+
+#undef USE_WEBCAM
+
+#undef USE_M5STACK_CORE2
+#undef USE_I2S_AUDIO
+#undef USE_TTGO_WATCH
+
+#undef USE_ALECTO_V2
+#undef USE_RF_SENSOR
+#undef USE_HX711
+#undef USE_MAX31855
+
+#undef USE_MHZ19
+#undef USE_SENSEAIR   
+
+#endif  // ESP32
 
 #endif  // _USER_CONFIG_OVERRIDE_H_
 
