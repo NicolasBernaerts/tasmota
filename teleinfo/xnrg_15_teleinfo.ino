@@ -156,14 +156,8 @@ TasmotaSerial *teleinfo_serial = nullptr;
 #define TELEINFO_PART_MAX               4         // maximum number of parts in a line
 #define TELEINFO_LINE_QTY               74        // maximum number of lines handled in a TIC message
 #define TELEINFO_LINE_MAX               128       // maximum size of a received TIC line
-#define TELEINFO_KEY_MAX                16        // maximum size of a TIC etiquette
-
-// ESP8266/ESP32 specificities
-#ifdef ESP32
-  #define TELEINFO_DATA_MAX             96        // maximum size of a TIC donnee
-#else       // ESP8266
-  #define TELEINFO_DATA_MAX             32        // maximum size of a TIC donnee
-#endif      // ESP32 & ESP8266
+#define TELEINFO_KEY_MAX                14        // maximum size of a TIC etiquette
+#define TELEINFO_DATA_MAX               64        // maximum size of a TIC donnee
 
 // commands : MQTT
 #define D_CMND_TELEINFO_HELP            "help"
@@ -285,20 +279,20 @@ static struct {
 
 // power calculation structure
 static struct {
-  uint8_t   method = TIC_METHOD_GLOBAL_COUNTER;         // power calculation method
-  float     papp_inc[ENERGY_MAX_PHASES];                // apparent power counter increment per phase (in vah)
-  long      papp_current_counter    = LONG_MAX;         // current apparent power counter (in vah)
-  long      papp_previous_counter   = LONG_MAX;         // previous apparent power counter (in vah)
-  long      pact_current_counter    = LONG_MAX;         // current active power counter (in wh)
-  long      pact_previous_counter   = LONG_MAX;         // previous active power counter (in wh)
-  uint32_t  previous_time_message   = UINT32_MAX;       // timestamp of previous message
-  uint32_t  previous_time_counter   = UINT32_MAX;       // timestamp of previous global counter increase
+  uint8_t   method = TIC_METHOD_GLOBAL_COUNTER;     // power calculation method
+  float     papp_inc[ENERGY_MAX_PHASES];            // apparent power counter increment per phase (in vah)
+  long      papp_current_counter    = LONG_MAX;     // current apparent power counter (in vah)
+  long      papp_previous_counter   = LONG_MAX;     // previous apparent power counter (in vah)
+  long      pact_current_counter    = LONG_MAX;     // current active power counter (in wh)
+  long      pact_previous_counter   = LONG_MAX;     // previous active power counter (in wh)
+  uint32_t  previous_time_message   = UINT32_MAX;   // timestamp of previous message
+  uint32_t  previous_time_counter   = UINT32_MAX;   // timestamp of previous global counter increase
 } teleinfo_calc; 
 
 // TIC : current message
 struct tic_line {
-  char str_etiquette[TELEINFO_KEY_MAX];             // TIC line etiquette
-  char str_donnee[TELEINFO_DATA_MAX];               // TIC line donnee
+  String str_etiquette;                             // TIC line etiquette
+  String str_donnee;                                // TIC line donnee
   char checksum;
 };
 static struct {
@@ -735,31 +729,32 @@ void TeleinfoSaveConfig ()
 // calculate line checksum
 char TeleinfoCalculateChecksum (const char* pstr_line, char* pstr_etiquette, char* pstr_donnee) 
 {
-  int     index, line_size;
-  uint8_t line_checksum  = 0;
-  uint8_t given_checksum = 0;
-  char    str_line[TELEINFO_LINE_MAX];
-  char    *pstr_token, *pstr_key, *pstr_data;
+  bool     prev_space = true;
+  uint8_t  line_checksum  = 0;
+  uint8_t  given_checksum = 0;
+  uint32_t index, line_size;
+  char     str_line[TELEINFO_LINE_MAX];
+  char     *pstr_token, *pstr_key, *pstr_data;
 
   // if given line exists
   if ((pstr_line == nullptr) || (pstr_etiquette == nullptr) || (pstr_donnee == nullptr)) return 0;
 
   // init result
-  strlcpy (str_line, pstr_line, TELEINFO_LINE_MAX);
+  strcpy (str_line, "");
   strcpy (pstr_etiquette, "");
   strcpy (pstr_donnee, "");
   pstr_key = pstr_data = nullptr;
 
   // get given checksum
-  line_size = strlen (str_line) - 1;
+  line_size = strlen (pstr_line) - 1;
   if (line_size < 4) return 0;
-  given_checksum = (uint8_t)str_line[line_size];
+  given_checksum = (uint8_t)pstr_line[line_size];
 
   // adjust checksum calculation according to mode
   if (teleinfo_meter.sep_line == ' ') line_size--;
 
   // loop to calculate checksum, keeping 6 lower bits and adding Ox20 and compare to given checksum
-  for (index = 0; index < line_size; index ++) line_checksum += (uint8_t)str_line[index];
+  for (index = 0; index < line_size; index ++) line_checksum += (uint8_t)pstr_line[index];
   line_checksum = (line_checksum & 0x3F) + 0x20;
 
   // if different than given checksum,  increase checksum error counter and log
@@ -768,32 +763,47 @@ char TeleinfoCalculateChecksum (const char* pstr_line, char* pstr_etiquette, cha
   // else extract etiquette and donnee
   if (line_checksum != 0)
   {
-    // remove checksum from current line
-    line_size = strlen (str_line) - 2;
-    str_line[line_size] = 0;
-
-    // replace all TABS with SPACE
-    pstr_token = strchr (str_line, 0x09);
-    while (pstr_token != nullptr)
+    // replace all TABS with SPACE and remove multiple SPACE
+    line_size = strlen (pstr_line);
+    for (index = 0; index < line_size; index ++)
     {
-      *pstr_token = ' ';
-      pstr_token = strchr (pstr_token + 1, 0x09);
+      // if current character is a separator (TAB or SPACE)
+      pstr_token = (char*)pstr_line + index;
+      if ((*pstr_token == 0x09) || (*pstr_token == ' '))
+      {
+        // if first SPACE and not last character
+        if (!prev_space) strcat (str_line, " ");
+
+        // previous character is as separator
+        prev_space = true;
+      }
+
+      // else character is not a separator
+      else
+      {
+        // copy current character
+        strncat (str_line, pstr_token, 1);
+
+        // reset previous character as separator
+        prev_space = false;
+      }
     }
 
     // extract key
-    pstr_key = pstr_token = str_line;
-    while ((*pstr_token != ' ') && (*pstr_token != 0)) pstr_token++;
-    if (*pstr_token == ' ') *pstr_token++ = 0;
+    pstr_key = str_line;
 
-    // left trim SPACE from data
-    while (*pstr_token == ' ') pstr_token++;
+    // extrat data
+    pstr_data = strchr (str_line, ' ');
+    if (pstr_data != nullptr)
+    {
+      // set data start
+      *pstr_data = 0;
+      pstr_data++;
 
-    // set data start
-    pstr_data = pstr_token;
-
-    // right trim data
-    pstr_token = pstr_data + strlen (pstr_data) - 1;
-    while (*pstr_token == ' ') *pstr_token-- = 0;
+      // remove checksum
+      pstr_token = strrchr (pstr_data, ' ');
+      if (pstr_token != nullptr) *pstr_token = 0;
+    }
 
     // set etiquette and donnee
     if ((pstr_key != nullptr) && (pstr_data != nullptr))
@@ -810,7 +820,7 @@ char TeleinfoCalculateChecksum (const char* pstr_line, char* pstr_etiquette, cha
   if (line_checksum == 0)
   {
     teleinfo_meter.nb_error++;
-    AddLog (LOG_LEVEL_DEBUG, PSTR ("TIC: Error %s [%c]"), pstr_line, line_checksum);
+    AddLog (LOG_LEVEL_DEBUG, PSTR ("TIC: Error %s"), pstr_line);
   } 
 
   return line_checksum;
@@ -970,8 +980,8 @@ void TeleinfoInit ()
   strcpy (teleinfo_meter.str_line, "");
   for (index = 0; index < TELEINFO_LINE_QTY; index ++) 
   {
-    strcpy (teleinfo_message.line[index].str_etiquette, "");
-    strcpy (teleinfo_message.line[index].str_donnee, "");
+    teleinfo_message.line[index].str_etiquette = "";
+    teleinfo_message.line[index].str_donnee = "";
     teleinfo_message.line[index].checksum = 0;
   }
 
@@ -1326,8 +1336,8 @@ void TeleinfoReceiveData ()
               index = teleinfo_message.line_index;
               if (index < TELEINFO_LINE_QTY)
               {
-                strlcpy (teleinfo_message.line[index].str_etiquette, str_etiquette, TELEINFO_KEY_MAX);
-                strlcpy (teleinfo_message.line[index].str_donnee, str_donnee, TELEINFO_DATA_MAX);
+                teleinfo_message.line[index].str_etiquette = str_etiquette;
+                teleinfo_message.line[index].str_donnee = str_donnee;
                 teleinfo_message.line[index].checksum = checksum;
               }
             }
@@ -1354,8 +1364,8 @@ void TeleinfoReceiveData ()
           // loop to remove unused message lines
           for (index = teleinfo_message.line_index; index < TELEINFO_LINE_QTY; index++)
           {
-            strcpy (teleinfo_message.line[index].str_etiquette, "");
-            strcpy (teleinfo_message.line[index].str_donnee, "");
+            teleinfo_message.line[index].str_etiquette = "";
+            teleinfo_message.line[index].str_donnee = "";
             teleinfo_message.line[index].checksum = 0;
           }
 
@@ -1688,7 +1698,7 @@ void TeleinfoPublishJsonTic ()
     {
       // add current line
       if (index != 0) ResponseAppend_P (PSTR (","));
-      ResponseAppend_P (PSTR ("\"%s\":\"%s\""), teleinfo_message.line[index].str_etiquette, teleinfo_message.line[index].str_donnee);
+      ResponseAppend_P (PSTR ("\"%s\":\"%s\""), teleinfo_message.line[index].str_etiquette.c_str (), teleinfo_message.line[index].str_donnee.c_str ());
     }
 
   // end of TIC section, publish JSON and process rules
