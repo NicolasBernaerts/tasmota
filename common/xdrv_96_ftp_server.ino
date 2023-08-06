@@ -5,9 +5,8 @@
   This FTP micro FTP server only accepts 1 concurrent connexion.
   Make sure ton configure your FTP client according to that limit or your connexion will fail.
    
-  Default is
-    - login    : ftp
-    - password : password 
+  Default login / paswword is ftp / password
+  For Tasmota Teleinfo version it is teleinfo / teleinfo
  
   Copyright (C) 2021  Nicolas Bernaerts
     02/11/2021 - v1.0 - Creation 
