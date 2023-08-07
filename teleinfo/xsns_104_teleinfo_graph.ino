@@ -1044,7 +1044,7 @@ void TeleinfoSensorWebTicUpdate ()
 {
   int      index;
   uint32_t timestart;
-  char     str_value[64];
+  char     str_line[TELEINFO_LINE_MAX];
   String   str_update;
 
   // start timestamp
@@ -1054,17 +1054,17 @@ void TeleinfoSensorWebTicUpdate ()
   WSContentBegin (200, CT_PLAIN);
 
   // send line number
-  sprintf (str_value, "%d\n", teleinfo_meter.nb_message);
-  str_update = str_value;
+  sprintf (str_line, "%d\n", teleinfo_meter.nb_message);
+  str_update = str_line;
 
   // loop thru TIC message lines to publish if defined
   for (index = 0; index < teleinfo_message.line_max; index ++)
   {
-    if (teleinfo_message.line[index].checksum != 0) sprintf (str_value, "%s|%s|%c\n", teleinfo_message.line[index].str_etiquette, teleinfo_message.line[index].str_donnee, teleinfo_message.line[index].checksum);
-      else strcpy (str_value, " | | \n");
-    str_update += str_value;
-
-    if (str_update.length () > 256) { WSContentSend_P (str_update.c_str ()); str_update = ""; }
+    if (teleinfo_message.line[index].checksum != 0) 
+      sprintf (str_line, "%s|%s|%c\n", teleinfo_message.line[index].str_etiquette.c_str (), teleinfo_message.line[index].str_donnee.c_str (), teleinfo_message.line[index].checksum);
+    else strcpy (str_line, " | | \n");
+    str_update += str_line;
+    if (str_update.length () > 512) { WSContentSend_P (str_update.c_str ()); str_update = ""; }
   }
 
   // end of data page
@@ -1116,7 +1116,7 @@ void TeleinfoSensorWebPageTic ()
   WSContentSend_P (PSTR (" httpData.send();\n"));
   WSContentSend_P (PSTR ("}\n"));
   
-  WSContentSend_P (PSTR ("setTimeout(function() {updateData();},500);\n"));                   // ask for first update
+  WSContentSend_P (PSTR ("setTimeout(function() {updateData();},100);\n"));                   // ask for first update
   WSContentSend_P (PSTR ("</script>\n"));
 
   // page style
@@ -1159,8 +1159,8 @@ void TeleinfoSensorWebPageTic ()
   WSContentSend_P (PSTR ("<tr><th class='label'>🏷️</th><th class='value'>📄</th><th>✅</th></tr>\n"));
 
   // loop to display TIC messsage lines
-  for (index = 0; index < teleinfo_message.line_max; index ++)
-    WSContentSend_P (PSTR ("<tr id='l%d'><td id='e%d'>%s</td><td id='d%d'>%s</td><td id='c%d'>%c</td></tr>\n"), index + 1, index + 1, teleinfo_message.line[index].str_etiquette, index + 1, teleinfo_message.line[index].str_donnee, index + 1, teleinfo_message.line[index].checksum);
+  for (index = 1; index <= teleinfo_message.line_max; index ++)
+    WSContentSend_P (PSTR ("<tr id='l%d'><td id='e%d'>&nbsp;</td><td id='d%d'>&nbsp;</td><td id='c%d'>&nbsp;</td></tr>\n"), index, index, index, index);
 
   // end of table and end of page
   WSContentSend_P (PSTR ("</table></div>\n"));
@@ -1349,7 +1349,7 @@ void TeleinfoSensorGraphCurveDisplay (const uint8_t phase, const uint8_t data)
         // set column with data
         column = 3 + (phase * 6) + data;
 
-        //open file and skip header
+        // open file and skip header
         file = ffsp->open (teleinfo_graph.str_filename, "r");
         while (file.available ())
         {
