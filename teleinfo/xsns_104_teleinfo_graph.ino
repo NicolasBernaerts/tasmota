@@ -548,10 +548,10 @@ void TeleinfoSensorFileRotate (const char* pstr_filename, const int index_min, c
 }
 
 // Rotation of log files
-void TeleinfoSensorRotateLog ()
+void TeleinfoSensorDailyRotate ()
 {
   // log default method
-  AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Rotate log files"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Daily files rotation"));
 
   // flush daily and weekly records
   TeleinfoSensorFlushDataHisto (TELEINFO_PERIOD_DAY);
@@ -1089,23 +1089,19 @@ void TeleinfoSensorWebPageTic ()
 
   WSContentSend_P (PSTR ("function updateData() {\n"));
   WSContentSend_P (PSTR (" httpData=new XMLHttpRequest();\n"));
-  WSContentSend_P (PSTR (" httpData.onreadystatechange=function()\n"));
-  WSContentSend_P (PSTR (" {\n"));
-  WSContentSend_P (PSTR ("  if (httpData.readyState==4)\n"));
-  WSContentSend_P (PSTR ("  {\n"));
-  WSContentSend_P (PSTR ("   setTimeout(function() {updateData();},1000);\n"));               // ask for next update in 1 sec
+  WSContentSend_P (PSTR (" httpData.onreadystatechange=function(){\n"));
+  WSContentSend_P (PSTR ("  if (httpData.readyState==4){\n"));
+  WSContentSend_P (PSTR ("   setTimeout(function() {updateData();},%u);\n"), 1000);               // ask for next update in 1 sec
   WSContentSend_P (PSTR ("   arr_param=httpData.responseText.split('\\n');\n"));
   WSContentSend_P (PSTR ("   num_param=arr_param.length;\n"));
   WSContentSend_P (PSTR ("   document.getElementById('msg').textContent=arr_param[0];\n"));
-  WSContentSend_P (PSTR ("   for (i=1;i<num_param;i++)\n"));
-  WSContentSend_P (PSTR ("   {\n"));
+  WSContentSend_P (PSTR ("   for (i=1;i<num_param;i++){\n"));
   WSContentSend_P (PSTR ("    arr_value=arr_param[i].split('|');\n"));
   WSContentSend_P (PSTR ("    document.getElementById('e'+i).textContent=arr_value[0];\n"));
   WSContentSend_P (PSTR ("    document.getElementById('d'+i).textContent=arr_value[1];\n"));
   WSContentSend_P (PSTR ("    document.getElementById('c'+i).textContent=arr_value[2];\n"));
   WSContentSend_P (PSTR ("   }\n"));
-  WSContentSend_P (PSTR ("   for (i=num_param;i<=%d;i++)\n"), teleinfo_message.line_max);
-  WSContentSend_P (PSTR ("   {\n"));
+  WSContentSend_P (PSTR ("   for (i=num_param;i<=%d;i++){\n"), teleinfo_message.line_max);
   WSContentSend_P (PSTR ("    document.getElementById('e'+i).textContent='';\n"));
   WSContentSend_P (PSTR ("    document.getElementById('d'+i).textContent='';\n"));
   WSContentSend_P (PSTR ("    document.getElementById('c'+i).textContent='';\n"));
@@ -1115,12 +1111,13 @@ void TeleinfoSensorWebPageTic ()
   WSContentSend_P (PSTR (" httpData.open('GET','%s',true);\n"), D_TELEINFO_PAGE_TIC_UPD);
   WSContentSend_P (PSTR (" httpData.send();\n"));
   WSContentSend_P (PSTR ("}\n"));
-  
-  WSContentSend_P (PSTR ("setTimeout(function() {updateData();},100);\n"));                   // ask for first update
+  WSContentSend_P (PSTR ("setTimeout(function(){updateData();},%u);\n"), 100);                   // ask for first update after 100ms
+
   WSContentSend_P (PSTR ("</script>\n"));
 
   // page style
   WSContentSend_P (PSTR ("<style>\n"));
+
   WSContentSend_P (PSTR ("body {color:white;background-color:#252525;font-family:Arial, Helvetica, sans-serif;}\n"));
   WSContentSend_P (PSTR ("div {width:100%%;margin:8px auto;padding:2px 0px;text-align:center;vertical-align:middle;}\n"));
 
@@ -1138,10 +1135,11 @@ void TeleinfoSensorWebPageTic ()
   WSContentSend_P (PSTR ("th {font-style:bold;background:#555;}\n"));
   WSContentSend_P (PSTR ("th.label {width:30%%;}\n"));
   WSContentSend_P (PSTR ("th.value {width:60%%;}\n"));
+
   WSContentSend_P (PSTR ("</style>\n"));
 
-  // set cache policy
-  WSContentSend_P (PSTR ("<meta http-equiv='cache-control' content='max-age=864000'/>\n"));
+  // set cache policy, no cache for 12 hours
+  WSContentSend_P (PSTR ("<meta http-equiv='Cache-control' content='public,max-age=720000'/>\n"));
 
   // page body
   WSContentSend_P (PSTR ("</head>\n"));
@@ -1549,6 +1547,136 @@ void TeleinfoSensorGraphCurveDisplay (const uint8_t phase, const uint8_t data)
 
 #ifdef USE_UFILESYS
 
+// calculate previous period parameters
+bool TeleinfoSensorGraphPreviousPeriod (const bool update)
+{
+  bool     is_file = false;
+  uint8_t  histo = teleinfo_graph.histo;
+  uint8_t  month = teleinfo_graph.month;
+  uint8_t  day   = teleinfo_graph.day;
+  uint32_t year;
+  TIME_T   time_dst;
+
+  // handle next according to period type
+  switch (teleinfo_graph.period)
+  {
+    case TELEINFO_PERIOD_DAY:
+      while (!is_file && (histo < teleinfo_config.param[TELEINFO_CONFIG_NBDAY])) is_file = TeleinfoSensorHistoGetFilename (TELEINFO_PERIOD_DAY, ++histo, teleinfo_graph.str_filename);
+      break;
+
+    case TELEINFO_PERIOD_WEEK:
+      while (!is_file && (histo < teleinfo_config.param[TELEINFO_CONFIG_NBWEEK])) is_file = TeleinfoSensorHistoGetFilename (TELEINFO_PERIOD_WEEK, ++histo, teleinfo_graph.str_filename);
+      break;
+
+    case TELEINFO_PERIOD_YEAR:
+      // full year view
+      if ((day == 0) && (month == 0)) histo++;
+
+      // month view
+      else if (day == 0)
+      {
+        month--;
+        if (month == 0) { month = 12; histo++; }
+      }
+
+      // day view
+      else
+      {
+        day--;
+        if (day == 0) month--;
+        if (month == 0) { month = 12; histo++; }
+        if (day == 0)
+        {
+          // calculate number of days in current month
+          BreakTime (LocalTime (), time_dst);
+          year = 1970 + (uint32_t)time_dst.year - histo;
+          day = TeleinfoSensorGetDaysInMonth (year, month);
+        }
+      }
+
+      // check if yearly file is available
+      is_file = TeleinfoSensorHistoGetFilename (TELEINFO_PERIOD_YEAR, histo, teleinfo_graph.str_filename);
+      break;
+  }
+
+  // if asked, set next period
+  if (is_file && update)
+  {
+    teleinfo_graph.histo = histo;
+    teleinfo_graph.month = month;
+    teleinfo_graph.day   = day;
+  }
+
+  return is_file;
+}
+
+bool TeleinfoSensorGraphNextPeriod (const bool update)
+{
+  bool     is_file = false;
+  bool     is_next = false;
+  uint8_t  nb_day;
+  uint8_t  histo = teleinfo_graph.histo;
+  uint8_t  month = teleinfo_graph.month;
+  uint8_t  day   = teleinfo_graph.day;
+  uint32_t year;
+  TIME_T   time_dst;
+
+  // handle next according to period type
+  switch (teleinfo_graph.period)
+  {
+    case TELEINFO_PERIOD_DAY:
+      while (!is_file && (histo > 0)) is_file = TeleinfoSensorHistoGetFilename (TELEINFO_PERIOD_DAY, --histo, teleinfo_graph.str_filename);
+      break;
+
+    case TELEINFO_PERIOD_WEEK:
+      while (!is_file && (histo > 0)) is_file = TeleinfoSensorHistoGetFilename (TELEINFO_PERIOD_WEEK, --histo, teleinfo_graph.str_filename);
+      break;
+
+    case TELEINFO_PERIOD_YEAR:
+      // full year view
+      if ((day == 0) && (month == 0)) is_next = true;
+
+      // month view
+      else if (day == 0)
+      {
+        month++;
+        if (month > 12) { month = 1; is_next = true; }
+      }
+
+      // day view
+      else
+      {
+        // calculate number of days in current month
+        BreakTime (LocalTime (), time_dst);
+        year = 1970 + (uint32_t)time_dst.year - histo;
+        nb_day = TeleinfoSensorGetDaysInMonth (year, month);
+
+        // next day
+        day++;
+        if (day > nb_day) { day = 1; month++; }
+        if (month == 13) { month = 1; is_next = true; }
+      }
+
+      // if yearly file available
+      if ((histo == 0) && is_next) histo = UINT8_MAX;
+        else if (is_next) histo--;
+
+      // check if yearly file is available
+      is_file = TeleinfoSensorHistoGetFilename (TELEINFO_PERIOD_YEAR, histo, teleinfo_graph.str_filename);
+      break;
+  }
+
+  // if asked, set next period
+  if (is_file && update)
+  {
+    teleinfo_graph.histo = histo;
+    teleinfo_graph.month = month;
+    teleinfo_graph.day   = day;
+  }
+
+  return is_file;
+}
+
 // Display bar graph
 void TeleinfoSensorGraphDisplayBar (const uint8_t histo, const bool current)
 {
@@ -1897,7 +2025,7 @@ void TeleinfoSensorGraphDisplayFrame ()
 }
 
 // Graph public page
-void  TeleinfoSensorWebGraphPage ()
+void TeleinfoSensorWebGraphPage ()
 {
   bool     display;
   uint8_t  phase, choice, counter;  
@@ -1970,85 +2098,23 @@ void  TeleinfoSensorWebGraphPage ()
     }
 
 #ifdef USE_UFILESYS
-    // handle next page
-    choice = TeleinfoSensorWebGetArgValue (D_CMND_TELEINFO_NEXT, 0, 1, 0);
-    if ((choice == 1) && (teleinfo_graph.period != TELEINFO_PERIOD_LIVE))
-    {
-      if ((teleinfo_graph.period != TELEINFO_PERIOD_YEAR) && (teleinfo_graph.histo > 0)) teleinfo_graph.histo--;
-      else if (teleinfo_graph.period == TELEINFO_PERIOD_YEAR)
-      {
-        // full year view
-        if ((teleinfo_graph.day == 0) && (teleinfo_graph.month == 0))
-        {
-        if (teleinfo_graph.histo > 0) teleinfo_graph.histo--;
-        }
-
-        // month view
-        else if (teleinfo_graph.day == 0)
-        {
-          if ((teleinfo_graph.month == 12) && (teleinfo_graph.histo > 0)) { teleinfo_graph.month = 1; teleinfo_graph.histo--; }
-          else if (teleinfo_graph.month < 12) teleinfo_graph.month++;
-        }
-
-        // day view
-        else
-        {
-          // calculate number of days in current month
-          BreakTime (LocalTime (), time_dst);
-          year = 1970 + (uint32_t)time_dst.year - teleinfo_graph.histo;
-          choice = TeleinfoSensorGetDaysInMonth (year, teleinfo_graph.month);
-
-          if (teleinfo_graph.day == choice) { teleinfo_graph.day = 1; teleinfo_graph.month++; }
-          else teleinfo_graph.day++;
-
-          if ((teleinfo_graph.month == 13) && (teleinfo_graph.histo > 0)) { teleinfo_graph.month = 1; teleinfo_graph.histo--; }
-          else if (teleinfo_graph.month == 13) { teleinfo_graph.month = 12; teleinfo_graph.day = 31; }
-        }
-      }
-    }
-
     // handle previous page
     choice = TeleinfoSensorWebGetArgValue (D_CMND_TELEINFO_PREV, 0, 1, 0);
-    if ((choice == 1) && (teleinfo_graph.period != TELEINFO_PERIOD_LIVE))
-    {
-      if (teleinfo_graph.period != TELEINFO_PERIOD_YEAR) teleinfo_graph.histo++;
-      else if (teleinfo_graph.period == TELEINFO_PERIOD_YEAR)
-      {
-        // full year view
-        if ((teleinfo_graph.day == 0) && (teleinfo_graph.month == 0)) teleinfo_graph.histo++;
+    if (choice == 1) TeleinfoSensorGraphPreviousPeriod (true);
 
-        // month view
-        else if (teleinfo_graph.day == 0)
-        {
-          if (teleinfo_graph.month == 1) { teleinfo_graph.month = 12; teleinfo_graph.histo++; }
-          else teleinfo_graph.month--;
-        }
-
-        // day view
-        else
-        {
-          teleinfo_graph.day--;
-          if (teleinfo_graph.day == 0) teleinfo_graph.month--;
-          if (teleinfo_graph.month == 0) { teleinfo_graph.month = 12; teleinfo_graph.histo++; }
-          if (teleinfo_graph.day == 0)
-          {
-            // calculate number of days in current month
-            BreakTime (LocalTime (), time_dst);
-            year = 1970 + (uint32_t)time_dst.year - teleinfo_graph.histo;
-            teleinfo_graph.day = TeleinfoSensorGetDaysInMonth (year, teleinfo_graph.month);
-          }
-        }
-      }
-    }
+    // handle next page
+    choice = TeleinfoSensorWebGetArgValue (D_CMND_TELEINFO_NEXT, 0, 1, 0);
+    if (choice == 1) TeleinfoSensorGraphNextPeriod (true);
 #endif      // USE_UFILESYS
 
     // javascript : screen swipe for previous and next period
-    WSContentSend_P (PSTR ("\nlet startX=0;let stopX=0;\n"));
-    WSContentSend_P (PSTR ("window.addEventListener('touchstart',function(evt){startX=evt.changedTouches[0].screenX;},false);\n"));
-    WSContentSend_P (PSTR ("window.addEventListener('touchend',function(evt){stopX=evt.changedTouches[0].screenX;handleGesture();},false);\n"));
+    WSContentSend_P (PSTR ("\nlet startX=0;let stopX=0;let startY=0;let stopY=0;\n"));
+    WSContentSend_P (PSTR ("window.addEventListener('touchstart',function(evt){startX=evt.changedTouches[0].pageX;startY=evt.changedTouches[0].pageY;},false);\n"));
+    WSContentSend_P (PSTR ("window.addEventListener('touchend',function(evt){stopX=evt.changedTouches[0].pageX;stopY=evt.changedTouches[0].pageY;handleGesture();},false);\n"));
     WSContentSend_P (PSTR ("function handleGesture(){\n"));
-    WSContentSend_P (PSTR ("if(stopX<startX-100){document.getElementById('%s').click();}\n"), D_CMND_TELEINFO_NEXT);
-    WSContentSend_P (PSTR ("else if(stopX>startX+100){document.getElementById('%s').click();}\n"), D_CMND_TELEINFO_PREV);
+    WSContentSend_P (PSTR (" let deltaX=stopX-startX;let deltaY=Math.abs(stopY-startY);\n"));
+    WSContentSend_P (PSTR (" if(deltaY<10 && deltaX<-100){document.getElementById('%s').click();}\n"), D_CMND_TELEINFO_NEXT);
+    WSContentSend_P (PSTR (" else if(deltaY<10 && deltaX>100){document.getElementById('%s').click();}\n"), D_CMND_TELEINFO_PREV);
     WSContentSend_P (PSTR ("}\n"));
 
     // end of script section
@@ -2060,14 +2126,11 @@ void  TeleinfoSensorWebGraphPage ()
 
     // data update
     counter = 0;
-    WSContentSend_P (PSTR ("function updateData()\n"));
-    WSContentSend_P (PSTR ("{\n"));
+    WSContentSend_P (PSTR ("function updateData(){\n"));
     WSContentSend_P (PSTR (" httpData=new XMLHttpRequest();\n"));
-    WSContentSend_P (PSTR (" httpData.onreadystatechange=function()\n"));
-    WSContentSend_P (PSTR (" {\n"));
-    WSContentSend_P (PSTR ("  if (httpData.readyState==4)\n"));
-    WSContentSend_P (PSTR ("  {\n"));
-    WSContentSend_P (PSTR ("   setTimeout(function() {updateData();},%u);\n"), 1000);       // ask for next update 
+    WSContentSend_P (PSTR (" httpData.onreadystatechange=function(){\n"));
+    WSContentSend_P (PSTR ("  if (httpData.readyState==4){\n"));
+    WSContentSend_P (PSTR ("   setTimeout(function() {updateData();},%u);\n"), 1000);       // ask for data update every second 
     WSContentSend_P (PSTR ("   arr_value=httpData.responseText.split(';');\n"));
     WSContentSend_P (PSTR ("   document.getElementById('msg').textContent=arr_value[%u];\n"), counter++ );                                                                        // number of received messages
     for (phase = 0; phase < teleinfo_contract.phase; phase++) WSContentSend_P (PSTR ("   document.getElementById('v%u').textContent=arr_value[%u];\n"), phase, counter++ );     // phase values
@@ -2076,30 +2139,31 @@ void  TeleinfoSensorWebGraphPage ()
     WSContentSend_P (PSTR (" httpData.open('GET','%s',true);\n"), D_TELEINFO_PAGE_GRAPH_DATA);
     WSContentSend_P (PSTR (" httpData.send();\n"));
     WSContentSend_P (PSTR ("}\n"));
-    WSContentSend_P (PSTR ("setTimeout(function() {updateData();},250);\n"));               // ask for first update
+    WSContentSend_P (PSTR ("setTimeout(function(){updateData();},%u);\n"), 100);               // ask for first data update after 100ms
 
     // curve update
     if (teleinfo_graph.period < teleinfo_graph.period_curve) 
     {
-      counter = 0;
+      // set curve update delay (live = every second, other = every 2 mn)
       if (teleinfo_graph.period == TELEINFO_PERIOD_LIVE) delay = 1000; else delay = 144000;
-      WSContentSend_P (PSTR ("function updateCurve()\n"));
-      WSContentSend_P (PSTR ("{\n"));
+
+      WSContentSend_P (PSTR ("function updateCurve(){\n"));
       WSContentSend_P (PSTR (" httpCurve=new XMLHttpRequest();\n"));
-      WSContentSend_P (PSTR (" httpCurve.onreadystatechange=function()\n"));
-      WSContentSend_P (PSTR (" {\n"));
-      WSContentSend_P (PSTR ("  if (httpCurve.readyState==4)\n"));
-      WSContentSend_P (PSTR ("  {\n"));
-      WSContentSend_P (PSTR ("   setTimeout(function() {updateCurve();},%u);\n"), delay);     // ask for next update 
+      WSContentSend_P (PSTR (" httpCurve.onreadystatechange=function(){\n"));
+      WSContentSend_P (PSTR ("  if (httpCurve.readyState==4){\n"));
+      WSContentSend_P (PSTR ("   setTimeout(function(){updateCurve();},%u);\n"), delay);     // ask for next curve update 
       WSContentSend_P (PSTR ("   arr_value=httpCurve.responseText.split(';');\n"));
+
+      counter = 0;
       for (phase = 0; phase < teleinfo_contract.phase; phase++) WSContentSend_P (PSTR ("   document.getElementById('m%u').setAttribute('d',arr_value[%u]);\n"), phase, counter++ );     // phase main curve
       for (phase = 0; phase < teleinfo_contract.phase; phase++) WSContentSend_P (PSTR ("   document.getElementById('p%u').setAttribute('d',arr_value[%u]);\n"), phase, counter++ );     // phase peak curve
+
       WSContentSend_P (PSTR ("  }\n"));
       WSContentSend_P (PSTR (" }\n"));
       WSContentSend_P (PSTR (" httpCurve.open('GET','%s',true);\n"), D_TELEINFO_PAGE_GRAPH_CURVE);
       WSContentSend_P (PSTR (" httpCurve.send();\n"));
       WSContentSend_P (PSTR ("}\n"));
-      WSContentSend_P (PSTR ("setTimeout(function() {updateCurve();},500);\n"));             // ask for first update
+      WSContentSend_P (PSTR ("setTimeout(function(){updateCurve();},%u);\n"), 200);             // ask for first curve update after 200ms
     }
 
     WSContentSend_P (PSTR ("</script>\n"));
@@ -2107,8 +2171,8 @@ void  TeleinfoSensorWebGraphPage ()
     // set page as scalable
     WSContentSend_P (PSTR ("<meta name='viewport' content='width=device-width,initial-scale=1,user-scalable=yes'/>\n"));
 
-    // set cache policy
-    WSContentSend_P (PSTR ("<meta http-equiv='cache-control' content='max-age=864000'/>\n"));
+    // set cache policy, no cache for 12h
+    WSContentSend_P (PSTR ("<meta http-equiv='Cache-control' content='public,max-age=720000'/>\n"));
 
     // page style
     WSContentSend_P (PSTR ("<style>\n"));
@@ -2168,6 +2232,7 @@ void  TeleinfoSensorWebGraphPage ()
     WSContentSend_P (PSTR ("button.navi {padding:2px 16px;}\n"));
     WSContentSend_P (PSTR ("button.range {width:24px;margin-bottom:8px;}\n"));
     WSContentSend_P (PSTR ("button:hover {background:#aaa;}\n"));
+    WSContentSend_P (PSTR ("button:disabled {background:#252525;color:#252525;}\n"));
 
     WSContentSend_P (PSTR ("div.graph {width:100%%;margin:auto;margin-top:4px;}\n"));
     WSContentSend_P (PSTR ("svg.graph {width:100%%;height:60vh;}\n"));
@@ -2196,8 +2261,15 @@ void  TeleinfoSensorWebGraphPage ()
 #ifdef USE_UFILESYS
     if (teleinfo_graph.period != TELEINFO_PERIOD_LIVE)
     {
-      WSContentSend_P (PSTR ("<div class='prev'><button class='navi' name='%s' id='%s' value=1>&lt;&lt;</button></div>\n"), D_CMND_TELEINFO_PREV, D_CMND_TELEINFO_PREV);
-      WSContentSend_P (PSTR ("<div class='next'><button class='navi' name='%s' id='%s' value=1>&gt;&gt;</button></div>\n"), D_CMND_TELEINFO_NEXT, D_CMND_TELEINFO_NEXT);
+      // previous button
+      if (TeleinfoSensorGraphPreviousPeriod (false)) strcpy (str_text, "");
+        else strcpy (str_text, "disabled");
+      WSContentSend_P (PSTR ("<div class='prev'><button class='navi' name='%s' id='%s' value=1 %s>&lt;&lt;</button></div>\n"), D_CMND_TELEINFO_PREV, D_CMND_TELEINFO_PREV, str_text);
+
+      // next button
+      if (TeleinfoSensorGraphNextPeriod (false)) strcpy (str_text, "");
+        else strcpy (str_text, "disabled");
+      WSContentSend_P (PSTR ("<div class='next'><button class='navi' name='%s' id='%s' value=1 %s>&gt;&gt;</button></div>\n"), D_CMND_TELEINFO_NEXT, D_CMND_TELEINFO_NEXT, str_text);
     }
 #endif      // USE_UFILESYS
 
@@ -2265,8 +2337,6 @@ void  TeleinfoSensorWebGraphPage ()
     WSContentSend_P (PSTR ("\n"));
 
 #else
-
-//    char str_filename[UFS_FILENAME_SIZE];
 
     for (index = TELEINFO_PERIOD_DAY; index < TELEINFO_PERIOD_MAX; index++)
     {
@@ -2621,7 +2691,7 @@ bool Xsns104 (uint32_t function)
 #ifdef USE_UFILESYS
     case FUNC_SAVE_AT_MIDNIGHT:
       TeleinfoSensorSaveDailyTotal ();
-      TeleinfoSensorRotateLog ();
+      TeleinfoSensorDailyRotate ();
       break;
 #endif      // USE_UFILESYS
 
