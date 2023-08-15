@@ -1250,7 +1250,7 @@ void TeleinfoSensorGraphDisplayTime (const uint8_t period, const uint8_t histo)
 }
 
 // Display data curve
-void TeleinfoSensorGraphCurveDisplay (const uint8_t phase, const uint8_t data)
+void TeleinfoSensorGraphDisplayCurve (const uint8_t phase, const uint8_t data)
 {
   bool     analyse;
   uint32_t timestart;
@@ -1530,7 +1530,15 @@ void TeleinfoSensorGraphCurveDisplay (const uint8_t phase, const uint8_t data)
     }
 
     // if needed, flush buffer
-    if (strlen (teleinfo_graph.str_buffer) > sizeof (teleinfo_graph.str_buffer) - 32) { WSContentSend_P (teleinfo_graph.str_buffer); strcpy (teleinfo_graph.str_buffer, ""); }
+    if (strlen (teleinfo_graph.str_buffer) > sizeof (teleinfo_graph.str_buffer) - 32)
+    {
+      // send and flush buffer
+      WSContentSend_P (teleinfo_graph.str_buffer); 
+      strcpy (teleinfo_graph.str_buffer, "");
+
+      // give control back to system to avoid watchdog
+      yield ();
+    }
   }
 
   // end data value curve
@@ -1546,136 +1554,6 @@ void TeleinfoSensorGraphCurveDisplay (const uint8_t phase, const uint8_t data)
 }
 
 #ifdef USE_UFILESYS
-
-// calculate previous period parameters
-bool TeleinfoSensorGraphPreviousPeriod (const bool update)
-{
-  bool     is_file = false;
-  uint8_t  histo = teleinfo_graph.histo;
-  uint8_t  month = teleinfo_graph.month;
-  uint8_t  day   = teleinfo_graph.day;
-  uint32_t year;
-  TIME_T   time_dst;
-
-  // handle next according to period type
-  switch (teleinfo_graph.period)
-  {
-    case TELEINFO_PERIOD_DAY:
-      while (!is_file && (histo < teleinfo_config.param[TELEINFO_CONFIG_NBDAY])) is_file = TeleinfoSensorHistoGetFilename (TELEINFO_PERIOD_DAY, ++histo, teleinfo_graph.str_filename);
-      break;
-
-    case TELEINFO_PERIOD_WEEK:
-      while (!is_file && (histo < teleinfo_config.param[TELEINFO_CONFIG_NBWEEK])) is_file = TeleinfoSensorHistoGetFilename (TELEINFO_PERIOD_WEEK, ++histo, teleinfo_graph.str_filename);
-      break;
-
-    case TELEINFO_PERIOD_YEAR:
-      // full year view
-      if ((day == 0) && (month == 0)) histo++;
-
-      // month view
-      else if (day == 0)
-      {
-        month--;
-        if (month == 0) { month = 12; histo++; }
-      }
-
-      // day view
-      else
-      {
-        day--;
-        if (day == 0) month--;
-        if (month == 0) { month = 12; histo++; }
-        if (day == 0)
-        {
-          // calculate number of days in current month
-          BreakTime (LocalTime (), time_dst);
-          year = 1970 + (uint32_t)time_dst.year - histo;
-          day = TeleinfoSensorGetDaysInMonth (year, month);
-        }
-      }
-
-      // check if yearly file is available
-      is_file = TeleinfoSensorHistoGetFilename (TELEINFO_PERIOD_YEAR, histo, teleinfo_graph.str_filename);
-      break;
-  }
-
-  // if asked, set next period
-  if (is_file && update)
-  {
-    teleinfo_graph.histo = histo;
-    teleinfo_graph.month = month;
-    teleinfo_graph.day   = day;
-  }
-
-  return is_file;
-}
-
-bool TeleinfoSensorGraphNextPeriod (const bool update)
-{
-  bool     is_file = false;
-  bool     is_next = false;
-  uint8_t  nb_day;
-  uint8_t  histo = teleinfo_graph.histo;
-  uint8_t  month = teleinfo_graph.month;
-  uint8_t  day   = teleinfo_graph.day;
-  uint32_t year;
-  TIME_T   time_dst;
-
-  // handle next according to period type
-  switch (teleinfo_graph.period)
-  {
-    case TELEINFO_PERIOD_DAY:
-      while (!is_file && (histo > 0)) is_file = TeleinfoSensorHistoGetFilename (TELEINFO_PERIOD_DAY, --histo, teleinfo_graph.str_filename);
-      break;
-
-    case TELEINFO_PERIOD_WEEK:
-      while (!is_file && (histo > 0)) is_file = TeleinfoSensorHistoGetFilename (TELEINFO_PERIOD_WEEK, --histo, teleinfo_graph.str_filename);
-      break;
-
-    case TELEINFO_PERIOD_YEAR:
-      // full year view
-      if ((day == 0) && (month == 0)) is_next = true;
-
-      // month view
-      else if (day == 0)
-      {
-        month++;
-        if (month > 12) { month = 1; is_next = true; }
-      }
-
-      // day view
-      else
-      {
-        // calculate number of days in current month
-        BreakTime (LocalTime (), time_dst);
-        year = 1970 + (uint32_t)time_dst.year - histo;
-        nb_day = TeleinfoSensorGetDaysInMonth (year, month);
-
-        // next day
-        day++;
-        if (day > nb_day) { day = 1; month++; }
-        if (month == 13) { month = 1; is_next = true; }
-      }
-
-      // if yearly file available
-      if ((histo == 0) && is_next) histo = UINT8_MAX;
-        else if (is_next) histo--;
-
-      // check if yearly file is available
-      is_file = TeleinfoSensorHistoGetFilename (TELEINFO_PERIOD_YEAR, histo, teleinfo_graph.str_filename);
-      break;
-  }
-
-  // if asked, set next period
-  if (is_file && update)
-  {
-    teleinfo_graph.histo = histo;
-    teleinfo_graph.month = month;
-    teleinfo_graph.day   = day;
-  }
-
-  return is_file;
-}
 
 // Display bar graph
 void TeleinfoSensorGraphDisplayBar (const uint8_t histo, const bool current)
@@ -1864,16 +1742,17 @@ void TeleinfoSensorGraphDisplayBar (const uint8_t histo, const bool current)
     file.close ();
   }
 
-  // loop to display bar graphs
+  // bar graph
+  // ---------
+
   for (index = graph_start; index <= graph_stop; index ++)
   {
     // if value is defined, display bar and value
     if (arr_value[index] != LONG_MAX)
     {
-
-      // bar graph
-      // ---------
-
+      // give control back to system to avoid watchdog
+      yield ();
+      
       // display
       if (graph_max != 0) graph_y = graph_height - (arr_value[index] * graph_height / graph_max / 1000); else graph_y = 0;
       if (graph_y < 0) graph_y = 0;
@@ -1947,6 +1826,137 @@ void TeleinfoSensorGraphDisplayBar (const uint8_t histo, const bool current)
     graph_x     += graph_width;
     graph_x_end += graph_width;
   }
+}
+
+
+// calculate previous period parameters
+bool TeleinfoSensorGraphPreviousPeriod (const bool update)
+{
+  bool     is_file = false;
+  uint8_t  histo = teleinfo_graph.histo;
+  uint8_t  month = teleinfo_graph.month;
+  uint8_t  day   = teleinfo_graph.day;
+  uint32_t year;
+  TIME_T   time_dst;
+
+  // handle next according to period type
+  switch (teleinfo_graph.period)
+  {
+    case TELEINFO_PERIOD_DAY:
+      while (!is_file && (histo < teleinfo_config.param[TELEINFO_CONFIG_NBDAY])) is_file = TeleinfoSensorHistoGetFilename (TELEINFO_PERIOD_DAY, ++histo, teleinfo_graph.str_filename);
+      break;
+
+    case TELEINFO_PERIOD_WEEK:
+      while (!is_file && (histo < teleinfo_config.param[TELEINFO_CONFIG_NBWEEK])) is_file = TeleinfoSensorHistoGetFilename (TELEINFO_PERIOD_WEEK, ++histo, teleinfo_graph.str_filename);
+      break;
+
+    case TELEINFO_PERIOD_YEAR:
+      // full year view
+      if ((day == 0) && (month == 0)) histo++;
+
+      // month view
+      else if (day == 0)
+      {
+        month--;
+        if (month == 0) { month = 12; histo++; }
+      }
+
+      // day view
+      else
+      {
+        day--;
+        if (day == 0) month--;
+        if (month == 0) { month = 12; histo++; }
+        if (day == 0)
+        {
+          // calculate number of days in current month
+          BreakTime (LocalTime (), time_dst);
+          year = 1970 + (uint32_t)time_dst.year - histo;
+          day = TeleinfoSensorGetDaysInMonth (year, month);
+        }
+      }
+
+      // check if yearly file is available
+      is_file = TeleinfoSensorHistoGetFilename (TELEINFO_PERIOD_YEAR, histo, teleinfo_graph.str_filename);
+      break;
+  }
+
+  // if asked, set next period
+  if (is_file && update)
+  {
+    teleinfo_graph.histo = histo;
+    teleinfo_graph.month = month;
+    teleinfo_graph.day   = day;
+  }
+
+  return is_file;
+}
+
+bool TeleinfoSensorGraphNextPeriod (const bool update)
+{
+  bool     is_file = false;
+  bool     is_next = false;
+  uint8_t  nb_day;
+  uint8_t  histo = teleinfo_graph.histo;
+  uint8_t  month = teleinfo_graph.month;
+  uint8_t  day   = teleinfo_graph.day;
+  uint32_t year;
+  TIME_T   time_dst;
+
+  // handle next according to period type
+  switch (teleinfo_graph.period)
+  {
+    case TELEINFO_PERIOD_DAY:
+      while (!is_file && (histo > 0)) is_file = TeleinfoSensorHistoGetFilename (TELEINFO_PERIOD_DAY, --histo, teleinfo_graph.str_filename);
+      break;
+
+    case TELEINFO_PERIOD_WEEK:
+      while (!is_file && (histo > 0)) is_file = TeleinfoSensorHistoGetFilename (TELEINFO_PERIOD_WEEK, --histo, teleinfo_graph.str_filename);
+      break;
+
+    case TELEINFO_PERIOD_YEAR:
+      // full year view
+      if ((day == 0) && (month == 0)) is_next = true;
+
+      // month view
+      else if (day == 0)
+      {
+        month++;
+        if (month > 12) { month = 1; is_next = true; }
+      }
+
+      // day view
+      else
+      {
+        // calculate number of days in current month
+        BreakTime (LocalTime (), time_dst);
+        year = 1970 + (uint32_t)time_dst.year - histo;
+        nb_day = TeleinfoSensorGetDaysInMonth (year, month);
+
+        // next day
+        day++;
+        if (day > nb_day) { day = 1; month++; }
+        if (month == 13) { month = 1; is_next = true; }
+      }
+
+      // if yearly file available
+      if ((histo == 0) && is_next) histo = UINT8_MAX;
+        else if (is_next) histo--;
+
+      // check if yearly file is available
+      is_file = TeleinfoSensorHistoGetFilename (TELEINFO_PERIOD_YEAR, histo, teleinfo_graph.str_filename);
+      break;
+  }
+
+  // if asked, set next period
+  if (is_file && update)
+  {
+    teleinfo_graph.histo = histo;
+    teleinfo_graph.month = month;
+    teleinfo_graph.day   = day;
+  }
+
+  return is_file;
 }
 
 #endif    // USE_UFILESYS
@@ -2635,7 +2645,7 @@ void  TeleinfoSensorWebGraphUpdateCurve ()
     // loop thru phases to display main curve
     for (phase = 0; phase < teleinfo_contract.phase; phase++)
     {
-      if (teleinfo_graph.str_phase[phase] == '1') TeleinfoSensorGraphCurveDisplay (phase, teleinfo_graph.data);
+      if (teleinfo_graph.str_phase[phase] == '1') TeleinfoSensorGraphDisplayCurve (phase, teleinfo_graph.data);
       WSContentSend_P (";");
     }
       
@@ -2644,8 +2654,8 @@ void  TeleinfoSensorWebGraphUpdateCurve ()
     {
       if (teleinfo_graph.str_phase[phase] == '1')
       {
-        if (teleinfo_graph.data == TELEINFO_UNIT_VA) TeleinfoSensorGraphCurveDisplay (phase, TELEINFO_UNIT_PEAK_VA);
-          else if (teleinfo_graph.data == TELEINFO_UNIT_V) TeleinfoSensorGraphCurveDisplay (phase, TELEINFO_UNIT_PEAK_V);
+        if (teleinfo_graph.data == TELEINFO_UNIT_VA) TeleinfoSensorGraphDisplayCurve (phase, TELEINFO_UNIT_PEAK_VA);
+          else if (teleinfo_graph.data == TELEINFO_UNIT_V) TeleinfoSensorGraphDisplayCurve (phase, TELEINFO_UNIT_PEAK_V);
       }
       WSContentSend_P (";");
     }
