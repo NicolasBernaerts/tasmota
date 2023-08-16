@@ -30,8 +30,8 @@ It manages :
   * Power Factor (**Cosφ**), calculated from Instant Power (VA) and meter Total (Wh)
 
 This firmware provides some extra Web page on the device :
+  * **/tic** : real time display of last received Teleinfo message
   * **/graph** : live, daily and weekly and yearly graphs
-  * **/msg** : real time display of last received Teleinfo message
 
 It also provides :
   * a TCP server to live stream teleinfo data
@@ -69,7 +69,10 @@ Here are some example of what you'll get if you publish **METER** section :
   * **PH** = number of phases
   * **PSUB** = power per phase in the contract (VA) 
   * **ISUB** = current per phase in the contract 
-  * **PMAX** = maximum power per phase including an accetable % of overload (VA)  
+  * **PMAX** = maximum power per phase including an accetable % of overload (VA)
+  * **I** = total instant current (on all phases)
+  * **P** = total instant apparent power (on all phases)
+  * **W** = total instant active power (on all phases)
   * **Ix** = instant current on phase **x** 
   * **Ux** = instant voltage on phase **x** 
   * **Px** = instant apparent power on phase **x** 
