@@ -78,7 +78,8 @@
                          Rewrite of Tasmota energy update
                          Avoid 100ms rules teleperiod update
     11/06/2023 - v11.2 - Change graph organisation & live display
-    05/08/2023 - v11.2.1 - Correct contract type bug
+    15/08/2023 - v11.3 - Evolution in graph navigation
+                         Change in XMLHttpRequest management 
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -159,7 +160,7 @@
 // extension data
 #define EXTENSION_NAME    "Teleinfo"          // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
-#define EXTENSION_VERSION "11.2.1"            // version
+#define EXTENSION_VERSION "11.3"              // version
 
 // MQTT default
 #undef MQTT_HOST

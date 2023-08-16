@@ -7,6 +7,8 @@
     28/02/2023 - v11.0 - Split between xnrg and xsns
     03/06/2023 - v11.1 - Graph curves live update
     11/06/2023 - v11.2 - Change graph organisation & live display
+    15/08/2023 - v11.3 - Evolution in graph navigation
+                         Change in XMLHttpRequest management 
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -1082,38 +1084,44 @@ void TeleinfoSensorWebPageTic ()
 
   // beginning of form without authentification
   WSContentStart_P (D_TELEINFO_MESSAGE, false);
-  WSContentSend_P (PSTR ("</script>\n"));
+  WSContentSend_P (PSTR ("</script>\n\n"));
 
   // page data refresh script
-  WSContentSend_P (PSTR ("<script type='text/javascript'>\n"));
+  WSContentSend_P (PSTR ("<script type='text/javascript'>\n\n"));
 
-  WSContentSend_P (PSTR ("function updateData() {\n"));
+  WSContentSend_P (PSTR ("function updateData(){\n"));
+
   WSContentSend_P (PSTR (" httpData=new XMLHttpRequest();\n"));
+
   WSContentSend_P (PSTR (" httpData.onreadystatechange=function(){\n"));
-  WSContentSend_P (PSTR ("  if (httpData.readyState==4){\n"));
-  WSContentSend_P (PSTR ("   setTimeout(function() {updateData();},%u);\n"), 1000);               // ask for next update in 1 sec
-  WSContentSend_P (PSTR ("   arr_param=httpData.responseText.split('\\n');\n"));
-  WSContentSend_P (PSTR ("   num_param=arr_param.length;\n"));
-  WSContentSend_P (PSTR ("   document.getElementById('msg').textContent=arr_param[0];\n"));
-  WSContentSend_P (PSTR ("   for (i=1;i<num_param;i++){\n"));
-  WSContentSend_P (PSTR ("    arr_value=arr_param[i].split('|');\n"));
-  WSContentSend_P (PSTR ("    document.getElementById('e'+i).textContent=arr_value[0];\n"));
-  WSContentSend_P (PSTR ("    document.getElementById('d'+i).textContent=arr_value[1];\n"));
-  WSContentSend_P (PSTR ("    document.getElementById('c'+i).textContent=arr_value[2];\n"));
-  WSContentSend_P (PSTR ("   }\n"));
-  WSContentSend_P (PSTR ("   for (i=num_param;i<=%d;i++){\n"), teleinfo_message.line_max);
-  WSContentSend_P (PSTR ("    document.getElementById('e'+i).textContent='';\n"));
-  WSContentSend_P (PSTR ("    document.getElementById('d'+i).textContent='';\n"));
-  WSContentSend_P (PSTR ("    document.getElementById('c'+i).textContent='';\n"));
+  WSContentSend_P (PSTR ("  if (httpData.readyState===XMLHttpRequest.DONE){\n"));
+  WSContentSend_P (PSTR ("   setTimeout(function(){updateData();},%u);\n"), 1000);               // ask for next update in 1 sec
+  WSContentSend_P (PSTR ("   if (httpData.status===0 || (httpData.status>=200 && httpData.status<400)){\n"));
+  WSContentSend_P (PSTR ("    arr_param=httpData.responseText.split('\\n');\n"));
+  WSContentSend_P (PSTR ("    num_param=arr_param.length;\n"));
+  WSContentSend_P (PSTR ("    document.getElementById('msg').textContent=arr_param[0];\n"));
+  WSContentSend_P (PSTR ("    for (i=1;i<num_param;i++){\n"));
+  WSContentSend_P (PSTR ("     arr_value=arr_param[i].split('|');\n"));
+  WSContentSend_P (PSTR ("     document.getElementById('e'+i).textContent=arr_value[0];\n"));
+  WSContentSend_P (PSTR ("     document.getElementById('d'+i).textContent=arr_value[1];\n"));
+  WSContentSend_P (PSTR ("     document.getElementById('c'+i).textContent=arr_value[2];\n"));
+  WSContentSend_P (PSTR ("    }\n"));
+  WSContentSend_P (PSTR ("    for (i=num_param;i<=%d;i++){\n"), teleinfo_message.line_max);
+  WSContentSend_P (PSTR ("     document.getElementById('e'+i).textContent='';\n"));
+  WSContentSend_P (PSTR ("     document.getElementById('d'+i).textContent='';\n"));
+  WSContentSend_P (PSTR ("     document.getElementById('c'+i).textContent='';\n"));
+  WSContentSend_P (PSTR ("    }\n"));
   WSContentSend_P (PSTR ("   }\n"));
   WSContentSend_P (PSTR ("  }\n"));
   WSContentSend_P (PSTR (" }\n"));
+
   WSContentSend_P (PSTR (" httpData.open('GET','%s',true);\n"), D_TELEINFO_PAGE_TIC_UPD);
   WSContentSend_P (PSTR (" httpData.send();\n"));
   WSContentSend_P (PSTR ("}\n"));
-  WSContentSend_P (PSTR ("setTimeout(function(){updateData();},%u);\n"), 100);                   // ask for first update after 100ms
 
-  WSContentSend_P (PSTR ("</script>\n"));
+  WSContentSend_P (PSTR ("setTimeout(function(){updateData();},%u);\n\n"), 100);                   // ask for first update after 100ms
+
+  WSContentSend_P (PSTR ("</script>\n\n"));
 
   // page style
   WSContentSend_P (PSTR ("<style>\n"));
@@ -1136,7 +1144,7 @@ void TeleinfoSensorWebPageTic ()
   WSContentSend_P (PSTR ("th.label {width:30%%;}\n"));
   WSContentSend_P (PSTR ("th.value {width:60%%;}\n"));
 
-  WSContentSend_P (PSTR ("</style>\n"));
+  WSContentSend_P (PSTR ("</style>\n\n"));
 
   // set cache policy, no cache for 12 hours
   WSContentSend_P (PSTR ("<meta http-equiv='Cache-control' content='public,max-age=720000'/>\n"));
@@ -1263,6 +1271,9 @@ void TeleinfoSensorGraphDisplayCurve (const uint8_t phase, const uint8_t data)
 
   // check parameters
   if (teleinfo_config.max_power == 0) return;
+
+  // give control back to system to avoid watchdog
+  yield ();
 
   // start timestamp
   timestart = millis ();
@@ -1532,12 +1543,8 @@ void TeleinfoSensorGraphDisplayCurve (const uint8_t phase, const uint8_t data)
     // if needed, flush buffer
     if (strlen (teleinfo_graph.str_buffer) > sizeof (teleinfo_graph.str_buffer) - 32)
     {
-      // send and flush buffer
       WSContentSend_P (teleinfo_graph.str_buffer); 
       strcpy (teleinfo_graph.str_buffer, "");
-
-      // give control back to system to avoid watchdog
-      yield ();
     }
   }
 
@@ -1574,6 +1581,9 @@ void TeleinfoSensorGraphDisplayBar (const uint8_t histo, const bool current)
   char     str_value[16];
   char    *pstr_token, *pstr_buffer, *pstr_line, *pstr_error;
   File     file;
+
+  // give control back to system to avoid watchdog
+  yield ();
 
   // init array
   for (index = 0; index < TELEINFO_GRAPH_MAX_BARGRAPH; index ++) arr_value[index] = LONG_MAX;
@@ -1750,9 +1760,6 @@ void TeleinfoSensorGraphDisplayBar (const uint8_t histo, const bool current)
     // if value is defined, display bar and value
     if (arr_value[index] != LONG_MAX)
     {
-      // give control back to system to avoid watchdog
-      yield ();
-      
       // display
       if (graph_max != 0) graph_y = graph_height - (arr_value[index] * graph_height / graph_max / 1000); else graph_y = 0;
       if (graph_y < 0) graph_y = 0;
@@ -2118,7 +2125,7 @@ void TeleinfoSensorWebGraphPage ()
 #endif      // USE_UFILESYS
 
     // javascript : screen swipe for previous and next period
-    WSContentSend_P (PSTR ("\nlet startX=0;let stopX=0;let startY=0;let stopY=0;\n"));
+    WSContentSend_P (PSTR ("\n\nlet startX=0;let stopX=0;let startY=0;let stopY=0;\n"));
     WSContentSend_P (PSTR ("window.addEventListener('touchstart',function(evt){startX=evt.changedTouches[0].pageX;startY=evt.changedTouches[0].pageY;},false);\n"));
     WSContentSend_P (PSTR ("window.addEventListener('touchend',function(evt){stopX=evt.changedTouches[0].pageX;stopY=evt.changedTouches[0].pageY;handleGesture();},false);\n"));
     WSContentSend_P (PSTR ("function handleGesture(){\n"));
@@ -2128,28 +2135,34 @@ void TeleinfoSensorWebGraphPage ()
     WSContentSend_P (PSTR ("}\n"));
 
     // end of script section
-    WSContentSend_P (PSTR ("</script>\n"));
+    WSContentSend_P (PSTR ("</script>\n\n"));
 
     // page data refresh script
     //  format : value phase 1;value phase 2;value phase 3;curve data phase 1
-    WSContentSend_P (PSTR ("<script type='text/javascript'>\n"));
+    WSContentSend_P (PSTR ("<script type='text/javascript'>\n\n"));
 
     // data update
     counter = 0;
     WSContentSend_P (PSTR ("function updateData(){\n"));
+
     WSContentSend_P (PSTR (" httpData=new XMLHttpRequest();\n"));
+    WSContentSend_P (PSTR (" httpData.open('GET','%s',true);\n"), D_TELEINFO_PAGE_GRAPH_DATA);
+
     WSContentSend_P (PSTR (" httpData.onreadystatechange=function(){\n"));
-    WSContentSend_P (PSTR ("  if (httpData.readyState==4){\n"));
+    WSContentSend_P (PSTR ("  if (httpData.readyState===XMLHttpRequest.DONE){\n"));
+    WSContentSend_P (PSTR ("   if (httpData.status===0 || (httpData.status>=200 && httpData.status<400)){\n"));
+    WSContentSend_P (PSTR ("    arr_value=httpData.responseText.split(';');\n"));
+    WSContentSend_P (PSTR ("    document.getElementById('msg').textContent=arr_value[%u];\n"), counter++ );                                                                        // number of received messages
+    for (phase = 0; phase < teleinfo_contract.phase; phase++) WSContentSend_P (PSTR ("    document.getElementById('v%u').textContent=arr_value[%u];\n"), phase, counter++ );     // phase values
+    WSContentSend_P (PSTR ("   }\n"));
     WSContentSend_P (PSTR ("   setTimeout(function() {updateData();},%u);\n"), 1000);       // ask for data update every second 
-    WSContentSend_P (PSTR ("   arr_value=httpData.responseText.split(';');\n"));
-    WSContentSend_P (PSTR ("   document.getElementById('msg').textContent=arr_value[%u];\n"), counter++ );                                                                        // number of received messages
-    for (phase = 0; phase < teleinfo_contract.phase; phase++) WSContentSend_P (PSTR ("   document.getElementById('v%u').textContent=arr_value[%u];\n"), phase, counter++ );     // phase values
     WSContentSend_P (PSTR ("  }\n"));
     WSContentSend_P (PSTR (" }\n"));
-    WSContentSend_P (PSTR (" httpData.open('GET','%s',true);\n"), D_TELEINFO_PAGE_GRAPH_DATA);
+
     WSContentSend_P (PSTR (" httpData.send();\n"));
     WSContentSend_P (PSTR ("}\n"));
-    WSContentSend_P (PSTR ("setTimeout(function(){updateData();},%u);\n"), 100);               // ask for first data update after 100ms
+
+    WSContentSend_P (PSTR ("setTimeout(function(){updateData();},%u);\n\n"), 100);               // ask for first data update after 100ms
 
     // curve update
     if (teleinfo_graph.period < teleinfo_graph.period_curve) 
@@ -2158,25 +2171,29 @@ void TeleinfoSensorWebGraphPage ()
       if (teleinfo_graph.period == TELEINFO_PERIOD_LIVE) delay = 1000; else delay = 144000;
 
       WSContentSend_P (PSTR ("function updateCurve(){\n"));
+
       WSContentSend_P (PSTR (" httpCurve=new XMLHttpRequest();\n"));
+      WSContentSend_P (PSTR (" httpCurve.open('GET','%s',true);\n"), D_TELEINFO_PAGE_GRAPH_CURVE);
+
       WSContentSend_P (PSTR (" httpCurve.onreadystatechange=function(){\n"));
-      WSContentSend_P (PSTR ("  if (httpCurve.readyState==4){\n"));
-      WSContentSend_P (PSTR ("   setTimeout(function(){updateCurve();},%u);\n"), delay);     // ask for next curve update 
-      WSContentSend_P (PSTR ("   arr_value=httpCurve.responseText.split(';');\n"));
-
+      WSContentSend_P (PSTR ("  if (httpCurve.readyState===XMLHttpRequest.DONE){\n"));
+      WSContentSend_P (PSTR ("   if (httpCurve.status===0 || (httpCurve.status>=200 && httpCurve.status<400)){\n"));
+      WSContentSend_P (PSTR ("    arr_value=httpCurve.responseText.split(';');\n"));
       counter = 0;
-      for (phase = 0; phase < teleinfo_contract.phase; phase++) WSContentSend_P (PSTR ("   document.getElementById('m%u').setAttribute('d',arr_value[%u]);\n"), phase, counter++ );     // phase main curve
-      for (phase = 0; phase < teleinfo_contract.phase; phase++) WSContentSend_P (PSTR ("   document.getElementById('p%u').setAttribute('d',arr_value[%u]);\n"), phase, counter++ );     // phase peak curve
-
+      for (phase = 0; phase < teleinfo_contract.phase; phase++) WSContentSend_P (PSTR ("    document.getElementById('m%u').setAttribute('d',arr_value[%u]);\n"), phase, counter++ );     // phase main curve
+      for (phase = 0; phase < teleinfo_contract.phase; phase++) WSContentSend_P (PSTR ("    document.getElementById('p%u').setAttribute('d',arr_value[%u]);\n"), phase, counter++ );     // phase peak curve
+      WSContentSend_P (PSTR ("   }\n"));
+      WSContentSend_P (PSTR ("   setTimeout(function(){updateCurve();},%u);\n"), delay);     // ask for next curve update 
       WSContentSend_P (PSTR ("  }\n"));
       WSContentSend_P (PSTR (" }\n"));
-      WSContentSend_P (PSTR (" httpCurve.open('GET','%s',true);\n"), D_TELEINFO_PAGE_GRAPH_CURVE);
+
       WSContentSend_P (PSTR (" httpCurve.send();\n"));
       WSContentSend_P (PSTR ("}\n"));
-      WSContentSend_P (PSTR ("setTimeout(function(){updateCurve();},%u);\n"), 200);             // ask for first curve update after 200ms
+
+      WSContentSend_P (PSTR ("setTimeout(function(){updateCurve();},%u);\n\n"), 200);             // ask for first curve update after 200ms
     }
 
-    WSContentSend_P (PSTR ("</script>\n"));
+    WSContentSend_P (PSTR ("</script>\n\n"));
 
     // set page as scalable
     WSContentSend_P (PSTR ("<meta name='viewport' content='width=device-width,initial-scale=1,user-scalable=yes'/>\n"));
@@ -2246,7 +2263,7 @@ void TeleinfoSensorWebGraphPage ()
 
     WSContentSend_P (PSTR ("div.graph {width:100%%;margin:auto;margin-top:4px;}\n"));
     WSContentSend_P (PSTR ("svg.graph {width:100%%;height:60vh;}\n"));
-    WSContentSend_P (PSTR ("</style>\n"));
+    WSContentSend_P (PSTR ("</style>\n\n"));
 
     // page body
     WSContentSend_P (PSTR ("</head>\n"));
