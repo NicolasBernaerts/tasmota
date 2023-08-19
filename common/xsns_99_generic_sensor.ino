@@ -661,7 +661,7 @@ void SensorGetWeekLabel (const uint8_t shift_week, char* pstr_label, size_t size
   BreakTime(day_time, stop_dst);
 
   // generate string
-  sprintf_P (pstr_label, PSTR("%02u/%02u - %02u/%02u"), start_dst.day_of_month, start_dst.month, stop_dst.day_of_month, stop_dst.month);
+  sprintf (pstr_label, "%02u/%02u - %02u/%02u", start_dst.day_of_month, start_dst.month, stop_dst.day_of_month, stop_dst.month);
 
 #else
   // 7 days shift
@@ -2040,8 +2040,8 @@ void SensorFileWeekLoad (const uint8_t week)
       }
 
       // deal with remaining string
-      if (pstr_buffer != str_buffer) strcpy(str_buffer, pstr_buffer);
-        else strcpy(str_buffer, "");
+      if (pstr_buffer != str_buffer) strcpy (str_buffer, pstr_buffer);
+        else strcpy (str_buffer, "");
     }
 
     // close file
@@ -2060,9 +2060,6 @@ void SensorFileWeekAppend ()
   String   str_buffer;
   File     file;
 
-  // init
-  str_buffer = "";
-
   // check filesystem
   if (ufs_type == 0) return;
 
@@ -2080,26 +2077,27 @@ void SensorFileWeekAppend ()
   else file = ffsp->open (str_value, "a");
 
   // loop to write all slots
+  str_buffer = "";
   day  = (7 + RtcTime.day_of_week - 2) % 7;           // monday is 0
   hour = RtcTime.hour;
   for (slot = 0; slot < 6; slot ++)
   {
     // day, hour, slot
-    sprintf_P (str_value, PSTR ("%u;%u;%u;"), day, hour, slot);
+    sprintf (str_value, "%u;%u;%u;", day, hour, slot);
     str_buffer += str_value;
 
     // temperature
     if (sensor_status.hour_slot[slot].temp == INT16_MAX) strcpy (str_value, "*;");
-      else sprintf_P (str_value, PSTR ("%d;"), sensor_status.hour_slot[slot].temp);
+      else sprintf (str_value, "%d;", sensor_status.hour_slot[slot].temp);
     str_buffer += str_value;
 
     // humidity
     if (sensor_status.hour_slot[slot].humi == INT8_MAX) strcpy (str_value, "*;");
-      else sprintf_P (str_value, PSTR ("%d;"), sensor_status.hour_slot[slot].humi);
+      else sprintf (str_value, "%d;", sensor_status.hour_slot[slot].humi);
     str_buffer += str_value;
 
     // presence, activity and inactivity
-    sprintf_P (str_value, PSTR ("%u;%u;%u\n"), sensor_status.hour_slot[slot].event.pres, sensor_status.hour_slot[slot].event.acti, sensor_status.hour_slot[slot].event.inac);
+    sprintf (str_value, "%u;%u;%u\n", sensor_status.hour_slot[slot].event.pres, sensor_status.hour_slot[slot].event.acti, sensor_status.hour_slot[slot].event.inac);
     str_buffer += str_value;
   }
 
@@ -2151,7 +2149,7 @@ void SensorFileYearLoad (const uint16_t year)
   if (TfsFileExists (str_value))
   {
     file = ffsp->open (str_value, "r");
-    strcpy(str_buffer, "");
+    strcpy (str_buffer, "");
     while (file.available ())
     {
       // read next block
@@ -2714,7 +2712,7 @@ bool SensorGetJsonKey (const char* pstr_json, const char* pstr_key, char* pstr_v
   strcpy (pstr_value, "");
 
   // look for provided key
-  sprintf_P (str_text, PSTR ("\"%s\""), pstr_key);
+  sprintf (str_text, "\"%s\"", pstr_key);
   pstr_position = strstr (pstr_json, str_text);
 
   // if key is found, go to end of value
@@ -2903,8 +2901,8 @@ void SensorWebSensor ()
   strcpy (str_value, "");
 
   // if needed, display remote sensors
-  if ((sensor_status.temp.source == SENSOR_SOURCE_REMOTE) && (sensor_status.temp.value != INT16_MAX)) WSContentSend_PD (PSTR ("{s}%s %s{m}%d.%d °C{e}"), D_SENSOR_REMOTE, D_SENSOR_TEMPERATURE, sensor_status.temp.value / 10, sensor_status.temp.value % 10);
-  if ((sensor_status.humi.source == SENSOR_SOURCE_REMOTE) && (sensor_status.humi.value != INT16_MAX)) WSContentSend_PD (PSTR ("{s}%s %s{m}%d.%d %%{e}"), D_SENSOR_REMOTE, D_SENSOR_HUMIDITY, sensor_status.humi.value / 10, sensor_status.humi.value % 10);
+  if ((sensor_status.temp.source == SENSOR_SOURCE_REMOTE) && (sensor_status.temp.value != INT16_MAX)) WSContentSend_P (PSTR ("{s}%s %s{m}%d.%d °C{e}"), D_SENSOR_REMOTE, D_SENSOR_TEMPERATURE, sensor_status.temp.value / 10, sensor_status.temp.value % 10);
+  if ((sensor_status.humi.source == SENSOR_SOURCE_REMOTE) && (sensor_status.humi.value != INT16_MAX)) WSContentSend_P (PSTR ("{s}%s %s{m}%d.%d %%{e}"), D_SENSOR_REMOTE, D_SENSOR_HUMIDITY, sensor_status.humi.value / 10, sensor_status.humi.value % 10);
 
   // calculate last presence detection delay
   SensorGetDelayText (sensor_status.pres.timestamp, str_time, sizeof (str_time));
@@ -2915,9 +2913,9 @@ void SensorWebSensor ()
     GetTextIndexed (str_type, sizeof (str_type), sensor_config.type_pres, kSensorPresenceModel);
     switch (sensor_config.type_pres)
     {
-      case SENSOR_PRESENCE_SWITCH: strcpy (str_value, "contact"); break;
+      case SENSOR_PRESENCE_SWITCH:   strcpy (str_value, "contact"); break;
       case SENSOR_PRESENCE_RCWL0516: strcpy (str_value, "0 - 7m"); break;
-      case SENSOR_PRESENCE_HWMS03: strcpy (str_value, "0.5 - 10m"); break;
+      case SENSOR_PRESENCE_HWMS03:   strcpy (str_value, "0.5 - 10m"); break;
     }
   }
 
@@ -2932,13 +2930,13 @@ void SensorWebSensor ()
   if (strlen (str_type) > 0)
   {
     // display presence sensor
-    WSContentSend_PD (PSTR ("<div style='display:flex;font-size:10px;text-align:center;margin-top:4px;padding:2px 6px;background:#333333;border-radius:8px;'>\n"));
-    WSContentSend_PD (PSTR ("<div style='width:40%%;padding:0px;text-align:left;font-size:12px;font-weight:bold;'>%s</div>\n"), str_type);
-    WSContentSend_PD (PSTR ("<div style='width:30%%;padding:0px;border-radius:6px;"));
-    if (sensor_status.pres.value == 1) WSContentSend_PD (PSTR ("background:#D00;'>%s</div>\n"), str_time);
-    else WSContentSend_PD (PSTR ("background:#444;color:grey;'>%s</div>\n"), str_time);
-    WSContentSend_PD (PSTR ("<div style='width:30%%;padding:2px 0px 0px 0px;text-align:right;'>%s</div>\n"), str_value);
-    WSContentSend_PD (PSTR ("</div>\n"));
+    WSContentSend_P (PSTR ("<div style='display:flex;font-size:10px;text-align:center;margin-top:4px;padding:2px 6px;background:#333333;border-radius:8px;'>\n"));
+    WSContentSend_P (PSTR ("<div style='width:40%%;padding:0px;text-align:left;font-size:12px;font-weight:bold;'>%s</div>\n"), str_type);
+    WSContentSend_P (PSTR ("<div style='width:30%%;padding:0px;border-radius:6px;"));
+    if (sensor_status.pres.value == 1) WSContentSend_P (PSTR ("background:#D00;'>%s</div>\n"), str_time);
+    else WSContentSend_P (PSTR ("background:#444;color:grey;'>%s</div>\n"), str_time);
+    WSContentSend_P (PSTR ("<div style='width:30%%;padding:2px 0px 0px 0px;text-align:right;'>%s</div>\n"), str_value);
+    WSContentSend_P (PSTR ("</div>\n"));
   }
 
   // display last presence detection
@@ -3029,8 +3027,7 @@ void SensorWebConfigure ()
   WSContentSend_P (PSTR ("<p>\n"));
   step = SENSOR_TEMP_DRIFT_STEP;
   ext_snprintf_P (str_text, sizeof (str_text), PSTR ("%1_f"), &step);
-  drift = (float)Settings->temp_comp / 10;
-  ext_snprintf_P (str_value, sizeof (str_value), PSTR ("%1_f"), &drift);
+  sprintf (str_value, "%u.%u", Settings->temp_comp / 10, Settings->temp_comp % 10);
   WSContentSend_P (SENSOR_FIELD_CONFIG, D_SENSOR_CORRECTION, "°C", D_CMND_SENSOR_TEMP D_CMND_SENSOR_DRIFT, D_CMND_SENSOR_TEMP D_CMND_SENSOR_DRIFT, - SENSOR_TEMP_DRIFT_MAX, SENSOR_TEMP_DRIFT_MAX, str_text, str_value);
   WSContentSend_P (PSTR ("</p>\n"));
 
@@ -3103,7 +3100,7 @@ void SensorWebConfigure ()
   for (index = 0; index < SENSOR_PRESENCE_MAX; index ++)
   {
     GetTextIndexed (str_text, sizeof (str_text), index, kSensorPresenceModel);
-    if (sensor_config.type_pres == index) strcpy_P (str_value, PSTR ("checked")); else strcpy (str_value, "");
+    if (sensor_config.type_pres == index) strcpy (str_value, "checked"); else strcpy (str_value, "");
     WSContentSend_P (PSTR ("<p><input type='radio' name='%s' value='%d' %s>%s</p>\n"), D_CMND_SENSOR_PRES D_CMND_SENSOR_TYPE, index, str_value, str_text);
   }
 
@@ -3124,13 +3121,13 @@ void SensorWebConfigure ()
 void SensorWebGraphSwipe ()
 {
   // javascript : screen swipe for previous and next period
-  WSContentSend_P (PSTR("\nlet startX=0;let stopX=0;\n"));
-  WSContentSend_P (PSTR("window.addEventListener('touchstart',function(evt){startX=evt.changedTouches[0].screenX;},false);\n"));
-  WSContentSend_P (PSTR("window.addEventListener('touchend',function(evt){stopX=evt.changedTouches[0].screenX;handleGesture();},false);\n"));
-  WSContentSend_P (PSTR("function handleGesture(){\n"));
-  WSContentSend_P (PSTR("if(stopX<startX-100){document.getElementById('next').click();}\n"));
-  WSContentSend_P (PSTR("else if(stopX>startX+100){document.getElementById('prev').click();}\n"));
-  WSContentSend_P (PSTR("}\n"));
+  WSContentSend_P (PSTR ("\nlet startX=0;let stopX=0;\n"));
+  WSContentSend_P (PSTR ("window.addEventListener('touchstart',function(evt){startX=evt.changedTouches[0].screenX;},false);\n"));
+  WSContentSend_P (PSTR ("window.addEventListener('touchend',function(evt){stopX=evt.changedTouches[0].screenX;handleGesture();},false);\n"));
+  WSContentSend_P (PSTR ("function handleGesture(){\n"));
+  WSContentSend_P (PSTR ("if(stopX<startX-100){document.getElementById('next').click();}\n"));
+  WSContentSend_P (PSTR ("else if(stopX>startX+100){document.getElementById('prev').click();}\n"));
+  WSContentSend_P (PSTR ("}\n"));
 }
 
 // --------------------
@@ -3154,18 +3151,18 @@ void SensorWebGraphWeeklyMeasureStyle ()
   WSContentSend_P (PSTR ("div.value span#humi {color:%s;}\n"), SENSOR_COLOR_HUMI);
   WSContentSend_P (PSTR ("div.value span#temp {color:%s;}\n"), SENSOR_COLOR_TEMP);
 
-  WSContentSend_P (PSTR("button {padding:2px 12px;font-size:2.5vh;background:none;color:#fff;border:1px #666 solid;border-radius:6px;}\n"));
-  WSContentSend_P (PSTR("button:hover {background:#aaa;}\n"));
-  WSContentSend_P (PSTR("button:disabled {color:#252525;background:#252525;border:1px #252525 solid;}\n"));
+  WSContentSend_P (PSTR ("button {padding:2px 12px;font-size:2.5vh;background:none;color:#fff;border:1px #666 solid;border-radius:6px;}\n"));
+  WSContentSend_P (PSTR ("button:hover {background:#aaa;}\n"));
+  WSContentSend_P (PSTR ("button:disabled {color:#252525;background:#252525;border:1px #252525 solid;}\n"));
 
-  WSContentSend_P (PSTR("div.banner {width:88%%;margin:auto;}\n"));
-  WSContentSend_P (PSTR("div.banner div {display:inline-block;}\n"));
-  WSContentSend_P (PSTR("div.date {font-size:3vh;}\n"));
-  WSContentSend_P (PSTR("div.prev {float:left;}\n"));
-  WSContentSend_P (PSTR("div.next {float:right;}\n"));
+  WSContentSend_P (PSTR ("div.banner {width:88%%;margin:auto;}\n"));
+  WSContentSend_P (PSTR ("div.banner div {display:inline-block;}\n"));
+  WSContentSend_P (PSTR ("div.date {font-size:3vh;}\n"));
+  WSContentSend_P (PSTR ("div.prev {float:left;}\n"));
+  WSContentSend_P (PSTR ("div.next {float:right;}\n"));
 
-  WSContentSend_P (PSTR("div.graph {width:100%%;margin:1vh auto;}\n"));
-  WSContentSend_P (PSTR("svg.graph {width:100%%;height:50vh;}\n"));
+  WSContentSend_P (PSTR ("div.graph {width:100%%;margin:1vh auto;}\n"));
+  WSContentSend_P (PSTR ("svg.graph {width:100%%;height:50vh;}\n"));
 }
 
 // Sensor graph curve display
@@ -3177,9 +3174,8 @@ void SensorWebGraphWeeklyMeasureCurve (const uint8_t week, const char* pstr_url)
   uint8_t  prev_week, next_week;
   int16_t  scale, temp_range, temp_incr, temp_min, temp_max;
   uint32_t index, unit, graph_width, graph_x, prev_x, graph_y, prev_y, last_x;
+  char     str_text[16];
   char     str_type[16];
-  char     str_text[48];
-  String   str_result;
 
   // check parameters
   if (week > 52) return;
@@ -3235,35 +3231,35 @@ void SensorWebGraphWeeklyMeasureCurve (const uint8_t week, const char* pstr_url)
   prev_week = week + 1;
 
   // start of form
-  WSContentSend_P(PSTR("<form method='get' action='/%s'>\n"), pstr_url);
-  WSContentSend_P (PSTR("<div class='banner'>\n"));
+  WSContentSend_P (PSTR ("<form method='get' action='/%s'>\n"), pstr_url);
+  WSContentSend_P (PSTR ("<div class='banner'>\n"));
 
   // date
   SensorGetWeekLabel (week, str_text, sizeof (str_text));
-  WSContentSend_P (PSTR("<div class='date'>%s</div>\n"), str_text);
+  WSContentSend_P (PSTR ("<div class='date'>%s</div>\n"), str_text);
 
   // if exist, navigation to previous week
   SensorGetWeekLabel (prev_week, str_text, sizeof (str_text));
   if (SensorFileWeekExist (prev_week)) strcpy (str_type, ""); else strcpy (str_type, "disabled");
-  WSContentSend_P (PSTR("<div class='prev'><button name='week' title='%s' value=%u id='prev' %s>&lt;&lt;</button></div>\n"), str_text, prev_week, str_type);
+  WSContentSend_P (PSTR ("<div class='prev'><button name='week' title='%s' value=%u id='prev' %s>&lt;&lt;</button></div>\n"), str_text, prev_week, str_type);
 
   // if exist, navigation to next week or to live values
   SensorGetWeekLabel (next_week, str_text, sizeof (str_text));
   if (SensorFileWeekExist (next_week)) strcpy (str_type, ""); else strcpy (str_type, "disabled");
-  WSContentSend_P (PSTR("<div class='next'><button name='week' title='%s' value=%u id='next' %s>&gt;&gt;</button></div>\n"), str_text, next_week, str_type);
+  WSContentSend_P (PSTR ("<div class='next'><button name='week' title='%s' value=%u id='next' %s>&gt;&gt;</button></div>\n"), str_text, next_week, str_type);
 
   // end of form
-  WSContentSend_P (PSTR("</div>\n"));     // banner
-  WSContentSend_P(PSTR("<form method='get' action='/%s'>\n"), D_SENSOR_PAGE_WEEK_MEASURE);
+  WSContentSend_P (PSTR ("</div>\n"));     // banner
+  WSContentSend_P (PSTR ("<form method='get' action='/%s'>\n"), D_SENSOR_PAGE_WEEK_MEASURE);
 
 #endif    // USE_UFILESYS
 
   // start of SVG graph
-  WSContentSend_P (PSTR("<div class='graph'>\n"));
-  WSContentSend_P (PSTR("<svg class='graph' viewBox='%d %d %d %d' preserveAspectRatio='none'>\n"), 0, 0, SENSOR_GRAPH_WIDTH, SENSOR_GRAPH_HEIGHT + 1);
+  WSContentSend_P (PSTR ("<div class='graph'>\n"));
+  WSContentSend_P (PSTR ("<svg class='graph' viewBox='%d %d %d %d' preserveAspectRatio='none'>\n"), 0, 0, SENSOR_GRAPH_WIDTH, SENSOR_GRAPH_HEIGHT + 1);
 
   // SVG style
-  WSContentSend_P (PSTR("<style type='text/css'>\n"));
+  WSContentSend_P (PSTR ("<style type='text/css'>\n"));
 
   WSContentSend_P (PSTR ("text {font-size:18px}\n"));
 
@@ -3285,7 +3281,7 @@ void SensorWebGraphWeeklyMeasureCurve (const uint8_t week, const char* pstr_url)
   WSContentSend_P (PSTR ("text.temp {fill:%s;}\n"), SENSOR_COLOR_TEMP);
   WSContentSend_P (PSTR ("text.humi {fill:%s;}\n"), SENSOR_COLOR_HUMI);
 
-  WSContentSend_P(PSTR("</style>\n"));
+  WSContentSend_P (PSTR ("</style>\n"));
 
   // ------  Humidity  ---------
 
@@ -3295,7 +3291,6 @@ void SensorWebGraphWeeklyMeasureCurve (const uint8_t week, const char* pstr_url)
     index   = 0;
     graph_x = prev_x = SENSOR_GRAPH_START;
     graph_y = prev_y = UINT32_MAX;
-    str_result = "";
 
     // loop thru points
     for (count = count_start; count < count_stop; count++)
@@ -3312,28 +3307,24 @@ void SensorWebGraphWeeklyMeasureCurve (const uint8_t week, const char* pstr_url)
             else graph_y = UINT32_MAX;
 
           // if needed, start path
-          if ((graph_y != UINT32_MAX) && (prev_y == UINT32_MAX))  { sprintf (str_text, "<path class='humi' d='M%d %d ", graph_x, SENSOR_GRAPH_HEIGHT); str_result += str_text; }
+          if ((graph_y != UINT32_MAX) && (prev_y == UINT32_MAX))  WSContentSend_P (PSTR ("<path class='humi' d='M%d %d "), graph_x, SENSOR_GRAPH_HEIGHT);
 
           // else if needed, stop path
-          else if ((graph_y == UINT32_MAX) && (prev_y != UINT32_MAX)) { sprintf (str_text, "L%d %d '/>\n", prev_x, SENSOR_GRAPH_HEIGHT); str_result += str_text; }
+          else if ((graph_y == UINT32_MAX) && (prev_y != UINT32_MAX)) WSContentSend_P (PSTR ("L%d %d '/>\n"), prev_x, SENSOR_GRAPH_HEIGHT);
 
           // if needed, draw point
-          else if (graph_y != UINT32_MAX) { sprintf (str_text, "L%u %u ", graph_x, graph_y); str_result += str_text; }
+          else if (graph_y != UINT32_MAX) WSContentSend_P (PSTR ("L%u %u "), graph_x, graph_y);
 
           // save previous values
           if (graph_y != UINT32_MAX) last_x = max (last_x, graph_x);
           prev_x = graph_x;
           prev_y = graph_y;
           index++;
-
-          // if needed, publish result
-          if (str_result.length () > 256) { WSContentSend_P (str_result.c_str ()); str_result = ""; }
         }
     }
 
     // end of graph
-    if (graph_y != UINT32_MAX) { sprintf (str_text, "L%u %u '/>\n", graph_x, SENSOR_GRAPH_HEIGHT); str_result += str_text; }
-    WSContentSend_P (str_result.c_str ());
+    if (graph_y != UINT32_MAX) WSContentSend_P (PSTR ("L%u %u '/>\n"), graph_x, SENSOR_GRAPH_HEIGHT);
   }
 
   // ---------  Temperature  ---------
@@ -3344,7 +3335,6 @@ void SensorWebGraphWeeklyMeasureCurve (const uint8_t week, const char* pstr_url)
     index   = 0;
     graph_x = prev_x = SENSOR_GRAPH_START;
     graph_y = prev_y = UINT32_MAX;
-    str_result = "";
 
     // loop thru points
     for (count = count_start; count < count_stop; count++)
@@ -3361,27 +3351,23 @@ void SensorWebGraphWeeklyMeasureCurve (const uint8_t week, const char* pstr_url)
             else graph_y = SENSOR_GRAPH_HEIGHT - SENSOR_GRAPH_HEIGHT * (uint32_t)(sensor_week[day][hour][slot].temp - temp_min) / (uint32_t)temp_range;
 
           // if needed, start polyline
-          if ((graph_y != UINT32_MAX) && (prev_y == UINT32_MAX)) str_result += "<polyline class='temp' points='";
+          if ((graph_y != UINT32_MAX) && (prev_y == UINT32_MAX)) WSContentSend_P (PSTR ("<polyline class='temp' points='"));
 
           // else if needed, stop polyline
-          else if ((graph_y == UINT32_MAX) && (prev_y != UINT32_MAX)) str_result += "'/>\n";
+          else if ((graph_y == UINT32_MAX) && (prev_y != UINT32_MAX)) WSContentSend_P (PSTR ("'/>\n"));
 
           // if needed, draw point
-          if (graph_y != UINT32_MAX) { sprintf (str_text, "%u,%u ", graph_x, graph_y); str_result += str_text; }
+          if (graph_y != UINT32_MAX) WSContentSend_P (PSTR ("%u,%u "), graph_x, graph_y);
 
           // save previous values
           if (graph_y != UINT32_MAX) last_x = max (last_x, graph_x);
           prev_x = graph_x;
           prev_y = graph_y;
           index++;
-
-          // if needed, publish result
-          if (str_result.length () > 256) { WSContentSend_P (str_result.c_str ()); str_result = ""; }
         }
     }
 
-    if (graph_y != UINT32_MAX) str_result += "'/>\n";
-    WSContentSend_P (str_result.c_str ());
+    if (graph_y != UINT32_MAX) WSContentSend_P (PSTR ("'/>\n"));
   }
 
   // ---------  Activity  ---------
@@ -3410,7 +3396,7 @@ void SensorWebGraphWeeklyMeasureCurve (const uint8_t week, const char* pstr_url)
           // if activity should be drawn
           if ((prev_x != UINT32_MAX) && (graph_x != UINT32_MAX))
           {
-            WSContentSend_P ("<rect class='acti' x=%d y=%d width=%d height=%d />\n", prev_x, graph_y, graph_x - prev_x, SENSOR_GRAPH_ACTI);
+            WSContentSend_P (PSTR ("<rect class='acti' x=%d y=%d width=%d height=%d />\n"), prev_x, graph_y, graph_x - prev_x, SENSOR_GRAPH_ACTI);
             prev_x = graph_x = UINT32_MAX;
           }
 
@@ -3419,7 +3405,7 @@ void SensorWebGraphWeeklyMeasureCurve (const uint8_t week, const char* pstr_url)
         } 
     }
 
-    if (prev_x != UINT32_MAX) WSContentSend_P ("<rect class='acti' x=%d y=%d width=%d height=%d />\n", prev_x, graph_y, graph_x - prev_x, SENSOR_GRAPH_ACTI);
+    if (prev_x != UINT32_MAX) WSContentSend_P (PSTR ("<rect class='acti' x=%d y=%d width=%d height=%d />\n"), prev_x, graph_y, graph_x - prev_x, SENSOR_GRAPH_ACTI);
   }
 
   // ---------  Inactivity  ---------
@@ -3448,7 +3434,7 @@ void SensorWebGraphWeeklyMeasureCurve (const uint8_t week, const char* pstr_url)
           // if activity should be drawn
           if ((prev_x != UINT32_MAX) && (graph_x != UINT32_MAX))
           {
-            WSContentSend_P ("<rect class='inac' x=%d y=%d width=%d height=%d />\n", prev_x, graph_y, graph_x - prev_x, SENSOR_GRAPH_INAC);
+            WSContentSend_P (PSTR ("<rect class='inac' x=%d y=%d width=%d height=%d />\n"), prev_x, graph_y, graph_x - prev_x, SENSOR_GRAPH_INAC);
             prev_x = graph_x = UINT32_MAX;
           }
 
@@ -3457,7 +3443,7 @@ void SensorWebGraphWeeklyMeasureCurve (const uint8_t week, const char* pstr_url)
         } 
     }
 
-    if (prev_x != UINT32_MAX) WSContentSend_P ("<rect class='inac' x=%d y=%d width=%d height=%d />\n", prev_x, graph_y, graph_x - prev_x, SENSOR_GRAPH_INAC);
+    if (prev_x != UINT32_MAX) WSContentSend_P (PSTR ("<rect class='inac' x=%d y=%d width=%d height=%d />\n"), prev_x, graph_y, graph_x - prev_x, SENSOR_GRAPH_INAC);
   }
 
   // -------  Frame  -------
@@ -3472,11 +3458,10 @@ void SensorWebGraphWeeklyMeasureCurve (const uint8_t week, const char* pstr_url)
     // get day label
     day = count % 7;
     strlcpy (str_text, kWeekdayNames + day * 3, 4);
-    strcpy (str_type, "day");
 
     // display day
     graph_x = SENSOR_GRAPH_START + ((count - count_start) * 2 + 1) * graph_width / 14 - 10;
-    WSContentSend_P (PSTR ("<text class='%s' x=%u y=%u>%s</text>\n"), str_type, graph_x, 20, str_text);
+    WSContentSend_P (PSTR ("<text class='day' x=%u y=%u>%s</text>\n"), graph_x, 20, str_text);
   }
 
   // display separation lines
@@ -3527,8 +3512,8 @@ void SensorWebGraphWeeklyMeasureCurve (const uint8_t week, const char* pstr_url)
 
   // --------  End  ---------
 
-  WSContentSend_P(PSTR("</svg>\n"));      // graph
-  WSContentSend_P(PSTR("</div>\n"));      // graph
+  WSContentSend_P (PSTR ("</svg>\n"));      // graph
+  WSContentSend_P (PSTR ("</div>\n"));      // graph
 }
 
 // Temperature and humidity weekly page
@@ -3637,8 +3622,7 @@ void SensorWebGraphYearlyMeasureCurve (const uint16_t year, const char* pstr_url
   uint8_t  month, month_start, month_stop, day, counter;
   int16_t  temp_min, temp_max, temp_range, temp_incr, scale;
   uint32_t index, unit, graph_width, graph_x, prev_x, graph_y, prev_y;
-  char     str_text[48];
-  String   str_result;
+  char     str_text[16];
 
 #ifdef USE_UFILESYS
 
@@ -3646,23 +3630,23 @@ void SensorWebGraphYearlyMeasureCurve (const uint16_t year, const char* pstr_url
   SensorFileYearLoad (year);
 
   // start of form
-  WSContentSend_P (PSTR("<form method='get' action='/%s'>\n"), pstr_url);
-  WSContentSend_P (PSTR("<div class='banner'>\n"));
+  WSContentSend_P (PSTR ("<form method='get' action='/%s'>\n"), pstr_url);
+  WSContentSend_P (PSTR ("<div class='banner'>\n"));
 
   // date
-  WSContentSend_P (PSTR("<div class='date'>%u</div>\n"), year);
+  WSContentSend_P (PSTR ("<div class='date'>%u</div>\n"), year);
 
   // if exist, navigation to previous year
   if (SensorFileYearExist (year - 1)) strcpy (str_text, ""); else strcpy (str_text, "disabled");
-  WSContentSend_P (PSTR("<div class='prev'><button name='year' title='%u' value=%u id='prev' %s>&lt;&lt;</button></div>\n"), year - 1, year - 1, str_text);
+  WSContentSend_P (PSTR ("<div class='prev'><button name='year' title='%u' value=%u id='prev' %s>&lt;&lt;</button></div>\n"), year - 1, year - 1, str_text);
 
   // if exist, navigation to next year
   if (SensorFileYearExist (year + 1)) strcpy (str_text, ""); else strcpy (str_text, "disabled");
-  WSContentSend_P (PSTR("<div class='next'><button name='year' title='%u' value=%u id='next' %s>&gt;&gt;</button></div>\n"), year + 1, year + 1, str_text);
+  WSContentSend_P (PSTR ("<div class='next'><button name='year' title='%u' value=%u id='next' %s>&gt;&gt;</button></div>\n"), year + 1, year + 1, str_text);
 
   // end of form
-  WSContentSend_P (PSTR("</div>\n"));     // banner
-  WSContentSend_P (PSTR("<form method='get' action='/%s'>\n"), D_SENSOR_PAGE_YEAR_MEASURE);
+  WSContentSend_P (PSTR ("</div>\n"));     // banner
+  WSContentSend_P (PSTR ("<form method='get' action='/%s'>\n"), D_SENSOR_PAGE_YEAR_MEASURE);
 
   // set month window
   month_start = 0;
@@ -3702,11 +3686,11 @@ void SensorWebGraphYearlyMeasureCurve (const uint16_t year, const char* pstr_url
   temp_incr  = max (temp_range / 40 * 10, 10);
 
   // start of SVG graph
-  WSContentSend_P (PSTR("<div class='graph'>\n"));
-  WSContentSend_P (PSTR("<svg class='graph' viewBox='%d %d %d %d' preserveAspectRatio='none'>\n"), 0, 0, SENSOR_GRAPH_WIDTH, SENSOR_GRAPH_HEIGHT + 1);
+  WSContentSend_P (PSTR ("<div class='graph'>\n"));
+  WSContentSend_P (PSTR ("<svg class='graph' viewBox='%d %d %d %d' preserveAspectRatio='none'>\n"), 0, 0, SENSOR_GRAPH_WIDTH, SENSOR_GRAPH_HEIGHT + 1);
 
   // SVG style
-  WSContentSend_P (PSTR("<style type='text/css'>\n"));
+  WSContentSend_P (PSTR ("<style type='text/css'>\n"));
 
   WSContentSend_P (PSTR ("text {font-size:18px}\n"));
 
@@ -3724,12 +3708,11 @@ void SensorWebGraphYearlyMeasureCurve (const uint16_t year, const char* pstr_url
   WSContentSend_P (PSTR ("text.month {fill:%s;font-size:16px;}\n"), SENSOR_COLOR_TIME);
   WSContentSend_P (PSTR ("text.temp {fill:%s;}\n"), SENSOR_COLOR_TEMP);
 
-  WSContentSend_P(PSTR("</style>\n"));
+  WSContentSend_P (PSTR ("</style>\n"));
 
   // --- Maximum temperature curve ---
 
   // loop thru months and days
-  str_result = "";
   graph_x = prev_x = UINT32_MAX;
   graph_y = prev_y = UINT32_MAX;
   index = 0;
@@ -3747,33 +3730,28 @@ void SensorWebGraphYearlyMeasureCurve (const uint16_t year, const char* pstr_url
         else graph_y = SENSOR_GRAPH_HEIGHT - SENSOR_GRAPH_HEIGHT * (uint32_t)(sensor_year[month][day].temp_max - temp_min) / (uint32_t)temp_range;
 
       // if curve restart from beginning
-      if ((graph_x < prev_x) && (prev_x != UINT32_MAX)) str_result += "'/>\n<polyline class='max' points='";
+      if ((graph_x < prev_x) && (prev_x != UINT32_MAX)) WSContentSend_P (PSTR ("'/>\n<polyline class='max' points='"));
 
       // if needed, start polyline
-      else if ((graph_y != UINT32_MAX) && (prev_y == UINT32_MAX)) str_result += "<polyline class='max' points='";
+      else if ((graph_y != UINT32_MAX) && (prev_y == UINT32_MAX)) WSContentSend_P (PSTR ("<polyline class='max' points='"));
 
       // else if needed, stop polyline
-      else if ((graph_y == UINT32_MAX) && (prev_y != UINT32_MAX)) str_result += "'/>\n";
+      else if ((graph_y == UINT32_MAX) && (prev_y != UINT32_MAX)) WSContentSend_P (PSTR ("'/>\n"));
 
       // if needed, draw point
-      if (graph_y != UINT32_MAX) { sprintf (str_text, "%u,%u ", graph_x, graph_y); str_result += str_text; }
+      if (graph_y != UINT32_MAX) WSContentSend_P (PSTR ("%u,%u "), graph_x, graph_y);
 
       // save previous values
       prev_x = graph_x;
       prev_y = graph_y;
       index ++;
-
-      // if needed, publish result
-      if (str_result.length () > 256) { WSContentSend_P (str_result.c_str ()); str_result = ""; }
     }
   }
-  if (graph_y != UINT32_MAX) str_result += "'/>\n";
-  WSContentSend_P (str_result.c_str ());
+  if (graph_y != UINT32_MAX) WSContentSend_P (PSTR ("'/>\n"));
 
   // ---  Minimum temperature curve  ---
 
   // loop thru months and days
-  str_result = "";
   graph_x = prev_x = UINT32_MAX;
   graph_y = prev_y = UINT32_MAX;
   index = 0;
@@ -3791,28 +3769,24 @@ void SensorWebGraphYearlyMeasureCurve (const uint16_t year, const char* pstr_url
         else graph_y = SENSOR_GRAPH_HEIGHT - SENSOR_GRAPH_HEIGHT * (uint32_t)(sensor_year[month][day].temp_min - temp_min) / (uint32_t)temp_range;
 
       // if curve restart from beginning
-      if ((graph_x < prev_x) && (prev_x != UINT32_MAX)) str_result += "'/>\n<polyline class='min' points='";
+      if ((graph_x < prev_x) && (prev_x != UINT32_MAX)) WSContentSend_P (PSTR ("'/>\n<polyline class='min' points='"));
 
       // if needed, start polyline
-      else if ((graph_y != UINT32_MAX) && (prev_y == UINT32_MAX)) str_result += "<polyline class='min' points='";
+      else if ((graph_y != UINT32_MAX) && (prev_y == UINT32_MAX)) WSContentSend_P (PSTR ("<polyline class='min' points='"));
 
       // else if needed, stop polyline
-      else if ((graph_y == UINT32_MAX) && (prev_y != UINT32_MAX)) str_result += "'/>\n";
+      else if ((graph_y == UINT32_MAX) && (prev_y != UINT32_MAX)) WSContentSend_P (PSTR ("'/>\n"));
 
       // if needed, draw point
-      if (graph_y != UINT32_MAX) { sprintf (str_text, "%u,%u ", graph_x, graph_y); str_result += str_text; }
+      if (graph_y != UINT32_MAX) WSContentSend_P (PSTR ("%u,%u "), graph_x, graph_y);
 
       // save previous values
       prev_x = graph_x;
       prev_y = graph_y;
       index ++;
-
-      // if needed, publish result
-      if (str_result.length () > 256) { WSContentSend_P (str_result.c_str ()); str_result = ""; }
     }
   }
-  if (graph_y != UINT32_MAX) str_result += "'/>\n";
-  WSContentSend_P (str_result.c_str ());
+  if (graph_y != UINT32_MAX) WSContentSend_P (PSTR ("'/>\n"));
 
   // ---  Frame  ---
 
@@ -3856,8 +3830,8 @@ void SensorWebGraphYearlyMeasureCurve (const uint16_t year, const char* pstr_url
 
   // ---  End  ---
 
-  WSContentSend_P(PSTR("</svg>\n"));      // graph
-  WSContentSend_P(PSTR("</div>\n"));      // graph
+  WSContentSend_P(PSTR ("</svg>\n"));      // graph
+  WSContentSend_P(PSTR ("</div>\n"));      // graph
 }
 
 // Temperature yearly page
@@ -3898,11 +3872,9 @@ void SensorWebYearlyMeasure ()
 
   // ------- Values --------
 
-  WSContentSend_P (PSTR ("<div class='value'><a href='/'>"));
-
   // temperature
+  WSContentSend_P (PSTR ("<div class='value'><a href='/'>"));
   if ((sensor_status.temp.source != SENSOR_SOURCE_NONE) && (sensor_status.temp.value != INT16_MAX)) WSContentSend_P (PSTR ("<span id='temp'>%d.%d °C</span>"), sensor_status.temp.value / 10, sensor_status.temp.value % 10);
-
   WSContentSend_P (PSTR ("</a></div>\n"));
 
   // ------- Graph --------
@@ -3930,16 +3902,16 @@ void SensorWebGraphPresenceStyle ()
   WSContentSend_P (PSTR ("a:link {text-decoration:none;}\n"));
 
   // navigation button
-  WSContentSend_P (PSTR("button {padding:2px 12px;font-size:2.5vh;background:none;color:#fff;border:1px #666 solid;border-radius:6px;}\n"));
-  WSContentSend_P (PSTR("button:hover {background:#aaa;}\n"));
-  WSContentSend_P (PSTR("button:disabled {color:#252525;background:#252525;border:1px #252525 solid;}\n"));
+  WSContentSend_P (PSTR ("button {padding:2px 12px;font-size:2.5vh;background:none;color:#fff;border:1px #666 solid;border-radius:6px;}\n"));
+  WSContentSend_P (PSTR ("button:hover {background:#aaa;}\n"));
+  WSContentSend_P (PSTR ("button:disabled {color:#252525;background:#252525;border:1px #252525 solid;}\n"));
 
   // banner
-  WSContentSend_P (PSTR("div.banner {width:88%%;}\n"));
-  WSContentSend_P (PSTR("div.banner div {display:inline-block;}\n"));
-  WSContentSend_P (PSTR("div.date {font-size:2.5vh;}\n"));
-  WSContentSend_P (PSTR("div.prev {float:left;}\n"));
-  WSContentSend_P (PSTR("div.next {float:right;}\n"));
+  WSContentSend_P (PSTR ("div.banner {width:88%%;}\n"));
+  WSContentSend_P (PSTR ("div.banner div {display:inline-block;}\n"));
+  WSContentSend_P (PSTR ("div.date {font-size:2.5vh;}\n"));
+  WSContentSend_P (PSTR ("div.prev {float:left;}\n"));
+  WSContentSend_P (PSTR ("div.next {float:right;}\n"));
 
   WSContentSend_P (PSTR("div.graph {width:96%%;}\n"));
 }
@@ -3947,7 +3919,7 @@ void SensorWebGraphPresenceStyle ()
 // Presence SVG style
 void SensorWebGraphPresenceSVGStyle ()
 {
-  WSContentSend_P (PSTR("<style type='text/css'>\n"));
+  WSContentSend_P (PSTR ("<style type='text/css'>\n"));
 
   WSContentSend_P (PSTR ("text {font-size:3vh;fill:%s;}\n"), SENSOR_COLOR_TIME);
   WSContentSend_P (PSTR ("text.time {}\n"));
@@ -3960,7 +3932,7 @@ void SensorWebGraphPresenceSVGStyle ()
 
   WSContentSend_P (PSTR ("line {stroke:#aaa;stroke-dasharray:2 6;}\n"));
 
-  WSContentSend_P (PSTR("</style>\n"));
+  WSContentSend_P (PSTR ("</style>\n"));
 }
 
 // Presence history page
@@ -3971,10 +3943,8 @@ void SensorWebGraphWeeklyPresenceCurve (const uint8_t week, const char* pstr_url
   uint32_t index, day, hour, slot;
   uint32_t count, count_start, count_stop;
   uint32_t last_x, graph_x, graph_y, line_height, bar_height;
-  char     str_day[8];
+  char     str_text[16];
   char     str_style[16];
-  char     str_text[64];
-  String   str_result;
 
   // check parameters
   if (pstr_url == nullptr) return;
@@ -3985,26 +3955,26 @@ void SensorWebGraphWeeklyPresenceCurve (const uint8_t week, const char* pstr_url
   prev_week = week + 1;
 
   // start of form
-  WSContentSend_P(PSTR("<form method='get' action='/%s'>\n"), pstr_url);
+  WSContentSend_P (PSTR("<form method='get' action='/%s'>\n"), pstr_url);
   WSContentSend_P (PSTR("<div class='banner'>\n"));
 
   // date
   SensorGetWeekLabel (week, str_text, sizeof (str_text));
-  WSContentSend_P (PSTR("<div class='date'>%s</div>\n"), str_text);
+  WSContentSend_P (PSTR ("<div class='date'>%s</div>\n"), str_text);
 
   // if exist, navigation to previous week
   SensorGetWeekLabel (prev_week, str_text, sizeof (str_text));
   if (SensorFileWeekExist (prev_week)) strcpy (str_style, ""); else strcpy (str_style, "disabled");
-  WSContentSend_P (PSTR("<div class='prev'><button name='week' title='%s' value=%u id='prev' %s>&lt;&lt;</button></div>\n"), str_text, prev_week, str_style);
+  WSContentSend_P (PSTR ("<div class='prev'><button name='week' title='%s' value=%u id='prev' %s>&lt;&lt;</button></div>\n"), str_text, prev_week, str_style);
 
   // if exist, navigation to next week
   SensorGetWeekLabel (next_week, str_text, sizeof (str_text));
   if (SensorFileWeekExist (next_week)) strcpy (str_style, ""); else strcpy (str_style, "disabled");
-  WSContentSend_P (PSTR("<div class='next'><button name='week' title='%s' value=%u id='next' %s>&gt;&gt;</button></div>\n"), str_text, next_week, str_style);
+  WSContentSend_P (PSTR ("<div class='next'><button name='week' title='%s' value=%u id='next' %s>&gt;&gt;</button></div>\n"), str_text, next_week, str_style);
 
   // end of form
-  WSContentSend_P (PSTR("</div>\n"));     // banner
-  WSContentSend_P(PSTR("<form method='get' action='/%s'>\n"), D_SENSOR_PAGE_WEEK_PRESENCE);
+  WSContentSend_P (PSTR ("</div>\n"));     // banner
+  WSContentSend_P (PSTR ("<form method='get' action='/%s'>\n"), D_SENSOR_PAGE_WEEK_PRESENCE);
 
   // load weekly data
   SensorFileWeekLoad (week);
@@ -4025,8 +3995,8 @@ void SensorWebGraphWeeklyPresenceCurve (const uint8_t week, const char* pstr_url
   bar_height  = line_height - 5;
 
   // start of SVG graph
-  WSContentSend_P (PSTR("<div class='graph'>\n"));
-  WSContentSend_P (PSTR("<svg class='graph' viewBox='%d %d %d %d' preserveAspectRatio='none'>\n"), 0, 0, SENSOR_GRAPH_WIDTH, SENSOR_GRAPH_HEIGHT + 1);
+  WSContentSend_P (PSTR ("<div class='graph'>\n"));
+  WSContentSend_P (PSTR ("<svg class='graph' viewBox='%d %d %d %d' preserveAspectRatio='none'>\n"), 0, 0, SENSOR_GRAPH_WIDTH, SENSOR_GRAPH_HEIGHT + 1);
 
   // SVG style
   SensorWebGraphPresenceSVGStyle ();
@@ -4037,7 +4007,6 @@ void SensorWebGraphWeeklyPresenceCurve (const uint8_t week, const char* pstr_url
   WSContentSend_P (PSTR ("<text class='time' text-anchor='end' x=%u y=%u>%s</text>\n"), SENSOR_GRAPH_WIDTH_HEAD + SENSOR_GRAPH_WIDTH_LINE, bar_height - 10, "24h");
 
   // loop thru days
-  str_result = "";
   index = 1;
   for (count = count_start; count < count_stop; count++)
   {
@@ -4048,10 +4017,9 @@ void SensorWebGraphWeeklyPresenceCurve (const uint8_t week, const char* pstr_url
     graph_y = index * line_height;
 
     // display week day
-    strlcpy (str_day, kWeekdayNames + day * 3, 4);
+    strlcpy (str_text, kWeekdayNames + day * 3, 4);
     if ((week == 0) && (day == RtcTime.day_of_week - 1)) strcpy (str_style, "today"); else strcpy (str_style, "head");
-    sprintf_P (str_text, PSTR ("<text class='%s' text-anchor='start' x=%u y=%u>%s</text>\n"), str_style, 20, graph_y + bar_height - 25, str_day);
-    str_result += str_text;
+    WSContentSend_P (PSTR ("<text class='%s' text-anchor='start' x=%u y=%u>%s</text>\n"), str_style, 20, graph_y + bar_height - 25, str_text);
 
     // loop to display slots of current day
     slot_state = sensor_week[day][0][0].event.pres;
@@ -4066,22 +4034,17 @@ void SensorWebGraphWeeklyPresenceCurve (const uint8_t week, const char* pstr_url
         if ((hour == 23) && (slot == 5))
         {
           graph_x = SENSOR_GRAPH_WIDTH_HEAD + SENSOR_GRAPH_WIDTH_LINE;
-          sprintf_P (str_text, PSTR ("<rect class='s%u' x=%u y=%u width=%u height=%u />\n"), slot_state, last_x, graph_y, graph_x - last_x, bar_height);
-          str_result += str_text;
+          WSContentSend_P (PSTR ("<rect class='s%u' x=%u y=%u width=%u height=%u />\n"), slot_state, last_x, graph_y, graph_x - last_x, bar_height);
         }
 
         // else if presence has changed
         else if (slot_state != slot_new)
         {
           graph_x = SENSOR_GRAPH_WIDTH_HEAD + SENSOR_GRAPH_WIDTH_LINE * (6 * hour + slot) / 144;
-          sprintf_P (str_text, PSTR ("<rect class='s%u' x=%u y=%u width=%u height=%u />\n"), slot_state, last_x, graph_y, graph_x - last_x, bar_height);
-          str_result += str_text;
+          WSContentSend_P (PSTR ("<rect class='s%u' x=%u y=%u width=%u height=%u />\n"), slot_state, last_x, graph_y, graph_x - last_x, bar_height);
           last_x = graph_x;
           slot_state = slot_new;
         }
-
-        // if needed, publish result
-        if (str_result.length () > 256) { WSContentSend_P (str_result.c_str ()); str_result = ""; }
       }
 
     // loop to display separation lines
@@ -4090,23 +4053,16 @@ void SensorWebGraphWeeklyPresenceCurve (const uint8_t week, const char* pstr_url
     {
       // draw line
       graph_x = SENSOR_GRAPH_WIDTH_HEAD + SENSOR_GRAPH_WIDTH_LINE * hour / 12;
-      sprintf_P (str_text, PSTR ("<line x1=%u y1=%u x2=%u y2=%u />\n"), graph_x, graph_y, graph_x, graph_y + bar_height);
-      str_result += str_text;
-
-      // if needed, publish result
-      if (str_result.length () > 256) { WSContentSend_P (str_result.c_str ()); str_result = ""; }
+      WSContentSend_P (PSTR ("<line x1=%u y1=%u x2=%u y2=%u />\n"), graph_x, graph_y, graph_x, graph_y + bar_height);
     }
 
     // increment
     index++;
   }
 
-  // publish last part
-  if (str_result.length () > 0) WSContentSend_P (str_result.c_str ());
-
   // ---  End  ---
-  WSContentSend_P (PSTR("</svg>\n"));      // graph
-  WSContentSend_P (PSTR("</div>\n"));      // graph
+  WSContentSend_P (PSTR ("</svg>\n"));      // graph
+  WSContentSend_P (PSTR ("</div>\n"));      // graph
 }
 
 // Presence weekly history page
