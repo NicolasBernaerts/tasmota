@@ -83,6 +83,8 @@
     03/06/2023 - v11.1 - Rewrite of Tasmota energy update
                          Avoid 100ms rules teleperiod update
     05/08/2023 - v11.2.1 - Correct contract type bug
+    15/08/2023 - v11.3 - Change in cosphi calculation
+                         Reorder Tempo periods
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -234,12 +236,12 @@ enum TeleinfoMode { TIC_MODE_UNDEFINED, TIC_MODE_HISTORIC, TIC_MODE_STANDARD, TI
 const char kTeleinfoModeName[] PROGMEM = "|Historique|Standard|PME";
 const uint16_t ARR_TELEINFO_RATE[] = { 1200, 9600, 19200 }; 
 
-// Tarifs                                  [  Toutes   ]   [ Creuses       Pleines   ] [ Normales   PointeMobile ] [CreusesBleu  CreusesBlanc  CreusesRouge  PleinesBleu   PleinesBlanc  PleinesRouge] [ Pointe   PointeMobile  Hiver      Pleines     Creuses    PleinesHiver CreusesHiver PleinesEte   CreusesEte   Pleines1/2S  Creuses1/2S  JuilletAout] [Pointe PleinesHiver CreusesHiver PleinesEte CreusesEte] [ Base  ]  [ Pleines    Creuses   ]  [ Creuses bleu     Creuse Blanc       Creuse Rouge      Pleine Bleu     Pleine Blanc      Pleine Rouge ]  [ Normale      Pointe  ]  [Production]
-enum TeleinfoPeriod                        { TIC_HISTO_TH, TIC_HISTO_HC, TIC_HISTO_HP, TIC_HISTO_HN, TIC_HISTO_PM, TIC_HISTO_CB, TIC_HISTO_CW, TIC_HISTO_CR, TIC_HISTO_PB, TIC_HISTO_PW, TIC_HISTO_PR, TIC_STD_P, TIC_STD_PM, TIC_STD_HH, TIC_STD_HP, TIC_STD_HC, TIC_STD_HPH, TIC_STD_HCH, TIC_STD_HPE, TIC_STD_HCE, TIC_STD_HPD, TIC_STD_HCD, TIC_STD_JA, TIC_STD_1, TIC_STD_2, TIC_STD_3, TIC_STD_4, TIC_STD_5, TIC_STD_BASE, TIC_STD_HPL, TIC_STD_HCR, TIC_STD_HC_BLEU, TIC_STD_HC_BLANC, TIC_STD_HC_ROUGE, TIC_STD_HP_BLEU, TIC_STD_HP_BLANC, TIC_STD_HP_ROUGE, TIC_STD_HNO, TIC_STD_HPT, TIC_STD_PROD, TIC_PERIOD_MAX };
-const int ARR_TELEINFO_PERIOD_FIRST[]    = { TIC_HISTO_TH, TIC_HISTO_HC, TIC_HISTO_HC, TIC_HISTO_HN, TIC_HISTO_HN, TIC_HISTO_CB, TIC_HISTO_CB, TIC_HISTO_CB, TIC_HISTO_CB, TIC_HISTO_CB, TIC_HISTO_CB, TIC_STD_P, TIC_STD_P,  TIC_STD_P,  TIC_STD_P,  TIC_STD_P,  TIC_STD_P,   TIC_STD_P,   TIC_STD_P,   TIC_STD_P,   TIC_STD_P,   TIC_STD_P,   TIC_STD_P,  TIC_STD_1, TIC_STD_1, TIC_STD_1, TIC_STD_1, TIC_STD_1, TIC_STD_BASE, TIC_STD_HPL, TIC_STD_HPL, TIC_STD_HC_BLEU, TIC_STD_HC_BLEU,  TIC_STD_HC_BLEU,  TIC_STD_HC_BLEU, TIC_STD_HC_BLEU,  TIC_STD_HC_BLEU,  TIC_STD_HNO, TIC_STD_HNO, TIC_STD_PROD };
+// Tarifs                                  [  Toutes   ]   [ Creuses       Pleines   ] [ Normales   PointeMobile ] [CreusesBleu  PleinesBleu   CreusesBlanc   PleinesBlanc CreusesRouge   PleinesRouge] [ Pointe   PointeMobile  Hiver      Pleines     Creuses    PleinesHiver CreusesHiver PleinesEte   CreusesEte   Pleines1/2S  Creuses1/2S  JuilletAout] [Pointe PleinesHiver CreusesHiver PleinesEte CreusesEte] [ Base  ]  [ Pleines    Creuses   ] [ Creuses bleu      Pleine Bleu    Creuse Blanc       Pleine Blanc     Creuse Rouge       Pleine Rouge ]  [ Normale      Pointe  ]  [Production]
+enum TeleinfoPeriod                        { TIC_HISTO_TH, TIC_HISTO_HC, TIC_HISTO_HP, TIC_HISTO_HN, TIC_HISTO_PM, TIC_HISTO_CB, TIC_HISTO_PB, TIC_HISTO_CW, TIC_HISTO_PW, TIC_HISTO_CR, TIC_HISTO_PR, TIC_STD_P, TIC_STD_PM, TIC_STD_HH, TIC_STD_HP, TIC_STD_HC, TIC_STD_HPH, TIC_STD_HCH, TIC_STD_HPE, TIC_STD_HCE, TIC_STD_HPD, TIC_STD_HCD, TIC_STD_JA, TIC_STD_1, TIC_STD_2, TIC_STD_3, TIC_STD_4, TIC_STD_5, TIC_STD_BASE, TIC_STD_HPL, TIC_STD_HCR, TIC_STD_HC_BLEU, TIC_STD_HP_BLEU, TIC_STD_HC_BLANC, TIC_STD_HP_BLANC, TIC_STD_HC_ROUGE, TIC_STD_HP_ROUGE, TIC_STD_HNO, TIC_STD_HPT, TIC_STD_PROD, TIC_PERIOD_MAX };
+const int ARR_TELEINFO_PERIOD_FIRST[]    = { TIC_HISTO_TH, TIC_HISTO_HC, TIC_HISTO_HC, TIC_HISTO_HN, TIC_HISTO_HN, TIC_HISTO_CB, TIC_HISTO_CB, TIC_HISTO_CB, TIC_HISTO_CB, TIC_HISTO_CB, TIC_HISTO_CB, TIC_STD_P, TIC_STD_P,  TIC_STD_P,  TIC_STD_P,  TIC_STD_P,  TIC_STD_P,   TIC_STD_P,   TIC_STD_P,   TIC_STD_P,   TIC_STD_P,   TIC_STD_P,   TIC_STD_P,  TIC_STD_1, TIC_STD_1, TIC_STD_1, TIC_STD_1, TIC_STD_1, TIC_STD_BASE, TIC_STD_HPL, TIC_STD_HPL, TIC_STD_HC_BLEU, TIC_STD_HC_BLEU, TIC_STD_HC_BLEU,  TIC_STD_HC_BLEU,  TIC_STD_HC_BLEU,  TIC_STD_HC_BLEU,  TIC_STD_HNO, TIC_STD_HNO, TIC_STD_PROD };
 const int ARR_TELEINFO_PERIOD_NUMBER[]   = { 1,            2,            2,            2,            2,            6,            6,            6,            6,            6,            6,            12,        12,         12,         12,         12,         12,          12,          12,          12,          12,          12,          12,         5,         5,         5,         5,         5,         1,            2,           2          ,         6      ,       6         ,       6        ,        6        ,       6        ,         6       ,       2     ,      2     ,      1       };
-const char kTeleinfoPeriod[] PROGMEM     = "TH..|HC..|HP..|HN..|PM..|HCJB|HCJW|HCJR|HPJB|HPJW|HPJR|P|PM|HH|HP|HC|HPH|HCH|HPE|HCE|HPD|HCD|JA|1|2|3|4|5|BASE|HEURE PLEINE|HEURE CREUSE|HC BLEU|HC BLANC|HC ROUGE|HP BLEU|HP BLANC|HP ROUGE|HEURE NORMALE|HEURE POINTE|INDEX NON CONSO";
-const char kTeleinfoPeriodName[] PROGMEM = "Toutes|Creuses|Pleines|Normales|Pointe Mobile|Creuses Bleu|Creuses Blanc|Creuses Rouge|Pleines Bleu|Pleines Blanc|Pleines Rouge|Pointe|Pointe Mobile|Hiver|Pleines|Creuses|Pleines Hiver|Creuses Hiver|Pleines Ete|Creuses Ete|Pleines Demi-saison|Creuses Demi-saison|Juillet-Aout|Pointe|Pleines Hiver|Creuses Hiver|Pleines Ete|Creuses Ete|Base|Pleines|Creuse|Creuses Bleu|Creuses Blanc|Creuses Rouge|Pleines Bleu|Pleines Blanc|Pleines Rouge|Normale|Pointe|Production";
+const char kTeleinfoPeriod[] PROGMEM     = "TH..|HC..|HP..|HN..|PM..|HCJB|HPJB|HCJW|HPJW|HCJR|HPJR|P|PM|HH|HP|HC|HPH|HCH|HPE|HCE|HPD|HCD|JA|1|2|3|4|5|BASE|HEURE PLEINE|HEURE CREUSE|HC BLEU|HP BLEU|HC BLANC|HP BLANC|HC ROUGE|HP ROUGE|HEURE NORMALE|HEURE POINTE|INDEX NON CONSO";
+const char kTeleinfoPeriodName[] PROGMEM = "Toutes|Creuses|Pleines|Normales|Pointe Mobile|Creuses Bleu|Pleines Bleu|Creuses Blanc|Pleines Blanc|Creuses Rouge|Pleines Rouge|Pointe|Pointe Mobile|Hiver|Pleines|Creuses|Pleines Hiver|Creuses Hiver|Pleines Ete|Creuses Ete|Pleines Demi-saison|Creuses Demi-saison|Juillet-Aout|Pointe|Pleines Hiver|Creuses Hiver|Pleines Ete|Creuses Ete|Base|Pleines|Creuse|Creuses Bleu|Pleines Bleu|Creuses Blanc|Pleines Blanc|Creuses Rouge|Pleines Rouge|Normale|Pointe|Production";
 
 // Data diffusion policy
 enum TeleinfoMessagePolicy { TELEINFO_POLICY_MESSAGE, TELEINFO_POLICY_PERCENT, TELEINFO_POLICY_TELEMETRY, TELEINFO_POLICY_MAX };
@@ -349,11 +351,11 @@ static struct {
 struct tic_phase {
   bool  volt_set;                                    // voltage set in current message
   long  voltage;                                     // instant voltage
-  long  current;                                     // instant current
+  long  current;                                     // instant current (x100)
   long  papp;                                        // instant apparent power
   long  pact;                                        // instant active power
   long  papp_last;                                   // last published apparent power
-  float cosphi;                                      // cos phi (x100)
+  long  cosphi;                                      // cos phi (x100)
 }; 
 static tic_phase teleinfo_phase[ENERGY_MAX_PHASES];
 
@@ -876,7 +878,7 @@ void TeleinfoUpdateCurrent (const char* str_value, const uint8_t phase)
 
   // calculate and update
   value = atol (str_value);
-  if ((value >= 0) && (value != LONG_MAX)) teleinfo_phase[phase].current = value; 
+  if ((value >= 0) && (value != LONG_MAX)) teleinfo_phase[phase].current = 100 * value; 
 }
 
 void TeleinfoUpdateApparentPower (const char* str_value)
@@ -996,10 +998,11 @@ void TeleinfoReceiveData ()
   bool      is_valid;
   uint8_t   phase;
   int       period, index;
-  long      value, total_current, increment;
+  long      value, total_current, increment, cosphi;
   long long counter, counter_wh, delta_wh;
   uint32_t  timeout, timestamp, message_ms;
-  float     cosphi, papp_inc, daily_kwh;
+//  float     cosphi, papp_inc, daily_kwh;
+  float     papp_inc, daily_kwh;
   char      checksum;
   char*     pstr_match;
   char      str_byte[2] = {0, 0};
@@ -1101,10 +1104,12 @@ void TeleinfoReceiveData ()
                   teleinfo_contract.mode = TIC_MODE_HISTORIC;
                     if (teleinfo_contract.ident == 0) teleinfo_contract.ident = atoll (str_donnee);
                   break;
+
                 case TIC_ADSC:
                   teleinfo_contract.mode = TIC_MODE_STANDARD;
                     if (teleinfo_contract.ident == 0) teleinfo_contract.ident = atoll (str_donnee);
                   break;
+
                 case TIC_ADS:
                     if (teleinfo_contract.ident == 0) teleinfo_contract.ident = atoll (str_donnee);
                   break;
@@ -1122,6 +1127,7 @@ void TeleinfoReceiveData ()
                     teleinfo_contract.type = TIC_TYPE_PROD;
                   }
                   break;
+
                 case TIC_NGTF:
                   if (strstr (str_donnee, "PRODUCTEUR") != nullptr) teleinfo_contract.type = TIC_TYPE_PROD;
                   break;
@@ -1140,15 +1146,14 @@ void TeleinfoReceiveData ()
                 case TIC_IINST:
                 case TIC_IRMS1:
                 case TIC_IINST1:
-                  TeleinfoUpdateCurrent (str_donnee,0);
                   break;
+
                 case TIC_IRMS2:
                 case TIC_IINST2:
-                  TeleinfoUpdateCurrent (str_donnee,1);
                   break;
+
                 case TIC_IRMS3:
                 case TIC_IINST3:
-                  TeleinfoUpdateCurrent (str_donnee,2);
                   teleinfo_contract.phase = 3; 
                   break;
 
@@ -1191,19 +1196,23 @@ void TeleinfoReceiveData ()
                 case TIC_URMS1:
                   TeleinfoUpdateVoltage (str_donnee, 0, true);
                   break;
+
                 case TIC_UMOY1:
                   TeleinfoUpdateVoltage (str_donnee, 0, false);
                   break;
+
                 case TIC_URMS2:
                   TeleinfoUpdateVoltage (str_donnee, 1, true);
                   break;
                 case TIC_UMOY2:
                   TeleinfoUpdateVoltage (str_donnee, 1, false);
                   break;
+
                 case TIC_URMS3:
                   TeleinfoUpdateVoltage (str_donnee, 2, true);
                   teleinfo_contract.phase = 3; 
                   break;
+
                 case TIC_UMOY3:
                   TeleinfoUpdateVoltage (str_donnee, 2, false);
                   teleinfo_contract.phase = 3; 
@@ -1240,6 +1249,7 @@ void TeleinfoReceiveData ()
                     }                   
                   }
                   break;
+
                 case TIC_PS:
                   strlcpy (str_text, str_donnee, sizeof (str_text));
 
@@ -1275,6 +1285,7 @@ void TeleinfoReceiveData ()
                   }
                   if (teleinfo_contract.type == TIC_TYPE_CONSO) TeleinfoUpdateGlobalCounter (str_text, 0);
                   break;
+
                 case TIC_BASE:
                 case TIC_HCHC:
                 case TIC_EJPHN:
@@ -1293,31 +1304,39 @@ void TeleinfoReceiveData ()
                 case TIC_EASF02:
                 if (teleinfo_contract.type == TIC_TYPE_CONSO) TeleinfoUpdateGlobalCounter (str_donnee, 1);
                   break;
+
                 case TIC_BBRHCJW:
                 case TIC_EASF03:
                   if (teleinfo_contract.type == TIC_TYPE_CONSO) TeleinfoUpdateGlobalCounter (str_donnee, 2);
                   break;
+
                 case TIC_BBRHPJW:
                 case TIC_EASF04:
                   if (teleinfo_contract.type == TIC_TYPE_CONSO) TeleinfoUpdateGlobalCounter (str_donnee, 3);
                   break;
+
                 case TIC_BBRHCJR:
                 case TIC_EASF05:
                   if (teleinfo_contract.type == TIC_TYPE_CONSO) TeleinfoUpdateGlobalCounter (str_donnee, 4);
                   break;
+
                 case TIC_BBRHPJR:
                 case TIC_EASF06:
                   if (teleinfo_contract.type == TIC_TYPE_CONSO) TeleinfoUpdateGlobalCounter (str_donnee, 5);
                   break;
+
                 case TIC_EASF07:
                   if (teleinfo_contract.type == TIC_TYPE_CONSO) TeleinfoUpdateGlobalCounter (str_donnee, 6);
                   break;
+
                 case TIC_EASF08:
                   if (teleinfo_contract.type == TIC_TYPE_CONSO) TeleinfoUpdateGlobalCounter (str_donnee, 7);
                   break;
+
                 case TIC_EASF09:
                   if (teleinfo_contract.type == TIC_TYPE_CONSO) TeleinfoUpdateGlobalCounter (str_donnee, 8);
                 break;
+
                 case TIC_EASF10:
                   if (teleinfo_contract.type == TIC_TYPE_CONSO) TeleinfoUpdateGlobalCounter (str_donnee, 9);
                   break;
@@ -1445,16 +1464,16 @@ void TeleinfoReceiveData ()
                 if (delta_wh > 0)
                 {
                   // new cosphi = 3/4 previous one + 1/4 calculated one, if new cosphi > 1, new cosphi = 1
-                  if (papp_inc > 0) cosphi = 0.75 * cosphi + 0.25 * 100 * (float)delta_wh / papp_inc;
+                  if (papp_inc > 0) cosphi = cosphi * 3 / 4 + (long)(delta_wh * 25 / papp_inc);
                   if (cosphi > 100) cosphi = 100;
                   teleinfo_meter.nb_update++;
                 }
 
                 // else, if apparent power is above 1, cosphi will be drastically reduced when global counter will be increased
-                // so lets apply slow reduction to cosphi according to apparent power current increment
+                //   so lets apply slow reduction to cosphi according to apparent power current increment
                 else if (papp_inc > 1)
                 {
-                  cosphi = 0.5 * cosphi + 0.5 * 100 / papp_inc;
+                  cosphi = cosphi / 2 + (long)(50 / papp_inc);
                   if (cosphi > teleinfo_phase[0].cosphi) cosphi = teleinfo_phase[0].cosphi;
                 }
 
@@ -1463,7 +1482,7 @@ void TeleinfoReceiveData ()
               }
 
               // calculate active power per phase
-              for (phase = 0; phase < teleinfo_contract.phase; phase++) teleinfo_phase[phase].pact = teleinfo_phase[phase].papp * (long)teleinfo_phase[phase].cosphi / 100;
+              for (phase = 0; phase < teleinfo_contract.phase; phase++) teleinfo_phase[phase].pact = teleinfo_phase[phase].papp * teleinfo_phase[phase].cosphi / 100;
 
               // update global counter
               teleinfo_meter.total_wh = counter_wh;
@@ -1561,7 +1580,7 @@ void TeleinfoReceiveData ()
               if (teleinfo_phase[0].pact > teleinfo_phase[0].papp) teleinfo_phase[0].pact = teleinfo_phase[0].papp;
 
               // calculate cos phi
-              if (teleinfo_phase[0].papp > 0) teleinfo_phase[0].cosphi = 100 * (float)teleinfo_phase[0].pact / (float)teleinfo_phase[0].papp;
+              if (teleinfo_phase[0].papp > 0) teleinfo_phase[0].cosphi = 100 * teleinfo_phase[0].pact / teleinfo_phase[0].papp;
 
               // update previous message timestamp
               teleinfo_calc.previous_time_message = teleinfo_message.timestamp;
@@ -1603,6 +1622,7 @@ void TeleinfoReceiveData ()
             // set current
             if (Energy->voltage[phase] > 0) Energy->current[phase] = Energy->apparent_power[phase] / Energy->voltage[phase];
               else Energy->current[phase] = 0;
+            teleinfo_phase[phase].current = (long)(Energy->current[phase] * 100);
           } 
 
           // declare received message
@@ -1714,7 +1734,7 @@ void TeleinfoPublishJsonMeter ()
 {
   uint8_t phase;
   int   value;
-  long  power_max, power_app, power_act;
+  long  current, power_max, power_app, power_act;
   float f_value;
   char  str_text[16];
 
@@ -1731,11 +1751,14 @@ void TeleinfoPublishJsonMeter ()
   ResponseAppend_P (PSTR (",\"%s\":%d"), TELEINFO_JSON_PMAX, power_max);
 
   // loop to calculate apparent and active power
+  current   = 0;
   power_app = 0;
   power_act = 0;
   for (phase = 0; phase < teleinfo_contract.phase; phase++)
   {
+    // calculate parameters
     value = phase + 1;
+    current   += teleinfo_phase[phase].current;
     power_app += teleinfo_phase[phase].papp;
     power_act += teleinfo_phase[phase].pact;
 
@@ -1746,24 +1769,14 @@ void TeleinfoPublishJsonMeter ()
     ResponseAppend_P (PSTR (",\"P%d\":%d,\"W%d\":%d"), value, teleinfo_phase[phase].papp, value, teleinfo_phase[phase].pact);
 
     // current
-    if (teleinfo_phase[phase].voltage > 0)
-    {
-      f_value = teleinfo_phase[phase].papp / teleinfo_phase[phase].voltage;
-      ext_snprintf_P (str_text, sizeof(str_text), PSTR ("%1_f"), &f_value);
-      ResponseAppend_P (PSTR (",\"I%d\":%s"), value, str_text);
-    }
+    ResponseAppend_P (PSTR (",\"I%d\":%d.%02d"), value, teleinfo_phase[phase].current / 100, teleinfo_phase[phase].current % 100);
 
     // cos phi
-    if (!isnan (teleinfo_phase[phase].cosphi))
-    {
-      f_value = teleinfo_phase[phase].cosphi / 100;
-      ext_snprintf_P (str_text, sizeof(str_text), PSTR ("%2_f"), &f_value);
-      ResponseAppend_P (PSTR (",\"C%d\":%s"), value, str_text);
-    }
+    ResponseAppend_P (PSTR (",\"C%d\":%d.%02d"), value, teleinfo_phase[phase].cosphi / 100, teleinfo_phase[phase].cosphi % 100);
   } 
 
-  // Total Papp and Pact
-  if (teleinfo_contract.phase > 1) ResponseAppend_P (PSTR (",\"P\":%d,\"W\":%d"), power_app, power_act);
+  // Total Papp, Pact and Current
+  ResponseAppend_P (PSTR (",\"P\":%d,\"W\":%d,\"I\":%d.%02d"), power_app, power_act, current / 100, current % 100);
 
   // end of METER section, publish JSON and process rules
   ResponseAppend_P (PSTR ("}}"));
@@ -1842,12 +1855,12 @@ void TeleinfoWebSensor ()
         strlcat (str_header, D_TELEINFO_CONTRACT, sizeof (str_header));
 
         // number of phases
-        strcpy_P (str_text, PSTR ("<br>"));
+        strcpy (str_text, "<br>");
         if (teleinfo_contract.phase > 1) sprintf_P (str_text, PSTR ("<br>%u x "), teleinfo_contract.phase);
         strlcat (str_data, str_text, sizeof (str_data));
 
         // power
-        sprintf_P (str_text, PSTR ("%d kVA"), teleinfo_contract.ssousc / 1000);
+        sprintf (str_text, "%d kVA", teleinfo_contract.ssousc / 1000);
         strlcat (str_data, str_text, sizeof (str_data));
       }
 
@@ -1870,8 +1883,8 @@ void TeleinfoWebSensor ()
       WSContentSend_P (PSTR ("{s}%s{m}%s{e}"), str_header, str_data);
 
       // display number of messages and cos phi
-      strcpy_P (str_header, PSTR ("Messages / Cosφ"));
-      sprintf_P (str_data, PSTR ("%d / %d"), teleinfo_meter.nb_message, teleinfo_meter.nb_update);
+      strcpy (str_header, "Messages / Cosφ");
+      sprintf (str_data, "%d / %d", teleinfo_meter.nb_message, teleinfo_meter.nb_update);
 
       // calculate error percentage
       percentage = 0;
@@ -1881,7 +1894,7 @@ void TeleinfoWebSensor ()
       if ((teleinfo_meter.nb_reset > 0) || (percentage > 0))
       {
         strlcat (str_header, "<br>Reset / Errors", sizeof (str_header));
-        sprintf_P (str_text, PSTR ("<br>%d / %d%%"), teleinfo_meter.nb_reset, percentage);
+        sprintf (str_text, "<br>%d / %d%%", teleinfo_meter.nb_reset, percentage);
         strlcat (str_data, str_text, sizeof (str_data));
       }
 
