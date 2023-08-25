@@ -177,7 +177,8 @@ Files should be taken from this repository and from **tasmota/common** :
 | --- | --- |
 | **platformio_override.ini** |    |
 | tasmota/**user_config_override.h**  |    |
-| boards/**esp32_4M_FS.json** |  Partitioning to get 1.3Mb FS on 4Mb ESP32  |
+| boards/**esp32_4M1300k_FS.json** |  Partitioning to get 1.3Mb FS on 4Mb ESP32  |
+| boards/**esp32s2_4M1300k_FS.json** |  Partitioning to get 1.3Mb FS on 4Mb ESP32S2  |
 | boards/**esp8266_16M14M.json** |  Partitioning to get 14Mb FS on 16Mb ESP32  |
 | boards/**esp32s3_lillygo_t7s3.json** |  Partitioning for 16Mb ESP32-S3  |
 | tasmota/include/**tasmota_type.h** | Redefinition of teleinfo structure |
