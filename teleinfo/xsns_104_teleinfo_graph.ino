@@ -8,7 +8,8 @@
     03/06/2023 - v11.1 - Graph curves live update
     11/06/2023 - v11.2 - Change graph organisation & live display
     15/08/2023 - v11.3 - Evolution in graph navigation
-                         Change in XMLHttpRequest management 
+                         Change in XMLHttpRequest management
+                         Memory leak hunting
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -180,42 +181,25 @@ uint8_t TeleinfoSensorGetDaysInMonth (const uint32_t year, const uint8_t month)
 // Display any value to a string with unit and kilo conversion with number of digits (12000, 2.0k, 12.0k, 2.3M, ...)
 void TeleinfoSensorGetDataDisplay (const int unit_type, const long value, char* pstr_result, const int size_result, bool in_kilo) 
 {
-  float result;
-  char  str_text[16];
+  char str_text[16];
 
   // check parameters
   if (pstr_result == nullptr) return;
 
   // convert cos phi value
-  if (unit_type == TELEINFO_UNIT_COSPHI)
-  {
-    result = (float)value / 100;
-    ext_snprintf_P (pstr_result, size_result, PSTR ("%2_f"), &result);
-  }
+  if (unit_type == TELEINFO_UNIT_COSPHI) sprintf (pstr_result, "%d.%02d", value / 100, value % 100);
 
   // else convert values in M with 1 digit
-  else if (in_kilo && (value > 999999))
-  {
-    result = (float)value / 1000000;
-    ext_snprintf_P (pstr_result, size_result, PSTR ("%1_fM"), &result);
-  }
+  else if (in_kilo && (value > 999999)) sprintf (pstr_result, "%d.%dM", value / 1000000, (value / 100000) % 10);
 
   // else convert values in k with no digit
-  else if (in_kilo && (value > 9999))
-  {
-    result = (float)value / 1000;
-    ext_snprintf_P (pstr_result, size_result, PSTR ("%0_fk"), &result);
-  }
+  else if (in_kilo && (value > 9999)) sprintf (pstr_result, "%dk", value / 1000);
 
   // else convert values in k
-  else if (in_kilo && (value > 999))
-  {
-    result = (float)value / 1000;
-    ext_snprintf_P (pstr_result, size_result, PSTR ("%1_fk"), &result);
-  }
+  else if (in_kilo && (value > 999)) sprintf (pstr_result, "%d.%dk", value / 1000, (value / 100) % 10);
 
   // else convert value
-  else sprintf_P (pstr_result, PSTR ("%d"), value);
+  else sprintf (pstr_result, "%d", value);
 
   // append unit if specified
   if (unit_type < TELEINFO_UNIT_MAX) 
@@ -250,7 +234,7 @@ void TeleinfoSensorGetCurrentDataDisplay (const int unit_type, const int phase, 
       value = teleinfo_phase[phase].voltage;
       break;
     case TELEINFO_UNIT_COSPHI:
-      value = (long)teleinfo_phase[phase].cosphi;
+      value = teleinfo_phase[phase].cosphi;
       break;
   }
 
@@ -312,17 +296,17 @@ bool TeleinfoSensorHistoGetDate (const int period, const int histo, char* pstr_t
   {
     // generate time label for day graph
     case TELEINFO_PERIOD_DAY:
-      sprintf_P (pstr_text, PSTR ("%02u/%02u"), start_dst.day_of_month, start_dst.month);
+      sprintf (pstr_text, "%02u/%02u", start_dst.day_of_month, start_dst.month);
       break;
 
     // generate time label for week graph
     case TELEINFO_PERIOD_WEEK:
-      sprintf_P (pstr_text, PSTR ("W %02u/%02u"), start_dst.day_of_month, start_dst.month);
+      sprintf (pstr_text, "W %02u/%02u", start_dst.day_of_month, start_dst.month);
       break;
 
     // generate time label for year graph
     case TELEINFO_PERIOD_YEAR:
-      sprintf_P (pstr_text, PSTR ("%04u"), 1970 + start_dst.year - histo);
+      sprintf (pstr_text, "%04u", 1970 + start_dst.year - histo);
       break;
 
     // default
@@ -379,7 +363,7 @@ void TeleinfoSensorFlushDataHisto (const uint8_t period)
       str_header = "Idx;Date;Time";
       for (phase = 1; phase <= teleinfo_contract.phase; phase++)
       {
-        sprintf_P (str_value, PSTR (";VA%d;W%d;V%d;C%d;pVA%d;pV%d"), phase, phase, phase, phase, phase, phase);
+        sprintf (str_value, ";VA%d;W%d;V%d;C%d;pVA%d;pV%d", phase, phase, phase, phase, phase, phase);
         str_header += str_value;
       }
 
@@ -415,9 +399,8 @@ void TeleinfoSensorSaveDataHisto (const uint8_t period, const uint8_t log_buffer
   uint8_t  phase;
   long     year, month, remain;
   uint32_t start_time, current_time, day_of_week, index;
-  TIME_T   time_dst;
+  TIME_T   time_dst, start_dst;
   char     str_value[32];
-//  char     str_filename[UFS_FILENAME_SIZE];
 
   // check boundaries
   if ((period != TELEINFO_PERIOD_DAY) && (period != TELEINFO_PERIOD_WEEK)) return;
@@ -443,11 +426,12 @@ void TeleinfoSensorSaveDataHisto (const uint8_t period, const uint8_t log_buffer
     sprintf_P (teleinfo_graph.str_filename, D_TELEINFO_HISTO_FILE_WEEK, 0);
 
     // calculate start of current week
-    time_dst.second = 1;
-    time_dst.minute = 0;
-    time_dst.hour   = 0;  
-    if (time_dst.day_of_week == 1) day_of_week = 8; else day_of_week = time_dst.day_of_week;
-    start_time = MakeTime (time_dst) - 86400 * (day_of_week - 2);
+    start_dst = time_dst;
+    start_dst.second = 1;
+    start_dst.minute = 0;
+    start_dst.hour   = 0;  
+    if (start_dst.day_of_week == 1) day_of_week = 8; else day_of_week = start_dst.day_of_week;
+    start_time = MakeTime (start_dst) - 86400 * (day_of_week - 2);
 
     // calculate index of weekly line
     index = (current_time - start_time) * TELEINFO_GRAPH_SAMPLE / 604800;
@@ -462,7 +446,7 @@ void TeleinfoSensorSaveDataHisto (const uint8_t period, const uint8_t log_buffer
 
   // line : index and date
   teleinfo_period[period].str_buffer += index;
-  sprintf_P (str_value, PSTR (";%02u/%02u;%02u:%02u"), time_dst.day_of_month, time_dst.month, time_dst.hour, time_dst.minute);
+  sprintf (str_value, ";%02u/%02u;%02u:%02u", time_dst.day_of_month, time_dst.month, time_dst.hour, time_dst.minute);
   teleinfo_period[period].str_buffer += str_value;
 
   // line : phase data
@@ -607,7 +591,7 @@ void TeleinfoSensorSaveDailyTotal ()
       str_line = "Idx;Month;Day;Global;Daily";
       for (index = 0; index < 24; index ++)
       {
-        sprintf_P (str_value, ";%02uh", index);
+        sprintf (str_value, ";%02uh", index);
         str_line += str_value;
       }
       str_line += "\n";
@@ -953,17 +937,17 @@ int TeleinfoSensorWebGetArgValue (const char* pstr_argument, const int value_min
 void TeleinfoSensorWebMainButton ()
 {
   // Teleinfo message page button
-  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), D_TELEINFO_PAGE_TIC, "TIC Message");
+  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>TIC Message</button></form></p>\n"), D_TELEINFO_PAGE_TIC);
 
   // Teleinfo graph page button
-  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), D_TELEINFO_PAGE_GRAPH, "TIC Graph");
+  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>TIC Graph</button></form></p>\n"), D_TELEINFO_PAGE_GRAPH);
 }
 
 // Append Teleinfo configuration button to configuration page
 void TeleinfoSensorWebConfigButton ()
 {
   // heater and meter configuration button
-  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), D_TELEINFO_PAGE_CONFIG, PSTR ("Configure Teleinfo"));
+  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>Configure Teleinfo</button></form></p>\n"), D_TELEINFO_PAGE_CONFIG);
 }
 
 // Teleinfo web page
@@ -1047,7 +1031,6 @@ void TeleinfoSensorWebTicUpdate ()
   int      index;
   uint32_t timestart;
   char     str_line[TELEINFO_LINE_MAX];
-  String   str_update;
 
   // start timestamp
   timestart = millis ();
@@ -1057,7 +1040,8 @@ void TeleinfoSensorWebTicUpdate ()
 
   // send line number
   sprintf (str_line, "%d\n", teleinfo_meter.nb_message);
-  str_update = str_line;
+  WSContentSend_P (PSTR ("%s"), str_line); 
+
 
   // loop thru TIC message lines to publish if defined
   for (index = 0; index < teleinfo_message.line_max; index ++)
@@ -1065,12 +1049,10 @@ void TeleinfoSensorWebTicUpdate ()
     if (teleinfo_message.line[index].checksum != 0) 
       sprintf (str_line, "%s|%s|%c\n", teleinfo_message.line[index].str_etiquette.c_str (), teleinfo_message.line[index].str_donnee.c_str (), teleinfo_message.line[index].checksum);
     else strcpy (str_line, " | | \n");
-    str_update += str_line;
-    if (str_update.length () > 512) { WSContentSend_P (str_update.c_str ()); str_update = ""; }
+    WSContentSend_P (PSTR ("%s"), str_line); 
   }
 
   // end of data page
-  if (str_update.length () > 0) WSContentSend_P (str_update.c_str ());
   WSContentEnd ();
 
   // log data serving time
@@ -1092,34 +1074,34 @@ void TeleinfoSensorWebPageTic ()
   WSContentSend_P (PSTR ("function updateData(){\n"));
 
   WSContentSend_P (PSTR (" httpData=new XMLHttpRequest();\n"));
+  WSContentSend_P (PSTR (" httpData.open('GET','%s',true);\n"), D_TELEINFO_PAGE_TIC_UPD);
 
   WSContentSend_P (PSTR (" httpData.onreadystatechange=function(){\n"));
   WSContentSend_P (PSTR ("  if (httpData.readyState===XMLHttpRequest.DONE){\n"));
-  WSContentSend_P (PSTR ("   setTimeout(function(){updateData();},%u);\n"), 1000);               // ask for next update in 1 sec
   WSContentSend_P (PSTR ("   if (httpData.status===0 || (httpData.status>=200 && httpData.status<400)){\n"));
   WSContentSend_P (PSTR ("    arr_param=httpData.responseText.split('\\n');\n"));
   WSContentSend_P (PSTR ("    num_param=arr_param.length;\n"));
-  WSContentSend_P (PSTR ("    document.getElementById('msg').textContent=arr_param[0];\n"));
+  WSContentSend_P (PSTR ("    if (document.getElementById('msg')!=null) document.getElementById('msg').textContent=arr_param[0];\n"));
   WSContentSend_P (PSTR ("    for (i=1;i<num_param;i++){\n"));
   WSContentSend_P (PSTR ("     arr_value=arr_param[i].split('|');\n"));
-  WSContentSend_P (PSTR ("     document.getElementById('e'+i).textContent=arr_value[0];\n"));
-  WSContentSend_P (PSTR ("     document.getElementById('d'+i).textContent=arr_value[1];\n"));
-  WSContentSend_P (PSTR ("     document.getElementById('c'+i).textContent=arr_value[2];\n"));
+  WSContentSend_P (PSTR ("     if (document.getElementById('e'+i)!=null) document.getElementById('e'+i).textContent=arr_value[0];\n"));
+  WSContentSend_P (PSTR ("     if (document.getElementById('d'+i)!=null) document.getElementById('d'+i).textContent=arr_value[1];\n"));
+  WSContentSend_P (PSTR ("     if (document.getElementById('c'+i)!=null) document.getElementById('c'+i).textContent=arr_value[2];\n"));
   WSContentSend_P (PSTR ("    }\n"));
   WSContentSend_P (PSTR ("    for (i=num_param;i<=%d;i++){\n"), teleinfo_message.line_max);
-  WSContentSend_P (PSTR ("     document.getElementById('e'+i).textContent='';\n"));
-  WSContentSend_P (PSTR ("     document.getElementById('d'+i).textContent='';\n"));
-  WSContentSend_P (PSTR ("     document.getElementById('c'+i).textContent='';\n"));
+  WSContentSend_P (PSTR ("     if (document.getElementById('e'+i)!=null) document.getElementById('e'+i).textContent='';\n"));
+  WSContentSend_P (PSTR ("     if (document.getElementById('d'+i)!=null) document.getElementById('d'+i).textContent='';\n"));
+  WSContentSend_P (PSTR ("     if (document.getElementById('c'+i)!=null) document.getElementById('c'+i).textContent='';\n"));
   WSContentSend_P (PSTR ("    }\n"));
   WSContentSend_P (PSTR ("   }\n"));
+  WSContentSend_P (PSTR ("   setTimeout(updateData,%u);\n"), 1000);               // ask for next update in 1 sec
   WSContentSend_P (PSTR ("  }\n"));
   WSContentSend_P (PSTR (" }\n"));
 
-  WSContentSend_P (PSTR (" httpData.open('GET','%s',true);\n"), D_TELEINFO_PAGE_TIC_UPD);
   WSContentSend_P (PSTR (" httpData.send();\n"));
   WSContentSend_P (PSTR ("}\n"));
 
-  WSContentSend_P (PSTR ("setTimeout(function(){updateData();},%u);\n\n"), 100);                   // ask for first update after 100ms
+  WSContentSend_P (PSTR ("setTimeout(updateData,%u);\n\n"), 100);                   // ask for first update after 100ms
 
   WSContentSend_P (PSTR ("</script>\n\n"));
 
@@ -1154,11 +1136,11 @@ void TeleinfoSensorWebPageTic ()
   WSContentSend_P (PSTR ("<body>\n"));
 
   // display counter
-  WSContentSend_P (PSTR ("<div><a href='/'>\n"));
-  WSContentSend_P (PSTR ("<div class='linky'><img src='%s'></div>\n"), D_TELEINFO_ICON_LINKY_SVG);
+  WSContentSend_P (PSTR ("<div>\n"));
+  WSContentSend_P (PSTR ("<div class='linky'><a href='/'><img src='%s'></a></div>\n"), D_TELEINFO_ICON_LINKY_SVG);
   WSContentSend_P (PSTR ("<div class='name'><span>%s</span></div>\n"), SettingsText (SET_DEVICENAME));
   WSContentSend_P (PSTR ("<div class='count'><span id='msg'>%u</span></div>\n"), teleinfo_meter.nb_message);
-  WSContentSend_P (PSTR ("</a></div>\n"));
+  WSContentSend_P (PSTR ("</div>\n"));
 
   // display table with header
   WSContentSend_P (PSTR ("<div class='table'><table>\n"));
@@ -1426,7 +1408,6 @@ void TeleinfoSensorGraphDisplayCurve (const uint8_t phase, const uint8_t data)
   }
 
   // display values
-  strcpy (teleinfo_graph.str_buffer, "");
   prev_x = LONG_MAX;
   for (index = 0; index < TELEINFO_GRAPH_SAMPLE; index++)
   {
@@ -1473,12 +1454,10 @@ void TeleinfoSensorGraphDisplayCurve (const uint8_t phase, const uint8_t data)
           if (prev_x == LONG_MAX)
           {
             // start point
-            sprintf_P (str_value, PSTR ("M%d %d "), graph_x, TELEINFO_GRAPH_HEIGHT);
-            strlcat (teleinfo_graph.str_buffer, str_value, sizeof (teleinfo_graph.str_buffer));
+            WSContentSend_P (PSTR ("M%d %d "), graph_x, TELEINFO_GRAPH_HEIGHT); 
 
             // first point
-            sprintf_P (str_value, PSTR ("L%d %d "), graph_x, graph_y);
-            strlcat (teleinfo_graph.str_buffer, str_value, sizeof (teleinfo_graph.str_buffer));
+            WSContentSend_P (PSTR ("L%d %d "), graph_x, graph_y); 
           }
 
           // else, other point
@@ -1497,8 +1476,7 @@ void TeleinfoSensorGraphDisplayCurve (const uint8_t phase, const uint8_t data)
             }
 
             // display point
-            sprintf_P (str_value, PSTR ("C%d %d,%d %d,%d %d "), graph_x, bezier_y1, prev_x, bezier_y2, graph_x, graph_y);
-            strlcat (teleinfo_graph.str_buffer, str_value, sizeof (teleinfo_graph.str_buffer));
+            WSContentSend_P (PSTR ("C%d %d,%d %d,%d %d "), graph_x, bezier_y1, prev_x, bezier_y2, graph_x, graph_y); 
           }
           break;
 
@@ -1507,11 +1485,7 @@ void TeleinfoSensorGraphDisplayCurve (const uint8_t phase, const uint8_t data)
         case TELEINFO_UNIT_V:
         case TELEINFO_UNIT_COSPHI:
           // if first point
-          if (prev_x == LONG_MAX)
-          {
-            sprintf_P (str_value, PSTR ("M%d %d "), graph_x, graph_y);
-            strlcat (teleinfo_graph.str_buffer, str_value, sizeof (teleinfo_graph.str_buffer));
-          }
+          if (prev_x == LONG_MAX) WSContentSend_P (PSTR ("M%d %d "), graph_x, graph_y); 
 
           // else, other point
           else
@@ -1529,8 +1503,7 @@ void TeleinfoSensorGraphDisplayCurve (const uint8_t phase, const uint8_t data)
             }
 
             // display point
-            sprintf_P (str_value, PSTR ("C%d %d,%d %d,%d %d "), graph_x, bezier_y1, prev_x, bezier_y2, graph_x, graph_y);
-            strlcat (teleinfo_graph.str_buffer, str_value, sizeof (teleinfo_graph.str_buffer));
+            WSContentSend_P (PSTR ("C%d %d,%d %d,%d %d "), graph_x, bezier_y1, prev_x, bezier_y2, graph_x, graph_y); 
           }
           break;
       }
@@ -1539,13 +1512,6 @@ void TeleinfoSensorGraphDisplayCurve (const uint8_t phase, const uint8_t data)
       prev_x = graph_x;
       prev_y = graph_y;
     }
-
-    // if needed, flush buffer
-    if (strlen (teleinfo_graph.str_buffer) > sizeof (teleinfo_graph.str_buffer) - 32)
-    {
-      WSContentSend_P (teleinfo_graph.str_buffer); 
-      strcpy (teleinfo_graph.str_buffer, "");
-    }
   }
 
   // end data value curve
@@ -1553,11 +1519,9 @@ void TeleinfoSensorGraphDisplayCurve (const uint8_t phase, const uint8_t data)
   {
     case TELEINFO_UNIT_VA:
     case TELEINFO_UNIT_W:
-      sprintf_P (str_value, PSTR ("L%d,%d Z"), graph_x, TELEINFO_GRAPH_HEIGHT);
-      strlcat (teleinfo_graph.str_buffer, str_value, sizeof (teleinfo_graph.str_buffer));
+      WSContentSend_P (PSTR ("L%d,%d Z"), graph_x, TELEINFO_GRAPH_HEIGHT); 
       break;
   }
-  WSContentSend_P (teleinfo_graph.str_buffer);
 }
 
 #ifdef USE_UFILESYS
@@ -1765,16 +1729,16 @@ void TeleinfoSensorGraphDisplayBar (const uint8_t histo, const bool current)
       if (graph_y < 0) graph_y = 0;
 
       // display link
-      if (current && (teleinfo_graph.month == 0)) WSContentSend_P (PSTR("<a href='%s?month=%d&day=0'>"), D_TELEINFO_PAGE_GRAPH, index);
-      else if (current && (teleinfo_graph.day == 0)) WSContentSend_P (PSTR("<a href='%s?day=%d'>"), D_TELEINFO_PAGE_GRAPH, index);
+      if (current && (teleinfo_graph.month == 0)) WSContentSend_P (PSTR ("<a href='%s?month=%d&day=0'>"), D_TELEINFO_PAGE_GRAPH, index);
+      else if (current && (teleinfo_graph.day == 0)) WSContentSend_P (PSTR ("<a href='%s?day=%d'>"), D_TELEINFO_PAGE_GRAPH, index);
 
       // display bar
       if (current) strcpy (str_value, "now"); else strcpy (str_value, "prev");
-      WSContentSend_P (PSTR("<path class='%s' d='M%d %d L%d %d L%d %d L%d %d L%d %d L%d %d Z'></path>"), str_value, graph_x, graph_height, graph_x, graph_y + 2, graph_x + 2, graph_y, graph_x_end - 2, graph_y, graph_x_end, graph_y + 2, graph_x_end, graph_height);
+      WSContentSend_P (PSTR ("<path class='%s' d='M%d %d L%d %d L%d %d L%d %d L%d %d L%d %d Z'></path>"), str_value, graph_x, graph_height, graph_x, graph_y + 2, graph_x + 2, graph_y, graph_x_end - 2, graph_y, graph_x_end, graph_y + 2, graph_x_end, graph_height);
 
       // end of link 
       if (current && ((teleinfo_graph.month == 0) || (teleinfo_graph.day == 0))) WSContentSend_P (PSTR("</a>\n"));
-        else WSContentSend_P (PSTR("\n"));
+        else WSContentSend_P (PSTR ("\n"));
 
       // if main graph
       if (current)
@@ -2152,17 +2116,17 @@ void TeleinfoSensorWebGraphPage ()
     WSContentSend_P (PSTR ("  if (httpData.readyState===XMLHttpRequest.DONE){\n"));
     WSContentSend_P (PSTR ("   if (httpData.status===0 || (httpData.status>=200 && httpData.status<400)){\n"));
     WSContentSend_P (PSTR ("    arr_value=httpData.responseText.split(';');\n"));
-    WSContentSend_P (PSTR ("    document.getElementById('msg').textContent=arr_value[%u];\n"), counter++ );                                                                        // number of received messages
-    for (phase = 0; phase < teleinfo_contract.phase; phase++) WSContentSend_P (PSTR ("    document.getElementById('v%u').textContent=arr_value[%u];\n"), phase, counter++ );     // phase values
+    WSContentSend_P (PSTR ("    if (document.getElementById('msg')!=null) document.getElementById('msg').textContent=arr_value[%u];\n"), counter++ );                                                                        // number of received messages
+    for (phase = 0; phase < teleinfo_contract.phase; phase++) WSContentSend_P (PSTR ("    if (document.getElementById('v%u')!=null) document.getElementById('v%u').textContent=arr_value[%u];\n"), phase, phase, counter++ );     // phase values
     WSContentSend_P (PSTR ("   }\n"));
-    WSContentSend_P (PSTR ("   setTimeout(function() {updateData();},%u);\n"), 1000);       // ask for data update every second 
+    WSContentSend_P (PSTR ("   setTimeout(updateData,%u);\n"), 1000);       // ask for data update every second 
     WSContentSend_P (PSTR ("  }\n"));
     WSContentSend_P (PSTR (" }\n"));
 
     WSContentSend_P (PSTR (" httpData.send();\n"));
     WSContentSend_P (PSTR ("}\n"));
 
-    WSContentSend_P (PSTR ("setTimeout(function(){updateData();},%u);\n\n"), 100);               // ask for first data update after 100ms
+    WSContentSend_P (PSTR ("setTimeout(updateData,%u);\n\n"), 100);               // ask for first data update after 100ms
 
     // curve update
     if (teleinfo_graph.period < teleinfo_graph.period_curve) 
@@ -2180,17 +2144,17 @@ void TeleinfoSensorWebGraphPage ()
       WSContentSend_P (PSTR ("   if (httpCurve.status===0 || (httpCurve.status>=200 && httpCurve.status<400)){\n"));
       WSContentSend_P (PSTR ("    arr_value=httpCurve.responseText.split(';');\n"));
       counter = 0;
-      for (phase = 0; phase < teleinfo_contract.phase; phase++) WSContentSend_P (PSTR ("    document.getElementById('m%u').setAttribute('d',arr_value[%u]);\n"), phase, counter++ );     // phase main curve
-      for (phase = 0; phase < teleinfo_contract.phase; phase++) WSContentSend_P (PSTR ("    document.getElementById('p%u').setAttribute('d',arr_value[%u]);\n"), phase, counter++ );     // phase peak curve
+      for (phase = 0; phase < teleinfo_contract.phase; phase++) WSContentSend_P (PSTR ("    if (document.getElementById('m%u')!=null) document.getElementById('m%u').setAttribute('d',arr_value[%u]);\n"), phase, phase, counter++ );     // phase main curve
+      for (phase = 0; phase < teleinfo_contract.phase; phase++) WSContentSend_P (PSTR ("    if (document.getElementById('p%u')!=null) document.getElementById('p%u').setAttribute('d',arr_value[%u]);\n"), phase, phase, counter++ );     // phase peak curve
       WSContentSend_P (PSTR ("   }\n"));
-      WSContentSend_P (PSTR ("   setTimeout(function(){updateCurve();},%u);\n"), delay);     // ask for next curve update 
+      WSContentSend_P (PSTR ("   setTimeout(updateCurve,%u);\n"), delay);     // ask for next curve update 
       WSContentSend_P (PSTR ("  }\n"));
       WSContentSend_P (PSTR (" }\n"));
 
       WSContentSend_P (PSTR (" httpCurve.send();\n"));
       WSContentSend_P (PSTR ("}\n"));
 
-      WSContentSend_P (PSTR ("setTimeout(function(){updateCurve();},%u);\n\n"), 200);             // ask for first curve update after 200ms
+      WSContentSend_P (PSTR ("setTimeout(updateCurve,%u);\n\n"), 200);             // ask for first curve update after 200ms
     }
 
     WSContentSend_P (PSTR ("</script>\n\n"));
@@ -2620,13 +2584,13 @@ void  TeleinfoSensorWebGraphUpdateData ()
     teleinfo_graph.serving = true;
 
     // send number of received messages
-    WSContentSend_P ("%u;", teleinfo_meter.nb_message);
+    WSContentSend_P (PSTR ("%u;"), teleinfo_meter.nb_message);
 
     // update phase data
     for (phase = 0; phase < teleinfo_contract.phase; phase++)
     {
       TeleinfoSensorGetCurrentDataDisplay (teleinfo_graph.data, phase, str_text, sizeof (str_text));
-      WSContentSend_P ("%s;", str_text);
+      WSContentSend_P (PSTR ("%s;"), str_text);
     }
 
     // end of serving
@@ -2663,7 +2627,7 @@ void  TeleinfoSensorWebGraphUpdateCurve ()
     for (phase = 0; phase < teleinfo_contract.phase; phase++)
     {
       if (teleinfo_graph.str_phase[phase] == '1') TeleinfoSensorGraphDisplayCurve (phase, teleinfo_graph.data);
-      WSContentSend_P (";");
+      WSContentSend_P (PSTR (";"));
     }
       
     // loop thru phases to display peak curve
@@ -2674,7 +2638,7 @@ void  TeleinfoSensorWebGraphUpdateCurve ()
         if (teleinfo_graph.data == TELEINFO_UNIT_VA) TeleinfoSensorGraphDisplayCurve (phase, TELEINFO_UNIT_PEAK_VA);
           else if (teleinfo_graph.data == TELEINFO_UNIT_V) TeleinfoSensorGraphDisplayCurve (phase, TELEINFO_UNIT_PEAK_V);
       }
-      WSContentSend_P (";");
+      WSContentSend_P (PSTR (";"));
     }
 
     // end of serving
