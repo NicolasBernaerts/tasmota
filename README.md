@@ -9,7 +9,7 @@ Some Tasmota firmware extensions :
   * **pilotwire** : manage french pilotwire electrical heaters with **offload** functionnality
   * **serialrelay** : handle ICSE01xA and LC Tech serial relay boards
   * **teleinfo** : manage french electricity smart meters using Teleinfo protocol (Linky)
-  * **vmc** : handle motor controled ventilator according to target humidity level
+  * **sensor-vmc** : handle local and MQTT sensors & Motor Controled Ventilator according to target humidity level
 
 # ESP8266 & ESP32 tools
 
