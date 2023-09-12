@@ -1,5 +1,5 @@
 /*
-  xsns_124_ld1115.ino - Driver for Presence and Movement sensor HLK-LD1115
+  xsns_122_ld1115.ino - Driver for Presence and Movement sensor HLK-LD1115
 
   Copyright (C) 2022  Nicolas Bernaerts
 

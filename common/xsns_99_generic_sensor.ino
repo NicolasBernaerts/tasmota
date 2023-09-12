@@ -20,6 +20,7 @@
     12/05/2023 - v4.2 - Save history in Settings strings
                         Add tweaked timing for SI7021
     17/07/2023 - v4.3 - Add yearly graph
+    26/08/2023 - v4.4 - Change update slot policy to avoid missed slot
 
   Configuration values are stored in :
     - Settings->free_73A[0]  : temperature validity timeout (x10 in sec.)
@@ -48,7 +49,7 @@
     * Temperature = DHT11, AM2301, SI7021, SHT30 or DS18x20
     * Humidity    = DHT11, AM2301, SI7021 or SHT30
     * Presence    = Generic presence/movement detector declared as Counter 1
-                    HLK-LD1115H, HLK-LD1125H or HLK-LD2410 connected thru serial port (Rx and Tx)
+                    HLK-LD1115H, HLK-LD1125H, HLK-LD2410 or HLK-LD2450 connected thru serial port (Rx and Tx)
   
   Use sens_help command to list available commands
 
@@ -179,8 +180,8 @@ uint8_t days_in_month[12] = {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 enum SensorFamilyType { SENSOR_TYPE_TEMP, SENSOR_TYPE_HUMI, SENSOR_TYPE_PRES, SENSOR_TYPE_MAX };
 
 // presence serial sensor type
-enum SensorPresenceModel { SENSOR_PRESENCE_NONE, SENSOR_PRESENCE_REMOTE, SENSOR_PRESENCE_SWITCH, SENSOR_PRESENCE_RCWL0516, SENSOR_PRESENCE_HWMS03, SENSOR_PRESENCE_LD1115, SENSOR_PRESENCE_LD1125, SENSOR_PRESENCE_LD2410, SENSOR_PRESENCE_MAX };
-const char kSensorPresenceModel[] PROGMEM = "None|Remote|Dry switch|RCWL-0516|HW-MS03|HLK-LD1115|HLK-LD1125|HLK-LD2410|";
+enum SensorPresenceModel { SENSOR_PRESENCE_NONE, SENSOR_PRESENCE_REMOTE, SENSOR_PRESENCE_SWITCH, SENSOR_PRESENCE_RCWL0516, SENSOR_PRESENCE_HWMS03, SENSOR_PRESENCE_LD1115, SENSOR_PRESENCE_LD1125, SENSOR_PRESENCE_LD2410, SENSOR_PRESENCE_LD2450, SENSOR_PRESENCE_MAX };
+const char kSensorPresenceModel[] PROGMEM = "None|Remote|Dry switch|RCWL-0516|HW-MS03|HLK-LD1115|HLK-LD1125|HLK-LD2410|HLK-LD2450|";
 
 // remote sensor sources
 enum SensorSource { SENSOR_SOURCE_DSB, SENSOR_SOURCE_DHT, SENSOR_SOURCE_SHT, SENSOR_SOURCE_COUNTER, SENSOR_SOURCE_SERIAL, SENSOR_SOURCE_REMOTE, SENSOR_SOURCE_NONE };
@@ -250,7 +251,7 @@ typedef union {                               // Restricted by MISRA-C Rule 18.4
 typedef struct
 {
   int16_t      temp;                          // temperature
-  int8_t       humi;                          // humidity
+  uint8_t      humi;                          // humidity
   sensor_event event;                         // event : presence, activity and inactivity
 } sensor_weekly;
 
@@ -281,6 +282,14 @@ struct {
   uint8_t  counter     = 0;                   // measure update counter
   uint32_t time_ignore = UINT32_MAX;          // timestamp to ignore sensor update
   uint32_t time_json   = UINT32_MAX;          // timestamp of next JSON update
+
+  uint8_t  hour;                              // hour of current weekly slot
+  uint8_t  dayofweek;                         // day of current weekly slot
+  uint8_t  month;                             // month of current yearly slot
+  uint8_t  dayofmonth;                        // day of month of current yearly slot
+  uint16_t dayofyear;                         // day of year of current yearly slot
+  uint16_t year;                              // year of current yearly slot
+
   sensor_data temp;                           // temperature sensor data
   sensor_data humi;                           // humidity sensor data
   sensor_data pres;                           // presence sensor data
@@ -1945,10 +1954,12 @@ void SensorFileWeekDelete (const uint8_t week)
 void SensorFileWeekLoad (const uint8_t week)
 {
   uint8_t  token, day, hour, slot;
+  uint8_t  humidity;
   uint32_t len_buffer, size_buffer;
   int      value;
+  int16_t  temperature;
   char     *pstr_token, *pstr_buffer, *pstr_line;
-  char     str_buffer[512];
+  char     str_buffer[256];
   File     file;
 
   // check filesystem
@@ -1998,32 +2009,38 @@ void SensorFileWeekLoad (const uint8_t week)
             value = atoi (pstr_token);
             switch (token)
             {
-              case 0: 
+              case 0:     // day
                 day = (value + 1) % 7;
                 break;
-              case 1:
+              case 1:     // hour
                 hour = value;
                 break;
-              case 2:
+              case 2:     // slot
                 slot = value;
                 break;
-              case 3:
+              case 3:     // temperature
+                temperature = (int16_t)value;
                 if ((day < 7) && (hour < 24) && (slot < 6)) 
-                  if (sensor_week[day][hour][slot].temp == INT16_MAX) sensor_week[day][hour][slot].temp = (int16_t)value;
-                    else if (sensor_week[day][hour][slot].temp < value) sensor_week[day][hour][slot].temp = (int16_t)value;
+                {
+                  if (sensor_week[day][hour][slot].temp == INT16_MAX) sensor_week[day][hour][slot].temp = temperature;
+                    else sensor_week[day][hour][slot].temp = max (temperature, sensor_week[day][hour][slot].temp);
+                }
                 break;
-              case 4:
+              case 4:     // humidity
+                humidity = (uint8_t)value;
                 if ((day < 7) && (hour < 24) && (slot < 6))
-                  if (sensor_week[day][hour][slot].humi == UINT8_MAX) sensor_week[day][hour][slot].humi = (uint8_t)value;
-                    else if (sensor_week[day][hour][slot].humi < value) sensor_week[day][hour][slot].humi = (uint8_t)value;
+                {
+                  if (sensor_week[day][hour][slot].humi == UINT8_MAX) sensor_week[day][hour][slot].humi = humidity;
+                    else sensor_week[day][hour][slot].humi = max (humidity, sensor_week[day][hour][slot].humi);
+                }
                 break;
-              case 5:
+              case 5:     // presence
                 if ((day < 7) && (hour < 24) && (slot < 6) && (value > 0)) sensor_week[day][hour][slot].event.pres = 1;
                 break;
-              case 6:
+              case 6:     // activity
                 if ((day < 7) && (hour < 24) && (slot < 6) && (value > 0)) sensor_week[day][hour][slot].event.acti = 1;
                 break;
-              case 7:
+              case 7:     // inactivity
                 if ((day < 7) && (hour < 24) && (slot < 6) && (value > 0)) sensor_week[day][hour][slot].event.inac = 1;
                 break;
             }
@@ -2078,8 +2095,8 @@ void SensorFileWeekAppend ()
 
   // loop to write all slots
   str_buffer = "";
-  day  = (7 + RtcTime.day_of_week - 2) % 7;           // monday is 0
-  hour = RtcTime.hour;
+  day  = (7 + sensor_status.dayofweek - 1) % 7;           // monday is 0
+  hour = sensor_status.hour;
   for (slot = 0; slot < 6; slot ++)
   {
     // day, hour, slot
@@ -2223,7 +2240,6 @@ void SensorFileYearLoad (const uint16_t year)
 // save current day to file
 void SensorFileYearAppend ()
 {
-  uint16_t day;
   char     str_value[32];
   String   str_buffer;
   File     file;
@@ -2232,7 +2248,7 @@ void SensorFileYearAppend ()
   if (ufs_type == 0) return;
 
   // if file doesn't exist, create it and append header
-  sprintf_P (str_value, D_SENSOR_FILENAME_YEAR, RtcTime.year);
+  sprintf_P (str_value, D_SENSOR_FILENAME_YEAR, sensor_status.year);
   if (!TfsFileExists (str_value))
   {
     file = ffsp->open (str_value, "w");
@@ -2243,7 +2259,7 @@ void SensorFileYearAppend ()
   else file = ffsp->open (str_value, "a");
 
   // day
-  sprintf (str_value, "%u;%u;%u;", RtcTime.day_of_year, RtcTime.month, RtcTime.day_of_month);
+  sprintf (str_value, "%u;%u;%u;", sensor_status.dayofyear, sensor_status.month, sensor_status.dayofmonth);
   str_buffer = str_value;
 
   // temperature max
@@ -2295,6 +2311,13 @@ void SensorInit ()
   sensor_status.pres.value     = INT16_MAX;
   sensor_status.pres.last      = INT16_MAX;
   sensor_status.pres.timestamp = UINT32_MAX;
+
+  // init slot data
+  sensor_status.hour       = UINT8_MAX;
+  sensor_status.dayofweek  = UINT8_MAX;
+  sensor_status.month      = UINT8_MAX;
+  sensor_status.dayofmonth = UINT8_MAX;
+  sensor_status.dayofyear  = UINT16_MAX;
 
   // init hourly data
   for (index = 0; index < 6; index ++)
@@ -2392,6 +2415,12 @@ void SensorInit ()
         if (LD2410InitDevice ()) sensor_status.pres.source = SENSOR_SOURCE_SERIAL;
         break;
 #endif    // USE_LD2410
+
+#ifdef USE_LD2450             // HLK-LD2450 sensor
+      case SENSOR_PRESENCE_LD2450:
+        if (LD2450InitDevice ()) sensor_status.pres.source = SENSOR_SOURCE_SERIAL;
+        break;
+#endif    // USE_LD2450
     }
   }
 
@@ -2405,22 +2434,98 @@ void SensorEverySecond ()
   bool     presence = true;                   // if no presence sensor, presence triggered by default
   bool     publish  = false;
   int8_t   value;
-  uint8_t  month, day_month, day_week, hour, minute, second, mask;
+  uint8_t  mask;
+  uint8_t  month, hour, minute, second;
+  uint8_t  dayofmonth, dayofweek;
   uint8_t  day_slot, hour_slot;
-  uint16_t day_year;
   uint32_t sensor, index, slot;
   float    temperature = NAN;
   float    humidity    = NAN;
 
   // get current time
-  month     = RtcTime.month - 1;
-  day_month = RtcTime.day_of_month - 1;
-  day_week  = RtcTime.day_of_week - 1;
-  hour      = RtcTime.hour;
-  minute    = RtcTime.minute;
-  second    = RtcTime.second;
-  day_slot  = hour / 3; 
-  hour_slot = minute / 10; 
+  month      = RtcTime.month - 1;
+  dayofmonth = RtcTime.day_of_month - 1;
+  dayofweek  = RtcTime.day_of_week - 1;
+  hour       = RtcTime.hour;
+  minute     = RtcTime.minute;
+  second     = RtcTime.second;
+  day_slot   = hour / 3; 
+  hour_slot  = minute / 10; 
+
+  // if needed, update current slot values
+  if (sensor_status.dayofyear == UINT16_MAX) sensor_status.dayofyear  = RtcTime.day_of_year;
+  if (sensor_status.year == UINT16_MAX)      sensor_status.year       = RtcTime.year;
+  if (sensor_status.hour == UINT8_MAX)       sensor_status.hour       = RtcTime.hour;
+  if (sensor_status.dayofweek == UINT8_MAX)  sensor_status.dayofweek  = dayofweek;
+  if (sensor_status.dayofmonth == UINT8_MAX) sensor_status.dayofmonth = dayofmonth;
+  if (sensor_status.month == UINT8_MAX)      sensor_status.month      = month;
+
+  // if hour has changed
+  if (sensor_status.hour != RtcTime.hour)
+  {
+#ifdef USE_UFILESYS
+    // save weekly slot
+    SensorFileWeekAppend ();
+#endif      // USE_UFILESYS
+
+    // reset hourly data
+    for (index = 0; index < 6; index ++)
+    {
+      sensor_status.hour_slot[index].temp = INT16_MAX;
+      sensor_status.hour_slot[index].humi = INT8_MAX;
+      sensor_status.hour_slot[index].event.data = 0;     // pres, acti & inac
+    }
+  }
+
+  // if day has changed, save yearly slot
+  if (sensor_status.dayofyear != RtcTime.day_of_year)
+  {
+#ifdef USE_UFILESYS
+    // save yearly slot
+    SensorFileYearAppend ();
+#endif      // USE_UFILESYS
+
+    // reset daily data
+    sensor_status.day_slot.temp_max  = INT16_MAX;
+    sensor_status.day_slot.temp_min  = INT16_MAX;
+    sensor_status.day_slot.pres      = 0;
+
+    // reset current day in weekly data
+    for (index = 0; index < 24; index ++)
+      for (slot = 0; slot < 6; slot ++)
+      {
+        sensor_week[dayofweek][index][slot].temp = INT16_MAX;
+        sensor_week[dayofweek][index][slot].humi = INT8_MAX;
+        sensor_week[dayofweek][index][slot].event.data = 0;
+      }
+  }
+
+  // if 1st of the month at midnight, erase current month in yearly data
+  if ((sensor_status.month != month) && (sensor_status.dayofmonth != dayofmonth))
+  {
+    // reset daily data
+    for (index = 0; index < 31; index ++)
+    {
+      sensor_year[month][index].temp_max = INT16_MAX;
+      sensor_year[month][index].temp_min = INT16_MAX;
+      sensor_year[month][index].pres     = 0;
+    }
+  }
+
+    // ---------------------------------------
+  //   EVERY SUNDAY NIMUTE BEFORE MIDNIGHT
+  //   shift and clenup weekly files
+  // ----------------------------------
+
+// a changer
+
+  if ((dayofweek == 0) && (hour == 23) && (minute == 59))
+  {
+    index = 59 - second;
+    if (index > sensor_config.week_histo) SensorFileWeekDelete (index);
+      else SensorFileWeekShift (index);
+  }
+
 
   // ---------------------------------
   //   temperature & humidity sensor
@@ -2501,11 +2606,24 @@ void SensorEverySecond ()
         presence = LD2410GetDetectionStatus (1);
         break;
 #endif      // USE_LD2410
+
+#ifdef USE_LD2450
+      case SENSOR_PRESENCE_LD2450:
+        presence = LD2450GetDetectionStatus (1);
+        break;
+#endif      // USE_LD2450
     }
   }
 
   // if presence newly detected
-  if (presence && (sensor_status.pres.value != 1)) publish = SensorPresenceSet ();
+  if (presence)
+  {
+    // if newly detected, publish
+    publish = (sensor_status.pres.value != 1);
+    
+    // set presence
+    SensorPresenceSet ();
+  } 
 
   // if presence detectection is active
   else if (sensor_status.pres.value == 1)
@@ -2517,66 +2635,8 @@ void SensorEverySecond ()
     if (LocalTime () > sensor_status.pres.timestamp + SENSOR_PRES_TIMEOUT) publish = SensorPresenceReset ();
   }
 
-  // ------------------------
-  //    START OF EVERY HOUR
-  //    reset hourly data
-  // ------------------------
-
-  if ((minute == 0) && (second == 0))
-  {
-    for (index = 0; index < 6; index ++)
-    {
-      sensor_status.hour_slot[index].temp = INT16_MAX;
-      sensor_status.hour_slot[index].humi = INT8_MAX;
-      sensor_status.hour_slot[index].event.data = 0;     // pres, acti & inac
-    }
-  }
-
-  // -----------------------------------------------------
-  //    AT MIDNIGHT
-  //    reset daily data and current day in weekly data
-  // -----------------------------------------------------
-
-  if ((hour == 0) && (minute == 0) && (second == 0) && (day_week < 7))
-  {
-    // reset daily data
-    sensor_status.day_slot.temp_max  = INT16_MAX;
-    sensor_status.day_slot.temp_min  = INT16_MAX;
-    sensor_status.day_slot.pres      = 0;
-
-    // reset current day in weekly data
-    for (index = 0; index < 24; index ++)
-      for (slot = 0; slot < 6; slot ++)
-      {
-        sensor_week[day_week][index][slot].temp = INT16_MAX;
-        sensor_week[day_week][index][slot].humi = INT8_MAX;
-        sensor_week[day_week][index][slot].event.data = 0;
-      }
-  }
-
-  // ----------------------------------------
-  //   EVERY 1ST OF MONTH AT MIDNIGHT
-  //   erase current month in yearly data
-  // ----------------------------------------
-
-  if ((day_month == 0) && (hour == 0) && (minute == 0) && (second == 0) && (month < 12))
-  {
-    // reset daily data
-    for (index = 0; index < 31; index ++)
-    {
-      sensor_year[month][index].temp_max = INT16_MAX;
-      sensor_year[month][index].temp_min = INT16_MAX;
-      sensor_year[month][index].pres     = 0;
-    }
-  }
-
-  // -----------------------------------------------
-  //    EVERY SECOND
-  //    update hourly data and current weekly data
-  // -----------------------------------------------
-
-  // update current hour records
-  if ((day_week < 7) && (hour < 24) && (hour_slot < 6))
+  // update hourly data and current weekly data
+  if ((dayofweek < 7) && (hour < 24) && (hour_slot < 6))
   {
     // update current temperature slot
     if (sensor_status.temp.value != INT16_MAX)
@@ -2597,17 +2657,13 @@ void SensorEverySecond ()
     if (sensor_status.pres.value == 1) sensor_status.hour_slot[hour_slot].event.pres = 1;
 
     // update current weekly data
-    sensor_week[day_week][hour][hour_slot].temp       = sensor_status.hour_slot[hour_slot].temp;
-    sensor_week[day_week][hour][hour_slot].humi       = sensor_status.hour_slot[hour_slot].humi;
-    sensor_week[day_week][hour][hour_slot].event.data = sensor_status.hour_slot[hour_slot].event.data;
+    sensor_week[dayofweek][hour][hour_slot].temp       = sensor_status.hour_slot[hour_slot].temp;
+    sensor_week[dayofweek][hour][hour_slot].humi       = sensor_status.hour_slot[hour_slot].humi;
+    sensor_week[dayofweek][hour][hour_slot].event.data = sensor_status.hour_slot[hour_slot].event.data;
   }
 
-  // -----------------------------------------------
-  //    EVERY SECOND
-  //    update daily data and current yearly data
-  // -----------------------------------------------
-
-  if ((month < 12) && (day_month < 31))
+  // update daily data and current yearly data
+  if ((month < 12) && (dayofmonth < 31))
   {
     // if temperature is available
     if (sensor_status.temp.value != INT16_MAX)
@@ -2630,40 +2686,18 @@ void SensorEverySecond ()
     }
 
     // current yearly data
-    sensor_year[month][day_month].temp_max = sensor_status.day_slot.temp_max;
-    sensor_year[month][day_month].temp_min = sensor_status.day_slot.temp_min;
-    sensor_year[month][day_month].pres     = sensor_status.day_slot.pres;
+    sensor_year[month][dayofmonth].temp_max = sensor_status.day_slot.temp_max;
+    sensor_year[month][dayofmonth].temp_min = sensor_status.day_slot.temp_min;
+    sensor_year[month][dayofmonth].pres     = sensor_status.day_slot.pres;
   }
 
-#ifdef USE_UFILESYS
-
-  // --------------------------------------
-  //    END OF EVERY HOUR 
-  //    save current hour in weekly data
-  // --------------------------------------
-
-  if ((minute == 59) && (second == 59)) SensorFileWeekAppend ();
-
-  // ------------------------------------
-  //   JUST BEFORE MIDNIGHT
-  //   save current day in yearly data
-  // ------------------------------------
-
-  if ((hour == 23) && (minute == 59) && (second == 59)) SensorFileYearAppend ();
-
-  // ---------------------------------------
-  //   EVERY SUNDAY NIMUTE BEFORE MIDNIGHT
-  //   shift and clenup weekly files
-  // ----------------------------------
-
-  if ((day_week == 0) && (hour == 23) && (minute == 59))
-  {
-    index = 59 - second;
-    if (index > sensor_config.week_histo) SensorFileWeekDelete (index);
-      else SensorFileWeekShift (index);
-  }
-
-#endif      // USE_UFILESYS
+  // update new slot data
+  sensor_status.dayofyear  = RtcTime.day_of_year;
+  sensor_status.year       = RtcTime.year;
+  sensor_status.hour       = RtcTime.hour;
+  sensor_status.dayofweek  = dayofweek;
+  sensor_status.dayofmonth = dayofmonth;
+  sensor_status.month      = month;
 
   // ---------
   //   JSON
@@ -3361,6 +3395,8 @@ void SensorWebGraphWeeklyMeasureCurve (const uint8_t week, const char* pstr_url)
 
           // save previous values
           if (graph_y != UINT32_MAX) last_x = max (last_x, graph_x);
+
+          // increment
           prev_x = graph_x;
           prev_y = graph_y;
           index++;

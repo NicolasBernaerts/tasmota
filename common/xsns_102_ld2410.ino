@@ -10,8 +10,8 @@
   Baud rate is forced at 256000.
 
   Settings are stored using unused parameters :
-    - Settings->free_ea6[26] : Presence detection timeout (sec.)
-    - Settings->free_ea6[27] : Presence detection number of samples to average
+    - Settings->free_ea6[24] : Presence detection timeout (sec.)
+    - Settings->free_ea6[25] : Presence detection number of samples to average
 
   Version history :
     28/06/2022 - v1.0 - Creation
@@ -322,8 +322,8 @@ void CmndLD2410SetGateMax ()
 void LD2410LoadConfig ()
 {
   // read parameters
-  ld2410_config.timeout = Settings->free_ea6[26];
-  ld2410_config.sample  = Settings->free_ea6[27];
+  ld2410_config.timeout = Settings->free_ea6[24];
+  ld2410_config.sample  = Settings->free_ea6[25];
 
   // check parameters
   if (ld2410_config.timeout == 0) ld2410_config.timeout = LD2410_DEFAULT_TIMEOUT;
@@ -333,16 +333,18 @@ void LD2410LoadConfig ()
 // Save configuration into flash memory
 void LD2410SaveConfig ()
 {
-  Settings->free_ea6[26] = ld2410_config.timeout;
-  Settings->free_ea6[27] = ld2410_config.sample;
+  Settings->free_ea6[24] = ld2410_config.timeout;
+  Settings->free_ea6[25] = ld2410_config.sample;
 }
 
 /**************************************************\
  *                  Functions
 \**************************************************/
 
-bool LD2410GetDetectionStatus (uint32_t timeout)
+bool LD2410GetDetectionStatus (const uint32_t delay)
 {
+  uint32_t timeout = delay;
+
   // if timestamp not defined, no detection
   if (ld2410_status.timestamp == 0) return false;
   
@@ -768,7 +770,6 @@ void LD2410ReceiveData ()
     
   // check sensor presence
   if (ld2410_status.pserial == nullptr) return;
-  if (!ld2410_status.enabled) return;
 
   // run serial receive loop
   while (ld2410_status.pserial->available ()) 
@@ -874,7 +875,7 @@ void LD2410WebSensor ()
 
   // scale
   WSContentSend_PD (PSTR ("<div style='display:flex;padding:0px;'>\n"));
-  WSContentSend_PD (PSTR ("<div style='width:28%%;padding:0px;text-align:left;font-size:12px;font-weight:bold;' title='firmware %u.%u.%u'>%s</div>\n"), ld2410_status.firmware.major, ld2410_status.firmware.minor, ld2410_status.firmware.revision, "LD2410");
+  WSContentSend_PD (PSTR ("<div style='width:28%%;padding:0px;text-align:left;font-size:12px;font-weight:bold;' title='firmware %u.%u.%u'>LD2410</div>\n"), ld2410_status.firmware.major, ld2410_status.firmware.minor, ld2410_status.firmware.revision);
 
   WSContentSend_PD (PSTR ("<div style='width:6%%;padding:0px;text-align:left;'>%um</div>\n"), 0);
   for (index = 1; index < 6; index ++) WSContentSend_PD (PSTR ("<div style='width:12%%;padding:0px;'>%um</div>\n"), index);
@@ -970,7 +971,7 @@ void LD2410WebSensor ()
  *              Interface
 \***************************************/
 
-// Teleinfo sensor
+// LD2410 sensor
 bool Xsns102 (uint32_t function)
 {
   bool result = false;
@@ -994,7 +995,7 @@ bool Xsns102 (uint32_t function)
       LD2410ShowJSON (true);
       break;
     case FUNC_LOOP:
-      LD2410ReceiveData ();
+      if (ld2410_status.enabled) LD2410ReceiveData ();
       break;
 
 #ifdef USE_WEBSERVER
