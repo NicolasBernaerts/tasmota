@@ -43,8 +43,8 @@ Driver for HLK-LD2410 presence & movement detector.
 Please note that this driver is different than the one in official Tasmota repository.
 
 To get the sensor operational :
-  - Connect **Tx** to **Rx** and set **Rx** as **LD2410-Rx**
-  - Connect **Rx** to **Tx** and set **Tx** as **LD2410-Tx**
+  - Connect **Rx** and **Tx**
+  - Configure **LD2410-Rx** and **LD2410-Tx**
   - Select **LD2410** in **Sensor** configuration 
 
 To get all available function, just type **ld2410_help** in console.
@@ -56,10 +56,10 @@ To get all available function, just type **ld2410_help** in console.
 Driver for HLK-LD2450 presence radar detector.
 
 To get the sensor operational :
-  - Connect **Tx** to **Rx** and set **Rx** as **LD2410-Rx**
-  - Connect **Rx** to **Tx** and set **Tx** as **LD2410-Tx**
+  - Connect **Rx** and **Tx**
+  - Configure **LD2410-Rx** and **LD2410-Tx**
   - Select **LD2450** in **Sensor** configuration
-  - 
+
 To get all available function, just type **ld2450_help** in console.
 
 You can get a realtime radar view of targets detected :
