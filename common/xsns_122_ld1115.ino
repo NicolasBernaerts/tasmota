@@ -4,14 +4,15 @@
   Copyright (C) 2022  Nicolas Bernaerts
 
   Connexions :
-    * GPIO1 (Tx) should be declared as Serial Tx and connected to HLK-LD1115 Rx
-    * GPIO3 (Rx) should be declared as Serial Rx and connected to HLK-LD1115 Tx
+    * GPIO1 should be declared as LD2410 Tx and connected to HLK-LD1115 Rx
+    * GPIO3 should be declared as LD2410 Rx and connected to HLK-LD1115 Tx
 
   Call LD1115InitDevice (timeout) to declare the device and make it operational
 
   Version history :
     22/06/2022 - v1.0 - Creation
     12/01/2023 - v2.0 - Complete rewrite
+    12/09/2023 - v2.1 - Switch to LD2410 Rx & LD2410 Tx
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -34,7 +35,7 @@
 \*************************************************/
 
 // declare teleinfo energy driver and sensor
-#define XSNS_122                   122
+#define XSNS_122                    122
 
 // constant
 #define LD1115_START_DELAY          15          // sensor answers after 15 seconds
@@ -48,7 +49,7 @@
 #define LD1115_COLOR_MOTION         "#D00"
 
 // strings
-const char D_LD1115_NAME[]          PROGMEM = "HLK-LD1115H";
+const char D_LD1115_NAME[]          PROGMEM = "HLK-LD1115";
 
 // MQTT commands : ld_help and ld_send
 const char kLD1115Commands[]         PROGMEM = "ld1115_|help|update|save|reset|move_th|pres_th|move_sn|pres_sn|timeout";
@@ -256,18 +257,18 @@ bool LD1115InitDevice (uint32_t timeout)
     else ld1115_status.timeout = timeout;
 
   // if ports are selected, init sensor state
-  if ((ld1115_status.pserial == nullptr) && PinUsed (GPIO_TXD) && PinUsed (GPIO_RXD))
+  if ((ld1115_status.pserial == nullptr) && PinUsed (GPIO_LD2410_RX) && PinUsed (GPIO_LD2410_TX))
   {
 #ifdef ESP32
     // create serial port
-    ld1115_status.pserial = new TasmotaSerial (Pin (GPIO_RXD), Pin (GPIO_TXD), 1);
+    ld1115_status.pserial = new TasmotaSerial (Pin (GPIO_LD2410_RX), Pin (GPIO_LD2410_RX), 1);
 
     // initialise serial port
     ld1115_status.enabled = ld1115_status.pserial->begin (115200, SERIAL_8N1);
 
 #else       // ESP8266
     // create serial port
-    ld1115_status.pserial = new TasmotaSerial (Pin (GPIO_RXD), Pin (GPIO_TXD), 1);
+    ld1115_status.pserial = new TasmotaSerial (Pin (GPIO_LD2410_RX), Pin (GPIO_LD2410_RX), 1);
 
     // initialise serial port
     ld1115_status.enabled = ld1115_status.pserial->begin (115200, SERIAL_8N1);
@@ -555,7 +556,7 @@ void LD1115ShowJSON (bool append)
   if (append) ResponseAppend_P (PSTR (",")); else Response_P (PSTR ("{"));
 
   // start of sensor section
-  ResponseAppend_P (PSTR ("\"%s\":{\"detect\":%u"), D_LD1115_NAME, ld1115_status.detected);
+  ResponseAppend_P (PSTR ("\"ld1115\":{\"detect\":%u"), ld1115_status.detected);
 
   if (append)
   {

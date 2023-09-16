@@ -4,19 +4,22 @@
   Copyright (C) 2022  Nicolas Bernaerts
 
   Connexions :
-    * GPIO1 (Tx) should be declared as Serial Tx and connected to HLK-LD2410 Rx
-    * GPIO3 (Rx) should be declared as Serial Rx and connected to HLK-LD2410 Tx
+    * GPIO1 should be declared as LD2410 Tx and connected to HLK-LD2410 Rx
+    * GPIO3 should be declared as LD2410 Rx and connected to HLK-LD2410 Tx
 
   Baud rate is forced at 256000.
+  
+  Call LD2410InitDevice (timeout) to declare the device and make it operational
 
   Settings are stored using unused parameters :
-    - Settings->free_ea6[24] : Presence detection timeout (sec.)
-    - Settings->free_ea6[25] : Presence detection number of samples to average
+    - Settings->free_ea6[23] : Presence detection timeout (sec.)
+    - Settings->free_ea6[24] : Presence detection number of samples to average
 
   Version history :
     28/06/2022 - v1.0 - Creation
     15/01/2023 - v2.0 - Complete rewrite
     03/04/2023 - v2.1 - Add trigger to avoid false detection
+    12/09/2023 - v2.2 - Switch to LD2410 Rx & LD2410 Tx
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -66,7 +69,6 @@ const char D_LD2410_NAME[] PROGMEM =    "HLK-LD2410";
 
 enum LD2410StepCommand { LD2410_STEP_NONE, LD2410_STEP_BEFORE_START, LD2410_STEP_AFTER_START, LD2410_STEP_BEFORE_COMMAND, LD2410_STEP_AFTER_COMMAND, LD2410_STEP_BEFORE_STOP, LD2410_STEP_AFTER_STOP };       // steps to run a command
 enum LD2410ListCommand { LD2410_CMND_START, LD2410_CMND_STOP, LD2410_CMND_READ_PARAM, LD2410_CMND_DIST_TIMEOUT, LD2410_CMND_SENSITIVITY, LD2410_CMND_READ_FIRMWARE, LD2410_CMND_RESET, LD2410_CMND_RESTART, LD2410_CMND_CLOSE_ENGINEER, LD2410_CMND_OPEN_ENGINEER, LD2410_CMND_DATA, LD2410_CMND_MAX };       // list of available commands
-//enum LD2410ListCommand { LD2410_CMND_START, LD2410_CMND_STOP, LD2410_CMND_READ_PARAM, LD2410_CMND_DIST_TIMEOUT, LD2410_CMND_SENSITIVITY, LD2410_CMND_READ_FIRMWARE, LD2410_CMND_SERIAL_RATE, LD2410_CMND_RESET, LD2410_CMND_RESTART, LD2410_CMND_CLOSE_ENGINEER, LD2410_CMND_OPEN_ENGINEER, LD2410_CMND_DATA, LD2410_CMND_MAX };       // list of available commands
 
 // commands
 uint8_t ld2410_cmnd_header[]         PROGMEM = { 0xfd, 0xfc, 0xfb, 0xfa };
@@ -91,20 +93,7 @@ void (* const HLKLD2410Command[])(void) PROGMEM = { &CmndLD2410Help, &CmndLD2410
  *                 Data
 \****************************************/
 
-// HLK-LD2410 configuration
-struct {
-  uint8_t sample  = LD2410_DEFAULT_SAMPLE;          // default running mode
-  uint8_t timeout = LD2410_DEFAULT_TIMEOUT;         // target humidity level
-} ld2410_config;
-
-// HLK-LD2410 commands queue
-static struct {
-  uint8_t step = LD2410_STEP_NONE;
-  uint8_t gate = 0;                                 // gate to handle
-  String  str_queue;
-} ld2410_command; 
-
-// HLK-LD2410 received message
+// LD2410 received message
 static struct {    
   uint32_t timestamp = UINT32_MAX;            // timestamp of last received character
   uint8_t  idx_body  = 0;                     // index of received body
@@ -112,7 +101,20 @@ static struct {
   uint8_t  arr_last[4] = {0, 0, 0, 0};        // last received characters
 } ld2410_received; 
 
-// HLK-LD2410 status
+// LD2410 commands queue
+static struct {
+  uint8_t step = LD2410_STEP_NONE;
+  uint8_t gate = 0;                                 // gate to handle
+  String  str_queue;
+} ld2410_command; 
+
+// LD2410 configuration
+struct {
+  uint8_t sample  = LD2410_DEFAULT_SAMPLE;          // default running mode
+  uint8_t timeout = LD2410_DEFAULT_TIMEOUT;         // target humidity level
+} ld2410_config;
+
+// LD2410 status
 struct ld2410_firmware
 {
   uint8_t  major    = 0;          // major version
@@ -133,7 +135,6 @@ struct ld2410_sensor
 static struct {
   TasmotaSerial  *pserial   = nullptr;                  // pointer to serial port
   bool            enabled   = false;                    // sensor enabled
-//  bool            publish   = false;                    // publish sensor data
   uint32_t        timestamp = 0;                        // timestamp of last detection
   ld2410_firmware firmware; 
   ld2410_sensor   motion; 
@@ -322,8 +323,8 @@ void CmndLD2410SetGateMax ()
 void LD2410LoadConfig ()
 {
   // read parameters
-  ld2410_config.timeout = Settings->free_ea6[24];
-  ld2410_config.sample  = Settings->free_ea6[25];
+  ld2410_config.timeout = Settings->free_ea6[23];
+  ld2410_config.sample  = Settings->free_ea6[24];
 
   // check parameters
   if (ld2410_config.timeout == 0) ld2410_config.timeout = LD2410_DEFAULT_TIMEOUT;
@@ -333,8 +334,8 @@ void LD2410LoadConfig ()
 // Save configuration into flash memory
 void LD2410SaveConfig ()
 {
-  Settings->free_ea6[24] = ld2410_config.timeout;
-  Settings->free_ea6[25] = ld2410_config.sample;
+  Settings->free_ea6[23] = ld2410_config.timeout;
+  Settings->free_ea6[24] = ld2410_config.sample;
 }
 
 /**************************************************\
@@ -359,28 +360,21 @@ bool LD2410GetDetectionStatus (const uint32_t delay)
 bool LD2410InitDevice ()
 {
   // if not done, init sensor state
-  if (ld2410_status.pserial == nullptr)
+  if ((ld2410_status.pserial == nullptr) && PinUsed (GPIO_LD2410_RX) && PinUsed (GPIO_LD2410_TX))
   {
     // calculate serial rate
     Settings->baudrate = 853;
 
-#ifdef ESP32
     // create serial port
-    ld2410_status.pserial = new TasmotaSerial (Pin (GPIO_RXD), Pin (GPIO_TXD), 2);
+    ld2410_status.pserial = new TasmotaSerial (Pin (GPIO_LD2410_RX), Pin (GPIO_LD2410_TX), 2);
 
     // initialise serial port
     ld2410_status.enabled = ld2410_status.pserial->begin (256000, SERIAL_8N1);
 
-#else       // ESP8266
-    // create serial port
-    ld2410_status.pserial = new TasmotaSerial (Pin (GPIO_RXD), Pin (GPIO_TXD), 2);
-
-    // initialise serial port
-    ld2410_status.enabled = ld2410_status.pserial->begin (256000, SERIAL_8N1);
-
+#ifdef ESP8266
     // force hardware configuration on ESP8266
     if (ld2410_status.enabled && ld2410_status.pserial->hardwareSerial ()) ClaimSerial ();
-#endif      // ESP32 & ESP8266
+#endif      // ESP8266
 
     // log
     if (ld2410_status.enabled) AddLog (LOG_LEVEL_INFO, PSTR ("HLK: %s sensor init at %u"), D_LD2410_NAME, 256000);
@@ -823,14 +817,14 @@ void LD2410ShowJSON (bool append)
 
   // check sensor presence
   if (ld2410_status.pserial == nullptr) return;
-//  if (!ld2410_status.publish) return;
 
+  // send data in append mode
   if (append)
   {
     // start of ld2410 section
     detected = (ld2410_status.timestamp != 0);
     ResponseAppend_P (PSTR (","));
-    ResponseAppend_P (PSTR ("\"%s\":{\"detect\":%u,"), D_LD2410_NAME, detected);
+    ResponseAppend_P (PSTR ("\"ld2410\":{\"detect\":%u,"), detected);
 
     // firmware
     ResponseAppend_P (PSTR ("\"firm\":\"%02u.%02u.%u\""), ld2410_status.firmware.major, ld2410_status.firmware.minor, ld2410_status.firmware.revision);
