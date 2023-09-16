@@ -12,27 +12,24 @@ This simple driver allows graphical configuration of Timezone and NTP server.
 
 ![RCWL0516](./screen/tasmota-sensor-main-pres.png)
 
-This generic sensor allows fews things around sensor management :
-  * standard function to read temperature, humidity and presence (not depending on sensor type)
-  * declaration and use of remote temperature, humidity and presence sensors
-  * presence sensor reading based on timeout
-  * visualisation of local presence sensor on main page
+This generic sensor drivers allows to :
+  - standardize local sensors access (temeprature and humidity)
+  - weekly and yearly historize data
+  - use remote sensors thru MQTT
 
 To get all available function, just type **sensor_help** in console.
 
-Handled local sensor are :
-  * Temperature DHT11, AM2301, SI7021, SHT30 or DS18x20
-  * Humidity DHT11, AM2301, SI7021 or SHT30
-  * Movement detector RCWL-0516 or HW-MS03 (declared as Counter 1)
-  * Presence detector HLK-LD1115H, HLK-LD1125H, HLK-LD2410 or HLK-LD2450
+ Local sensor can be :
+  * Temperature : DHT11, AM2301, SI7021, SHT30 or DS18x20
+  * Humidity : DHT11, AM2301, SI7021 or SHT30
+  * Movement : RCWL-0516 or HW-MS03 (declared as Counter 1)
+  * Presence : HLK-LD1115H, HLK-LD1125H, HLK-LD2410 or HLK-LD2450
 
 ![Config](./screen/tasmota-sensor-config-local.png)
 
-Remote sensor configuration can be done graphically.
+If enabled, weekly and/or yearly data can be recorded.
 
-![Temperature](./screen/tasmota-sensor-config-temp.png)
-
-![Humidity](./screen/tasmota-sensor-config-humi.png) ![Presence](./screen/tasmota-sensor-config-pres.png)
+![Config](./screen/tasmota-sensor-weekly.png)
 
 ## xsns_102_ld2410.ino ##
 
