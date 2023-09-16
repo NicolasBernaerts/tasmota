@@ -46,7 +46,7 @@ To get the sensor operational :
 
 To get all available function, just type **ld2410_help** in console.
 
-## xsns_102_ld2450.ino ##
+## xsns_124_ld2450.ino ##
 
 ![HLK LD2450](./screen/tasmota-ld2450-main.png)
 
