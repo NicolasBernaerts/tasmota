@@ -8,7 +8,7 @@ This simple driver allows graphical configuration of fixed IP.
 
 This simple driver allows graphical configuration of Timezone and NTP server.
 
-## xsns_125_generic_sensor.ino ##
+## xsns_99_generic_sensor.ino ##
 
 ![RCWL0516](./screen/tasmota-sensor-main-pres.png)
 
@@ -24,7 +24,7 @@ Handled local sensor are :
   * Temperature DHT11, AM2301, SI7021, SHT30 or DS18x20
   * Humidity DHT11, AM2301, SI7021 or SHT30
   * Movement detector RCWL-0516 or HW-MS03 (declared as Counter 1)
-  * Presence detector HLK-LD1115H, HLK-LD1125H or HLK-LD2410 (connected thru Rx and Tx)
+  * Presence detector HLK-LD1115H, HLK-LD1125H, HLK-LD2410 or HLK-LD2450
 
 ![Config](./screen/tasmota-sensor-config-local.png)
 
