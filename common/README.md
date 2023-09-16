@@ -34,17 +34,37 @@ Remote sensor configuration can be done graphically.
 
 ![Humidity](./screen/tasmota-sensor-config-humi.png) ![Presence](./screen/tasmota-sensor-config-pres.png)
 
-## xsns_102_hlk_ld2410.ino ##
+## xsns_102_ld2410.ino ##
 
-![HLK LD2410](./screen/tasmota-main-hlk-ld2410.jpg)
+![HLK LD2410](./screen/tasmota-ld2410-main.png)
 
 Driver for HLK-LD2410 presence & movement detector.
 
 Please note that this driver is different than the one in official Tasmota repository.
 
-To get the sensor operational, connect it on Tx and Rx and set **baudrate 256000** in console.
+To get the sensor operational :
+  - Connect **Tx** to **Rx** and set **Rx** as **LD2410-Rx**
+  - Connect **Rx** to **Tx** and set **Tx** as **LD2410-Tx**
+  - Select **LD2410** in **Sensor** configuration 
 
 To get all available function, just type **ld2410_help** in console.
+
+## xsns_102_ld2450.ino ##
+
+![HLK LD2450](./screen/tasmota-ld2450-main.png)
+
+Driver for HLK-LD2450 presence radar detector.
+
+To get the sensor operational :
+  - Connect **Tx** to **Rx** and set **Rx** as **LD2410-Rx**
+  - Connect **Rx** to **Tx** and set **Tx** as **LD2410-Tx**
+  - Select **LD2450** in **Sensor** configuration
+  - 
+To get all available function, just type **ld2450_help** in console.
+
+You can get a realtime radar view of targets detected :
+
+![HLK LD2450 radar](./screen/tasmota-ld2450-radar.png)
 
 ## xdrv_40_telegram_extension.ino ##
 
