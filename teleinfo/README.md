@@ -4,6 +4,8 @@
 
 This evolution of **Tasmota 12.5.0** firmware has been enhanced to handle France energy meters known as **Linky** using **Teleinfo** protocol.
 
+It also implements an **Ecowatt** server to publish Ecowatt signals thru MQTT.
+
 This firmware has been developped and tested on  :
   * **Sagem Classic Monophase** with TIC **Historique**
   * **Linky Monophase** with TIC **Historique** & **Standard**
@@ -218,6 +220,70 @@ For example, you can use :
 Finaly, in **Configure Teleinfo** you need to select your Teleinfo adapter baud rate :
   * **1200** (original white meter or green Linky in historic mode)
   * **9600** (green Linky in standard mode)
+
+## Ecowatt ##
+
+This evolution of Tasmota firmware allows to collect [**France RTE Ecowatt**](https://data.rte-france.com/catalog/-/api/doc/user-guide/Ecowatt/4.0) signals and to publish them thru MQTT.
+
+It is compatible with **ESP32**, **ESP32S2** and **ESP32S3**, as SSL connexions are using too much memory for ESP8266.
+
+It will connect every hour to RTE API and collect Ecowatt signals.
+
+Result will be published as an MQTT message :
+
+    {"Time":"2022-10-10T23:51:09","Ecowatt":{"dval":2,"hour":14,"now":1,"next":2,
+      "day0":{"jour":"2022-10-06","dval":1,"0":1,"1":1,"2":1,"3":1,"4":1,"5":1,"6":1,...,"23":1},
+      "day1":{"jour":"2022-10-07","dval":2,"0":1,"1":1,"2":2,"3":1,"4":1,"5":1,"6":1,...,"23":1},
+      "day2":{"jour":"2022-10-08","dval":3,"0":1,"1":1,"2":1,"3":1,"4":1,"5":3,"6":1,...,"23":1},
+      "day3":{"jour":"2022-10-09","dval":2,"0":1,"1":1,"2":1,"3":2,"4":1,"5":1,"6":1,...,"23":1}}}
+ 
+Pre-compiled versions are available in the [**binary**](https://github.com/NicolasBernaerts/tasmota/tree/master/teleinfo/binary) folder.
+
+### Configuration ###
+
+The **Ecowatt** functionnality needs :
+  * a Base64 private key provided by RTE when you create you account on https://data.rte-france.com/
+  * the PEM root certificate authority from https://data.rte-france.com/
+  * a topic where to publish Ecowatt data
+
+#### 1. Private Key ####
+
+You can declare your private Base64 key thru this console command :
+
+    # eco_key your-rte-base64-private-key
+
+#### 2. Root CA ####
+
+To declare the root CA of https://data.rte-france.com/, you can collect it from the site itself.
+
+With Firefox :
+  * go on the home page
+  * click on the lock just before the URL
+  * select the certificate in the menu and select **more information**
+  * on the page, select **display the certificate**
+  * on the new page, select **Global Sign** tab
+  * click to download **PEM(cert)**
+  
+To ease the process, the certificate has been uploaded to this repository. To download it, you just need :
+  * to go to [ecowatt.pem](https://github.com/NicolasBernaerts/tasmota/blob/master/ecowatt/ecowatt.pem) raw page
+  * right click and **save as**
+  * rename downloaded file to **ecowatt.pem**
+
+Once the certificate is downloaded and renamed ***ecowatt.pem***, just upload it to the root of the LittleFS partition.
+
+#### 3. MQTT Topic #### 
+
+To declare the MQTT topic where to publish Ecowatt data, run following console command :
+
+    # eco_topic ecowatt/tele/SENSOR
+    
+You can replace *ecowatt/tele/SENSOR* by any other topic you want.
+
+#### 4. Restart ####
+
+Once you've setup these 3 data, restart your Tasmota module.
+
+Your Ecowatt MQTT server should be up and running.
 
 ## Screenshot ##
 
