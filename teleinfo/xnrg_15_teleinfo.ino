@@ -1001,7 +1001,7 @@ void TeleinfoInit ()
 
   // log default method & help command
   AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Using default Global Counter method"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tic_help to get help on Teleinfo TIC commands"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Type EnergyConfig to get help on all Teleinfo commands"));
 }
 
 // Handling of received teleinfo data
@@ -1451,61 +1451,67 @@ void TeleinfoReceiveData ()
               if (teleinfo_meter.total_wh == 0) teleinfo_meter.total_wh = counter_wh;
               delta_wh = counter_wh - teleinfo_meter.total_wh;
 
-              // slit apparent power between phases, based on current per phase
-              papp_inc = 0;
-              for (phase = 0; phase < teleinfo_contract.phase; phase++)
+              // avoid meter total errors :
+              //  - total smaller than previous one
+              //  - delta of more than 10% of previous total
+              if ((delta_wh >= 0) && (delta_wh < teleinfo_meter.total_wh / 10))
               {
-                // if current is given, apparent power is split between phase according to current ratio
-                if (total_current > 0) teleinfo_phase[phase].papp = teleinfo_meter.papp * teleinfo_phase[phase].current / total_current;
+                // slit apparent power between phases, based on current per phase
+                papp_inc = 0;
+                for (phase = 0; phase < teleinfo_contract.phase; phase++)
+                {
+                  // if current is given, apparent power is split between phase according to current ratio
+                  if (total_current > 0) teleinfo_phase[phase].papp = teleinfo_meter.papp * teleinfo_phase[phase].current / total_current;
 
-                // else if current is 0, apparent power is equally split between phases
-                else if (teleinfo_contract.phase > 0) teleinfo_phase[phase].papp = teleinfo_meter.papp / teleinfo_contract.phase;
+                  // else if current is 0, apparent power is equally split between phases
+                  else if (teleinfo_contract.phase > 0) teleinfo_phase[phase].papp = teleinfo_meter.papp / teleinfo_contract.phase;
 
-                // add apparent power for message time window
-                teleinfo_calc.papp_inc[phase] += (float)teleinfo_phase[phase].papp * (float)message_ms / 3600000;
-                papp_inc += teleinfo_calc.papp_inc[phase];
-              }
+                  // add apparent power for message time window
+                  teleinfo_calc.papp_inc[phase] += (float)teleinfo_phase[phase].papp * (float)message_ms / 3600000;
+                  papp_inc += teleinfo_calc.papp_inc[phase];
+                }
 
-              // if global counter increment start is known
-              if (teleinfo_calc.previous_time_counter != UINT32_MAX)
-              {
-                // if global counter has got incremented, calculate new cos phi, averaging with previous one to avoid peaks
-                cosphi = teleinfo_phase[0].cosphi;
+                // if global counter increment start is known
+                if (teleinfo_calc.previous_time_counter != UINT32_MAX)
+                {
+                  // if global counter has got incremented, calculate new cos phi, averaging with previous one to avoid peaks
+                  cosphi = teleinfo_phase[0].cosphi;
+                  if (delta_wh > 0)
+                  {
+                    // new cosphi = 3/4 previous one + 1/4 calculated one, if new cosphi > 1, new cosphi = 1
+                    if (papp_inc > 0) cosphi = cosphi * 3 / 4 + (long)(delta_wh * 25 / papp_inc);
+                    if (cosphi > 100) cosphi = 100;
+                    teleinfo_meter.nb_update++;
+                  }
+
+                  // else, if apparent power is above 1, cosphi will be drastically reduced when global counter will be increased
+                  //   so lets apply slow reduction to cosphi according to apparent power current increment
+                  else if (papp_inc > 1)
+                  {
+                    cosphi = cosphi / 2 + (long)(50 / papp_inc);
+                    if (cosphi > teleinfo_phase[0].cosphi) cosphi = teleinfo_phase[0].cosphi;
+                  }
+
+                  // apply cos phi to each phase
+                  for (phase = 0; phase < teleinfo_contract.phase; phase++) teleinfo_phase[phase].cosphi = cosphi;
+                }
+
+                // calculate active power per phase
+                for (phase = 0; phase < teleinfo_contract.phase; phase++) teleinfo_phase[phase].pact = teleinfo_phase[phase].papp * teleinfo_phase[phase].cosphi / 100;
+
+                // update global counter
+                teleinfo_meter.total_wh = counter_wh;
+
+                // update calculation timestamp
+                teleinfo_calc.previous_time_message = teleinfo_message.timestamp;
                 if (delta_wh > 0)
                 {
-                  // new cosphi = 3/4 previous one + 1/4 calculated one, if new cosphi > 1, new cosphi = 1
-                  if (papp_inc > 0) cosphi = cosphi * 3 / 4 + (long)(delta_wh * 25 / papp_inc);
-                  if (cosphi > 100) cosphi = 100;
-                  teleinfo_meter.nb_update++;
+                  // update calculation timestamp
+                  teleinfo_calc.previous_time_counter = teleinfo_message.timestamp;
+
+                  // reset apparent power sum for the period
+                  for (phase = 0; phase < teleinfo_contract.phase; phase++) teleinfo_calc.papp_inc[phase] = 0;
                 }
-
-                // else, if apparent power is above 1, cosphi will be drastically reduced when global counter will be increased
-                //   so lets apply slow reduction to cosphi according to apparent power current increment
-                else if (papp_inc > 1)
-                {
-                  cosphi = cosphi / 2 + (long)(50 / papp_inc);
-                  if (cosphi > teleinfo_phase[0].cosphi) cosphi = teleinfo_phase[0].cosphi;
-                }
-
-                // apply cos phi to each phase
-                for (phase = 0; phase < teleinfo_contract.phase; phase++) teleinfo_phase[phase].cosphi = cosphi;
-              }
-
-              // calculate active power per phase
-              for (phase = 0; phase < teleinfo_contract.phase; phase++) teleinfo_phase[phase].pact = teleinfo_phase[phase].papp * teleinfo_phase[phase].cosphi / 100;
-
-              // update global counter
-              teleinfo_meter.total_wh = counter_wh;
-
-              // update calculation timestamp
-              teleinfo_calc.previous_time_message = teleinfo_message.timestamp;
-              if (delta_wh > 0)
-              {
-                // update calculation timestamp
-                teleinfo_calc.previous_time_counter = teleinfo_message.timestamp;
-
-                // reset apparent power sum for the period
-                for (phase = 0; phase < teleinfo_contract.phase; phase++) teleinfo_calc.papp_inc[phase] = 0;
               }
             break;
 
