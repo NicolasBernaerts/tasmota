@@ -82,9 +82,10 @@
                          Update today and yesterday totals
     03/06/2023 - v11.1 - Rewrite of Tasmota energy update
                          Avoid 100ms rules teleperiod update
-    05/08/2023 - v11.2.1 - Correct contract type bug
     15/08/2023 - v11.3 - Change in cosphi calculation
                          Reorder Tempo periods
+    25/08/2023 - v11.4 - Change in ESP32S2 partitionning (1.3M littleFS)
+                         Add serial reception in display loops to avoid errors
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -234,6 +235,7 @@ enum TeleinfoType { TIC_TYPE_UNDEFINED, TIC_TYPE_CONSO, TIC_TYPE_PROD, TIC_TYPE_
 const char kTeleinfoTypeName[] PROGMEM = "Non déterminé|Consommateur|Producteur";
 enum TeleinfoMode { TIC_MODE_UNDEFINED, TIC_MODE_HISTORIC, TIC_MODE_STANDARD, TIC_MODE_PME, TIC_MODE_MAX };
 const char kTeleinfoModeName[] PROGMEM = "|Historique|Standard|PME";
+const char kTeleinfoModeIcon[] PROGMEM = "|🇭|🇸|🇵";
 const uint16_t ARR_TELEINFO_RATE[] = { 1200, 9600, 19200 }; 
 
 // Tarifs                                  [  Toutes   ]   [ Creuses       Pleines   ] [ Normales   PointeMobile ] [CreusesBleu  PleinesBleu   CreusesBlanc   PleinesBlanc CreusesRouge   PleinesRouge] [ Pointe   PointeMobile  Hiver      Pleines     Creuses    PleinesHiver CreusesHiver PleinesEte   CreusesEte   Pleines1/2S  Creuses1/2S  JuilletAout] [Pointe PleinesHiver CreusesHiver PleinesEte CreusesEte] [ Base  ]  [ Pleines    Creuses   ] [ Creuses bleu      Pleine Bleu    Creuse Blanc       Pleine Blanc     Creuse Rouge       Pleine Rouge ]  [ Normale      Pointe  ]  [Production]
@@ -261,8 +263,8 @@ enum TeleinfoPowerTarget { TIC_POWER_UPDATE_COUNTER, TIC_POWER_UPDATE_PAPP, TIC_
 enum TeleinfoSerialStatus { TIC_SERIAL_INIT, TIC_SERIAL_ACTIVE, TIC_SERIAL_STOPPED, TIC_SERIAL_FAILED };
 
 // phase colors
-const char kTeleinfoColorPhase[] PROGMEM = "#6bc4ff|#ffca74|#23bf64";                            // phase colors (blue, orange, green)
-const char kTeleinfoColorPeak[]  PROGMEM = "#5dade2|#d9ad67|#20a457";                            // peak colors (blue, orange, green)
+const char kTeleinfoColorPhase[] PROGMEM = "#09f|#f90|#093";                   // phase colors (blue, orange, green)
+const char kTeleinfoColorPeak[]  PROGMEM = "#5ae|#eb6|#2a6";                   // peak colors (blue, orange, green)
 
 /****************************************\
  *                 Data
@@ -573,6 +575,16 @@ char* lltoa (const long long value, char *pstr_result, const int base)
 }
 
 #endif      // ESP32
+
+// General update (wifi & serial)
+void TeleinfoDataUpdate ()
+{
+  // give control back to system to avoid watchdog
+  yield ();
+
+  // read serial data
+  TeleinfoReceiveData ();
+}
 
 // Start serial reception
 bool TeleinfoEnableSerial ()
@@ -1001,7 +1013,6 @@ void TeleinfoReceiveData ()
   long      value, total_current, increment, cosphi;
   long long counter, counter_wh, delta_wh;
   uint32_t  timeout, timestamp, message_ms;
-//  float     cosphi, papp_inc, daily_kwh;
   float     papp_inc, daily_kwh;
   char      checksum;
   char*     pstr_match;
@@ -1013,8 +1024,7 @@ void TeleinfoReceiveData ()
   // serial receive loop
   while (teleinfo_serial->available ()) 
   {
-    // give control back to system to avoid watchdog and read character
-    yield ();
+    // read character
     str_byte[0] = (char)teleinfo_serial->read (); 
 
     // if teleinfo enabled
@@ -1640,6 +1650,9 @@ void TeleinfoReceiveData ()
       tcp_server.send (str_byte[0]); 
 #endif
     }
+
+    // give control back to system to avoid watchdog
+    yield ();
   }
 }
 
@@ -1810,7 +1823,7 @@ void TeleinfoJSONTeleperiod ()
 void TeleinfoWebSensor ()
 {
   uint8_t phase;
-  long    percentage = 0;
+  long    value;
   char    str_text[32];
   char    str_header[64];
   char    str_data[128];
@@ -1831,75 +1844,84 @@ void TeleinfoWebSensor ()
       break;
 
     case TIC_SERIAL_ACTIVE:
-      // One bar graph per phase
+      // start
+      WSContentSend_P (PSTR ("<div style='font-size:13px;text-align:center;padding:2px 6px;background:#333333;border-radius:12px;margin-bottom:5px;'>\n"));
+
+      // title
+      WSContentSend_P (PSTR ("<div style='display:flex;margin:2px 0px 6px 0px;padding:0px;font-size:14px;'>\n"));
+      WSContentSend_P (PSTR ("<div style='width:25%%;padding:0px;text-align:left;font-size:16px;font-weight:bold;'>Teleinfo</div>\n"));
+      GetTextIndexed (str_text, sizeof (str_text), teleinfo_contract.mode, kTeleinfoModeIcon);
+      WSContentSend_P (PSTR ("<div style='width:35%%;padding:0px;text-align:left;font-size:16px;'>%s</div>\n"), str_text);
+      value = 0;
+      for (phase = 0; phase < teleinfo_contract.phase; phase++) value += teleinfo_phase[phase].pact;
+      WSContentSend_P (PSTR ("<div style='width:25%%;padding:1px 0px;font-weight:bold;'>%d</div>\n"), value);
+      WSContentSend_P (PSTR ("<div style='width:15%%;padding:1px 0px;text-align:left;'>W</div>\n"));
+      WSContentSend_P (PSTR ("</div>\n"));
+
+      // percentage per phase
       if (teleinfo_contract.ssousc > 0)
         for (phase = 0; phase < teleinfo_contract.phase; phase++)
         {
           // calculate and display bar graph percentage
-          percentage = 100 * teleinfo_phase[phase].papp / teleinfo_contract.ssousc;
+          value = 100 * teleinfo_phase[phase].papp / teleinfo_contract.ssousc;
           GetTextIndexed (str_text, sizeof (str_text), phase, kTeleinfoColorPhase);
-          WSContentSend_P (PSTR ("<div style='font-size:0.9rem;text-align:center;color:white;padding:1px;margin-bottom:4px;border-radius:4px;background-color:%s;width:%d%%;'>%d%%</div>\n"), str_text, percentage, percentage);
+          WSContentSend_P (PSTR ("<div style='display:flex;padding:2px 0px;opacity:70%%;'>\n"));
+          WSContentSend_P (PSTR ("<div style='width:%d%%;padding:1px 0px;font-weight:bold;background-color:%s;border-radius:6px;'>%d%%</div>\n"), value, str_text, value);
+          WSContentSend_P (PSTR ("</div>\n"));
         }
 
-      // Teleinfo mode 
-      //   Mode Historique / Standard       Conso / Prod
-      GetTextIndexed (str_text, sizeof (str_text), teleinfo_contract.mode, kTeleinfoModeName);
-      sprintf (str_header, "%s %s", D_TELEINFO_MODE, str_text);
+      // separator
+      WSContentSend_P (PSTR ("<hr>\n"));
+
+      // mode
+      WSContentSend_P (PSTR ("<div style='display:flex;padding:2px 0px;'>\n"));
+      WSContentSend_P (PSTR ("<div style='width:25%%;padding:1px 0px;text-align:left;'>Mode</div>\n"));
       GetTextIndexed (str_data, sizeof (str_data), teleinfo_contract.type, kTeleinfoTypeName);
+      if (teleinfo_contract.type == TIC_TYPE_PROD) strcpy (str_text, "#080"); else strcpy (str_text, "#800");
+      WSContentSend_P (PSTR ("<div style='width:35%%;padding:1px 0px;background-color:%s;border-radius:6px;'>%s</div>\n"), str_text, str_data);
+      WSContentSend_P (PSTR ("<div style='width:40%%;'></div>\n"));
+      WSContentSend_P (PSTR ("</div>\n"));
 
-      // Teleinfo contract power
-      if (teleinfo_contract.ssousc > 0)
+      // contract
+      WSContentSend_P (PSTR ("<div style='display:flex;padding:2px 0px;'>\n"));
+      WSContentSend_P (PSTR ("<div style='width:25%%;padding:1px 0px;text-align:left;'>Contrat</div>\n"));
+      GetTextIndexed (str_text, sizeof (str_text), teleinfo_contract.period, kTeleinfoPeriodName);
+      WSContentSend_P (PSTR ("<div style='width:35%%;padding:1px 0px;background-color:#555;border-radius:6px;'>%s</div>\n"), str_text);
+      WSContentSend_P (PSTR ("<div style='width:5%%;'></div>\n"));
+      if (teleinfo_contract.phase > 1) sprintf (str_text, "%u x ", teleinfo_contract.phase); else strcpy (str_text, ""); 
+      WSContentSend_P (PSTR ("<div style='width:20%%;padding:1px 0px;font-weight:bold;'>%s%d</div>\n"), str_text, teleinfo_contract.ssousc / 1000);
+      WSContentSend_P (PSTR ("<div style='width:15%%;padding:1px 0px;text-align:left;'>kVA</div>\n"));
+      WSContentSend_P (PSTR ("</div>\n"));
+
+      // counters
+      WSContentSend_P (PSTR ("<div style='display:flex;padding:2px 0px;'>\n"));
+      WSContentSend_P (PSTR ("<div style='width:25%%;padding:1px 0px;text-align:left;'>Trames</div>\n"));
+      WSContentSend_P (PSTR ("<div style='width:35%%;padding:1px 0px;font-weight:bold;'>%d</div>\n"), teleinfo_meter.nb_message);
+      WSContentSend_P (PSTR ("<div style='width:5%%;'></div>\n"));
+      WSContentSend_P (PSTR ("<div style='width:20%%;padding:1px 0px;'>%d</div>\n"), teleinfo_meter.nb_update);
+      WSContentSend_P (PSTR ("<div style='width:15%%;padding:1px 0px;text-align:left;'>cosφ</div>\n"));
+      WSContentSend_P (PSTR ("</div>\n"));
+
+      // if needed, display reset and errors
+      if ((teleinfo_meter.nb_reset > 0) || (teleinfo_meter.nb_error > teleinfo_meter.nb_line / 100))
       {
-        // header
-        strlcat (str_header, "<br>", sizeof (str_header));
-        strlcat (str_header, D_TELEINFO_CONTRACT, sizeof (str_header));
+        WSContentSend_P (PSTR ("<div style='display:flex;padding:2px 0px;'>\n"));
 
-        // number of phases
-        strcpy (str_text, "<br>");
-        if (teleinfo_contract.phase > 1) sprintf_P (str_text, PSTR ("<br>%u x "), teleinfo_contract.phase);
-        strlcat (str_data, str_text, sizeof (str_data));
+        // errors
+        if (teleinfo_meter.nb_error == 0) strcpy (str_text, "white"); else strcpy (str_text, "red");
+        WSContentSend_P (PSTR ("<div style='width:25%%;padding:1px 0px;color:%s;text-align:left;'>Trames</div>\n"), str_text);
+        WSContentSend_P (PSTR ("<div style='width:35%%;padding:1px 5px;color:%s;font-weight:bold;'>%d</div>\n"), str_text, teleinfo_meter.nb_error);
+        WSContentSend_P (PSTR ("<div style='width:5%%;'></div>\n"));
 
-        // power
-        sprintf (str_text, "%d kVA", teleinfo_contract.ssousc / 1000);
-        strlcat (str_data, str_text, sizeof (str_data));
+        // reset
+        if (teleinfo_meter.nb_reset == 0) strcpy (str_text, "white"); else strcpy (str_text, "orange");
+        WSContentSend_P (PSTR ("<div style='width:20%%;padding:1px 0px;color:%s;'>%d</div>\n"), str_text, teleinfo_meter.nb_reset);
+        WSContentSend_P (PSTR ("<div style='width:15%%;padding:1px 0px;color:%s;text-align:left;'>reset</div>\n"), str_text);
+        WSContentSend_P (PSTR ("</div>\n"));
       }
 
-      // Teleinfo period
-      if ((teleinfo_contract.period >= 0) && (teleinfo_contract.period < TIC_PERIOD_MAX))
-      {
-        // header
-        strlcat (str_header, "<br>", sizeof (str_header));
-        strlcat (str_header, D_TELEINFO_PERIOD, sizeof (str_header));
-
-        // period label
-        GetTextIndexed (str_text, sizeof (str_text), teleinfo_contract.period, kTeleinfoPeriodName);
-        strlcat (str_data, "<br>", sizeof (str_data));
-        strlcat (str_data, D_TELEINFO_HEURES, sizeof (str_data));
-        strlcat (str_data, " ", sizeof (str_data));
-        strlcat (str_data, str_text, sizeof (str_data));
-      }
-
-      // display data
-      WSContentSend_P (PSTR ("{s}%s{m}%s{e}"), str_header, str_data);
-
-      // display number of messages and cos phi
-      strcpy (str_header, "Messages / Cosφ");
-      sprintf (str_data, "%d / %d", teleinfo_meter.nb_message, teleinfo_meter.nb_update);
-
-      // calculate error percentage
-      percentage = 0;
-      if (teleinfo_meter.nb_line > 0) percentage = (long)(teleinfo_meter.nb_error * 100 / teleinfo_meter.nb_line);
-
-      // if needed, display reset and error percentage
-      if ((teleinfo_meter.nb_reset > 0) || (percentage > 0))
-      {
-        strlcat (str_header, "<br>Reset / Errors", sizeof (str_header));
-        sprintf (str_text, "<br>%d / %d%%", teleinfo_meter.nb_reset, percentage);
-        strlcat (str_data, str_text, sizeof (str_data));
-      }
-
-      // display data
-      WSContentSend_P (PSTR ("{s}%s{m}%s{e}"), str_header, str_data);
+      // end
+      WSContentSend_P (PSTR ("</div>\n"));
       break;
   }
 }

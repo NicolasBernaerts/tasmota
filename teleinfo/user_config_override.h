@@ -80,6 +80,7 @@
     11/06/2023 - v11.2 - Change graph organisation & live display
     15/08/2023 - v11.3 - Evolution in graph navigation
                          Change in XMLHttpRequest management 
+    10/10/2023 - v12.0 - Add support for Ecowatt signal in ESP32 versions
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -122,13 +123,15 @@
 // complementary modules
 #define USE_ENERGY_SENSOR                     // Enable energy sensors
 
-#define USE_TELEINFO                          // Enable Teleinfo energy module
-#define USE_TELEINFO_GRAPH                    // Enable Teleinfo sensor module for graph display
 #define USE_IPADDRESS                         // Add fixed IP configuration page
 #define USE_TIMEZONE                          // Enable Timezone management
 #define USE_TIMEZONE_WEB_CONFIG               // Enable timezone web configuration page
 #define USE_TCPSERVER                         // Enable TCP server (for TIC to TCP)
 #define USE_FTPSERVER                         // Enable embedded light FTP server
+
+// teleinfo modules
+#define USE_TELEINFO                          // Enable Teleinfo energy module
+#define USE_TELEINFO_GRAPH                    // Enable Teleinfo sensor module for graph display
 
 // FTP server login and password
 #ifdef USE_FTPSERVER
@@ -160,7 +163,7 @@
 // extension data
 #define EXTENSION_NAME    "Teleinfo"          // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
-#define EXTENSION_VERSION "11.3"              // version
+#define EXTENSION_VERSION "12.0"              // version
 
 // MQTT default
 #undef MQTT_HOST
