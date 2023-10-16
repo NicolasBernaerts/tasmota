@@ -205,7 +205,7 @@ If you want to compile this firmware version, you just need to :
 1. install official tasmota sources (please get exact version given at the beginning of this page)
 2. place or replace files from this repository
 3. place specific files from **tasmota/common** repository
-4. install **FTPClientServer** library
+4. install **FTPClientServer** and **ArduinoJson** libraries
 
 Here is where you should place different files.
 Files should be taken from this repository and from **tasmota/common** :
@@ -227,7 +227,7 @@ Files should be taken from this repository and from **tasmota/common** :
 | tasmota/tasmota_sns_sensor/**xsns_104_teleinfo_graph.ino** | Teleinfo Graphs |
 | tasmota/tasmota_sns_sensor/**xsns_119_ecowatt_server.ino** | Ecowatt server |
 | tasmota/tasmota_sns_sensor/**xsns_120_timezone.ino** | Timezone Web configuration |
-| lib/default/**ArduinoJSON** | JSON handling library used by Ecowatt server, extract content of **ArduinoJSON.zip** |
+| lib/default/**ArduinoJSON** | JSON handling library used by Ecowatt server, extract content of **ArduinoJson.zip** |
 | lib/default/**FTPClientServer** | FTP server library, extract content of **FTPClientServer.zip** |
 
 If everything goes fine, you should be able to compile your own build.
