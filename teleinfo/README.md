@@ -259,7 +259,8 @@ Finaly, in **Configure Teleinfo** you need to select your Teleinfo adapter baud 
 
 ## Screenshot ##
 
-![Main page](./screen/tasmota-teleinfo-main-triphase.png)
+![Monophasé](./screen/tasmota-teleinfo-main.png)
+![Triphasé](./screen/tasmota-teleinfo-main-triphase.png)
 ![Config page](./screen/tasmota-teleinfo-config.png)
 
 ### Realtime messages ###
