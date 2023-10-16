@@ -128,7 +128,7 @@ TasmotaSerial *teleinfo_serial = nullptr;
 #define TELEINFO_INDEX_MAX              12        // maximum number of total power counters
 #define TELEINFO_PERCENT_MIN            1         // minimum acceptable percentage of energy contract
 #define TELEINFO_PERCENT_MAX            200       // maximum acceptable percentage of energy contract
-#define TELEINFO_PERCENT_CHANGE         3         // 3% of power change to publish JSON
+#define TELEINFO_PERCENT_CHANGE         5         // 5% of power change to publish JSON
 #define TELEINFO_FILE_DAILY             7         // default number of daily files
 #define TELEINFO_FILE_WEEKLY            8         // default number of weekly files
 
@@ -1156,14 +1156,17 @@ void TeleinfoReceiveData ()
                 case TIC_IINST:
                 case TIC_IRMS1:
                 case TIC_IINST1:
+                  TeleinfoUpdateCurrent (str_donnee, 0);
                   break;
 
                 case TIC_IRMS2:
                 case TIC_IINST2:
+                  TeleinfoUpdateCurrent (str_donnee, 1);
                   break;
 
                 case TIC_IRMS3:
                 case TIC_IINST3:
+                  TeleinfoUpdateCurrent (str_donnee, 2);
                   teleinfo_contract.phase = 3; 
                   break;
 
@@ -1399,7 +1402,7 @@ void TeleinfoReceiveData ()
           }
 
           // save number of lines and reset index
-          teleinfo_message.line_max   = teleinfo_message.line_index;
+          teleinfo_message.line_max   = min (teleinfo_message.line_index, TELEINFO_LINE_QTY);
           teleinfo_message.line_index = 0;
 
           // if needed, default to CONSO mode
@@ -1618,7 +1621,7 @@ void TeleinfoReceiveData ()
 
             // detect more than x % power change
             value = abs (teleinfo_phase[phase].papp_last - teleinfo_phase[phase].papp);
-            if (value > (teleinfo_contract.ssousc * TELEINFO_PERCENT_CHANGE / 100)) teleinfo_message.percent = true;
+            if (value > (teleinfo_phase[phase].papp_last * TELEINFO_PERCENT_CHANGE / 100)) teleinfo_message.percent = true;
             teleinfo_phase[phase].papp_last = teleinfo_phase[phase].papp;
           }
 
