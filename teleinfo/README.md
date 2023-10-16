@@ -1,10 +1,10 @@
-# Teleinfo Tasmota firmware for Linky meters
+# Teleinfo & Ecowatt Tasmota firmware for Linky meters
 
 ## Presentation
 
-This evolution of **Tasmota 12.5.0** firmware has been enhanced to handle France energy meters known as **Linky** using **Teleinfo** protocol.
-
-It also implements an **Ecowatt** server to publish Ecowatt signals thru MQTT.
+This evolution of **Tasmota 12.5.0** firmware has been enhanced to :
+  * handle France energy meters known as **Linky** using **Teleinfo** protocol*
+  * implements an **Ecowatt** server to publish Ecowatt signals
 
 This firmware has been developped and tested on  :
   * **Sagem Classic Monophase** with TIC **Historique**
@@ -18,7 +18,15 @@ It has been compiled and tested on the following devices :
   * **ESP32** 4Mb
   * **ESP32S2** 4Mb
   * **ESP32S3** 16Mb
- 
+
+This firmware also provides :
+  * a TCP server to live stream **teleinfo** data
+  * a FTP server to easily retrieve graph data
+
+Pre-compiled versions are available in the [**binary**](./binary) folder.
+
+## Teleinfo
+
 Please note that it is a completly different implementation than the one published early 2020 by Charles Hallard and actually on the official Tasmota repository. 
 
 Some of these firmware versions are using a LittleFS partition to store graph data. Il allows to keep historical data over reboots.
@@ -35,21 +43,15 @@ This firmware provides some extra Web page on the device :
   * **/tic** : real time display of last received Teleinfo message
   * **/graph** : live, daily and weekly and yearly graphs
 
-It also provides :
-  * a TCP server to live stream teleinfo data
-  * a FTP server to easily retrieve graph data
-
 If you are using a LittleFS version, you'll also get peak apparent power and peak voltage on the graphs.
 
 If your linky in in historic mode, it doesn't provide instant voltage. Voltage is then forced to 230V.
 
 If you are using an **ESP32** board, you can use the wired connexion by selection the proper board model in **Configuration/ESP32 board**.
 
-Pre-compiled versions are available in the [**binary**](./binary) folder.
-
 Teleinfo protocol is described in [this document](https://www.enedis.fr/sites/default/files/Enedis-NOI-CPT_54E.pdf)
 
-## MQTT data
+#### MQTT data
 
 Standard **ENERGY** section is published during **Telemetry**.
 
@@ -87,7 +89,7 @@ MQTT result should look like that :
     compteur/tele/SENSOR = {"Time":"2021-03-13T09:20:30","TIC":{"ADCO":"061964xxxxxx","OPTARIF":"BASE","ISOUSC":"30","BASE":"007970903","PTEC":"TH..","IINST":"003","IMAX":"090","PAPP":"00780","HHPHC":"A","MOTDETAT":"000000","PHASE":1,"SSOUSC":"6000","IINST1":"3","SINSTS1":"780"}}
     compteur/tele/SENSOR = {"Time":"2023-03-10T13:53:42","METER":{"PH":1,"ISUB":45,"PSUB":9000,"PMAX":8910,"U1":235,"P1":1470,"W1":1470,"I1":6.0,"C1":1.00,"P":1470,"W":1470,"I":6.0}}
 
-## Configuration ##
+#### Configuration
 
 This Teleinfo firmware can be configured thru some **EnergyConfig** console commands :
 
@@ -110,7 +112,50 @@ You can use few commands at once :
 
       EnergyConfig percent=110 nbday=8 nbweek=12
 
-## TCP server ##
+#### Log files
+
+If you run this firmware on an ESP having a LittleFS partition, it will generate 3 types of energy logs :
+  * **teleinfo-day-nn.csv** : average values daily file with a record every ~5 mn (**00** is today's log, **01** yesterday's log, ...)
+  * **teleinfo-week-nn.csv** : average values weekly file with a record every ~30 mn (**00** is current week's log, **01** is previous week's log, ...)
+  * **teleinfo-year-yyyy.csv** : kWh total yearly file with a line per day and detail of hourly total for each day.
+
+Every CSV file includes a header.
+
+These files are used to generate all graphs other than **Live** ones.
+
+## Ecowatt
+
+This evolution of Tasmota firmware allows to collect [**France RTE Ecowatt**](https://data.rte-france.com/catalog/-/api/doc/user-guide/Ecowatt/4.0) signals and to publish them thru MQTT.
+
+It uses SSL RTE API and update Ecowatt signals every hour.
+
+It is only enabled with **ESP32**, **ESP32S2** and **ESP32S3**, as SSL connexions are using too much memory for ESP8266.
+
+Ecowatt data are published as a specific MQTT message :
+
+18:19:53.527 MQT: your-device/tele/ECOWATT = {"Time":"2022-10-10T23:51:09","Ecowatt":{"dval":2,"hour":14,"now":1,"next":2,
+      "day0":{"jour":"2022-10-06","dval":1,"0":1,"1":1,"2":1,"3":1,"4":1,"5":1,"6":1,...,"23":1},
+      "day1":{"jour":"2022-10-07","dval":2,"0":1,"1":1,"2":2,"3":1,"4":1,"5":1,"6":1,...,"23":1},
+      "day2":{"jour":"2022-10-08","dval":3,"0":1,"1":1,"2":1,"3":1,"4":1,"5":3,"6":1,...,"23":1},
+      "day3":{"jour":"2022-10-09","dval":2,"0":1,"1":1,"2":1,"3":2,"4":1,"5":1,"6":1,...,"23":1}}}
+ 
+#### Configuration
+
+Here the **Ecowatt** server console commands :
+
+    eco_enable <0/1>  = enable/disable ecowatt server
+    eco_sandbox <0/1> = set sandbox mode (0/1)
+    eco_key <key>     = set RTE base64 private key
+    eco_update        = force ecowatt update from RTE server
+    eco_publish       = publish ecowatt data now
+
+You can generate your Base64 private key when you create you account on RTE site https://data.rte-france.com/
+
+To use Ecowatt module you need to enable it as it is disabled by default.
+
+Once configuration is complete, restart Tasmota.
+
+## TCP server
 
 This firmware brings a minimal embedded TCP server.
 
@@ -135,18 +180,7 @@ When started, you can now receive your Linky teleinfo stream in real time on any
 
 Server allows only 1 concurrent connexion. Any new client will kill previous one.
 
-## Log files ##
-
-If you run this firmware on an ESP having a LittleFS partition, it will generate 3 types of energy logs :
-  * **teleinfo-day-nn.csv** : average values daily file with a record every ~5 mn (**00** is today's log, **01** yesterday's log, ...)
-  * **teleinfo-week-nn.csv** : average values weekly file with a record every ~30 mn (**00** is current week's log, **01** is previous week's log, ...)
-  * **teleinfo-year-yyyy.csv** : kWh total yearly file with a line per day and detail of hourly total for each day.
-
-Every CSV file includes a header.
-
-These files are used to generate all graphs other than **Live** ones.
-
-## FTP server ##
+## FTP server
 
 If you are using a build with a LittleFS partition, you can access the partition thru a very basic FTP server embedded in this firmware.
 
@@ -165,7 +199,7 @@ On the client side, credentials are :
 This embedded FTP server main limitation is that it can only one connexion at a time. \
 So you need to limit simultaneous connexions to **1** on your FTP client. Otherwise, connexion will fail.
 
-## Compilation ##
+## Compilation
 
 If you want to compile this firmware version, you just need to :
 1. install official tasmota sources (please get exact version given at the beginning of this page)
@@ -191,12 +225,14 @@ Files should be taken from this repository and from **tasmota/common** :
 | tasmota/tasmota_drv_driver/**xdrv_97_tcp_server.ino** | Embedded Teleinfo stream server |
 | tasmota/tasmota_drv_driver/**xdrv_98_esp32_board.ino** | Configuration of Ethernet ESP32 boards |
 | tasmota/tasmota_sns_sensor/**xsns_104_teleinfo_graph.ino** | Teleinfo Graphs |
+| tasmota/tasmota_sns_sensor/**xsns_119_ecowatt_server.ino** | Ecowatt server |
 | tasmota/tasmota_sns_sensor/**xsns_120_timezone.ino** | Timezone Web configuration |
+| lib/default/**ArduinoJSON** | JSON handling library used by Ecowatt server, extract content of **ArduinoJSON.zip** |
 | lib/default/**FTPClientServer** | FTP server library, extract content of **FTPClientServer.zip** |
 
 If everything goes fine, you should be able to compile your own build.
 
-## Adapter ##
+## Adapter
 
 Between your Energy meter and your Tasmota device, you'll need an adapter to convert **Teleinfo** signal to **TTL serial**.
 
@@ -220,70 +256,6 @@ For example, you can use :
 Finaly, in **Configure Teleinfo** you need to select your Teleinfo adapter baud rate :
   * **1200** (original white meter or green Linky in historic mode)
   * **9600** (green Linky in standard mode)
-
-## Ecowatt ##
-
-This evolution of Tasmota firmware allows to collect [**France RTE Ecowatt**](https://data.rte-france.com/catalog/-/api/doc/user-guide/Ecowatt/4.0) signals and to publish them thru MQTT.
-
-It is compatible with **ESP32**, **ESP32S2** and **ESP32S3**, as SSL connexions are using too much memory for ESP8266.
-
-It will connect every hour to RTE API and collect Ecowatt signals.
-
-Result will be published as an MQTT message :
-
-    {"Time":"2022-10-10T23:51:09","Ecowatt":{"dval":2,"hour":14,"now":1,"next":2,
-      "day0":{"jour":"2022-10-06","dval":1,"0":1,"1":1,"2":1,"3":1,"4":1,"5":1,"6":1,...,"23":1},
-      "day1":{"jour":"2022-10-07","dval":2,"0":1,"1":1,"2":2,"3":1,"4":1,"5":1,"6":1,...,"23":1},
-      "day2":{"jour":"2022-10-08","dval":3,"0":1,"1":1,"2":1,"3":1,"4":1,"5":3,"6":1,...,"23":1},
-      "day3":{"jour":"2022-10-09","dval":2,"0":1,"1":1,"2":1,"3":2,"4":1,"5":1,"6":1,...,"23":1}}}
- 
-Pre-compiled versions are available in the [**binary**](https://github.com/NicolasBernaerts/tasmota/tree/master/teleinfo/binary) folder.
-
-### Configuration ###
-
-The **Ecowatt** functionnality needs :
-  * a Base64 private key provided by RTE when you create you account on https://data.rte-france.com/
-  * the PEM root certificate authority from https://data.rte-france.com/
-  * a topic where to publish Ecowatt data
-
-#### 1. Private Key ####
-
-You can declare your private Base64 key thru this console command :
-
-    # eco_key your-rte-base64-private-key
-
-#### 2. Root CA ####
-
-To declare the root CA of https://data.rte-france.com/, you can collect it from the site itself.
-
-With Firefox :
-  * go on the home page
-  * click on the lock just before the URL
-  * select the certificate in the menu and select **more information**
-  * on the page, select **display the certificate**
-  * on the new page, select **Global Sign** tab
-  * click to download **PEM(cert)**
-  
-To ease the process, the certificate has been uploaded to this repository. To download it, you just need :
-  * to go to [ecowatt.pem](https://github.com/NicolasBernaerts/tasmota/blob/master/ecowatt/ecowatt.pem) raw page
-  * right click and **save as**
-  * rename downloaded file to **ecowatt.pem**
-
-Once the certificate is downloaded and renamed ***ecowatt.pem***, just upload it to the root of the LittleFS partition.
-
-#### 3. MQTT Topic #### 
-
-To declare the MQTT topic where to publish Ecowatt data, run following console command :
-
-    # eco_topic ecowatt/tele/SENSOR
-    
-You can replace *ecowatt/tele/SENSOR* by any other topic you want.
-
-#### 4. Restart ####
-
-Once you've setup these 3 data, restart your Tasmota module.
-
-Your Ecowatt MQTT server should be up and running.
 
 ## Screenshot ##
 
