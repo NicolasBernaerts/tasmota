@@ -8,7 +8,7 @@ Some Tasmota firmware extensions :
   * **offload** : pilot device with power offloading according to power meter publishing thru MQTT
   * **pilotwire** : manage french pilotwire electrical heaters with **offload** functionnality
   * **serialrelay** : handle ICSE01xA and LC Tech serial relay boards
-  * **teleinfo** : manage french electricity smart meters using Teleinfo protocol (Linky)
+  * **teleinfo** : manage french electricity smart meters using Teleinfo protocol (Linky) & Ecowatt data server
   * **sensor-vmc** : handle local and MQTT sensors & Motor Controled Ventilator according to target humidity level
 
 # ESP8266 & ESP32 tools
