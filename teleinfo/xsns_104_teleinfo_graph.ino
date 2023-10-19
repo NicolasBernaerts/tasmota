@@ -10,6 +10,7 @@
     15/08/2023 - v11.3 - Evolution in graph navigation
                          Change in XMLHttpRequest management
                          Memory leak hunting
+    25/08/2023 - v11.4 - Add serial reception in display loops to avoid errors
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -90,9 +91,9 @@ struct tic_period {
   int      index;                                   // current array index per refresh period (day of year for yearly period)
   long     counter;                                 // counter in seconds of current refresh period (10k*year + 100*month + day_of_month for yearly period)
 
-  long  papp_peak[ENERGY_MAX_PHASES];               // peak apparent power during refresh period
   long  volt_low[ENERGY_MAX_PHASES];                // lowest voltage during refresh period
   long  volt_peak[ENERGY_MAX_PHASES];               // peak high voltage during refresh period
+  long  papp_peak[ENERGY_MAX_PHASES];               // peak apparent power during refresh period
   long  long papp_sum[ENERGY_MAX_PHASES];           // sum of apparent power during refresh period
   long  long pact_sum[ENERGY_MAX_PHASES];           // sum of active power during refresh period
   float cosphi_sum[ENERGY_MAX_PHASES];              // sum of cos phi during refresh period
@@ -110,29 +111,38 @@ struct tic_graph {
   uint8_t arr_cosphi[ENERGY_MAX_PHASES][TELEINFO_GRAPH_SAMPLE];   // array of cos phi
 };
 static struct {
-  bool    serving = false;
-  uint8_t period_curve = 0;                   // graph max period to display curve
-  uint8_t period = TELEINFO_PERIOD_LIVE;      // graph period
-  uint8_t data = TELEINFO_UNIT_VA;            // graph default data
-  uint8_t histo = 0;                          // graph histotisation index
-  uint8_t month = 0;                          // graph current month
-  uint8_t day = 0;                            // graph current day
-  long    left;                               // left position of the curve
-  long    right;                              // right position of the curve
-  long    width;                              // width of the curve (in pixels)
-  long    papp_peak[ENERGY_MAX_PHASES];       // peak apparent power to save
-  long    volt_low[ENERGY_MAX_PHASES];        // voltage to save
-  long    volt_peak[ENERGY_MAX_PHASES];       // voltage to save
-  long    papp[ENERGY_MAX_PHASES];            // apparent power to save
-  long    pact[ENERGY_MAX_PHASES];            // active power to save
-  uint8_t cosphi[ENERGY_MAX_PHASES];          // cosphi to save
-  char    str_phase[ENERGY_MAX_PHASES + 1];   // phases to displayed
-  char    str_buffer[512];                    // buffer used for graph display 
-  tic_graph data_live;                        // live last 10mn values
+  bool    serving      = false;
+  uint8_t period_curve = 0;                       // graph max period to display curve
+  uint8_t period       = TELEINFO_PERIOD_LIVE;    // graph period
+  uint8_t data         = TELEINFO_UNIT_VA;        // graph default data
+  uint8_t histo        = 0;                       // graph histotisation index
+  uint8_t month        = 0;                       // graph current month
+  uint8_t day          = 0;                       // graph current day
+  uint8_t last_hour    = UINT8_MAX;               // last hour slot
+
+  long    left;                                   // left position of the curve
+  long    right;                                  // right position of the curve
+  long    width;                                  // width of the curve (in pixels)
+
+  long    papp_peak[ENERGY_MAX_PHASES];           // peak apparent power to save
+  long    volt_low[ENERGY_MAX_PHASES];            // voltage to save
+  long    volt_peak[ENERGY_MAX_PHASES];           // voltage to save
+  long    papp[ENERGY_MAX_PHASES];                // apparent power to save
+  long    pact[ENERGY_MAX_PHASES];                // active power to save
+  uint8_t cosphi[ENERGY_MAX_PHASES];              // cosphi to save
+
+  long      conso_hour_wh[24];                    // conso hourly increments
+  long long conso_last_day_wh  = 0;               // conso previous daily total
+  long long conso_last_hour_wh = 0;               // conso previous hour total
+
+  char    str_phase[ENERGY_MAX_PHASES + 1];       // phases to displayed
+  char    str_buffer[512];                        // buffer used for graph display 
+
+  tic_graph data_live;                            // live last 10mn values
 #ifdef USE_UFILESYS
-  char    str_filename[UFS_FILENAME_SIZE];    // littlefs filename
+  char    str_filename[UFS_FILENAME_SIZE];        // littlefs filename
 #else
-  tic_graph data_daily;                       // daily last 24h values
+  tic_graph data_daily;                           // daily last 24h values
 #endif    // USE_UFILESYS
 
 } teleinfo_graph;
@@ -348,7 +358,7 @@ void TeleinfoSensorFlushDataHisto (const uint8_t period)
 
   // validate parameters
   if ((period != TELEINFO_PERIOD_DAY) && (period != TELEINFO_PERIOD_WEEK)) return;
-  if ((teleinfo_contract.period < 0) || (teleinfo_contract.period >= TIC_PERIOD_MAX)) return;
+  if (teleinfo_contract.period_current >= TIC_PERIOD_MAX) return;
 
   // if buffer is filled, save buffer to log
   if (teleinfo_period[period].str_buffer.length () > 0)
@@ -369,12 +379,13 @@ void TeleinfoSensorFlushDataHisto (const uint8_t period)
 
       // append contract period and totals
       str_header += ";Period";
-      for (index = ARR_TELEINFO_PERIOD_FIRST[teleinfo_contract.period]; index < ARR_TELEINFO_PERIOD_FIRST[teleinfo_contract.period] + teleinfo_contract.nb_indexes; index++)
-      {
-        GetTextIndexed (str_value, sizeof (str_value), index, kTeleinfoPeriod);
-        str_header += ";";
-        str_header += str_value;
-      }
+      if (teleinfo_contract.period_first < TIC_PERIOD_MAX) 
+        for (index = teleinfo_contract.period_first; index < teleinfo_contract.period_first + teleinfo_contract.period_qty; index++)
+        {
+          GetTextIndexed (str_value, sizeof (str_value), index, kTeleinfoPeriod);
+          str_header += ";";
+          str_header += str_value;
+        }
  
       // write header
       str_header += "\n";
@@ -478,15 +489,16 @@ void TeleinfoSensorSaveDataHisto (const uint8_t period, const uint8_t log_buffer
   }
 
   // line : totals
-  GetTextIndexed (str_value, sizeof (str_value), teleinfo_contract.period, kTeleinfoPeriod);
+  GetTextIndexed (str_value, sizeof (str_value), teleinfo_contract.period_current, kTeleinfoPeriod);
   teleinfo_period[period].str_buffer += ";";
   teleinfo_period[period].str_buffer += str_value;
-  for (index = 0; index < teleinfo_contract.nb_indexes; index++)
-  {
-    lltoa (teleinfo_meter.index_wh[index], str_value, 10); 
-    teleinfo_period[period].str_buffer += ";";
-    teleinfo_period[period].str_buffer += str_value;
-  }
+  if (teleinfo_contract.period_qty < TIC_PERIOD_MAX) 
+    for (index = 0; index < teleinfo_contract.period_qty; index++)
+    {
+      lltoa (teleinfo_meter.conso_index_wh[index], str_value, 10); 
+      teleinfo_period[period].str_buffer += ";";
+      teleinfo_period[period].str_buffer += str_value;
+    }
 
   // line : end
   teleinfo_period[period].str_buffer += "\n";
@@ -528,8 +540,8 @@ void TeleinfoSensorFileRotate (const char* pstr_filename, const int index_min, c
       AddLog (LOG_LEVEL_INFO, PSTR ("UFS: renamed %s to %s"), str_original, str_target);
     }
 
-    // handle received data
-    TeleinfoReceiveData ();
+    // handle data update
+    TeleinfoDataUpdate ();
   }
 }
 
@@ -566,15 +578,15 @@ void TeleinfoSensorSaveDailyTotal ()
   BreakTime (current_time, today_dst);
 
   // if daily total has been updated and date is defined
-  if ((teleinfo_meter.total_wh != 0) && (today_dst.year != 0))
+  if ((teleinfo_meter.conso_total_wh != 0) && (today_dst.year != 0))
   {
     // calculate daily ahd hourly delta
-    delta = teleinfo_meter.total_wh - teleinfo_meter.last_day_wh;
-    teleinfo_meter.hour_wh[today_dst.hour] += (long)(teleinfo_meter.total_wh - teleinfo_meter.last_hour_wh);
+    delta = teleinfo_meter.conso_total_wh - teleinfo_graph.conso_last_day_wh;
+    teleinfo_graph.conso_hour_wh[today_dst.hour] += (long)(teleinfo_meter.conso_total_wh - teleinfo_graph.conso_last_hour_wh);
 
     // update last day and hour total
-    teleinfo_meter.last_day_wh  = teleinfo_meter.total_wh;
-    teleinfo_meter.last_hour_wh = teleinfo_meter.total_wh;
+    teleinfo_graph.conso_last_day_wh  = teleinfo_meter.conso_total_wh;
+    teleinfo_graph.conso_last_hour_wh = teleinfo_meter.conso_total_wh;
 
     // get filename
     sprintf_P (teleinfo_graph.str_filename, D_TELEINFO_HISTO_FILE_YEAR, 1970 + today_dst.year);
@@ -602,7 +614,7 @@ void TeleinfoSensorSaveDailyTotal ()
     sprintf (str_value, "%u;%u;%u", today_dst.day_of_year, today_dst.month, today_dst.day_of_month);
     str_line = str_value;
     str_line += ";";
-    lltoa (teleinfo_meter.total_wh, str_value, 10);
+    lltoa (teleinfo_meter.conso_total_wh, str_value, 10);
     str_line += str_value;
     str_line += ";";
     if (delta != LONG_LONG_MAX) lltoa (delta, str_value, 10);
@@ -614,10 +626,10 @@ void TeleinfoSensorSaveDailyTotal ()
     {
       // append hourly increment to line
       str_line += ";";
-      str_line += teleinfo_meter.hour_wh[index];
+      str_line += teleinfo_graph.conso_hour_wh[index];
 
       // reset hourly increment
-      teleinfo_meter.hour_wh[index] = 0;
+      teleinfo_graph.conso_hour_wh[index] = 0;
     }
 
     // write line and close file
@@ -787,6 +799,9 @@ void TeleinfoSensorInit ()
   teleinfo_graph.period_curve = TELEINFO_PERIOD_MAX;
 #endif      // USE_UFILESYS
 
+  // init hourly values
+  for (index = 0; index < 24; index ++) teleinfo_graph.conso_hour_wh[index] = 0;
+
   // boundaries of SVG graph
   teleinfo_graph.left  = TELEINFO_GRAPH_PERCENT_START * TELEINFO_GRAPH_WIDTH / 100;
   teleinfo_graph.right = TELEINFO_GRAPH_PERCENT_STOP  * TELEINFO_GRAPH_WIDTH / 100;
@@ -867,6 +882,19 @@ void TeleinfoSensorEverySecond ()
 
   // current time
   time_now = LocalTime ();
+
+  // if hour change, save hourly increment
+  if (teleinfo_graph.last_hour == UINT8_MAX) teleinfo_graph.last_hour = RtcTime.hour;
+  if (teleinfo_graph.last_hour != RtcTime.hour)
+  {
+    teleinfo_graph.conso_hour_wh[teleinfo_graph.last_hour] += (long)(teleinfo_meter.conso_total_wh - teleinfo_graph.conso_last_hour_wh);
+    teleinfo_graph.conso_last_hour_wh = teleinfo_meter.conso_total_wh;
+    teleinfo_graph.last_hour = RtcTime.hour;
+  }
+
+  // if needed, init first graph total
+  if (teleinfo_graph.conso_last_day_wh  == 0) teleinfo_graph.conso_last_day_wh  = teleinfo_meter.conso_total_wh;
+  if (teleinfo_graph.conso_last_hour_wh == 0) teleinfo_graph.conso_last_hour_wh = teleinfo_meter.conso_total_wh;
 
   // loop thru the periods and the phases, to update all values over the period
   for (period = 0; period < teleinfo_graph.period_curve; period++)
@@ -1391,8 +1419,8 @@ void TeleinfoSensorGraphDisplayCurve (const uint8_t phase, const uint8_t data)
             pstr_buffer = pstr_line + 1;
             pstr_line = strchr (pstr_buffer, '\n');
 
-            // handle received data (to avoid reception errors)
-            TeleinfoReceiveData ();
+            // handle data update
+            TeleinfoDataUpdate ();
           }
 
           // deal with remaining string
@@ -1512,6 +1540,9 @@ void TeleinfoSensorGraphDisplayCurve (const uint8_t phase, const uint8_t data)
       prev_x = graph_x;
       prev_y = graph_y;
     }
+
+    // handle data update
+    TeleinfoDataUpdate ();
   }
 
   // end data value curve
@@ -1599,11 +1630,11 @@ void TeleinfoSensorGraphDisplayBar (const uint8_t histo, const bool current)
   if ((histo == 0) && (teleinfo_graph.month == RtcTime.month) && (teleinfo_graph.day == RtcTime.day_of_month))
   {
     // update last hour increment
-    teleinfo_meter.hour_wh[RtcTime.hour] += (long)(teleinfo_meter.total_wh - teleinfo_meter.last_hour_wh);
-    teleinfo_meter.last_hour_wh = teleinfo_meter.total_wh;
+    teleinfo_graph.conso_hour_wh[RtcTime.hour] += (long)(teleinfo_meter.conso_total_wh - teleinfo_graph.conso_last_hour_wh);
+    teleinfo_graph.conso_last_hour_wh = teleinfo_meter.conso_total_wh;
 
     // init hour slots from live values
-    for (index = 0; index < 24; index ++) if (teleinfo_meter.hour_wh[index] > 0) arr_value[index] = teleinfo_meter.hour_wh[index];
+    for (index = 0; index < 24; index ++) if (teleinfo_graph.conso_hour_wh[index] > 0) arr_value[index] = teleinfo_graph.conso_hour_wh[index];
   }
 
   // calculate graph height and graph start
@@ -1708,8 +1739,8 @@ void TeleinfoSensorGraphDisplayBar (const uint8_t histo, const bool current)
       if (pstr_buffer != teleinfo_graph.str_buffer) strcpy (teleinfo_graph.str_buffer, pstr_buffer);
         else strcpy (teleinfo_graph.str_buffer, "");
 
-      // handle received data
-      TeleinfoReceiveData ();
+      // handle data update
+      TeleinfoDataUpdate ();
     }
 
     // close file
@@ -1796,6 +1827,9 @@ void TeleinfoSensorGraphDisplayBar (const uint8_t histo, const bool current)
     // increment bar position
     graph_x     += graph_width;
     graph_x_end += graph_width;
+
+    // handle data update
+    TeleinfoDataUpdate ();
   }
 }
 
@@ -2131,8 +2165,8 @@ void TeleinfoSensorWebGraphPage ()
     // curve update
     if (teleinfo_graph.period < teleinfo_graph.period_curve) 
     {
-      // set curve update delay (live = every second, other = every 2 mn)
-      if (teleinfo_graph.period == TELEINFO_PERIOD_LIVE) delay = 1000; else delay = 144000;
+      // set curve update delay (live = every second, other = every 30s)
+      if (teleinfo_graph.period == TELEINFO_PERIOD_LIVE) delay = 1000; else delay = 30000;
 
       WSContentSend_P (PSTR ("function updateCurve(){\n"));
 

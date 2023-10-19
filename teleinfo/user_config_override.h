@@ -81,6 +81,8 @@
     15/08/2023 - v11.3 - Evolution in graph navigation
                          Change in XMLHttpRequest management 
     10/10/2023 - v12.0 - Add support for Ecowatt signal in ESP32 versions
+    17/10/2023 - v12.1 - Handle Production & consommation simultaneously
+                         Display all periods with total
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -163,7 +165,7 @@
 // extension data
 #define EXTENSION_NAME    "Teleinfo"          // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
-#define EXTENSION_VERSION "12.0"              // version
+#define EXTENSION_VERSION "12.1"              // version
 
 // MQTT default
 #undef MQTT_HOST
