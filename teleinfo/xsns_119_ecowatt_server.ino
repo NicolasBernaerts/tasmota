@@ -670,13 +670,6 @@ void EcowattInit ()
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: eco_help to get help on Ecowatt module"));
 }
 
-
-// handle Ecowatt stream update steps (with RTE API)
-void EcowattEvery250ms ()
-{
-
-}
-
 // called every second
 void EcowattEverySecond ()
 {
