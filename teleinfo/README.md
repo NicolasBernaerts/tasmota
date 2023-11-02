@@ -41,7 +41,11 @@ It manages :
 
 This firmware provides some extra Web page on the device :
   * **/tic** : real time display of last received Teleinfo message
-  * **/graph** : live, daily and weekly and yearly graphs
+  * **/graph** : live, daily and weekly graphs
+  * **/conso** : yearly consumption data
+  * **/prod** : yearly production
+  
+According to your installation, you may get some production data.
 
 If you are using a LittleFS version, you'll also get peak apparent power and peak voltage on the graphs.
 
@@ -82,6 +86,7 @@ Here are some example of what you'll get if you publish **METER** section :
   * **Px** = instant apparent power on phase **x** 
   * **Wx** = instant active power on phase **x** 
   * **Cx** = instant power factor on phase **x** 
+  * **PROD** = instant production apparent power
 
 MQTT result should look like that :
 
@@ -94,18 +99,20 @@ MQTT result should look like that :
 This Teleinfo firmware can be configured thru some **EnergyConfig** console commands :
 
     EnergyConfig Teleinfo parameters :
-      enable=1 (enable teleinfo : 0/1)
-      rate=9600 (serial rate)
-      percent=99 (maximum acceptable contract in %)
-      msgpol=2 (message policy : 0=Never, 1=Every TIC, 2=± 5% Power Fluctuation, 3=Telemetry only)
+      Historique (enable teleinfo historique mode - need restart)
+      Standard (enable teleinfo standard mode - need restart)
+      Mode=1 (set teleinfo mode : 0=historique, 1=standard, 2=custom[9600 baud] - need restart)
+      Stats (display reception statistics)
+      Led=1 (enable RGB LED display status)
+      Percent=100 (maximum acceptable contract in %)
+      msgpol=1 (message policy : 0=Every TIC, 1=± 5% Power Change, 2=Telemetry only)
       msgtype=1 (message type : 0=None, 1=METER only, 2=TIC only, 3=METER and TIC)
-      buffer=1 (log policy : 0=buffered, 1=immediate)
-      nbday=7 (number of daily logs)
-      nbweek=10 (number of weekly logs)
-      maxv=265 (graph max voltage, in V)
-      maxva=9000 (graph max power, in VA or W)
-      maxhour=8 (graph max total per hour, in Wh)
-      maxday=110 (graph max total per day, in Wh)
+      maxv=240     (graph max voltage, in V)
+      maxva=9000    (graph max power, in VA or W)
+      nbday=8    (number of daily logs)
+      nbweek=4   (number of weekly logs)
+      maxhour=8  (graph max total per hour, in Wh)
+      maxday=110   (graph max total per day, in Wh)
       maxmonth=2000 (graph max total per month, in Wh)
 
 You can use few commands at once :
@@ -117,7 +124,8 @@ You can use few commands at once :
 If you run this firmware on an ESP having a LittleFS partition, it will generate 3 types of energy logs :
   * **teleinfo-day-nn.csv** : average values daily file with a record every ~5 mn (**00** is today's log, **01** yesterday's log, ...)
   * **teleinfo-week-nn.csv** : average values weekly file with a record every ~30 mn (**00** is current week's log, **01** is previous week's log, ...)
-  * **teleinfo-year-yyyy.csv** : kWh total yearly file with a line per day and detail of hourly total for each day.
+  * **teleinfo-year-yyyy.csv** : Consumption kWh total yearly file with a line per day and detail of hourly total for each day.
+  * **production-year-yyyy.csv** : Production kWh total yearly file with a line per day and detail of hourly total for each day.
 
 Every CSV file includes a header.
 
@@ -149,11 +157,19 @@ Here the **Ecowatt** server console commands :
     eco_update        = force ecowatt update from RTE server
     eco_publish       = publish ecowatt data now
 
-You can generate your Base64 private key when you create you account on RTE site https://data.rte-france.com/
+You first need to declare your **Ecowatt Base64 private** that you create from your account on RTE site https://data.rte-france.com/
 
-To use Ecowatt module you need to enable it as it is disabled by default.
+Once you've declared your key, you need to enable Ecowatt module as it is disabled by default.
+
+    eco_key your_rte_key_in_base64
+    eco_enable 1
 
 Once configuration is complete, restart Tasmota.
+
+You should see connexion in the console logs
+
+    08:40:55.046 ECO: Token - HTTP code 200 ()
+    08:40:55.344 ECO: Token - xxxxxxxxxL23OeISCK50tsGKzYD60hUt2TeESE1kBEe38x0MH0apF0y valid for 7200 seconds
 
 ## TCP server
 
