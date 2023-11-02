@@ -787,12 +787,14 @@ char TeleinfoCalculateChecksum (const char* pstr_line, char* pstr_etiquette, cha
   bool     prev_space = true;
   uint8_t  line_checksum  = 0;
   uint8_t  given_checksum = 0;
-  uint32_t index, line_size;
+  int      index, line_size;
   char     str_line[TELEINFO_LINE_MAX];
   char     *pstr_token, *pstr_key, *pstr_data;
 
-  // if given line exists
+  // check parameters
   if ((pstr_line == nullptr) || (pstr_etiquette == nullptr) || (pstr_donnee == nullptr)) return 0;
+  line_size = strlen (pstr_line) - 1;
+  if (line_size < 4) return 0;
 
   // init result
   strcpy (str_line, "");
@@ -801,8 +803,6 @@ char TeleinfoCalculateChecksum (const char* pstr_line, char* pstr_etiquette, cha
   pstr_key = pstr_data = nullptr;
 
   // get given checksum
-  line_size = strlen (pstr_line) - 1;
-  if (line_size < 4) return 0;
   given_checksum = (uint8_t)pstr_line[line_size];
 
   // adjust checksum calculation according to mode
