@@ -1,10 +1,10 @@
-# Teleinfo & Ecowatt Tasmota firmware for Linky meters
+# Teleinfo & Ecowatt Tasmota firmware
 
 ## Presentation
 
 This evolution of **Tasmota 12.5.0** firmware has been enhanced to :
-  * handle France energy meters known as **Linky** using **Teleinfo** protocol*
-  * implements an **Ecowatt** server to publish Ecowatt signals
+  * handle France energy meters known as **Linky** using **Teleinfo** protocol
+  * implements an **Ecowatt** server to publish RTE Ecowatt signals
 
 This firmware has been developped and tested on  :
   * **Sagem Classic Monophase** with TIC **Historique**
