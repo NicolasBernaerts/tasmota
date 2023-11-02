@@ -144,8 +144,8 @@ static struct {
   ecowatt_day arr_day[ECOWATT_DAY_MAX];             // slots for today and next days
 } ecowatt_status;
 
+WiFiClientSecure ecowatt_wifi;                      // wifi secure client
 HTTPClient       ecowatt_http;                      // https client
-WiFiClientSecure ecowatt_net;                       // wifi client
 
 /***********************************************************\
  *                      Commands
@@ -401,7 +401,7 @@ void EcowattStreamTokenRetry ()
 {
   ecowatt_update.step        = ECOWATT_UPDATE_NONE;
   ecowatt_update.time_token  = LocalTime () + ECOWATT_TOKEN_RETRY;
-  ecowatt_update.time_signal = UINT32_MAX;
+  ecowatt_update.time_signal = max (ecowatt_update.time_signal, ecowatt_update.time_token + 30);
 }
 
 // token connexion
@@ -412,12 +412,25 @@ bool EcowattStreamTokenBegin ()
 
   // check private key
   is_ok = (strlen (ecowatt_config.str_private_key) > 0);
-
-  // private key missing
   if (!is_ok) AddLog (LOG_LEVEL_INFO, PSTR ("ECO: Token - Private key missing"));
 
-  // else connexion
-  else
+  // prepare connexion
+  if (is_ok)
+  {
+    // declare connexion
+    is_ok = ecowatt_http.begin (ecowatt_wifi, ECOWATT_URL_OAUTH2);
+
+    // connexion refused
+    if (!is_ok)
+    {
+      AddLog (LOG_LEVEL_INFO, PSTR ("ECO: Token - Connexion refused"));
+      ecowatt_http.end ();
+      ecowatt_wifi.stop ();
+    }
+  }
+
+  // set headers
+  if (is_ok)
   {
     // set authorisation
     strcpy (str_auth, "Basic ");
@@ -427,8 +440,8 @@ bool EcowattStreamTokenBegin ()
     ecowatt_http.addHeader ("Authorization", str_auth, false, true);
     ecowatt_http.addHeader ("Content-Type", "application/x-www-form-urlencoded", false, true);
 
-    // connexion
-    ecowatt_http.begin (ecowatt_net, ECOWATT_URL_OAUTH2);
+    // set http timeout
+    ecowatt_http.setTimeout (2000);
   }
 
   return is_ok;
@@ -440,15 +453,22 @@ bool EcowattStreamTokenGet ()
   bool is_ok;
   int  http_code;
 
+#ifdef USE_TELEINFO
+    // to avoid reception errors, flush reception buffer before long POST
+    TeleinfoDataUpdate ();
+#endif    // USE_TELEINFO
+
   // connexion
   http_code = ecowatt_http.POST (nullptr, 0);
 
   // check if connexion failed
   is_ok = ((http_code == HTTP_CODE_OK) || (http_code == HTTP_CODE_MOVED_PERMANENTLY));
-  if (!is_ok) ecowatt_http.end ();
-
-  // log
-  AddLog (LOG_LEVEL_INFO, PSTR ("ECO: Token - HTTP code %d (%s)"), http_code, ecowatt_http.errorToString (http_code).c_str());
+  if (!is_ok)
+  {
+    AddLog (LOG_LEVEL_INFO, PSTR ("ECO: Token - Error %d (%s)"), http_code, ecowatt_http.errorToString (http_code).c_str());
+    ecowatt_http.end ();
+    ecowatt_wifi.stop ();
+  }
 
   return is_ok;
 }
@@ -473,10 +493,14 @@ bool EcowattStreamTokenEnd ()
 
   // set next token and next signal update
   ecowatt_update.time_token  = time_now + token_validity - 60;
-  ecowatt_update.time_signal = max (ecowatt_update.time_signal, time_now + 60);
+  ecowatt_update.time_signal = max (ecowatt_update.time_signal, time_now + 30);
 
   // log
   AddLog (LOG_LEVEL_INFO, PSTR ("ECO: Token - %s valid for %u seconds"), ecowatt_update.str_token, token_validity);
+
+  // end connexion
+  ecowatt_http.end ();
+  ecowatt_wifi.stop ();
 
   return (strlen (ecowatt_update.str_token) > 0);
 }
@@ -496,12 +520,26 @@ bool EcowattStreamSignalBegin ()
 
   // check token
   is_ok = (strlen (ecowatt_update.str_token) > 0);
-
-  // private key missing
   if (!is_ok) AddLog (LOG_LEVEL_INFO, PSTR ("ECO: Signal - Token missing"));
 
-  // else start signal retrieve
-  else
+  // prepare connexion
+  if (is_ok) 
+  {
+    // connexion
+    if (ecowatt_config.sandbox) is_ok = ecowatt_http.begin (ecowatt_wifi, ECOWATT_URL_SANDBOX);
+      else is_ok = ecowatt_http.begin (ecowatt_wifi, ECOWATT_URL_DATA);
+
+    // connexion refused
+    if (!is_ok)
+    {
+      AddLog (LOG_LEVEL_INFO, PSTR ("ECO: Signal - Connexion refused"));
+      ecowatt_http.end ();
+      ecowatt_wifi.stop ();
+    }
+  }
+
+  // set headers
+  if (is_ok)
   {
     // set authorisation
     strcpy (str_auth, "Bearer ");
@@ -511,9 +549,8 @@ bool EcowattStreamSignalBegin ()
     ecowatt_http.addHeader ("Authorization", str_auth, false, true);
     ecowatt_http.addHeader ("Content-Type", "application/x-www-form-urlencoded", false, true);
 
-    // connexion
-    if (ecowatt_config.sandbox) ecowatt_http.begin (ecowatt_net, ECOWATT_URL_SANDBOX);
-      else ecowatt_http.begin (ecowatt_net, ECOWATT_URL_DATA);
+    // set http timeout
+    ecowatt_http.setTimeout (2000);
   }
 
   return is_ok;
@@ -525,15 +562,22 @@ bool EcowattStreamSignalGet ()
   bool is_ok;
   int  http_code;
 
+#ifdef USE_TELEINFO
+    // to avoid reception errors, flush reception buffer before long GET
+    TeleinfoDataUpdate ();
+#endif    // USE_TELEINFO
+
   // connexion
   http_code = ecowatt_http.GET ();
 
   // check if connexion failed
   is_ok = ((http_code == HTTP_CODE_OK) || (http_code == HTTP_CODE_MOVED_PERMANENTLY));
-  if (!is_ok) ecowatt_http.end ();
-
-  // log
-  AddLog (LOG_LEVEL_INFO, PSTR ("ECO: Signal - HTTP code %d (%s)"), http_code, ecowatt_http.errorToString (http_code).c_str());
+  if (!is_ok)
+  {
+    AddLog (LOG_LEVEL_INFO, PSTR ("ECO: Signal - Error %d (%s)"), http_code, ecowatt_http.errorToString (http_code).c_str());
+    ecowatt_http.end ();
+    ecowatt_wifi.stop ();
+  }
 
   return is_ok;
 }
@@ -579,6 +623,10 @@ bool EcowattStreamSignalEnd ()
   // log
   AddLog (LOG_LEVEL_INFO, PSTR ("ECO: Signal - Update till %s"), str_day.c_str ());
 
+  // end connexion
+  ecowatt_http.end ();
+  ecowatt_wifi.stop ();
+
   return true;
 }
 
@@ -616,62 +664,26 @@ void EcowattInit ()
   }
 
   // set root certificate
-  ecowatt_net.setCACert (ecowatt_root_certificate);
-
-  // set http timeout
-  ecowatt_http.setTimeout (5000);
+  ecowatt_wifi.setCACert (ecowatt_root_certificate);
 
   // log help command
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: eco_help to get help on Ecowatt module"));
 }
 
-// called every second
-void EcowattEverySecond ()
-{
-  bool update_json = false;
-
-  // check stratup delay
-  if (TasmotaGlobal.uptime < ECOWATT_STARTUP_DELAY) return;
-
-  // check for JSON update
-  if (ecowatt_status.time_json == UINT32_MAX) update_json = true;
-  else if (ecowatt_status.time_json < LocalTime ()) update_json = true;
-
-  // if JSON update needed
-  if (update_json) EcowattPublishJson ();
-}
-
-// called every day at midnight
-void EcowattMidnigth ()
-{
-  uint8_t index, slot;
-
-  // shift day's data from 0 to day+2
-  for (index = 0; index < ECOWATT_DAY_MAX - 1; index ++)
-  {
-    // shift date, global status and slots for day, day+1 and day+2
-    strcpy (ecowatt_status.arr_day[index].str_day, ecowatt_status.arr_day[index + 1].str_day);
-    ecowatt_status.arr_day[index].dvalue = ecowatt_status.arr_day[index + 1].dvalue;
-    for (slot = 0; slot < ECOWATT_SLOT_PER_DAY; slot ++) ecowatt_status.arr_day[index].arr_hvalue[slot] = ecowatt_status.arr_day[index + 1].arr_hvalue[slot];
-  }
-
-  // init date, global status and slots for day+3
-  index = ECOWATT_DAY_MAX - 1;
-  strcpy (ecowatt_status.arr_day[index].str_day, "");
-  ecowatt_status.arr_day[index].dvalue = ECOWATT_LEVEL_NORMAL;
-  for (slot = 0; slot < ECOWATT_SLOT_PER_DAY; slot ++) ecowatt_status.arr_day[index].arr_hvalue[slot] = ECOWATT_LEVEL_NORMAL;
-
-  // publish data change
-  EcowattPublishJson ();
-}
 
 // handle Ecowatt stream update steps (with RTE API)
 void EcowattEvery250ms ()
 {
+
+}
+
+// called every second
+void EcowattEverySecond ()
+{
   bool     result;
   uint32_t time_now;
 
-  // switch according to reception step
+  // Handle stream recetion steps
   time_now = LocalTime ();
   switch (ecowatt_update.step)
   {
@@ -717,7 +729,7 @@ void EcowattEvery250ms ()
         else EcowattStreamTokenRetry ();
 
       // if token is available and signal not plannned, plan it
-      if (result && (ecowatt_update.time_signal == UINT32_MAX)) ecowatt_update.time_signal = time_now + 5;
+      if (result && (ecowatt_update.time_signal == UINT32_MAX)) ecowatt_update.time_signal = time_now + 30;
       break;
 
     case ECOWATT_UPDATE_SIGNAL_BEGIN:
@@ -749,6 +761,36 @@ void EcowattEvery250ms ()
         else EcowattStreamSignalRetry ();
       break;
   }
+
+  // check for JSON update
+  if (ecowatt_status.time_json == UINT32_MAX) result = true;
+    else if (ecowatt_status.time_json < time_now) result = true;
+    else result = false;
+  if (result) EcowattPublishJson ();
+}
+
+// called every day at midnight
+void EcowattMidnigth ()
+{
+  uint8_t index, slot;
+
+  // shift day's data from 0 to day+2
+  for (index = 0; index < ECOWATT_DAY_MAX - 1; index ++)
+  {
+    // shift date, global status and slots for day, day+1 and day+2
+    strcpy (ecowatt_status.arr_day[index].str_day, ecowatt_status.arr_day[index + 1].str_day);
+    ecowatt_status.arr_day[index].dvalue = ecowatt_status.arr_day[index + 1].dvalue;
+    for (slot = 0; slot < ECOWATT_SLOT_PER_DAY; slot ++) ecowatt_status.arr_day[index].arr_hvalue[slot] = ecowatt_status.arr_day[index + 1].arr_hvalue[slot];
+  }
+
+  // init date, global status and slots for day+3
+  index = ECOWATT_DAY_MAX - 1;
+  strcpy (ecowatt_status.arr_day[index].str_day, "");
+  ecowatt_status.arr_day[index].dvalue = ECOWATT_LEVEL_NORMAL;
+  for (slot = 0; slot < ECOWATT_SLOT_PER_DAY; slot ++) ecowatt_status.arr_day[index].arr_hvalue[slot] = ECOWATT_LEVEL_NORMAL;
+
+  // publish data change
+  EcowattPublishJson ();
 }
 
 /***********************************************\
@@ -852,9 +894,6 @@ bool Xsns119 (uint32_t function)
       break;
     case FUNC_EVERY_SECOND:
       if (ecowatt_config.enabled && (TasmotaGlobal.uptime > ECOWATT_STARTUP_DELAY)) EcowattEverySecond ();
-      break;
-    case FUNC_EVERY_250_MSECOND:
-      if (ecowatt_config.enabled && (TasmotaGlobal.uptime > ECOWATT_STARTUP_DELAY)) EcowattEvery250ms ();
       break;
     case FUNC_SAVE_AT_MIDNIGHT:
       if (ecowatt_config.enabled && (TasmotaGlobal.uptime > ECOWATT_STARTUP_DELAY)) EcowattMidnigth ();
