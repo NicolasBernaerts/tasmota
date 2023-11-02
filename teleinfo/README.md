@@ -168,8 +168,7 @@ Once configuration is complete, restart Tasmota.
 
 You should see connexion in the console logs
 
-    08:40:55.046 ECO: Token - HTTP code 200 ()
-    08:40:55.344 ECO: Token - xxxxxxxxxL23OeISCK50tsGKzYD60hUt2TeESE1kBEe38x0MH0apF0y valid for 7200 seconds
+    ECO: Token - abcdefghiL23OeISCK50tsGKzYD60hUt2TeESE1kBEe38x0MH0apF0y valid for 7200 seconds
 
 #### Root CA
 
