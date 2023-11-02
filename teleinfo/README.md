@@ -171,6 +171,16 @@ You should see connexion in the console logs
     08:40:55.046 ECO: Token - HTTP code 200 ()
     08:40:55.344 ECO: Token - xxxxxxxxxL23OeISCK50tsGKzYD60hUt2TeESE1kBEe38x0MH0apF0y valid for 7200 seconds
 
+#### Root CA
+
+Root CA is included in the source code.
+It has been collected form https://data.rte-france.com/ with Firefox :
+ - on the home page, click on the lock just before the URL
+ - select the certificate in the menu and select more information
+ - on the page, select display the certificate
+ - on the new page, select Global Sign tab
+ - click to download PEM(cert)
+
 ## TCP server
 
 This firmware brings a minimal embedded TCP server.
