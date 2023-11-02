@@ -423,12 +423,12 @@ bool EcowattStreamTokenBegin ()
     strcpy (str_auth, "Basic ");
     strlcat (str_auth, ecowatt_config.str_private_key, sizeof (str_auth));
 
-    // connexion
-    ecowatt_http.begin (ecowatt_net, ECOWATT_URL_OAUTH2);
-
     // set headers
     ecowatt_http.addHeader ("Authorization", str_auth, false, true);
     ecowatt_http.addHeader ("Content-Type", "application/x-www-form-urlencoded", false, true);
+
+    // connexion
+    ecowatt_http.begin (ecowatt_net, ECOWATT_URL_OAUTH2);
   }
 
   return is_ok;
@@ -473,7 +473,7 @@ bool EcowattStreamTokenEnd ()
 
   // set next token and next signal update
   ecowatt_update.time_token  = time_now + token_validity - 60;
-  ecowatt_update.time_signal = max (ecowatt_update.time_signal, time_now + 10);
+  ecowatt_update.time_signal = max (ecowatt_update.time_signal, time_now + 60);
 
   // log
   AddLog (LOG_LEVEL_INFO, PSTR ("ECO: Token - %s valid for %u seconds"), ecowatt_update.str_token, token_validity);
@@ -503,10 +503,6 @@ bool EcowattStreamSignalBegin ()
   // else start signal retrieve
   else
   {
-    // connexion
-    if (ecowatt_config.sandbox) ecowatt_http.begin (ecowatt_net, ECOWATT_URL_SANDBOX);
-      else ecowatt_http.begin (ecowatt_net, ECOWATT_URL_DATA);
-
     // set authorisation
     strcpy (str_auth, "Bearer ");
     strlcat (str_auth, ecowatt_update.str_token, sizeof (str_auth));
@@ -514,6 +510,10 @@ bool EcowattStreamSignalBegin ()
     // set headers
     ecowatt_http.addHeader ("Authorization", str_auth, false, true);
     ecowatt_http.addHeader ("Content-Type", "application/x-www-form-urlencoded", false, true);
+
+    // connexion
+    if (ecowatt_config.sandbox) ecowatt_http.begin (ecowatt_net, ECOWATT_URL_SANDBOX);
+      else ecowatt_http.begin (ecowatt_net, ECOWATT_URL_DATA);
   }
 
   return is_ok;
