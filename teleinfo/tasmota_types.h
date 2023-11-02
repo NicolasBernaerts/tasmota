@@ -471,7 +471,8 @@ typedef union {
   uint32_t percent : 8;               // percentage adjustment to max contract power (1...200)
   uint32_t adjust_v : 3;              // max graph voltage adjust (x5V)
   uint32_t adjust_va : 6;             // max graph power adjust (x3kVA)
-  uint32_t spare21 : 3;               // Keep some spares for future uses
+  uint32_t led : 1;                   // enable led energy display
+  uint32_t spare22 : 2;               // Keep some spares for future uses
   uint32_t spare24 : 8;               // Keep some spares for future uses
   };
 } TeleinfoCfg;

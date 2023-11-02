@@ -88,6 +88,7 @@
                          Add serial reception in display loops to avoid errors
     17/10/2023 - v12.1 - Handle Production & consommation simultaneously
                          Display all periods with total
+    17/10/2023 - v12.2 - Handle RGB color according to total power
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -130,7 +131,7 @@ TasmotaSerial *teleinfo_serial = nullptr;
 #define TELEINFO_INDEX_MAX              12        // maximum number of total power counters
 #define TELEINFO_PERCENT_MIN            1         // minimum acceptable percentage of energy contract
 #define TELEINFO_PERCENT_MAX            200       // maximum acceptable percentage of energy contract
-#define TELEINFO_PERCENT_CHANGE         5         // 5% of power change to publish JSON
+#define TELEINFO_PERCENT_CHANGE         4         // 5% of power change to publish JSON
 #define TELEINFO_FILE_DAILY             7         // default number of daily files
 #define TELEINFO_FILE_WEEKLY            8         // default number of weekly files
 
@@ -165,18 +166,20 @@ TasmotaSerial *teleinfo_serial = nullptr;
 #define TELEINFO_DATA_MAX               64        // maximum size of a TIC donnee
 
 // commands : MQTT
-#define D_CMND_TELEINFO_HELP            "help"
-#define D_CMND_TELEINFO_ENABLE          "enable"
-#define D_CMND_TELEINFO_RATE            "rate"
-#define D_CMND_TELEINFO_CONTRACT        "percent"
+//#define D_CMND_TELEINFO_HELP            "help"
+#define D_CMND_TELEINFO_MODE            "Mode"
+#define D_CMND_TELEINFO_HISTORIQUE      "Historique"
+#define D_CMND_TELEINFO_STANDARD        "Standard"
+#define D_CMND_TELEINFO_LED             "Led"
+#define D_CMND_TELEINFO_STATS           "Stats"
+#define D_CMND_TELEINFO_CONTRACT        "Percent"
 
 #define D_CMND_TELEINFO_MSG_POLICY      "msgpol"
 #define D_CMND_TELEINFO_MSG_TYPE        "msgtype"
 
-#define D_CMND_TELEINFO_BUFFER          "buffer"
 #define D_CMND_TELEINFO_LOG_DAY         "nbday"
 #define D_CMND_TELEINFO_LOG_WEEK        "nbweek"
-#define D_CMND_TELEINFO_LOG_ROTATE      "logrot"
+//#define D_CMND_TELEINFO_LOG_ROTATE      "Logrot"
 
 #define D_CMND_TELEINFO_MAX_V           "maxv"
 #define D_CMND_TELEINFO_MAX_VA          "maxva"
@@ -185,7 +188,6 @@ TasmotaSerial *teleinfo_serial = nullptr;
 #define D_CMND_TELEINFO_MAX_KWH_MONTH   "maxmonth"
 
 // commands : Web
-#define D_CMND_TELEINFO_MODE            "mode"
 #define D_CMND_TELEINFO_ETH             "eth"
 #define D_CMND_TELEINFO_PHASE           "phase"
 #define D_CMND_TELEINFO_PERIOD          "period"
@@ -219,18 +221,24 @@ TasmotaSerial *teleinfo_serial = nullptr;
 #define D_TELEINFO_RESET                "Message reset"
 #define D_TELEINFO_PERIOD               "Period"
 
+// RGB limits
+#define TELEINFO_RGB_RED_MAX            208
+#define TELEINFO_RGB_GREEN_MAX          176
+
 // Historic data files
 #define D_TELEINFO_CFG                  "/teleinfo.cfg"
+#define TELEINFO_HISTO_DAY_DEFAULT      8         // default number of daily histotisation files
 #define TELEINFO_HISTO_DAY_MAX          31        // max number of daily histotisation files
+#define TELEINFO_HISTO_WEEK_DEFAULT     4         // default number of weekly histotisation files
 #define TELEINFO_HISTO_WEEK_MAX         52        // max number of weekly histotisation files
 
-// MQTT commands : tic_help, tic_enable, tic_rate, tic_msgpol, tic_msgtype, tic_percent, tic_buffer, tic_nbday, tic_nbweek, tic_maxv, tic_maxva, tic_maxhour, tic_maxday and tic_maxmonth
-const char kTeleinfoCommands[] PROGMEM = D_CMND_TELEINFO_ENABLE "|" D_CMND_TELEINFO_RATE "|" D_CMND_TELEINFO_MSG_POLICY "|" D_CMND_TELEINFO_MSG_TYPE "|" D_CMND_TELEINFO_CONTRACT "|" D_CMND_TELEINFO_BUFFER "|" D_CMND_TELEINFO_LOG_DAY "|" D_CMND_TELEINFO_LOG_WEEK "|" D_CMND_TELEINFO_MAX_V "|" D_CMND_TELEINFO_MAX_VA "|" D_CMND_TELEINFO_MAX_KWH_HOUR "|" D_CMND_TELEINFO_MAX_KWH_DAY "|" D_CMND_TELEINFO_MAX_KWH_MONTH;
-enum TeleinfoCommand                   { TIC_CMND_ENABLE, TIC_CMND_RATE, TIC_CMND_MSG_POLICY, TIC_CMND_MSG_TYPE, TIC_CMND_CONTRACT, TIC_CMND_BUFFER, TIC_CMND_LOG_DAY, TIC_CMND_LOG_WEEK, TIC_CMND_MAX_V, TIC_CMND_MAX_VA, TIC_CMND_MAX_KWH_HOUR, TIC_CMND_MAX_KWH_DAY, TIC_CMND_MAX_KWH_MONTH };
+// MQTT commands : tic_help, tic_enable, tic_led, tic_msgpol, tic_msgtype, tic_percent, tic_nbday, tic_nbweek, tic_maxv, tic_maxva, tic_maxhour, tic_maxday and tic_maxmonth
+const char kTeleinfoCommands[] PROGMEM = D_CMND_TELEINFO_MODE "|" D_CMND_TELEINFO_HISTORIQUE "|" D_CMND_TELEINFO_STANDARD "|" D_CMND_TELEINFO_LED "|" D_CMND_TELEINFO_STATS "|" D_CMND_TELEINFO_MSG_POLICY "|" D_CMND_TELEINFO_MSG_TYPE "|" D_CMND_TELEINFO_CONTRACT "|" D_CMND_TELEINFO_LOG_DAY "|" D_CMND_TELEINFO_LOG_WEEK "|" D_CMND_TELEINFO_MAX_V "|" D_CMND_TELEINFO_MAX_VA "|" D_CMND_TELEINFO_MAX_KWH_HOUR "|" D_CMND_TELEINFO_MAX_KWH_DAY "|" D_CMND_TELEINFO_MAX_KWH_MONTH;
+enum TeleinfoCommand                   { TIC_CMND_MODE,           TIC_CMND_HISTORIQUE,           TIC_CMND_STANDARD,           TIC_CMND_LED,           TIC_CMND_STATS,           TIC_CMND_MSG_POLICY,           TIC_CMND_MSG_TYPE,           TIC_CMND_CONTRACT,           TIC_CMND_LOG_DAY,           TIC_CMND_LOG_WEEK,           TIC_CMND_MAX_V,           TIC_CMND_MAX_VA,           TIC_CMND_MAX_KWH_HOUR,           TIC_CMND_MAX_KWH_DAY,           TIC_CMND_MAX_KWH_MONTH };
 
 // Specific etiquettes
 enum TeleinfoEtiquette { TIC_NONE, TIC_ADCO, TIC_ADSC, TIC_PTEC, TIC_NGTF, TIC_EAIT, TIC_IINST, TIC_IINST1, TIC_IINST2, TIC_IINST3, TIC_ISOUSC, TIC_PS, TIC_PAPP, TIC_SINSTS, TIC_SINSTI, TIC_BASE, TIC_EAST, TIC_HCHC, TIC_HCHP, TIC_EJPHN, TIC_EJPHPM, TIC_BBRHCJB, TIC_BBRHPJB, TIC_BBRHCJW, TIC_BBRHPJW, TIC_BBRHCJR, TIC_BBRHPJR, TIC_ADPS, TIC_ADIR1, TIC_ADIR2, TIC_ADIR3, TIC_URMS1, TIC_URMS2, TIC_URMS3, TIC_UMOY1, TIC_UMOY2, TIC_UMOY3, TIC_IRMS1, TIC_IRMS2, TIC_IRMS3, TIC_SINSTS1, TIC_SINSTS2, TIC_SINSTS3, TIC_PTCOUR, TIC_PTCOUR1, TIC_PTCOUR2, TIC_PREF, TIC_PCOUP, TIC_LTARF, TIC_EASF01, TIC_EASF02, TIC_EASF03, TIC_EASF04, TIC_EASF05, TIC_EASF06, TIC_EASF07, TIC_EASF08, TIC_EASF09, TIC_EASF10, TIC_ADS, TIC_CONFIG, TIC_EAPS, TIC_EAS, TIC_EAPPS, TIC_PREAVIS, TIC_MAX };
-const char kTeleinfoEtiquetteName[]     PROGMEM = "|ADCO|ADSC|PTEC|NGTF|EAIT|IINST|IINST1|IINST2|IINST3|ISOUSC|PS|PAPP|SINSTS|SINSTI|BASE|EAST|HCHC|HCHP|EJPHN|EJPHPM|BBRHCJB|BBRHPJB|BBRHCJW|BBRHPJW|BBRHCJR|BBRHPJR|ADPS|ADIR1|ADIR2|ADIR3|URMS1|URMS2|URMS3|UMOY1|UMOY2|UMOY3|IRMS1|IRMS2|IRMS3|SINSTS1|SINSTS2|SINSTS3|PTCOUR|PTCOUR1|PTCOUR2|PREF|PCOUP|LTARF|EASF01|EASF02|EASF03|EASF04|EASF05|EASF06|EASF07|EASF08|EASF09|EASF10|ADS|CONFIG|EAP_s|EA_s|EAPP_s|PREAVIS";
+const char kTeleinfoEtiquetteName[] PROGMEM = "|ADCO|ADSC|PTEC|NGTF|EAIT|IINST|IINST1|IINST2|IINST3|ISOUSC|PS|PAPP|SINSTS|SINSTI|BASE|EAST|HCHC|HCHP|EJPHN|EJPHPM|BBRHCJB|BBRHPJB|BBRHCJW|BBRHPJW|BBRHCJR|BBRHPJR|ADPS|ADIR1|ADIR2|ADIR3|URMS1|URMS2|URMS3|UMOY1|UMOY2|UMOY3|IRMS1|IRMS2|IRMS3|SINSTS1|SINSTS2|SINSTS3|PTCOUR|PTCOUR1|PTCOUR2|PREF|PCOUP|LTARF|EASF01|EASF02|EASF03|EASF04|EASF05|EASF06|EASF07|EASF08|EASF09|EASF10|ADS|CONFIG|EAP_s|EA_s|EAPP_s|PREAVIS";
 
 // TIC - modes and rates
 enum TeleinfoType { TIC_TYPE_UNDEFINED, TIC_TYPE_CONSO, TIC_TYPE_PROD, TIC_TYPE_MAX };
@@ -238,7 +246,6 @@ const char kTeleinfoTypeName[] PROGMEM = "Non déterminé|Consommateur|Producteu
 enum TeleinfoMode { TIC_MODE_UNDEFINED, TIC_MODE_HISTORIC, TIC_MODE_STANDARD, TIC_MODE_PME, TIC_MODE_MAX };
 const char kTeleinfoModeName[] PROGMEM = "|Historique|Standard|PME";
 const char kTeleinfoModeIcon[] PROGMEM = "|🇭|🇸|🇵";
-const uint16_t ARR_TELEINFO_RATE[] = { 1200, 9600, 19200 }; 
 
 // Tarifs                                  [  Toutes   ]   [ Creuses       Pleines   ] [ Normales   PointeMobile ] [CreusesBleu  PleinesBleu   CreusesBlanc   PleinesBlanc CreusesRouge   PleinesRouge] [ Pointe   PointeMobile  Hiver      Pleines     Creuses    PleinesHiver CreusesHiver PleinesEte   CreusesEte   Pleines1/2S  Creuses1/2S  JuilletAout] [Pointe PleinesHiver CreusesHiver PleinesEte CreusesEte] [ Base  ]  [ Pleines    Creuses   ] [ Creuses bleu      Pleine Bleu    Creuse Blanc       Pleine Blanc     Creuse Rouge       Pleine Rouge ]  [ Normale      Pointe  ]  [Production]
 enum TeleinfoPeriod                        { TIC_HISTO_TH, TIC_HISTO_HC, TIC_HISTO_HP, TIC_HISTO_HN, TIC_HISTO_PM, TIC_HISTO_CB, TIC_HISTO_PB, TIC_HISTO_CW, TIC_HISTO_PW, TIC_HISTO_CR, TIC_HISTO_PR, TIC_STD_P, TIC_STD_PM, TIC_STD_HH, TIC_STD_HP, TIC_STD_HC, TIC_STD_HPH, TIC_STD_HCH, TIC_STD_HPE, TIC_STD_HCE, TIC_STD_HPD, TIC_STD_HCD, TIC_STD_JA, TIC_STD_1, TIC_STD_2, TIC_STD_3, TIC_STD_4, TIC_STD_5, TIC_STD_BASE, TIC_STD_HPL, TIC_STD_HCR, TIC_STD_HC_BLEU, TIC_STD_HP_BLEU, TIC_STD_HC_BLANC, TIC_STD_HP_BLANC, TIC_STD_HC_ROUGE, TIC_STD_HP_ROUGE, TIC_STD_HNO, TIC_STD_HPT, TIC_STD_PROD, TIC_PERIOD_MAX };
@@ -249,13 +256,13 @@ const char kTeleinfoPeriodName[] PROGMEM = "Toutes|Creuses|Pleines|Normales|Poin
 
 // Data diffusion policy
 enum TeleinfoMessagePolicy { TELEINFO_POLICY_MESSAGE, TELEINFO_POLICY_PERCENT, TELEINFO_POLICY_TELEMETRY, TELEINFO_POLICY_MAX };
-const char kTeleinfoMessagePolicy[] PROGMEM = "Every TIC|± 3% Power Fluctuation|Telemetry only";
+const char kTeleinfoMessagePolicy[] PROGMEM = "Every TIC|± 5% Power Change|Telemetry only";
 enum TeleinfoMessageType { TELEINFO_MSG_NONE, TELEINFO_MSG_METER, TELEINFO_MSG_TIC, TELEINFO_MSG_BOTH, TELEINFO_MSG_MAX };
 const char kTeleinfoMessageType[] PROGMEM = "None|METER only|TIC only|METER and TIC";
 
 // config
-enum TeleinfoConfigKey { TELEINFO_CONFIG_BUFFER, TELEINFO_CONFIG_NBDAY, TELEINFO_CONFIG_NBWEEK, TELEINFO_CONFIG_MAX_HOUR, TELEINFO_CONFIG_MAX_DAY, TELEINFO_CONFIG_MAX_MONTH, TELEINFO_CONFIG_MAX };     // configuration parameters
-const char kTeleinfoConfigKey[] PROGMEM = D_CMND_TELEINFO_BUFFER "|" D_CMND_TELEINFO_LOG_DAY "|" D_CMND_TELEINFO_LOG_WEEK "|" D_CMND_TELEINFO_MAX_KWH_HOUR "|" D_CMND_TELEINFO_MAX_KWH_DAY "|" D_CMND_TELEINFO_MAX_KWH_MONTH;      // configuration keys
+enum TeleinfoConfigKey { TELEINFO_CONFIG_NBDAY, TELEINFO_CONFIG_NBWEEK, TELEINFO_CONFIG_MAX_HOUR, TELEINFO_CONFIG_MAX_DAY, TELEINFO_CONFIG_MAX_MONTH, TELEINFO_CONFIG_MAX };     // configuration parameters
+const char kTeleinfoConfigKey[] PROGMEM = D_CMND_TELEINFO_LOG_DAY "|" D_CMND_TELEINFO_LOG_WEEK "|" D_CMND_TELEINFO_MAX_KWH_HOUR "|" D_CMND_TELEINFO_MAX_KWH_DAY "|" D_CMND_TELEINFO_MAX_KWH_MONTH;      // configuration keys
 
 // power calculation modes
 enum TeleinfoPowerCalculationMethod { TIC_METHOD_GLOBAL_COUNTER, TIC_METHOD_INCREMENT };
@@ -274,13 +281,13 @@ const char kTeleinfoColorPeak[]  PROGMEM = "#5ae|#eb6|#2a6";                   /
 
 // teleinfo : configuration
 static struct {
-  uint16_t baud_rate  = 1200;                            // meter transmission rate (bauds)
+  uint8_t  led        = 0;                               // enable p
   uint8_t  msg_policy = TELEINFO_POLICY_TELEMETRY;       // publishing policy for data
   uint8_t  msg_type   = TELEINFO_MSG_METER;              // type of data to publish (METER and/or TIC)
   uint8_t  percent    = 100;                             // maximum acceptable power in percentage of contract power
   long     max_volt   = TELEINFO_GRAPH_DEF_VOLTAGE;      // maximum voltage on graph
   long     max_power  = TELEINFO_GRAPH_DEF_POWER;        // maximum power on graph
-  long     param[TELEINFO_CONFIG_MAX] = { 1, TELEINFO_HISTO_DAY_MAX, TELEINFO_HISTO_WEEK_MAX, TELEINFO_GRAPH_DEF_WH_HOUR, TELEINFO_GRAPH_DEF_WH_DAY, TELEINFO_GRAPH_DEF_WH_MONTH };      // graph configuration
+  long     param[TELEINFO_CONFIG_MAX] = { TELEINFO_HISTO_DAY_DEFAULT, TELEINFO_HISTO_WEEK_DEFAULT, TELEINFO_GRAPH_DEF_WH_HOUR, TELEINFO_GRAPH_DEF_WH_DAY, TELEINFO_GRAPH_DEF_WH_MONTH };      // graph configuration
 } teleinfo_config;
 
 // power calculation structure
@@ -330,7 +337,7 @@ static struct {
 
 // teleinfo : power meter
 static struct {
-  bool      enabled        = true;                  // reception enabled by default
+  uint8_t   led_state      = 0;                     // led state
   uint8_t   status_rx      = TIC_SERIAL_INIT;       // Teleinfo Rx initialisation status
   uint8_t   day_of_month   = UINT8_MAX;             // Current day of month
 
@@ -347,7 +354,8 @@ static struct {
   long long conso_midnight_wh  = LONG_LONG_MAX;     // conso previous daily total
   long long conso_index_wh[TELEINFO_INDEX_MAX];     // array of conso total of different tarif periods
 
-  long      prod_papp         = 0;                  // current conso apparent power 
+  long      prod_papp         = 0;                  // current production apparent power 
+  long      prod_papp_last    = 0;                  // current production apparent power 
   long long prod_total_wh     = 0;                  // total production index
   long long prod_midnight_wh  = LONG_LONG_MAX;      // conso previous daily total
 
@@ -386,9 +394,15 @@ bool TeleinfoHandleCommand ()
     if (XdrvMailbox.data_len == 0) 
     {
       AddLog (LOG_LEVEL_INFO, PSTR ("EnergyConfig Teleinfo parameters :"));
-      AddLog (LOG_LEVEL_INFO, PSTR ("  enable=%u (enable teleinfo : 0/1)"), (bool)(teleinfo_serial != nullptr));
-      AddLog (LOG_LEVEL_INFO, PSTR ("  rate=%d (serial rate)"), teleinfo_config.baud_rate);
-      AddLog (LOG_LEVEL_INFO, PSTR ("  percent=%u (maximum acceptable contract in %%)"), teleinfo_config.percent);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  Historique (enable teleinfo historique mode - need restart)"));
+      AddLog (LOG_LEVEL_INFO, PSTR ("  Standard (enable teleinfo standard mode - need restart)"));
+      if (Settings->baudrate == 4) index = 0;
+      else if (Settings->baudrate == 32) index = 1;
+      else index = 2;
+      AddLog (LOG_LEVEL_INFO, PSTR ("  Mode=%d (set teleinfo mode : 0=historique, 1=standard, 2=custom[%d baud] - need restart)"), index, Settings->baudrate * 300);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  Stats (display reception statistics)"));
+      AddLog (LOG_LEVEL_INFO, PSTR ("  Led=%u (enable RGB LED display status)"), teleinfo_config.led);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  Percent=%u (maximum acceptable contract in %%)"), teleinfo_config.percent);
 
       // publishing policy
       str_line = "";
@@ -413,15 +427,14 @@ bool TeleinfoHandleCommand ()
       AddLog (LOG_LEVEL_INFO, PSTR ("  msgtype=%u (message type : %s)"), teleinfo_config.msg_type, str_line.c_str ());
 
 #ifdef USE_TELEINFO_GRAPH
-      AddLog (LOG_LEVEL_INFO, PSTR ("  maxv=%u (graph max voltage, in V)"), teleinfo_config.max_volt);
-      AddLog (LOG_LEVEL_INFO, PSTR ("  maxva=%u (graph max power, in VA or W)"), teleinfo_config.max_power);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  maxv=%u     (graph max voltage, in V)"), teleinfo_config.max_volt);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  maxva=%u    (graph max power, in VA or W)"), teleinfo_config.max_power);
 
-      AddLog (LOG_LEVEL_INFO, PSTR ("  buffer=%d (log policy : 0=buffered, 1=immediate)"), teleinfo_config.param[TELEINFO_CONFIG_BUFFER]);
-      AddLog (LOG_LEVEL_INFO, PSTR ("  nbday=%d (number of daily logs)"), teleinfo_config.param[TELEINFO_CONFIG_NBDAY]);
-      AddLog (LOG_LEVEL_INFO, PSTR ("  nbweek=%d (number of weekly logs)"), teleinfo_config.param[TELEINFO_CONFIG_NBWEEK]);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  nbday=%d    (number of daily logs)"), teleinfo_config.param[TELEINFO_CONFIG_NBDAY]);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  nbweek=%d   (number of weekly logs)"), teleinfo_config.param[TELEINFO_CONFIG_NBWEEK]);
 
-      AddLog (LOG_LEVEL_INFO, PSTR ("  maxhour=%d (graph max total per hour, in Wh)"), teleinfo_config.param[TELEINFO_CONFIG_MAX_HOUR]);
-      AddLog (LOG_LEVEL_INFO, PSTR ("  maxday=%d (graph max total per day, in Wh)"), teleinfo_config.param[TELEINFO_CONFIG_MAX_DAY]);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  maxhour=%d  (graph max total per hour, in Wh)"), teleinfo_config.param[TELEINFO_CONFIG_MAX_HOUR]);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  maxday=%d   (graph max total per day, in Wh)"), teleinfo_config.param[TELEINFO_CONFIG_MAX_DAY]);
       AddLog (LOG_LEVEL_INFO, PSTR ("  maxmonth=%d (graph max total per month, in Wh)"), teleinfo_config.param[TELEINFO_CONFIG_MAX_MONTH]);
 #endif    // USE_TELEINFO_GRAPH
 
@@ -445,7 +458,7 @@ bool TeleinfoHandleCommand ()
         if (pstr_next != nullptr) { *pstr_next = 0; pstr_next++; }
 
         // if param is defined, handle it
-        if ((pstr_key != nullptr) && (pstr_value != nullptr)) serviced |= TeleinfoExecuteCommand (pstr_key, pstr_value);
+        if (pstr_key != nullptr) serviced |= TeleinfoExecuteCommand (pstr_key, pstr_value);
       } 
       while (pstr_next != nullptr);
 
@@ -465,20 +478,47 @@ bool TeleinfoExecuteCommand (const char* pstr_command, const char* pstr_param)
   long value;
   char str_buffer[32];
 
+  // check parameter
+  if (pstr_command == nullptr) return false;
+
   // check for command and value
   index = GetCommandCode (str_buffer, sizeof(str_buffer), pstr_command, kTeleinfoCommands);
-  value = atol (pstr_param);
+  if (pstr_param == nullptr) value = 0; else value = atol (pstr_param);
 
   // handle command
   switch (index)
   {
-    case TIC_CMND_ENABLE:
-      if ((strcasecmp (pstr_param, MQTT_STATUS_ON) == 0)  || (strcmp (pstr_param, "1") == 0)) serviced = TeleinfoEnableSerial ();
-      else if ((strcasecmp (pstr_param, MQTT_STATUS_OFF) == 0) || (strcmp (pstr_param, "0") == 0)) serviced = TeleinfoDisableSerial ();
+    case TIC_CMND_MODE:
+      if (value == 0) Settings->baudrate = 4;             // 1200 bauds
+      else if (value == 1) Settings->baudrate = 32;       // 9600 bauds
+      serviced = true;
       break;
 
-    case TIC_CMND_RATE:
-      teleinfo_config.baud_rate = (uint16_t)value;
+    case TIC_CMND_HISTORIQUE:
+      Settings->baudrate = 4;                             // 1200 bauds
+      serviced = true;
+      break;
+
+    case TIC_CMND_STANDARD:
+      Settings->baudrate = 32;                            // 9600 bauds
+      serviced = true;
+      break;
+
+    case TIC_CMND_LED:
+      teleinfo_config.led = (uint8_t)value;               // enable LED display
+      serviced = true;
+#ifdef USE_LIGHT
+      // reset light controller
+      light_controller.changeRGB (0, 0, 0, false);
+#endif      // USE_LIGHT
+      break;
+
+    case TIC_CMND_STATS:
+      AddLog (LOG_LEVEL_INFO, PSTR (" - Messages : %d"), teleinfo_meter.nb_message);
+      AddLog (LOG_LEVEL_INFO, PSTR (" - Cos φ    : %d"), teleinfo_meter.nb_update);
+      AddLog (LOG_LEVEL_INFO, PSTR (" - Erreurs  : %d"), (long)teleinfo_meter.nb_error);
+      AddLog (LOG_LEVEL_INFO, PSTR (" - Reset    : %d"), teleinfo_meter.nb_reset);
+      serviced = true;
       break;
 
     case TIC_CMND_MSG_POLICY:
@@ -505,11 +545,6 @@ bool TeleinfoExecuteCommand (const char* pstr_command, const char* pstr_param)
     case TIC_CMND_MAX_VA:
       serviced = ((value >= TELEINFO_GRAPH_MIN_POWER) && (value <= TELEINFO_GRAPH_MAX_POWER));
       if (serviced) teleinfo_config.max_power = value;
-      break;
-
-    case TIC_CMND_BUFFER:
-      serviced = true;
-      teleinfo_config.param[TELEINFO_CONFIG_BUFFER] = (value != 0);
       break;
 
     case TIC_CMND_LOG_DAY:
@@ -601,18 +636,18 @@ bool TeleinfoEnableSerial ()
   if (!is_ready)
   { 
     // check if environment is ok
-    is_ready = ((TasmotaGlobal.energy_driver == XNRG_15) && PinUsed (GPIO_TELEINFO_RX) && (teleinfo_config.baud_rate > 0));
+    is_ready = ((TasmotaGlobal.energy_driver == XNRG_15) && PinUsed (GPIO_TELEINFO_RX) && (Settings->baudrate > 0));
     if (is_ready)
     {
 #ifdef ESP32
       // create and initialise serial port
       teleinfo_serial = new TasmotaSerial (Pin (GPIO_TELEINFO_RX), -1, 1);
-      is_ready = teleinfo_serial->begin (teleinfo_config.baud_rate, SERIAL_7E1);
+      is_ready = teleinfo_serial->begin (Settings->baudrate * 300, SERIAL_7E1);
 
 #else       // ESP8266
       // create and initialise serial port
       teleinfo_serial = new TasmotaSerial (Pin (GPIO_TELEINFO_RX), -1, 1);
-      is_ready = teleinfo_serial->begin (teleinfo_config.baud_rate, SERIAL_7E1);
+      is_ready = teleinfo_serial->begin (Settings->baudrate * 300, SERIAL_7E1);
 
       // force configuration on ESP8266
       if (teleinfo_serial->hardwareSerial ()) ClaimSerial ();
@@ -626,7 +661,7 @@ bool TeleinfoEnableSerial ()
       }
 
       // log action
-      if (is_ready) AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Serial set to 7E1 %d bauds"), teleinfo_config.baud_rate);
+      if (is_ready) AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Serial set to 7E1 %d bauds"), Settings->baudrate * 300);
         else AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Serial port init failed"));
     }
 
@@ -657,7 +692,7 @@ bool TeleinfoDisableSerial ()
 void TeleinfoLoadConfig () 
 {
   // load standard settings
-  teleinfo_config.baud_rate  = Settings->sbaudrate * 300;
+  teleinfo_config.led        = Settings->teleinfo.led;
   teleinfo_config.msg_policy = Settings->teleinfo.msg_policy;
   teleinfo_config.msg_type   = Settings->teleinfo.msg_type;
   teleinfo_config.percent    = Settings->teleinfo.percent;
@@ -695,7 +730,7 @@ void TeleinfoLoadConfig ()
 # endif     // USE_UFILESYS
 
   // validate boundaries
-  if (teleinfo_config.baud_rate == 0) teleinfo_config.baud_rate = 1200;
+  if (Settings->baudrate == 0) Settings->baudrate = 9600 / 300;
   if ((teleinfo_config.msg_policy < 0) || (teleinfo_config.msg_policy >= TELEINFO_POLICY_MAX)) teleinfo_config.msg_policy = TELEINFO_POLICY_TELEMETRY;
   if (teleinfo_config.msg_type >= TELEINFO_MSG_MAX) teleinfo_config.msg_type = TELEINFO_MSG_METER;
   if ((teleinfo_config.percent < TELEINFO_PERCENT_MIN) || (teleinfo_config.percent > TELEINFO_PERCENT_MAX)) teleinfo_config.percent = 100;
@@ -708,7 +743,7 @@ void TeleinfoLoadConfig ()
 void TeleinfoSaveConfig () 
 {
   // save standard settings
-  Settings->sbaudrate = teleinfo_config.baud_rate / 300;
+  Settings->teleinfo.led        = teleinfo_config.led;
   Settings->teleinfo.msg_policy = teleinfo_config.msg_policy;
   Settings->teleinfo.msg_type   = teleinfo_config.msg_type;
   Settings->teleinfo.percent    = teleinfo_config.percent;
@@ -996,7 +1031,6 @@ void TeleinfoUpdateConsoPeriod (const char* pstr_period)
     AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Period %s detected, %u period(s)"), str_text, teleinfo_contract.period_qty);
   }
 }
-                 
 
 /*********************************************\
  *                   Callback
@@ -1097,7 +1131,13 @@ void TeleinfoInit ()
 
   // log default method & help command
   AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Using default Global Counter method"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Type EnergyConfig to get help on all Teleinfo commands"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: EnergyConfig to get help on all Teleinfo commands"));
+
+#ifdef USE_LIGHT
+  // set light controller brightness
+  if (teleinfo_config.led) light_controller.changeBri (128);
+    else light_controller.changeBri (0);
+#endif      // USE_LIGHT
 }
 
 // Handling of received teleinfo data
@@ -1106,7 +1146,7 @@ void TeleinfoReceiveData ()
 //  bool      is_valid;
   uint8_t   phase, period;
   int       index;
-  long      value, total_current, increment, cosphi;
+  long      value, total, increment, total_current, cosphi, green, red;
   long long counter, counter_wh;
   uint32_t  timeout, timestamp, message_ms;
   float     papp_inc, daily_kwh;
@@ -1674,16 +1714,22 @@ void TeleinfoReceiveData ()
           //  update flags
           // --------------
 
-          // loop thru phases
+          // loop thru phases to detect overload
           for (phase = 0; phase < teleinfo_contract.phase; phase++)
-          {
-            // detect apparent power overload
             if (teleinfo_phase[phase].papp > teleinfo_contract.ssousc * (long)teleinfo_config.percent / 100) teleinfo_message.overload = true;
 
-            // detect more than x % power change
-            value = abs (teleinfo_phase[phase].papp_last - teleinfo_phase[phase].papp);
-            if (value > (teleinfo_phase[phase].papp_last * TELEINFO_PERCENT_CHANGE / 100)) teleinfo_message.percent = true;
-            teleinfo_phase[phase].papp_last = teleinfo_phase[phase].papp;
+          // loop thru phase to detect % power change (should be > to handle 0 conso)
+          for (phase = 0; phase < teleinfo_contract.phase; phase++) 
+            if (abs (teleinfo_phase[phase].papp_last - teleinfo_phase[phase].papp) > (teleinfo_contract.ssousc * TELEINFO_PERCENT_CHANGE / 100)) teleinfo_message.percent = true;
+
+          // detect % power change on production (should be > to handle 0 prod)
+          if (abs (teleinfo_meter.prod_papp_last - teleinfo_meter.prod_papp) > (teleinfo_contract.ssousc * TELEINFO_PERCENT_CHANGE / 100)) teleinfo_message.percent = true;
+
+          // if % power change detected, save values
+          if (teleinfo_message.percent)
+          {
+            for (phase = 0; phase < teleinfo_contract.phase; phase++) teleinfo_phase[phase].papp_last = teleinfo_phase[phase].papp;
+            teleinfo_meter.prod_papp_last = teleinfo_meter.prod_papp;
           }
 
           //  update energy counters
@@ -1704,6 +1750,43 @@ void TeleinfoReceiveData ()
               else Energy->current[phase] = 0;
             teleinfo_phase[phase].current = (long)(Energy->current[phase] * 100);
           } 
+
+          //  update RGB lignt
+          // ------------------------
+#ifdef USE_LIGHT
+          // update if percent changed
+          if (teleinfo_config.led)
+          {
+            // switch led state
+            teleinfo_meter.led_state = !teleinfo_meter.led_state;
+
+            // if LED is on
+            if (teleinfo_meter.led_state)
+            {
+              // calculate color according to power
+              // green : low power
+              // red   : full contract power
+              value = total = 0;
+              for (phase = 0; phase < teleinfo_contract.phase; phase++)
+              {
+                value += teleinfo_phase[phase].papp;
+                total += teleinfo_contract.ssousc;
+              }
+              value = 100 * value / total;
+
+              // calculate color
+              if (value < 50) green = TELEINFO_RGB_GREEN_MAX; else green = TELEINFO_RGB_GREEN_MAX * 2 * (100 - value) / 100;
+              if (value > 50) red = TELEINFO_RGB_RED_MAX; else red = TELEINFO_RGB_RED_MAX * 2 * value / 100;
+
+              // update light controller
+              light_controller.changeRGB ((uint8_t)red, (uint8_t)green, 0, false);
+              teleinfo_meter.led_state = 1;
+            }
+
+            // else LED state is off
+            else  light_controller.changeRGB (0, 0, 0, false);
+          }
+#endif      // USE_LIGHT
 
           // declare received message
           teleinfo_message.received = true;
@@ -1904,7 +1987,7 @@ void TeleinfoWebSensor ()
 {
   bool      contract = false;
   uint8_t   phase, period;
-  long      value;
+  long      value, red, green;
   long long total;
   char      str_text[32];
   char      str_color[16];
@@ -1930,10 +2013,11 @@ void TeleinfoWebSensor ()
 
       // title
       WSContentSend_P (PSTR ("<div style='display:flex;margin:2px 0px 6px 0px;padding:0px;font-size:16px;'>\n"));
+      WSContentSend_P (PSTR ("<div style='width:30%%;padding:0px;text-align:left;font-weight:bold;'>Teleinfo</div>\n"));
       GetTextIndexed (str_text, sizeof (str_text), teleinfo_contract.mode, kTeleinfoModeIcon);
-      WSContentSend_P (PSTR ("<div style='width:60%%;padding:0px;text-align:left;font-weight:bold;'>Teleinfo&nbsp;%s</div>\n"), str_text);
+      WSContentSend_P (PSTR ("<div style='width:10%%;padding:0px;'>%s</div>\n"), str_text);
       if (teleinfo_contract.phase > 1) sprintf (str_text, "%u x ", teleinfo_contract.phase); else strcpy (str_text, ""); 
-      WSContentSend_P (PSTR ("<div style='width:25%%;padding:1px 0px;text-align:right;font-weight:bold;'>%s%d</div>\n"), str_text, teleinfo_contract.ssousc / 1000);
+      WSContentSend_P (PSTR ("<div style='width:45%%;padding:1px 0px;text-align:right;font-weight:bold;'>%s%d</div>\n"), str_text, teleinfo_contract.ssousc / 1000);
       WSContentSend_P (PSTR ("<div style='width:1%%;'></div><div style='width:14%%;padding:1px 0px;text-align:left;'>kVA</div>\n"));
       WSContentSend_P (PSTR ("</div>\n"));
 
@@ -1948,7 +2032,7 @@ void TeleinfoWebSensor ()
             if (contract) strcpy (str_text, ""); else strcpy (str_text, "Période");
             WSContentSend_P (PSTR ("<div style='width:18%%;padding:1px 0px;text-align:left;'>%s</div>\n"), str_text);
             GetTextIndexed (str_text, sizeof (str_text), teleinfo_contract.period_first + period, kTeleinfoPeriodName);
-            if (teleinfo_contract.period_current == teleinfo_contract.period_first + period) strcpy (str_color, "#800"); else strcpy (str_color, "#444");
+            if (teleinfo_contract.period_current == teleinfo_contract.period_first + period) strcpy (str_color, "#09f"); else strcpy (str_color, "#444");
             WSContentSend_P (PSTR ("<div style='width:35%%;padding:1px 0px;background-color:%s;border-radius:6px;'>%s</div>\n"), str_color, str_text);
 
             // counter value
@@ -2000,12 +2084,17 @@ void TeleinfoWebSensor ()
         if (teleinfo_contract.ssousc > 0)
           for (phase = 0; phase < teleinfo_contract.phase; phase++)
           {
-            // calculate and display bar graph percentage
+            // calculate percentage
             value = 100 * teleinfo_phase[phase].papp / teleinfo_contract.ssousc;
             if (value > 100) value = 100;
-            GetTextIndexed (str_text, sizeof (str_text), phase, kTeleinfoColorPhase);
-            WSContentSend_P (PSTR ("<div style='display:flex;margin:2px 0px;padding:1px;height:16px;opacity:75%%;'>\n"));
 
+            // calculate color
+            if (value < 50) green = TELEINFO_RGB_GREEN_MAX; else green = TELEINFO_RGB_GREEN_MAX * 2 * (100 - value) / 100;
+            if (value > 50) red = TELEINFO_RGB_RED_MAX; else red = TELEINFO_RGB_RED_MAX * 2 * value / 100;
+            sprintf (str_text, "#%02x%02x00", red, green);
+
+            // display bar graph percentage
+            WSContentSend_P (PSTR ("<div style='display:flex;margin:2px 0px;padding:1px;height:16px;opacity:75%%;'>\n"));
             WSContentSend_P (PSTR ("<div style='width:18%%;padding:0px;text-align:left;'>Phase %u</div>\n"), phase + 1);
             WSContentSend_P (PSTR ("<div style='width:82%%;padding:0px;text-align:left;background-color:#252525;border-radius:6px;'><div style='width:%d%%;height:16px;padding:0px;text-align:center;font-size:12px;background-color:%s;border-radius:6px;'>%d%%</div></div>\n"), value, str_text, value);
 
@@ -2029,11 +2118,18 @@ void TeleinfoWebSensor ()
         // calculate and display production bar graph percentage
         if (teleinfo_contract.ssousc > 0)
         {            
+          // calculate percentage
           value = 100 * teleinfo_meter.prod_papp / teleinfo_contract.ssousc;
           if (value > 100) value = 100;
+
+          // calculate color
+          if (value < 50) red = TELEINFO_RGB_GREEN_MAX; else red = TELEINFO_RGB_GREEN_MAX * 2 * (100 - value) / 100;
+          if (value > 50) green = TELEINFO_RGB_RED_MAX; else green = TELEINFO_RGB_RED_MAX * 2 * value / 100;
+          sprintf (str_text, "#%02x%02x00", red, green);
+
           WSContentSend_P (PSTR ("<div style='display:flex;margin:2px 0px;padding:1px;height:16px;opacity:75%%;'>\n"));
           WSContentSend_P (PSTR ("<div style='width:18%%;padding:0px;text-align:left;'>Actuel</div>\n"));
-          WSContentSend_P (PSTR ("<div style='width:82%%;padding:0px;text-align:left;background-color:#252525;border-radius:6px;'><div style='width:%d%%;height:16px;padding:0px;text-align:center;font-size:12px;background-color:#080;border-radius:6px;'>%d%%</div></div>\n"), value, value);
+          WSContentSend_P (PSTR ("<div style='width:82%%;padding:0px;text-align:left;background-color:#252525;border-radius:6px;'><div style='width:%d%%;height:16px;padding:0px;text-align:center;font-size:12px;background-color:%s;border-radius:6px;'>%d%%</div></div>\n"), value, str_text, value);
           WSContentSend_P (PSTR ("</div>\n"));
         }
 
