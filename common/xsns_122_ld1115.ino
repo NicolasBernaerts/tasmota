@@ -49,7 +49,7 @@
 #define LD1115_COLOR_MOTION         "#D00"
 
 // strings
-const char D_LD1115_NAME[]          PROGMEM = "HLK-LD1115";
+const char D_LD1115_NAME[]          PROGMEM = "LD1115";
 
 // MQTT commands : ld_help and ld_send
 const char kLD1115Commands[]         PROGMEM = "ld1115_|help|update|save|reset|move_th|pres_th|move_sn|pres_sn|timeout";
@@ -253,22 +253,22 @@ bool LD1115ExecuteNextCommand ()
 bool LD1115InitDevice (uint32_t timeout)
 {
   // set timeout
+  ld1115_status.timeout = timeout;
   if ((timeout == 0) || (timeout == UINT32_MAX)) ld1115_status.timeout = LD1115_DEFAULT_TIMEOUT;
-    else ld1115_status.timeout = timeout;
 
   // if ports are selected, init sensor state
   if ((ld1115_status.pserial == nullptr) && PinUsed (GPIO_LD2410_RX) && PinUsed (GPIO_LD2410_TX))
   {
 #ifdef ESP32
     // create serial port
-    ld1115_status.pserial = new TasmotaSerial (Pin (GPIO_LD2410_RX), Pin (GPIO_LD2410_RX), 1);
+    ld1115_status.pserial = new TasmotaSerial (Pin (GPIO_LD2410_RX), Pin (GPIO_LD2410_TX), 1);
 
     // initialise serial port
     ld1115_status.enabled = ld1115_status.pserial->begin (115200, SERIAL_8N1);
 
 #else       // ESP8266
     // create serial port
-    ld1115_status.pserial = new TasmotaSerial (Pin (GPIO_LD2410_RX), Pin (GPIO_LD2410_RX), 1);
+    ld1115_status.pserial = new TasmotaSerial (Pin (GPIO_LD2410_RX), Pin (GPIO_LD2410_TX), 1);
 
     // initialise serial port
     ld1115_status.enabled = ld1115_status.pserial->begin (115200, SERIAL_8N1);
@@ -389,9 +389,6 @@ void LD1115Init ()
 // loop every 250 msecond
 void LD1115Every250ms ()
 {
-  // check status
-  if (!ld1115_status.enabled) return;
-
   // execute any command in the pipe
   LD1115ExecuteNextCommand ();
 }
@@ -421,16 +418,14 @@ void LD1115ReceiveData ()
   long value;
   char *pstr_key;
   char *pstr_value;
-  char str_recv[2];
+  char str_recv[2] = {0, 0};
   char str_key[16];
 
   // check sensor presence
   if (ld1115_status.pserial == nullptr) return;
-  if (!ld1115_status.enabled) return;
 
   // init strings
   strcpy (str_key, "");
-  strcpy (str_recv, " ");
 
   // run serial receive loop
   while (ld1115_status.pserial->available ()) 
@@ -608,33 +603,33 @@ void LD1115WebSensor ()
   // check status
   if (!ld1115_status.enabled) return;
 
-  WSContentSend_P (PSTR ("<div style='font-size:10px;text-align:center;margin:0px;padding:1px;border:1px solid #666;border-radius:6px;'>\n"));
+  WSContentSend_P (PSTR ("<div style='font-size:10px;text-align:center;margin-top:4px;padding:2px 6px;background:#333333;border-radius:8px;'>\n"));
+
+  // scale
+  WSContentSend_P (PSTR ("<div style='display:flex;padding:0px;'>\n"));
+  WSContentSend_P (PSTR ("<div style='width:28%%;padding:0px;text-align:left;font-size:12px;font-weight:bold;'>%s</div>\n"), D_LD1115_NAME);
+  WSContentSend_P (PSTR ("<div style='width:9%%;padding:0px;text-align:left;'>%um</div>\n"), 0);
+  for (index = 1; index < 4; index ++) WSContentSend_P (PSTR ("<div style='width:18%%;padding:0px;'>%um</div>\n"), index * 4);
+  WSContentSend_P (PSTR ("<div style='width:9%%;padding:0px;text-align:right;'>%um</div>\n"), 16);
+  WSContentSend_P (PSTR ("</div>\n"));
 
   // presence sensor
-  WSContentSend_P (PSTR ("<div style='display:flex;margin-top:-2px;'>\n"));
-  WSContentSend_P (PSTR ("<div style='width:20%%;padding:0px;text-align:left;'>Presence</div>\n"));
+  WSContentSend_P (PSTR ("<div style='display:flex;padding:1px 0px;color:white;'>\n"));
+  WSContentSend_P (PSTR ("<div style='width:28%%;padding:0px;text-align:left;'>&nbsp;&nbsp;Presence</div>\n"));
   detected = LD1115GetPresenceDetectionStatus (0);
   if (ld1115_status.occ.th != LONG_MAX) ltoa (ld1115_status.occ.th, str_value, 10); else strcpy (str_value, "---");
-  if (detected) WSContentSend_P (PSTR ("<div style='width:20%%;padding:0px;border:1px solid %s;border-radius:4px;background:%s;color:%s;'>%d</div>\n"), LD1115_COLOR_PRESENCE, LD1115_COLOR_PRESENCE, LD1115_COLOR_TEXT_ON, ld1115_status.occ.power);
-    else WSContentSend_P (PSTR ("<div style='width:20%%;padding:0px;border:1px solid %s;border-radius:4px;background:%s;color:%s;'>%s</div>\n"), LD1115_COLOR_BORDER, LD1115_COLOR_NONE, LD1115_COLOR_TEXT_OFF, str_value);
-  WSContentSend_P (PSTR ("<div style='width:60%%;padding:0px;background:none;'>&nbsp;</div>\n"));
+  if (detected) WSContentSend_P (PSTR ("<div style='width:18%%;padding:0px;border-radius:4px;background:%s;color:%s;opacity:90%%;'>%d</div>\n"), LD1115_COLOR_PRESENCE, LD1115_COLOR_TEXT_ON, ld1115_status.occ.power);
+    else WSContentSend_P (PSTR ("<div style='width:18%%;padding:0px;border-radius:4px;background:%s;color:%s;'>%s</div>\n"), LD1115_COLOR_NONE, LD1115_COLOR_TEXT_OFF, str_value);
+  WSContentSend_P (PSTR ("<div style='width:54%%;padding:0px;'></div>\n"));
   WSContentSend_P (PSTR ("</div>\n"));
 
   // motion sensor
-  WSContentSend_P (PSTR ("<div style='display:flex;margin-top:-8px;'>\n"));
-  WSContentSend_P (PSTR ("<div style='width:20%%;padding:0px;text-align:left;'>Motion</div>\n"));
+  WSContentSend_P (PSTR ("<div style='display:flex;padding:0px;'>\n"));
+  WSContentSend_P (PSTR ("<div style='width:28%%;padding:0px;text-align:left;'>&nbsp;&nbsp;Motion</div>\n"));
   detected = LD1115GetMotionDetectionStatus (0);
   if (ld1115_status.mov.th != LONG_MAX) ltoa (ld1115_status.mov.th, str_value, 10); else strcpy (str_value, "---");
-  if (detected) WSContentSend_P (PSTR ("<div style='width:80%%;padding:0px;border:1px solid %s;border-radius:4px;background:%s;color:%s;'>%d</div>\n"), LD1115_COLOR_MOTION, LD1115_COLOR_MOTION, LD1115_COLOR_TEXT_ON, ld1115_status.mov.power);
-    else WSContentSend_P (PSTR ("<div style='width:80%%;padding:0px;border:1px solid %s;border-radius:4px;background:%s;color:%s;'>%s</div>\n"), LD1115_COLOR_BORDER, LD1115_COLOR_NONE, LD1115_COLOR_TEXT_OFF, str_value);
-  WSContentSend_P (PSTR ("</div>\n"));
-
-  // scale
-  WSContentSend_P (PSTR ("<div style='display:flex;margin-top:-10px;padding:0px;'>\n"));
-  WSContentSend_P (PSTR ("<div style='width:20%%;padding-bottom:2px;'>&nbsp;</div>\n"));
-  WSContentSend_P (PSTR ("<div style='width:10%%;padding-bottom:2px;text-align:left;'>%um</div>\n"), 0);
-  for (index = 1; index < 4; index ++) WSContentSend_P (PSTR ("<div style='width:20%%;padding-bottom:2px;'>%um</div>\n"), index * 4);
-  WSContentSend_P (PSTR ("<div style='width:10%%;padding-bottom:2px;text-align:right;'>%um</div>\n"), 16);
+  if (detected) WSContentSend_P (PSTR ("<div style='width:72%%;padding:0px;border-radius:4px;background:%s;color:%s;opacity:75%%;'>%d</div>\n"), LD1115_COLOR_MOTION, LD1115_COLOR_TEXT_ON, ld1115_status.mov.power);
+    else WSContentSend_P (PSTR ("<div style='width:72%%;padding:0px;border-radius:4px;background:%s;color:%s;'>%s</div>\n"), LD1115_COLOR_NONE, LD1115_COLOR_TEXT_OFF, str_value);
   WSContentSend_P (PSTR ("</div>\n"));
 
   WSContentSend_P (PSTR ("</div>\n"));
@@ -661,16 +656,16 @@ bool Xsns122 (uint32_t function)
       result = DecodeCommand (kLD1115Commands, LD1115Command);
       break;
     case FUNC_EVERY_250_MSECOND:
-      if (RtcTime.valid) LD1115Every250ms ();
+      if (ld1115_status.enabled && RtcTime.valid) LD1115Every250ms ();
       break;
     case FUNC_EVERY_SECOND:
-      if (RtcTime.valid) LD1115EverySecond ();
+      if (ld1115_status.enabled && RtcTime.valid) LD1115EverySecond ();
       break;
     case FUNC_JSON_APPEND:
-      LD1115ShowJSON (true);
+      if (ld1115_status.enabled) LD1115ShowJSON (true);
       break;
     case FUNC_LOOP:
-      LD1115ReceiveData ();
+      if (ld1115_status.enabled) LD1115ReceiveData ();
       break;
 
 #ifdef USE_WEBSERVER

@@ -128,8 +128,8 @@ struct ld2410_sensor
   uint8_t  power;                                       // detection power
   uint8_t  avg_count;
   uint16_t distance;                                    // detection distance
-  uint16_t avg_power;
-  uint16_t avg_distance;
+  uint16_t sum_power;
+  uint16_t sum_distance;
   uint8_t  arr_sensitivity[LD2410_GATE_MAX];            // gates sensitivity
 };
 static struct {
@@ -253,13 +253,12 @@ void CmndLD2410SetGateParam ()
     ld2410_status.presence.arr_sensitivity[gate] = presence;
     ld2410_status.motion.arr_sensitivity[gate] = motion;
     LD2410AppendCommand (LD2410_CMND_SENSITIVITY);
-    ResponseCmndDone ();
   }
 
-  // else if gate is provided, send param
-  else if (gate < LD2410_GATE_MAX)
+  // if gate is provided, display param
+  if (gate < LD2410_GATE_MAX)
   {
-    sprintf (str_data, "%u : %u & %u", gate, ld2410_status.presence.arr_sensitivity[gate], ld2410_status.motion.arr_sensitivity[gate]);
+    sprintf (str_data, "%u,%u,%u", gate, ld2410_status.presence.arr_sensitivity[gate], ld2410_status.motion.arr_sensitivity[gate]);
     ResponseCmndChar (str_data);
   }
 
@@ -297,22 +296,17 @@ void CmndLD2410SetGateMax ()
   }
 
   // if parameters are provided, update gate
-  result = ((max_presence <= LD2410_GATE_MAX) && (max_motion <= LD2410_GATE_MAX));
-  if (result)
+  if ((max_presence <= LD2410_GATE_MAX) && (max_motion <= LD2410_GATE_MAX))
   {
     ld2410_status.presence.max_gate = max_presence;
     ld2410_status.motion.max_gate   = max_motion;
     LD2410AppendCommand (LD2410_CMND_DIST_TIMEOUT);
     LD2410AppendCommand (LD2410_CMND_READ_PARAM);
-    ResponseCmndDone ();
   }
 
-  // if no command, display status
-  else
-  {
-    sprintf (str_data, "max gate : %u & %u", ld2410_status.presence.max_gate, ld2410_status.motion.max_gate);
-    ResponseCmndChar (str_data);
-  }
+  // display status
+  sprintf (str_data, "%u,%u", ld2410_status.presence.max_gate, ld2410_status.motion.max_gate);
+  ResponseCmndChar (str_data);
 }
 
 /**************************************************\
@@ -362,7 +356,7 @@ bool LD2410InitDevice ()
   // if not done, init sensor state
   if ((ld2410_status.pserial == nullptr) && PinUsed (GPIO_LD2410_RX) && PinUsed (GPIO_LD2410_TX))
   {
-    // calculate serial rate
+    // force baud rate to 256000
     Settings->baudrate = 853;
 
     // create serial port
@@ -447,7 +441,7 @@ void LD2410SendCommand (const uint8_t command)
       arr_buffer[6] = ld2410_command.gate;
       arr_buffer[12] = ld2410_status.motion.arr_sensitivity[ld2410_command.gate];
       arr_buffer[18] = ld2410_status.presence.arr_sensitivity[ld2410_command.gate];
-      AddLog (LOG_LEVEL_INFO, PSTR ("HLK: cmnd set gate %u : pres %u / motion %u"), ld2410_command.gate, ld2410_status.presence.arr_sensitivity[ld2410_command.gate], ld2410_status.motion.arr_sensitivity[ld2410_command.gate]);
+      AddLog (LOG_LEVEL_INFO, PSTR ("HLK: cmnd set for gate %u : pres %u & motion %u"), ld2410_command.gate, ld2410_status.presence.arr_sensitivity[ld2410_command.gate], ld2410_status.motion.arr_sensitivity[ld2410_command.gate]);
       break;
 
     case LD2410_CMND_READ_FIRMWARE:
@@ -491,7 +485,6 @@ void LD2410SendCommand (const uint8_t command)
 
     // if in debug mode, log command to console
     LD2410LogMessage (arr_buffer, size_buffer, true);
-
   }
 }
 
@@ -505,6 +498,9 @@ void LD2410HandleReceivedMessage ()
   uint32_t *pheader;
   uint32_t *prevision;
 
+  // if in debug mode, log data to console
+  LD2410LogMessage (ld2410_received.arr_body, ld2410_received.idx_body, false);
+
   // handle header
   pheader = (uint32_t*)&ld2410_received.arr_body;
   switch (*pheader)
@@ -516,9 +512,6 @@ void LD2410HandleReceivedMessage ()
     
       // step is after command reception
       ld2410_command.step = LD2410_STEP_AFTER_COMMAND;
-
-      // if in debug mode, log data to console
-      LD2410LogMessage (ld2410_received.arr_body, ld2410_received.idx_body, false);
 
       // handle command
       pcommand = (uint16_t*)(ld2410_received.arr_body + 6);
@@ -601,41 +594,41 @@ void LD2410HandleReceivedMessage ()
 
       // motion : update average data
       pvalue = (uint16_t*)(ld2410_received.arr_body + 9);
-      ld2410_status.motion.avg_distance += *pvalue;
-      ld2410_status.motion.avg_power    += (uint16_t)ld2410_received.arr_body[11];
+      ld2410_status.motion.sum_distance += *pvalue;
+      ld2410_status.motion.sum_power    += (uint16_t)ld2410_received.arr_body[11];
       ld2410_status.motion.avg_count++;
 
       // motion : number of samples reached
       if (ld2410_status.motion.avg_count >= ld2410_config.sample)
       {
         // calculate distance and power
-        ld2410_status.motion.distance = ld2410_status.motion.avg_distance / ld2410_status.motion.avg_count;
-        ld2410_status.motion.power    = ld2410_status.motion.avg_power / ld2410_status.motion.avg_count;
+        ld2410_status.motion.distance = ld2410_status.motion.sum_distance / ld2410_status.motion.avg_count;
+        ld2410_status.motion.power    = ld2410_status.motion.sum_power / ld2410_status.motion.avg_count;
 
         // update detection status
         gate = ld2410_status.motion.distance / 75;
         if (gate < ld2410_status.motion.max_gate) ld2410_status.motion.active = (ld2410_status.motion.power >= ld2410_status.motion.arr_sensitivity[gate]);
           else ld2410_status.motion.active = false;
         if (ld2410_status.motion.active) ld2410_status.timestamp = LocalTime ();
-
+        
         // reset average counters
         ld2410_status.motion.avg_count    = 0;
-        ld2410_status.motion.avg_distance = 0;
-        ld2410_status.motion.avg_power    = 0;
+        ld2410_status.motion.sum_distance = 0;
+        ld2410_status.motion.sum_power    = 0;
       }
 
       // presence : update average data
       pvalue   = (uint16_t*)(ld2410_received.arr_body + 12);
-      ld2410_status.presence.avg_distance += *pvalue;
-      ld2410_status.presence.avg_power    += (uint16_t)ld2410_received.arr_body[14];
+      ld2410_status.presence.sum_distance += *pvalue;
+      ld2410_status.presence.sum_power    += (uint16_t)ld2410_received.arr_body[14];
       ld2410_status.presence.avg_count++;
 
       // presence : number of samples reached
       if (ld2410_status.presence.avg_count >= ld2410_config.sample)
       {
         // calculate distance and power
-        ld2410_status.presence.distance = ld2410_status.presence.avg_distance / ld2410_status.presence.avg_count;
-        ld2410_status.presence.power    = ld2410_status.presence.avg_power / ld2410_status.presence.avg_count;
+        ld2410_status.presence.distance = ld2410_status.presence.sum_distance / ld2410_status.presence.avg_count;
+        ld2410_status.presence.power    = ld2410_status.presence.sum_power / ld2410_status.presence.avg_count;
 
         // update detection status
         gate = ld2410_status.presence.distance / 75;
@@ -645,12 +638,9 @@ void LD2410HandleReceivedMessage ()
 
         // reset average counters
         ld2410_status.presence.avg_count    = 0;
-        ld2410_status.presence.avg_distance = 0;
-        ld2410_status.presence.avg_power    = 0;
+        ld2410_status.presence.sum_distance = 0;
+        ld2410_status.presence.sum_power    = 0;
       }
-
-      AddLog (LOG_LEVEL_DEBUG_MORE, PSTR ("SEN: pres %ucm/%u%% - motion %ucm/%u%%"), ld2410_status.presence.distance, ld2410_status.presence.power, ld2410_status.motion.distance, ld2410_status.motion.power);
-
       break;
   }
 }
@@ -670,8 +660,8 @@ void LD2410Init ()
   ld2410_status.motion.active       = false;
   ld2410_status.motion.power        = 0;
   ld2410_status.motion.avg_count    = 0;
-  ld2410_status.motion.avg_distance = 0;
-  ld2410_status.motion.avg_power    = 0;
+  ld2410_status.motion.sum_distance = 0;
+  ld2410_status.motion.sum_power    = 0;
   for (index = 0; index < LD2410_GATE_MAX; index ++) ld2410_status.motion.arr_sensitivity[index] = UINT8_MAX;
 
   // init presence sensor
@@ -680,8 +670,8 @@ void LD2410Init ()
   ld2410_status.presence.active       = false;
   ld2410_status.presence.power        = 0;
   ld2410_status.presence.avg_count    = 0;
-  ld2410_status.presence.avg_distance = 0;
-  ld2410_status.presence.avg_power    = 0;
+  ld2410_status.presence.sum_distance = 0;
+  ld2410_status.presence.sum_power    = 0;
   for (index = 0; index < LD2410_GATE_MAX; index ++) ld2410_status.presence.arr_sensitivity[index] = UINT8_MAX;
 
   // load configuration
@@ -959,6 +949,215 @@ void LD2410WebSensor ()
   WSContentSend_PD (PSTR ("</div>\n"));
 }
 
+#ifdef USE_LD2410_RADAR
+
+// Radar page
+void LD2410GraphRadarUpdate ()
+{
+  long index, distance;
+  long cpres, cmove;
+  long x, y, r;
+  long sin60 = 866;
+  long cos60 = 500;
+
+  // calculate environment
+  if (ld2410_status.presence.max_gate > ld2410_status.motion.max_gate) { cpres = 1; cmove = 2; }
+    else { cpres = 2; cmove = 1; }
+
+  // start of update page
+  WSContentBegin (200, CT_PLAIN);
+
+  // presence detection zone
+  distance = (max (ld2410_status.presence.max_gate, ld2410_status.motion.max_gate) - 1) * 75;
+  x = distance * sin60 * 400 / 1000 / 600 - 1;
+  y = distance * cos60 * 400 / 1000 / 600 - 1;
+  r = distance * 400 / 600;
+  WSContentSend_P (PSTR ("zone;M %d %d L %d %d A %d %d 0 0 1 %d %d Z\n"), 400, 50, 400 + x, 50 + y, r, r, 400 - x, 50 + y);
+
+  // presence detection limit
+  distance = (long)(ld2410_status.presence.max_gate - 1) * 75;
+  x = distance * sin60 * 400 / 1000 / 600 - 1;
+  y = distance * cos60 * 400 / 1000 / 600 - 1;
+  r = distance * 400 / 600;
+  WSContentSend_P (PSTR ("pres-max;M %d %d L %d %d A %d %d 0 0 1 %d %d Z\n"), 400, 50 + cpres * 2, 400 + x - cpres * 3, 50 + y + cpres, r - cpres * 2, r - cpres * 2, 400 - x + cpres * 3, 50 + y + cpres);
+
+  // motion detection limit
+  distance = (long)(ld2410_status.motion.max_gate - 1) * 75;
+  x = distance * sin60 * 400 / 1000 / 600;
+  y = distance * cos60 * 400 / 1000 / 600;
+  r = distance * 400 / 600;
+  WSContentSend_P (PSTR ("move-max;M %d %d L %d %d A %d %d 0 0 1 %d %d Z\n"), 400, 50 + cmove * 2, 400 + x - cmove * 3, 50 + y + cmove, r - cmove * 2, r - cmove * 2, 400 - x + cmove * 3, 50 + y + cmove);
+
+  // presence detection
+  x = y = r = 0;
+  if (ld2410_status.presence.active)
+  {
+    if (ld2410_status.presence.distance < 10) distance = 10;
+      else distance = ld2410_status.presence.distance;
+    x = distance * sin60 * 400 / 1000 / 600;
+    y = distance * cos60 * 400 / 1000 / 600;
+    r = distance * 400 / 600;
+  }
+  WSContentSend_P (PSTR ("pres;M %d %d A %d %d 0 0 1 %d %d\n"), 400 + x, 50 + y, r, r, 400 - x, 50 + y);
+
+  // motion detection
+  x = y = r = 0;
+  if (ld2410_status.motion.active)
+  {
+    if (ld2410_status.motion.distance < 10) distance = 10;
+      else distance = ld2410_status.motion.distance;
+    x = distance * sin60 * 400 / 1000 / 600;
+    y = distance * cos60 * 400 / 1000 / 600;
+    r = distance * 400 / 600;
+  }
+  WSContentSend_P (PSTR ("move;M %d %d A %d %d 0 0 1 %d %d\n"), 400 + x, 50 + y, r, r, 400 - x, 50 + y);
+
+  // end of update page
+  WSContentEnd ();
+}
+
+// Radar page
+void LD2410GraphRadar ()
+{
+  long index, distance;
+  long x, y, r;
+  long cos[7] = {-1000, -866, -500, 0, 500, 866, 1000};
+  long sin[7] = {0, 500, 866, 1000, 866, 500, 0};
+
+  // if access not allowed, close
+  if (!HttpCheckPriviledgedAccess ()) return;
+  
+  // set page label
+  WSContentStart_P ("LD2410 Radar", true);
+  WSContentSend_P (PSTR ("\n</script>\n"));
+
+  // page data refresh script
+  WSContentSend_P (PSTR ("<script type='text/javascript'>\n\n"));
+
+  WSContentSend_P (PSTR ("function updateData(){\n"));
+
+  WSContentSend_P (PSTR (" httpData=new XMLHttpRequest();\n"));
+  WSContentSend_P (PSTR (" httpData.open('GET','/ld2410.upd',true);\n"));
+
+  WSContentSend_P (PSTR (" httpData.onreadystatechange=function(){\n"));
+  WSContentSend_P (PSTR ("  if (httpData.readyState===XMLHttpRequest.DONE){\n"));
+  WSContentSend_P (PSTR ("   if (httpData.status===0 || (httpData.status>=200 && httpData.status<400)){\n"));
+  WSContentSend_P (PSTR ("    arr_param=httpData.responseText.split('\\n');\n"));
+  WSContentSend_P (PSTR ("    num_param=arr_param.length;\n"));
+  WSContentSend_P (PSTR ("    for (i=0;i<num_param;i++){\n"));
+  WSContentSend_P (PSTR ("     arr_value=arr_param[i].split(';');\n"));
+  WSContentSend_P (PSTR ("     if (document.getElementById(arr_value[0])!=null) document.getElementById(arr_value[0]).setAttributeNS(null,'d',arr_value[1]);\n"));
+  WSContentSend_P (PSTR ("    }\n"));
+  WSContentSend_P (PSTR ("   }\n"));
+  WSContentSend_P (PSTR ("   setTimeout(updateData,%u);\n"), 1000);               // ask for next update in 1 sec
+  WSContentSend_P (PSTR ("  }\n"));
+  WSContentSend_P (PSTR (" }\n"));
+
+  WSContentSend_P (PSTR (" httpData.send();\n"));
+  WSContentSend_P (PSTR ("}\n"));
+
+  WSContentSend_P (PSTR ("setTimeout(updateData,%u);\n\n"), 100);                   // ask for first update after 100ms
+
+  WSContentSend_P (PSTR ("</script>\n\n"));
+
+  // set page as scalable
+  WSContentSend_P (PSTR ("<meta name='viewport' content='width=device-width,initial-scale=1,user-scalable=yes'/>\n"));
+
+  // page style
+  WSContentSend_P (PSTR ("<style>\n"));
+  WSContentSend_P (PSTR ("body {color:white;background-color:#252525;font-family:Arial, Helvetica, sans-serif;}\n"));
+
+  WSContentSend_P (PSTR ("a {color:white;}\n"));
+  WSContentSend_P (PSTR ("a:link {text-decoration:none;}\n"));
+
+  WSContentSend_P (PSTR ("div {padding:0px;margin:0px;text-align:center;}\n"));
+  WSContentSend_P (PSTR ("div.title {font-size:4vh;font-weight:bold;}\n"));
+  WSContentSend_P (PSTR ("div.header {font-size:3vh;margin:1vh auto;}\n"));
+
+  WSContentSend_P (PSTR ("div.graph {width:100%%;margin:2vh auto;}\n"));
+  WSContentSend_P (PSTR ("svg.graph {width:100%%;height:80vh;}\n"));
+
+  WSContentSend_P (PSTR ("</style>\n"));
+
+  // page body
+  WSContentSend_P (PSTR ("</head>\n"));
+  WSContentSend_P (PSTR ("<body>\n"));
+  WSContentSend_P (PSTR ("<div class='main'>\n"));
+
+  // room name
+  WSContentSend_P (PSTR ("<div class='title'><a href='/'>%s</a></div>\n"), SettingsText(SET_DEVICENAME));
+
+  // header
+  WSContentSend_P (PSTR ("<div class='header'>Live Radar</div>\n"));
+
+  // ------- Graph --------
+
+  // start of radar
+  WSContentSend_P (PSTR ("<div class='graph'>\n"));
+  WSContentSend_P (PSTR ("<svg class='graph' viewBox='0 0 %u %u'>\n"), 800, 400 + 50 + 4);
+
+  // style
+  WSContentSend_P (PSTR ("<style type='text/css'>\n"));
+  WSContentSend_P (PSTR ("text {font-size:16px;fill:#aaa;text-anchor:middle;}\n"));
+  WSContentSend_P (PSTR ("text.sensor {font-weight:bold;}\n"));
+  WSContentSend_P (PSTR ("text.pres {fill:#fa0;font-size:12px;}\n"));
+  WSContentSend_P (PSTR ("text.move {fill:#f00;font-size:12px;}\n"));
+
+  WSContentSend_P (PSTR ("path {stroke-opacity:0.5;fill:none;}\n"));
+  WSContentSend_P (PSTR ("path.pres {stroke:#fa0;stroke-width:12;}\n"));
+  WSContentSend_P (PSTR ("path.move {stroke:#f00;stroke-width:12;}\n"));
+  WSContentSend_P (PSTR ("path.zone {stroke:none;fill:#1c1c1c;}\n"));
+  WSContentSend_P (PSTR ("path.radar {stroke:#0a0;stroke-dasharray:1 1;}\n"));
+  WSContentSend_P (PSTR ("path.pres-max {stroke:#fa0;stroke-dasharray:1 1;}\n"));
+  WSContentSend_P (PSTR ("path.move-max {stroke:#f00;stroke-dasharray:1 1;}\n"));
+  WSContentSend_P (PSTR ("</style>\n"));
+
+  // legend
+  WSContentSend_P (PSTR ("<path class='pres-max' d='M 170 15 L 230 15 L 230 35 L 170 35 Z'></path>\n"));
+  WSContentSend_P (PSTR ("<text class='pres' x=200 y=30>Presence</text>\n"));
+  WSContentSend_P (PSTR ("<path class='move-max' d='M 570 15 L 630 15 L 630 35 L 570 35 Z'></path>\n"));
+  WSContentSend_P (PSTR ("<text class='move' x=600 y=30>Motion</text>\n"));
+
+  // detection zone
+  WSContentSend_P (PSTR ("<path class='zone' id='zone' d='' />\n"));
+
+  // radar frame lines
+  for (index = 1; index < 6; index++) WSContentSend_P (PSTR ("<path class='radar' d='M 400 50 L %d %d' />\n"), 400 + 400 * cos[index] / 1000, 50 + 400 * sin[index] / 1000);
+
+  // radar frame circles and distance
+  WSContentSend_P (PSTR ("<text x=400 y=30>LD2410</text>\n"));
+  for (index = 1; index < 7; index++) 
+  {
+    x = index * sin[4] * 400 / 1000 / 6;
+    y = index * cos[4] * 400 / 1000 / 6;
+    r = index * 400 / 6;
+    WSContentSend_P (PSTR ("<text x=%d y=%d>%dm</text>\n"), 400 + x, 40 + y, index);
+    WSContentSend_P (PSTR ("<text x=%d y=%d>%dm</text>\n"), 400 - 5 - x, 40 + y, index);
+    WSContentSend_P (PSTR ("<path class='radar'tasmota-flash --querytasmota-flash --query d='M %d %d A %d %d 0 0 1 %d %d' />\n"), 400 + x, 50 + y, r, r, 400 - x, 50 + y);
+  }
+
+  // presence detection limit
+  WSContentSend_P (PSTR ("<path class='pres-max' id='pres-max' d='' />\n"));
+
+  // motion detection limit
+  WSContentSend_P (PSTR ("<path class='move-max' id='move-max' d='' />\n"));
+
+  // presence detection
+  WSContentSend_P (PSTR ("<path class='pres' id='pres' d='' />\n"));
+
+  // motion detection
+  WSContentSend_P (PSTR ("<path class='move' id='move' d='' />\n"));
+
+  // end of radar
+  WSContentSend_P (PSTR ("</svg>\n"));
+  WSContentSend_P (PSTR ("</div>\n"));
+
+  // end of page
+  WSContentStop ();
+}
+
+#endif    // USE_LD2410_RADAR
+
 #endif  // USE_WEBSERVER
 
 /***************************************\
@@ -986,7 +1185,7 @@ bool Xsns102 (uint32_t function)
       if (RtcTime.valid) LD2410Every100ms ();
       break;
     case FUNC_JSON_APPEND:
-      LD2410ShowJSON (true);
+      if (ld2410_status.enabled) LD2410ShowJSON (true);
       break;
     case FUNC_LOOP:
       if (ld2410_status.enabled) LD2410ReceiveData ();
@@ -994,8 +1193,19 @@ bool Xsns102 (uint32_t function)
 
 #ifdef USE_WEBSERVER
     case FUNC_WEB_SENSOR:
-      LD2410WebSensor ();
+      if (ld2410_status.enabled) LD2410WebSensor ();
       break;
+
+#ifdef USE_LD2410_RADAR
+    case FUNC_WEB_ADD_MAIN_BUTTON:
+      if (ld2410_status.enabled) WSContentSend_P (PSTR ("<p><form action='ld2410' method='get'><button>LD2410 Radar</button></form></p>\n"));
+      break;
+    case FUNC_WEB_ADD_HANDLER:
+      if (ld2410_status.enabled) Webserver->on ("/ld2410", LD2410GraphRadar);
+      if (ld2410_status.enabled) Webserver->on ("/ld2410.upd", LD2410GraphRadarUpdate);
+      break;
+#endif    // USE_LD2410_RADAR
+
 #endif  // USE_WEBSERVER
   }
 

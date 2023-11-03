@@ -2391,13 +2391,10 @@ void SensorInit ()
   }
 
   // movement : serial sensors
-  else if (PinUsed (GPIO_TXD) && PinUsed (GPIO_RXD))
+  else if (PinUsed (GPIO_LD2410_TX) && PinUsed (GPIO_LD2410_RX))
   {
     switch (sensor_config.type_pres)
     {
-      case SENSOR_PRESENCE_NONE:
-        break;
-
 #ifdef USE_LD1115             // HLK-LD1115 sensor
       case SENSOR_PRESENCE_LD1115:
         if (LD1115InitDevice (0)) sensor_status.pres.source = SENSOR_SOURCE_SERIAL;
@@ -2421,6 +2418,9 @@ void SensorInit ()
         if (LD2450InitDevice ()) sensor_status.pres.source = SENSOR_SOURCE_SERIAL;
         break;
 #endif    // USE_LD2450
+
+      default:
+        break;
     }
   }
 
@@ -2519,13 +2519,14 @@ void SensorEverySecond ()
 
 // a changer
 
+#ifdef USE_UFILESYS
   if ((dayofweek == 0) && (hour == 23) && (minute == 59))
   {
     index = 59 - second;
     if (index > sensor_config.week_histo) SensorFileWeekDelete (index);
       else SensorFileWeekShift (index);
   }
-
+#endif      // USE_UFILESYS
 
   // ---------------------------------
   //   temperature & humidity sensor
@@ -3129,7 +3130,7 @@ void SensorWebConfigure ()
   //   presence sensors  
   // ----------------------
 
-  WSContentSend_P (SENSOR_FIELDSET_START, "⚙️", "Presence Sensor");
+  WSContentSend_P (SENSOR_FIELDSET_START, "📡", "Presence Sensor");
 
   for (index = 0; index < SENSOR_PRESENCE_MAX; index ++)
   {
@@ -3949,7 +3950,8 @@ void SensorWebGraphPresenceStyle ()
   WSContentSend_P (PSTR ("div.prev {float:left;}\n"));
   WSContentSend_P (PSTR ("div.next {float:right;}\n"));
 
-  WSContentSend_P (PSTR("div.graph {width:96%%;}\n"));
+  WSContentSend_P (PSTR("div.graph {width:90%%;margin:2vh auto;}\n"));
+  WSContentSend_P (PSTR("svg.graph {width:100%%;height:70vh;}\n"));
 }
 
 // Presence SVG style
@@ -3963,7 +3965,7 @@ void SensorWebGraphPresenceSVGStyle ()
   WSContentSend_P (PSTR ("text.today {font-weight:bold;}\n"));
 
   WSContentSend_P (PSTR ("rect {opacity:0.8;}\n"));
-  WSContentSend_P (PSTR ("rect.s0 {stroke:none;fill:%s;}\n"), "#333");
+  WSContentSend_P (PSTR ("rect.s0 {stroke:none;div.graph {width:96%%;}fill:%s;}\n"), "#333");
   WSContentSend_P (PSTR ("rect.s1 {stroke:none;fill:%s;}\n"), SENSOR_COLOR_PRES);
 
   WSContentSend_P (PSTR ("line {stroke:#aaa;stroke-dasharray:2 6;}\n"));

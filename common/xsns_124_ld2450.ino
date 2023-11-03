@@ -611,8 +611,14 @@ void LD2450GraphRadarUpdate ()
 // Radar page
 void LD2450GraphRadar ()
 {
-  uint8_t index;
+  long index;
+  long x, y, r;
+  long cos[7] = {-1000, -866, -500, 0, 500, 866, 1000};
+  long sin[7] = {0, 500, 866, 1000, 866, 500, 0};
 
+  // if access not allowed, close
+  if (!HttpCheckPriviledgedAccess ()) return;
+  
   // set page label
   WSContentStart_P ("LD2450 Radar", true);
   WSContentSend_P (PSTR ("\n</script>\n"));
@@ -668,8 +674,8 @@ void LD2450GraphRadar ()
   WSContentSend_P (PSTR ("div.title {font-size:4vh;font-weight:bold;}\n"));
   WSContentSend_P (PSTR ("div.header {font-size:3vh;margin:1vh auto;}\n"));
 
-  WSContentSend_P (PSTR ("div.graph {width:100%%;max-width:800px;margin:5vh auto;}\n"));
-  WSContentSend_P (PSTR ("svg.graph {width:100%%;height:50vh;}\n"));
+  WSContentSend_P (PSTR ("div.graph {width:100%%;margin:2vh auto;}\n"));
+  WSContentSend_P (PSTR ("svg.graph {width:100%%;height:80vh;}\n"));
 
   WSContentSend_P (PSTR ("</style>\n"));
 
@@ -688,60 +694,43 @@ void LD2450GraphRadar ()
 
   // start of radar
   WSContentSend_P (PSTR ("<div class='graph'>\n"));
-  WSContentSend_P (PSTR ("<svg class='graph' viewBox='0 0 800 454'>\n"));
+  WSContentSend_P (PSTR ("<svg class='graph' viewBox='0 0 %u %u'>\n"), 800, 400 + 50 + 4);
 
   // style
   WSContentSend_P (PSTR ("<style type='text/css'>\n"));
-  WSContentSend_P (PSTR ("text {font-size:20px;fill:white;text-anchor:middle;}\n"));
-  WSContentSend_P (PSTR ("text.start {text-anchor:start;}\n"));
-  WSContentSend_P (PSTR ("text.end {text-anchor:end;}\n"));
+  WSContentSend_P (PSTR ("text {font-size:16px;fill:#aaa;text-anchor:middle;}\n"));
   WSContentSend_P (PSTR ("text.abs {fill:%s;}\n"), LD2450_COLOR_ABSENT);
-  WSContentSend_P (PSTR ("path {stroke:green;fill:none;}\n"));
+  WSContentSend_P (PSTR ("path {stroke:green;stroke-dasharray:2 2;fill:none;}\n"));
   WSContentSend_P (PSTR ("path.zone {stroke-dasharray:2 4;fill:#1c1c1c;}\n"));
+  WSContentSend_P (PSTR ("circle {opacity:0.75;}\n"));
   WSContentSend_P (PSTR ("circle.ina {fill:#555;}\n"), LD2450_COLOR_OUTRANGE);
   WSContentSend_P (PSTR ("circle.act {fill:%s;}\n"), LD2450_COLOR_PRESENT);
   WSContentSend_P (PSTR ("circle.abs {fill:%s;}\n"), LD2450_COLOR_ABSENT);
   WSContentSend_P (PSTR ("</style>\n"));
 
-  // radar distances
-  WSContentSend_P (PSTR ("<text x=0 y=30 class='start'>6m</text>\n"));
-  WSContentSend_P (PSTR ("<text x=67 y=30>5m</text>\n"));
-  WSContentSend_P (PSTR ("<text x=133 y=30>4m</text>\n"));
-  WSContentSend_P (PSTR ("<text x=200 y=30>3m</text>\n"));
-  WSContentSend_P (PSTR ("<text x=267 y=30>2m</text>\n"));
-  WSContentSend_P (PSTR ("<text x=333 y=30>1m</text>\n"));
-  WSContentSend_P (PSTR ("<text x=400 y=30>📡</text>\n"));
-  WSContentSend_P (PSTR ("<text x=467 y=30>1m</text>\n"));
-  WSContentSend_P (PSTR ("<text x=533 y=30>2m</text>\n"));
-  WSContentSend_P (PSTR ("<text x=600 y=30>3m</text>\n"));
-  WSContentSend_P (PSTR ("<text x=667 y=30>4m</text>\n"));
-  WSContentSend_P (PSTR ("<text x=733 y=30>5m</text>\n"));
-  WSContentSend_P (PSTR ("<text x=800 y=30 class='end'>6m</text>\n"));
-
-  // radar zone
+  // radar active zone
   WSContentSend_P (PSTR ("<path id='zone' class='zone' d='' />\n"));
 
-  // radar frame
-  WSContentSend_P (PSTR ("<path d='M 0 50 L 800 50' />\n"));
+  // radar frame lines
+  for (index = 1; index < 6; index++) WSContentSend_P (PSTR ("<path d='M 400 50 L %d %d' />\n"), 400 + 400 * cos[index] / 1000, 50 + 400 * sin[index] / 1000);
 
-  WSContentSend_P (PSTR ("<path d='M 800 50 A 400 400 0 0 1 0 50' />\n"));
-  WSContentSend_P (PSTR ("<path d='M 733 50 A 330 330 0 0 1 67 50' />\n"));
-  WSContentSend_P (PSTR ("<path d='M 667 50 A 267 267 0 0 1 133 50' />\n"));
-  WSContentSend_P (PSTR ("<path d='M 600 50 A 200 200 0 0 1 200 50' />\n"));
-  WSContentSend_P (PSTR ("<path d='M 533 50 A 133 133 0 0 1 267 50' />\n"));
-  WSContentSend_P (PSTR ("<path d='M 467 50 A 67 67 0 0 1 333 50' />\n"));
-
-  WSContentSend_P (PSTR ("<path d='M 400 50 L 54 250' />\n"));
-  WSContentSend_P (PSTR ("<path d='M 400 50 L 200 396' />\n"));
-  WSContentSend_P (PSTR ("<path d='M 400 50 L 400 450' />\n"));
-  WSContentSend_P (PSTR ("<path d='M 400 50 L 600 396' />\n"));
-  WSContentSend_P (PSTR ("<path d='M 400 50 L 746 250' />\n"));
+  // radar frame circles and distance
+  WSContentSend_P (PSTR ("<text x=400 y=30>LD2450</text>\n"));
+  for (index = 1; index < 7; index++) 
+  {
+    x = index * sin[4] * 400 / 1000 / 6;
+    y = index * cos[4] * 400 / 1000 / 6;
+    r = index * 400 / 6;
+    WSContentSend_P (PSTR ("<text x=%d y=%d>%dm</text>\n"), 400 + x, 40 + y, index);
+    WSContentSend_P (PSTR ("<text x=%d y=%d>%dm</text>\n"), 400 - 5 - x, 40 + y, index);
+    WSContentSend_P (PSTR ("<path d='M %d %d A %d %d 0 0 1 %d %d' />\n"), 400 + x, 50 + y, r, r, 400 - x, 50 + y);
+  }
 
   // display targets
   for (index = 0; index < LD2450_TARGET_MAX; index++)
   {
-    WSContentSend_P (PSTR ("<circle id='c%u' class='abs' cx=400 cy=50 r=20 />\n"), index + 1);
-    WSContentSend_P (PSTR ("<text id='t%u' class='abs' x=400 y=55>%u</text>\n"), index + 1, index + 1);
+    WSContentSend_P (PSTR ("<circle id='c%d' class='abs' cx=400 cy=50 r=20 />\n"), index + 1);
+    WSContentSend_P (PSTR ("<text id='t%d' class='abs' x=400 y=55>%d</text>\n"), index + 1, index + 1);
   }
 
   // end of radar
@@ -775,7 +764,7 @@ bool Xsns124 (uint32_t function)
       result = DecodeCommand (kHLKLD2450Commands, HLKLD2450Command);
       break;
     case FUNC_JSON_APPEND:
-      LD2450ShowJSON (true);
+      if (ld2450_status.enabled) LD2450ShowJSON (true);
       break;
     case FUNC_LOOP:
       if (ld2450_status.enabled) LD2450ReceiveData ();
@@ -784,16 +773,16 @@ bool Xsns124 (uint32_t function)
 #ifdef USE_WEBSERVER
 
     case FUNC_WEB_SENSOR:
-      LD2450WebSensor ();
+      if (ld2450_status.enabled) LD2450WebSensor ();
       break;
 
 #ifdef USE_LD2450_RADAR
     case FUNC_WEB_ADD_MAIN_BUTTON:
-      WSContentSend_P (PSTR ("<p><form action='ld2450' method='get'><button>LD2450 Radar</button></form></p>\n"));
+      if (ld2450_status.enabled) WSContentSend_P (PSTR ("<p><form action='ld2450' method='get'><button>LD2450 Radar</button></form></p>\n"));
       break;
     case FUNC_WEB_ADD_HANDLER:
-      Webserver->on ("/ld2450", LD2450GraphRadar);
-      Webserver->on ("/ld2450.upd", LD2450GraphRadarUpdate);
+      if (ld2450_status.enabled) Webserver->on ("/ld2450", LD2450GraphRadar);
+      if (ld2450_status.enabled) Webserver->on ("/ld2450.upd", LD2450GraphRadarUpdate);
       break;
 #endif    // USE_LD2450_RADAR
 

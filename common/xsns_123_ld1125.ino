@@ -48,7 +48,7 @@
 #define LD1125_COLOR_MOTION         "#D00"
 
 // strings
-const char D_LD1125_NAME[]          PROGMEM = "HLK-LD1125";
+const char D_LD1125_NAME[]          PROGMEM = "LD1125";
 
 // MQTT commands : ld_help and ld_send
 const char kLD1125Commands[]         PROGMEM = "ld1125_|help|move_th|pres_th|max|timeout|update|save|reset";
@@ -274,22 +274,22 @@ void LD1125ExecuteNextCommand ()
 bool LD1125InitDevice (uint32_t timeout)
 {
   // set timeout and switch index
+  ld1125_status.timeout = timeout;
   if ((timeout == 0) || (timeout == UINT32_MAX)) ld1125_status.timeout = LD1125_DEFAULT_TIMEOUT;
-    else ld1125_status.timeout = timeout;
 
   // if ports are selected, init sensor state
-  if ((ld1125_status.pserial == nullptr) && PinUsed (GPIO_TXD) && PinUsed (GPIO_RXD))
+  if ((ld1125_status.pserial == nullptr) && PinUsed (GPIO_LD2410_RX) && PinUsed (GPIO_LD2410_TX))
   {
 #ifdef ESP32
     // create serial port
-    ld1125_status.pserial = new TasmotaSerial (Pin (GPIO_RXD), Pin (GPIO_TXD), 1);
+    ld1125_status.pserial = new TasmotaSerial (Pin (GPIO_LD2410_RX), Pin (GPIO_LD2410_TX), 1);
 
     // initialise serial port
     ld1125_status.enabled = ld1125_status.pserial->begin (115200, SERIAL_8N1);
 
 #else       // ESP8266
     // create serial port
-    ld1125_status.pserial = new TasmotaSerial (Pin (GPIO_RXD), Pin (GPIO_TXD), 1);
+    ld1125_status.pserial = new TasmotaSerial (Pin (GPIO_LD2410_RX), Pin (GPIO_LD2410_TX), 1);
 
     // initialise serial port
     ld1125_status.enabled = ld1125_status.pserial->begin (115200, SERIAL_8N1);
@@ -759,7 +759,7 @@ bool Xsns123 (uint32_t function)
       if (ld1125_status.enabled && RtcTime.valid) LD1125EverySecond ();
       break;
     case FUNC_JSON_APPEND:
-      LD1125ShowJSON (true);
+      if (ld1125_status.enabled) LD1125ShowJSON (true);
       break;
     case FUNC_LOOP:
       if (ld1125_status.enabled) LD1125ReceiveData ();
