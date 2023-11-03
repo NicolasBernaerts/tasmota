@@ -23,13 +23,26 @@ To get all available function, just type **sensor_help** in console.
   * Temperature : DHT11, AM2301, SI7021, SHT30 or DS18x20
   * Humidity : DHT11, AM2301, SI7021 or SHT30
   * Movement : RCWL-0516 or HW-MS03 (declared as Counter 1)
-  * Presence : HLK-LD1115H, HLK-LD1125H, HLK-LD2410 or HLK-LD2450
+  * Presence : HLK-LD1115, HLK-LD1125, HLK-LD2410 or HLK-LD2450
 
 ![Config](./screen/tasmota-sensor-config-local.png)
 
 If enabled, weekly and/or yearly data can be recorded.
 
 ![Config](./screen/tasmota-sensor-weekly.png)
+
+## xsns_122_ld1115.ino ##
+
+![HLK LD1115](./screen/tasmota-ld1115-main.png)
+
+Driver for HLK-LD1115 presence & movement detector.
+
+To get the sensor operational :
+  - Connect **Rx** and **Tx**
+  - Configure **LD2410-Rx** and **LD2410-Tx**
+  - Select **LD1115** in **Sensor** configuration 
+
+To get all available function, just type **ld1115_help** in console.
 
 ## xsns_102_ld2410.ino ##
 
