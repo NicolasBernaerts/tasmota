@@ -94,26 +94,24 @@ MQTT result should look like that :
     compteur/tele/SENSOR = {"Time":"2021-03-13T09:20:30","TIC":{"ADCO":"061964xxxxxx","OPTARIF":"BASE","ISOUSC":"30","BASE":"007970903","PTEC":"TH..","IINST":"003","IMAX":"090","PAPP":"00780","HHPHC":"A","MOTDETAT":"000000","PHASE":1,"SSOUSC":"6000","IINST1":"3","SINSTS1":"780"}}
     compteur/tele/SENSOR = {"Time":"2023-03-10T13:53:42","METER":{"PH":1,"ISUB":45,"PSUB":9000,"PMAX":8910,"U1":235,"P1":1470,"W1":1470,"I1":6.0,"C1":1.00,"P":1470,"W":1470,"I":6.0}}
 
-#### Configuration
+#### Commands
 
 This Teleinfo firmware can be configured thru some **EnergyConfig** console commands :
 
     EnergyConfig Teleinfo parameters :
-      Historique (enable teleinfo historique mode - need restart)
-      Standard (enable teleinfo standard mode - need restart)
-      Mode=1 (set teleinfo mode : 0=historique, 1=standard, 2=custom[9600 baud] - need restart)
-      Stats (display reception statistics)
-      Led=1 (enable RGB LED display status)
-      Percent=100 (maximum acceptable contract in %)
-      msgpol=1 (message policy : 0=Every TIC, 1=± 5% Power Change, 2=Telemetry only)
-      msgtype=1 (message type : 0=None, 1=METER only, 2=TIC only, 3=METER and TIC)
-      maxv=240     (graph max voltage, in V)
-      maxva=9000    (graph max power, in VA or W)
-      nbday=8    (number of daily logs)
-      nbweek=4   (number of weekly logs)
-      maxhour=8  (graph max total per hour, in Wh)
-      maxday=110   (graph max total per day, in Wh)
-      maxmonth=2000 (graph max total per month, in Wh)
+      historique      set historique mode at 1200 bauds (needs restart)
+      standard        set standard mode at 9600 bauds (needs restart)
+      Stats           display reception statistics
+      percent=100     maximum acceptable % of total contract
+      msgpol=1        message policy : 0=Every TIC, 1=± 5% Power Change, 2=Telemetry only
+      msgtype=1       message type : 0=None, 1=METER only, 2=TIC only, 3=METER and TIC
+      maxv=240        graph max voltage (V)
+      maxva=9000      graph max power (VA or W)
+      nbday=8         number of daily logs
+      nbweek=4        number of weekly logs
+      maxhour=8       graph max total per hour (Wh)
+      maxday=110      graph max total per day (Wh)
+      maxmonth=2000   graph max total per month (Wh)
 
 You can use few commands at once :
 
