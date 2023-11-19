@@ -2,9 +2,7 @@
 
 **ATTENTION**
 
-With **version 13** partitionning has changed on **ESP32 family**.
-
-From version 13.0 onward it uses new **safeboot** partitionning.
+With **version 13** partitionning has changed on **ESP32 family**. From version **13.0** onward it uses new **safeboot** partitionning.
 
 If you upgrade ESP32 from previous version, you need to do a serial flash in **erase** mode. If you do OTA, you may encounter serious instabilities. Of course you need to do it once. You'll be able to update futur versions using OTA.
 
