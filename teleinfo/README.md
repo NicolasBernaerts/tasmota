@@ -1,8 +1,16 @@
 # Teleinfo & Ecowatt Tasmota firmware
 
+**Attention**
+
+Partitionning has changed on **ESP32 family**.From version 13.0 onward itt uses new **safeboot** partitionning.
+If you upgrade ESP32 from previous version, you need to do a serial flash in **erase** mode.
+If you do OTA, you may encounter serious instabilities.
+Of course you need to do it once. You'll be able to update futur versions using OTA.
+ESP8266 family keep the same partitionning.
+
 ## Presentation
 
-This evolution of **Tasmota 12.5.0** firmware has been enhanced to :
+This evolution of **Tasmota 13.2.0** firmware has been enhanced to :
   * handle France energy meters known as **Linky** using **Teleinfo** protocol
   * implements an **Ecowatt** server to publish RTE Ecowatt signals
 
@@ -15,9 +23,10 @@ This firmware has been developped and tested on  :
 It has been compiled and tested on the following devices :
   * **ESP8266** 1Mb
   * **ESP12F** 4Mb and 16Mb
-  * **ESP32** 4Mb
-  * **ESP32S2** 4Mb
-  * **ESP32S3** 16Mb
+  * **ESP32** 4Mb (safeboot)
+  * **Denky D4** 8Mb (safeboot)
+  * **ESP32S2** 4Mb (safeboot)
+  * **ESP32S3** 16Mb (safeboot)
 
 This firmware also provides :
   * a TCP server to live stream **teleinfo** data
@@ -28,6 +37,11 @@ Pre-compiled versions are available in the [**binary**](./binary) folder.
 ## Teleinfo
 
 Please note that it is a completly different implementation than the one published early 2020 by Charles Hallard and actually on the official Tasmota repository. 
+
+This tasmota firmware handles consommation and production modes :
+  * Consommation publishes standard **ENERGY** and specific **METER** JSON section
+  * Production publishes specific **PROD** JSON section
+  * You can also publish a specific **TIC** section to have all Teleinfo keys
 
 Some of these firmware versions are using a LittleFS partition to store graph data. Il allows to keep historical data over reboots.
 To take advantage of this feature, make sure to follow partitioning procedure given in the **readme** of the **binary** folder.
@@ -45,13 +59,11 @@ This firmware provides some extra Web page on the device :
   * **/conso** : yearly consumption data
   * **/prod** : yearly production
   
-According to your installation, you may get some production data.
-
 If you are using a LittleFS version, you'll also get peak apparent power and peak voltage on the graphs.
 
 If your linky in in historic mode, it doesn't provide instant voltage. Voltage is then forced to 230V.
 
-If you are using an **ESP32** board, you can use the wired connexion by selection the proper board model in **Configuration/ESP32 board**.
+If you are using an **ESP32** board with Ethernet, you can use the wired connexion by selection the proper board model in **Configuration/ESP32 board**.
 
 Teleinfo protocol is described in [this document](https://www.enedis.fr/sites/default/files/Enedis-NOI-CPT_54E.pdf)
 
@@ -61,7 +73,8 @@ Standard **ENERGY** section is published during **Telemetry**.
 
 You can also publish energy data under 2 different sections :
   * **TIC** : Teleinfo data are publish as is
-  * **METER** : Energy data are published in a condensed form
+  * **METER** : Consommation energy data are in a condensed form
+  * **PROD** : Production energy data
 
 These options can be enabled in **Configure Teleinfo** page.
 
@@ -85,14 +98,19 @@ Here are some example of what you'll get if you publish **METER** section :
   * **Ux** = instant voltage on phase **x** 
   * **Px** = instant apparent power on phase **x** 
   * **Wx** = instant active power on phase **x** 
-  * **Cx** = instant power factor on phase **x** 
-  * **PROD** = instant production apparent power
+  * **Cx** = current calculated power factor (cos φ) on phase **x** 
+
+Here is what you'll get in **PROD** section if your Linky is in production mode :
+  * **VA**  = instant apparent power
+  * **W**   = instant active power 
+  * **COS** = current calculated power factor (cos φ)
 
 MQTT result should look like that :
 
     compteur/tele/SENSOR = {"Time":"2021-03-13T09:20:26","ENERGY":{"TotalStartTime":"2021-03-13T09:20:26","Total":7970.903,"Yesterday":3.198,"Today":6.024,"Period":63,"Power":860,"Current":4.000},"IP":"192.168.xx.xx","MAC":"50:02:91:xx:xx:xx"}
     compteur/tele/SENSOR = {"Time":"2021-03-13T09:20:30","TIC":{"ADCO":"061964xxxxxx","OPTARIF":"BASE","ISOUSC":"30","BASE":"007970903","PTEC":"TH..","IINST":"003","IMAX":"090","PAPP":"00780","HHPHC":"A","MOTDETAT":"000000","PHASE":1,"SSOUSC":"6000","IINST1":"3","SINSTS1":"780"}}
     compteur/tele/SENSOR = {"Time":"2023-03-10T13:53:42","METER":{"PH":1,"ISUB":45,"PSUB":9000,"PMAX":8910,"U1":235,"P1":1470,"W1":1470,"I1":6.0,"C1":1.00,"P":1470,"W":1470,"I":6.0}}
+    compteur/tele/SENSOR = {"Time":"2023-03-10T13:54:42","PROD":{"VA":1470,"W":1470,"COS":1.00}}
 
 #### Commands
 
@@ -101,7 +119,7 @@ This Teleinfo firmware can be configured thru some **EnergyConfig** console comm
     EnergyConfig Teleinfo parameters :
       historique      set historique mode at 1200 bauds (needs restart)
       standard        set standard mode at 9600 bauds (needs restart)
-      Stats           display reception statistics
+      stats           display reception statistics
       percent=100     maximum acceptable % of total contract
       msgpol=1        message policy : 0=Every TIC, 1=± 5% Power Change, 2=Telemetry only
       msgtype=1       message type : 0=None, 1=METER only, 2=TIC only, 3=METER and TIC
@@ -135,7 +153,7 @@ This evolution of Tasmota firmware allows to collect [**France RTE Ecowatt**](ht
 
 It uses SSL RTE API and update Ecowatt signals every hour.
 
-It is only enabled with **ESP32**, **ESP32S2** and **ESP32S3**, as SSL connexions are using too much memory for ESP8266.
+It is only enabled on **ESP32** familiies, as SSL connexions are using too much memory for ESP8266.
 
 Ecowatt data are published as a specific MQTT message :
 
@@ -147,7 +165,7 @@ Ecowatt data are published as a specific MQTT message :
  
 #### Configuration
 
-Here the **Ecowatt** server console commands :
+**eco_help** in console lists all Ecowatt commands available :
 
     eco_enable <0/1>  = enable/disable ecowatt server
     eco_sandbox <0/1> = set sandbox mode (0/1)
@@ -162,16 +180,13 @@ Once you've declared your key, you need to enable Ecowatt module as it is disabl
     eco_key your_rte_key_in_base64
     eco_enable 1
 
-Once configuration is complete, restart Tasmota.
-
-You should see connexion in the console logs
+You'll see that you ESP32 first gets a token and then gets the Ecowatt signal data. Every step is traced in the console logs.
 
     ECO: Token - abcdefghiL23OeISCK50tsGKzYD60hUt2TeESE1kBEe38x0MH0apF0y valid for 7200 seconds
 
-#### Root CA
+**Root CA** is included in the source code, but connexion is currently done in unsecure mode, not using the certificate.
 
-Root CA is included in the source code.
-It has been collected form https://data.rte-france.com/ with Firefox :
+If you want to get Root CA from RTE site https://data.rte-france.com/ you need to follow these steps in Firefox :
  - on the home page, click on the lock just before the URL
  - select the certificate in the menu and select more information
  - on the page, select display the certificate
@@ -184,9 +199,7 @@ This firmware brings a minimal embedded TCP server.
 
 This server allows you to retrieve the complete teleinfo stream over your LAN.
 
-Here are the commands available for this TCP server :
-
-  * **tcp_help** : list of available commands
+Type **tcp_help** to list all available commands :
   * **tcp_status** : status of TCP server (running port or 0 if not running)
   * **tcp_start** [port] : start TCP server on specified port
   * **tcp_stop** : stop TCP server
@@ -209,8 +222,7 @@ If you are using a build with a LittleFS partition, you can access the partition
 
 This can allow you to retrieve automatically any CSV generated file.
 
-Here are the commands available for this TCP server :
-  * **ftp_help** : list of available commands
+Type **ftp_help** to list all available commands :
   * **ftp_status** : status of FTP server (running port or 0 if not running)
   * **ftp_start** : start FTP server on port 21
   * **ftp_stop** : stop FTP server
@@ -236,20 +248,24 @@ Files should be taken from this repository and from **tasmota/common** :
 | --- | --- |
 | **platformio_override.ini** |    |
 | tasmota/**user_config_override.h**  |    |
-| boards/**esp32_4M1300k_FS.json** |  Partitioning to get 1.3Mb FS on 4Mb ESP32  |
-| boards/**esp32s2_4M1300k_FS.json** |  Partitioning to get 1.3Mb FS on 4Mb ESP32S2  |
-| boards/**esp8266_16M14M.json** |  Partitioning to get 14Mb FS on 16Mb ESP32  |
-| boards/**esp32s3_lillygo_t7s3.json** |  Partitioning for 16Mb ESP32-S3  |
+| partition/**esp32_partition_4M_app1800k_fs1200k.csv** | Safeboot partitioning to get 1.3Mb FS on 4Mb ESP32   |
+| partition/**esp32_partition_8M_app3M_fs4M.csv** | Safeboot partitioning to get 4Mb FS on 8Mb ESP32   |
+| partition/**esp32_partition_16M_app3M_fs12M.csv** | Safeboot partitioning to get 12Mb FS on 16Mb ESP32   |
+| boards/**esp8266_16M14M.json** | ESP8266 16Mb boards  |
+| boards/**esp32_4M1200k.json** | ESP32 4Mb boards  |
+| boards/**esp32s2_4M1200k.json** | ESP32S2 4Mb boards  |
+| boards/**denkyd4_8M4M-safeboot.json** | ESP32 Denky D4 8Mb boards  |
+| boards/**esp32s3_16M12M-safeboot.json** | ESP32S3 16Mb boards  |
 | tasmota/include/**tasmota_type.h** | Redefinition of teleinfo structure |
 | tasmota/tasmota_nrg_energy/**xnrg_15_teleinfo.ino** | Teleinfo driver  |
 | tasmota/tasmota_drv_driver/**xdrv_01_9_webserver.ino** | Add compilation target in footer  |
 | tasmota/tasmota_drv_driver/**xdrv_94_ip_address.ino** | Fixed IP address Web configuration |
 | tasmota/tasmota_drv_driver/**xdrv_96_ftp_server.ino** | Embedded FTP server |
-| tasmota/tasmota_drv_driver/**xdrv_97_tcp_server.ino** | Embedded Teleinfo stream server |
+| tasmota/tasmota_drv_driver/**xdrv_97_tcp_server.ino** | Embedded TCP stream server |
 | tasmota/tasmota_drv_driver/**xdrv_98_esp32_board.ino** | Configuration of Ethernet ESP32 boards |
 | tasmota/tasmota_sns_sensor/**xsns_104_teleinfo_graph.ino** | Teleinfo Graphs |
 | tasmota/tasmota_sns_sensor/**xsns_119_ecowatt_server.ino** | Ecowatt server |
-| tasmota/tasmota_sns_sensor/**xsns_120_timezone.ino** | Timezone Web configuration |
+| tasmota/tasmota_sns_sensor/**xsns_126_timezone.ino** | Timezone Web configuration |
 | lib/default/**ArduinoJSON** | JSON handling library used by Ecowatt server, extract content of **ArduinoJson.zip** |
 | lib/default/**FTPClientServer** | FTP server library, extract content of **FTPClientServer.zip** |
 
@@ -276,9 +292,9 @@ For example, you can use :
   * WT32-ETH01 : **GPIO5 (RXD)** port
   * Olimex ESP32-POE : **GPIO2** port
 
-Finaly, in **Configure Teleinfo** you need to select your Teleinfo adapter baud rate :
-  * **1200** (original white meter or green Linky in historic mode)
-  * **9600** (green Linky in standard mode)
+Finaly, in **Configure Teleinfo** you need to select your Teleinfo adapter protocol :
+  * **Historique** (original white meter or green Linky in historic mode, 1200 bauds)
+  * **Standard** (green Linky in standard mode, 9600 bauds)
 
 ## Screenshot ##
 
