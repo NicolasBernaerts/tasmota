@@ -83,8 +83,14 @@
     10/10/2023 - v12.0 - Add support for Ecowatt signal in ESP32 versions
     17/10/2023 - v12.1 - Handle Production & consommation simultaneously
                          Display all periods with total
-    28/10/2023 - v12.2 - Rotate daily and weekly files every second
+    07/11/2023 - v12.2 - Rotate daily and weekly files every second
                          Change in ecowatt stream reception to avoid overload
+                         Remove daily graph to save RAM on ESP8266 1Mb
+                         Change daily filename to teleinfo-day-00.csv
+    19/11/2023 - v13.0 - Tasmota 13 compatibility
+                         Switch to safeboot partitionning
+                         Calculate active power for production
+    
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -129,45 +135,43 @@
 
 #define USE_IPADDRESS                         // Add fixed IP configuration page
 #define USE_TIMEZONE                          // Enable Timezone management
-#define USE_TIMEZONE_WEB_CONFIG               // Enable timezone web configuration page
 #define USE_TCPSERVER                         // Enable TCP server (for TIC to TCP)
-#define USE_FTPSERVER                         // Enable embedded light FTP server
-
-// teleinfo modules
 #define USE_TELEINFO                          // Enable Teleinfo energy module
+
+// web modules
+#define USE_TIMEZONE_WEB_CONFIG               // Enable timezone web configuration page
 #define USE_TELEINFO_GRAPH                    // Enable Teleinfo sensor module for graph display
 
-// FTP server login and password
-#ifdef USE_FTPSERVER
-#define FTP_SERVER_LOGIN          "teleinfo"
-#define FTP_SERVER_PASSWORD       "teleinfo"
+#ifdef USE_UFILESYS
+#define USE_FTPSERVER                         // Enable embedded light FTP server
+#define FTP_SERVER_LOGIN      "teleinfo"      // FTP server login
+#define FTP_SERVER_PASSWORD   "teleinfo"      // FTP server password
 #endif
 
 // build
 #if defined BUILD_ESP32S3_16M
-#define EXTENSION_BUILD "esp32s3_16m10m"
+#define EXTENSION_BUILD "esp32s3_16m-10m"
 #elif defined BUILD_ESP32S2
-#define EXTENSION_BUILD "esp32s2-4m1.3m"
+#define EXTENSION_BUILD "esp32s2-4m-1200k"
+#elif defined BUILD_ESP32_DENKYD4
+#define EXTENSION_BUILD "denkyd4-8m-4m"
+#define USER_TEMPLATE "{\"NAME\":\"Denky D4\",\"GPIO\":[32,0,0,0,1,0,0,0,0,1,1376,1,0,0,0,0,0,640,608,0,0,0,0,0,0,0,5632,0,0,0,0,0,0,0,0,0],\"FLAG\":0,\"BASE\":1}" 
 #elif defined BUILD_ESP32_4M
-#define EXTENSION_BUILD "esp32-4m1.3m"
+#define EXTENSION_BUILD "esp32-4m-1200k"
 #elif defined BUILD_16M14M
-#define EXTENSION_BUILD "esp8266-16m14m"
+#define EXTENSION_BUILD "esp8266-16m-14m"
 #elif defined BUILD_4M2M
-#define EXTENSION_BUILD "esp8266-4m2m"
+#define EXTENSION_BUILD "esp8266-4m-2m"
 #elif defined BUILD_2M1M
-#define EXTENSION_BUILD "esp8266-2m1m"
-#elif defined BUILD_1M128K
-#define EXTENSION_BUILD "esp8266-1m128k"
-#elif defined BUILD_1M64K
-#define EXTENSION_BUILD "esp8266-1m64k"
+#define EXTENSION_BUILD "esp8266-2m-1m"
 #else
-#define EXTENSION_BUILD "esp8266"
+#define EXTENSION_BUILD "esp8266-1m"
 #endif
 
 // extension data
 #define EXTENSION_NAME    "Teleinfo"          // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
-#define EXTENSION_VERSION "12.2"              // version
+#define EXTENSION_VERSION "13.0"              // version
 
 // MQTT default
 #undef MQTT_HOST
@@ -192,6 +196,8 @@
 // ----------------------
 // Common ESP8266 & ESP32
 // ----------------------
+
+#define MQTT_DATA_STRING                      // Enable use heap instead of fixed memory for TasmotaGlobal.mqtt_data
 
 #undef USE_ARDUINO_OTA                        // support for Arduino OTA
 #undef USE_WPS                                // support for WPS as initial wifi configuration tool
@@ -246,8 +252,6 @@
 #undef SHELLY_CMDS                            // Add command to send co-processor commands (+0k3 code)
 #undef SHELLY_FW_UPGRADE                      // Add firmware upgrade option for co-processor (+3k4 code)
 
-//#undef USE_LIGHT                              // Add support for light control
-//#undef USE_WS2812                             // WS2812 Led string using library NeoPixelBus (+5k code, +1k mem, 232 iram) - Disable by //
 #undef USE_MY92X1                             // Add support for MY92X1 RGBCW led controller as used in Sonoff B1, Ailight and Lohas
 #undef USE_SM16716                            // Add support for SM16716 RGB LED controller (+0k7 code)
 #undef USE_SM2135                             // Add support for SM2135 RGBCW led control as used in Action LSC (+0k6 code)
@@ -263,11 +267,7 @@
 
 #undef USE_DHT                                // Disable internal DHT sensor
 
-#undef USE_I2C                                // Disable all I2C sensors and devices
-
 #undef USE_SPI                                // Disable all SPI devices
-
-#undef USE_DISPLAY                            // Add Display support
 
 #undef USE_SERIAL_BRIDGE                      // Disable support for software Serial Bridge (+0k8 code)
 
@@ -330,7 +330,7 @@
 #undef USE_TIMEPROP                           // Add support for the timeprop feature (+9k1 code)
 #undef USE_PID                                // Add suport for the PID  feature (+11k2 code)
 
-#define USE_TLS                               // for safeboot and BearSSL
+//#define USE_TLS                               // for safeboot and BearSSL
 
 // ----------------------
 //    ESP32 specific
@@ -341,14 +341,23 @@
 
 //#undef USE_ESP32_SENSORS
 
-//#define USE_TLS                               // for safeboot and BearSSL
+#define USE_TLS                               // for safeboot and BearSSL
+#define USE_LIB_SSL_ENGINE
+
+// conso LED status
+#define USE_LIGHT                              // Add support for light control
+#define USE_WS2812                             // WS2812 Led string using library NeoPixelBus (+5k code, +1k mem, 232 iram) - Disable by //
+
+// display
+#define USE_I2C                                // Disable all I2C sensors and devices
+#define USE_DISPLAY                            // Add Display support
 
 #undef USE_BLE_ESP32
 #undef USE_MI_ESP32
 #undef USE_IBEACON
 
-#undef USE_AUTOCONF                           // Disable Esp32 autoconf feature
-#undef USE_BERRY
+#define USE_AUTOCONF                           // Enable Esp32 autoconf feature
+#define USE_BERRY                              // Enable Berry scripting langage
 
 #undef USE_DISPLAY
 #undef USE_SR04

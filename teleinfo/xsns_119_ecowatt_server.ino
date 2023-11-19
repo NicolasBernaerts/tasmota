@@ -8,6 +8,7 @@
     15/05/2023 - v1.3 - Rewrite CSV file access
     14/10/2023 - v1.4 - Rewrite API management and intergrate RTE root certificate
     28/10/2023 - v1.5 - Change in ecowatt stream reception to avoid overload
+    19/11/2023 - v2.0 - Switch to BearSSL::WiFiClientSecure_light
 
   This module connects to french RTE EcoWatt server to retrieve electricity production forecast.
   It publishes status of current slot and next 2 slots on the MQTT stream under
@@ -45,12 +46,14 @@
 #define XSNS_119                    119
 
 #include <ArduinoJson.h>
+#include <WiFiClientSecureLightBearSSL.h>
 
 // constant
 #define ECOWATT_STARTUP_DELAY       10         // ecowatt connexion delay
 #define ECOWATT_UPDATE_JSON         900        // publish JSON every 15 mn
 #define ECOWATT_SLOT_PER_DAY        24         // maximum number of 1h slots per day
 
+#define ECOWATT_HTTP_TIMEOUT        5000       // HTTP connexion timeout (ms)
 #define ECOWATT_TOKEN_RETRY         300        // token retry timeout (sec.)
 #define ECOWATT_SIGNAL_RETRY        900        // signal retry timeout (sec.)
 #define ECOWATT_SIGNAL_RENEW        3595       // signal renew period (sec.)
@@ -93,6 +96,39 @@ const char kEcowattConfigKey[] PROGMEM = D_CMND_ECOWATT_ENABLE "|" D_CMND_ECOWAT
  *                        Data
 \***********************************************************/
 
+// update management
+static struct {
+  uint8_t     step       = ECOWATT_UPDATE_NONE;     // current reception step
+  uint32_t    timeout    = UINT32_MAX;              // timeout of current reception
+  uint32_t    time_token = UINT32_MAX;              // timestamp of token update
+  uint32_t    time_signal = UINT32_MAX;              // timestamp of signal update
+  char        str_token[128];                       // token value
+} ecowatt_update;
+
+// Ecowatt configuration
+static struct {
+  bool  enabled = false;                            // flag to enable ecowatt server
+  bool  sandbox = false;                            // flag to use RTE sandbox
+  char  str_private_key[128];                       // base 64 private key (provided on RTE site)
+} ecowatt_config;
+
+// Ecowatt status
+struct ecowatt_day {
+  uint8_t dvalue;                                   // day global status
+  char    str_day_of_week[4];                       // day of week (mon, Tue, ...)
+  uint8_t day_of_month;                             // dd
+  uint8_t month;                                    // mm
+  uint8_t arr_hvalue[ECOWATT_SLOT_PER_DAY];         // hourly slots
+};
+static struct {
+  uint32_t    time_json   = UINT32_MAX;             // timestamp of next JSON update
+  ecowatt_day arr_day[ECOWATT_DAY_MAX];             // slots for today and next days
+} ecowatt_status;
+
+/***********************************************************\
+ *                       SSL client
+\***********************************************************/
+
 // RTE API root certificate
 const char ecowatt_root_certificate[] PROGMEM = \
 "-----BEGIN CERTIFICATE-----\n" \
@@ -117,35 +153,8 @@ const char ecowatt_root_certificate[] PROGMEM = \
 "WD9f\n" \
 "-----END CERTIFICATE-----\n";
 
-// update management
-static struct {
-  uint8_t     step       = ECOWATT_UPDATE_NONE;     // current reception step
-  uint32_t    timeout    = UINT32_MAX;              // timeout of current reception
-  uint32_t    time_token = UINT32_MAX;              // timestamp of token update
-  uint32_t    time_signal = UINT32_MAX;              // timestamp of signal update
-  char        str_token[128];                       // token value
-} ecowatt_update;
-
-// Ecowatt configuration
-static struct {
-  bool  enabled = false;                            // flag to enable ecowatt server
-  bool  sandbox = false;                            // flag to use RTE sandbox
-  char  str_private_key[128];                       // base 64 private key (provided on RTE site)
-} ecowatt_config;
-
-// Ecowatt status
-struct ecowatt_day {
-  uint8_t dvalue;                                   // day global status
-  char    str_day[12];                              // slot date (dd-mm-aaaa)
-  uint8_t arr_hvalue[ECOWATT_SLOT_PER_DAY];         // hourly slots
-};
-static struct {
-  uint32_t    time_json   = UINT32_MAX;             // timestamp of next JSON update
-  ecowatt_day arr_day[ECOWATT_DAY_MAX];             // slots for today and next days
-} ecowatt_status;
-
-WiFiClientSecure ecowatt_wifi;                      // wifi secure client
-HTTPClient       ecowatt_http;                      // https client
+BearSSL::WiFiClientSecure_light  ecowatt_wifi (4096, 1024);         // bear ssl client
+HTTPClient                       ecowatt_http;                      // https client
 
 /***********************************************************\
  *                      Commands
@@ -377,7 +386,7 @@ void EcowattPublishJson ()
   // loop thru number of slots to publish
   for (index = 0; index < ECOWATT_DAY_MAX; index ++)
   {
-    ResponseAppend_P (PSTR (",\"day%u\":{\"jour\":\"%s\",\"dval\":%u"), index, ecowatt_status.arr_day[index].str_day, ecowatt_status.arr_day[index].dvalue);
+    ResponseAppend_P (PSTR (",\"day%u\":{\"jour\":\"%s\",\"date\":\"%u:%u\",\"dval\":%u"), index, ecowatt_status.arr_day[index].str_day_of_week, ecowatt_status.arr_day[index].day_of_month, ecowatt_status.arr_day[index].month, ecowatt_status.arr_day[index].dvalue);
     for (slot = 0; slot < ECOWATT_SLOT_PER_DAY; slot ++) ResponseAppend_P (PSTR (",\"%u\":%u"), slot, ecowatt_status.arr_day[index].arr_hvalue[slot]);
     ResponseAppend_P (PSTR ("}"));
   }
@@ -441,7 +450,7 @@ bool EcowattStreamTokenBegin ()
     ecowatt_http.addHeader ("Content-Type", "application/x-www-form-urlencoded", false, true);
 
     // set http timeout
-    ecowatt_http.setTimeout (2000);
+    ecowatt_http.setTimeout (ECOWATT_HTTP_TIMEOUT);
   }
 
   return is_ok;
@@ -550,7 +559,7 @@ bool EcowattStreamSignalBegin ()
     ecowatt_http.addHeader ("Content-Type", "application/x-www-form-urlencoded", false, true);
 
     // set http timeout
-    ecowatt_http.setTimeout (2000);
+    ecowatt_http.setTimeout (ECOWATT_HTTP_TIMEOUT);
   }
 
   return is_ok;
@@ -586,8 +595,14 @@ bool EcowattStreamSignalGet ()
 bool EcowattStreamSignalEnd ()
 {
   uint8_t  index, index_array, slot, value;
-  String   str_day;
+  char     str_day[12];
+  char     str_list[24];
+  uint32_t day_time;
+  TIME_T   day_dst;
   DynamicJsonDocument json_result(8192);
+
+  // get week days list
+  strcpy (str_list, D_DAY3LIST);
 
   // extract token from JSON
   deserializeJson (json_result, ecowatt_http.getString ().c_str ());
@@ -599,14 +614,25 @@ bool EcowattStreamSignalEnd ()
     if (ecowatt_config.sandbox) index_array = (index + ECOWATT_DAY_MAX - 1) % ECOWATT_DAY_MAX;
       else index_array = index;
 
-    // get day for current signal index
-    str_day = json_result["signals"][index]["jour"].as<const char*> ();
-    str_day = str_day.substring (0, 10);
-
-    // get global status and date
+    // get global status
     ecowatt_status.arr_day[index_array].dvalue = json_result["signals"][index]["dvalue"];
-    strlcpy (ecowatt_status.arr_day[index_array].str_day, json_result["signals"][index]["jour"], 12);
-    ecowatt_status.arr_day[index_array].str_day[10] = 0;
+
+    // get date and convert from yyyy-mm-dd to dd.mm.yyyy
+    strlcpy (str_day, json_result["signals"][index]["jour"], sizeof (str_day));
+    str_day[4] = str_day[7] = str_day[10] = 0;
+    day_dst.year = atoi (str_day) - 1970;
+    day_dst.month = atoi (str_day + 5);
+    day_dst.day_of_month = atoi (str_day + 8);
+    day_dst.day_of_week = 0;
+    day_time = MakeTime (day_dst);
+    BreakTime (day_time, day_dst);
+    if (day_dst.day_of_week < 8) strlcpy (str_day, str_list + 3 * (day_dst.day_of_week - 1), 4);
+      else strcpy (str_day, "");
+
+    // update current slot
+    strlcpy (ecowatt_status.arr_day[index_array].str_day_of_week, str_day, sizeof (ecowatt_status.arr_day[index_array].str_day_of_week));
+    ecowatt_status.arr_day[index_array].day_of_month = day_dst.day_of_month;
+    ecowatt_status.arr_day[index_array].month        = day_dst.month;
 
     // loop to populate the slots
     for (slot = 0; slot < ECOWATT_SLOT_PER_DAY; slot ++)
@@ -621,7 +647,7 @@ bool EcowattStreamSignalEnd ()
   ecowatt_update.time_signal = LocalTime () + ECOWATT_SIGNAL_RENEW;
 
   // log
-  AddLog (LOG_LEVEL_INFO, PSTR ("ECO: Signal - Update till %s"), str_day.c_str ());
+  AddLog (LOG_LEVEL_INFO, PSTR ("ECO: Signal - Update till %u:%u"), ecowatt_status.arr_day[index_array].day_of_month, ecowatt_status.arr_day[index_array].month);
 
   // end connexion
   ecowatt_http.end ();
@@ -657,14 +683,16 @@ void EcowattInit ()
   for (index = 0; index < ECOWATT_DAY_MAX; index ++)
   {
     // init date
-    strcpy (ecowatt_status.arr_day[index].str_day, "");
+    strcpy (ecowatt_status.arr_day[index].str_day_of_week, "");
+    ecowatt_status.arr_day[index].day_of_month = 0;
+    ecowatt_status.arr_day[index].month        = 0;
 
     // slot initialisation to normal state
     for (slot = 0; slot < ECOWATT_SLOT_PER_DAY; slot ++) ecowatt_status.arr_day[index].arr_hvalue[slot] = ECOWATT_LEVEL_NORMAL;
   }
 
-  // set root certificate
-  ecowatt_wifi.setCACert (ecowatt_root_certificate);
+  // set insecure mode to access RTE server
+  ecowatt_wifi.setInsecure ();
 
   // log help command
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: eco_help to get help on Ecowatt module"));
@@ -771,15 +799,19 @@ void EcowattMidnigth ()
   for (index = 0; index < ECOWATT_DAY_MAX - 1; index ++)
   {
     // shift date, global status and slots for day, day+1 and day+2
-    strcpy (ecowatt_status.arr_day[index].str_day, ecowatt_status.arr_day[index + 1].str_day);
-    ecowatt_status.arr_day[index].dvalue = ecowatt_status.arr_day[index + 1].dvalue;
+    strcpy (ecowatt_status.arr_day[index].str_day_of_week, ecowatt_status.arr_day[index + 1].str_day_of_week);
+    ecowatt_status.arr_day[index].day_of_month = ecowatt_status.arr_day[index + 1].day_of_month;
+    ecowatt_status.arr_day[index].month        = ecowatt_status.arr_day[index + 1].month;
+    ecowatt_status.arr_day[index].dvalue       = ecowatt_status.arr_day[index + 1].dvalue;
     for (slot = 0; slot < ECOWATT_SLOT_PER_DAY; slot ++) ecowatt_status.arr_day[index].arr_hvalue[slot] = ecowatt_status.arr_day[index + 1].arr_hvalue[slot];
   }
 
   // init date, global status and slots for day+3
   index = ECOWATT_DAY_MAX - 1;
-  strcpy (ecowatt_status.arr_day[index].str_day, "");
-  ecowatt_status.arr_day[index].dvalue = ECOWATT_LEVEL_NORMAL;
+  strcpy (ecowatt_status.arr_day[index].str_day_of_week, "");
+  ecowatt_status.arr_day[index].day_of_month = 0;
+  ecowatt_status.arr_day[index].month        = 0;
+  ecowatt_status.arr_day[index].dvalue       = ECOWATT_LEVEL_NORMAL;
   for (slot = 0; slot < ECOWATT_SLOT_PER_DAY; slot ++) ecowatt_status.arr_day[index].arr_hvalue[slot] = ECOWATT_LEVEL_NORMAL;
 
   // publish data change
@@ -806,33 +838,38 @@ void EcowattWebSensor ()
   BreakTime (time_now, dst_now);
 
   // start of ecowatt data
-  WSContentSend_P (PSTR ("<div style='font-size:10px;text-align:center;padding:2px 6px;background:#333333;border-radius:12px;'>\n"));
+  WSContentSend_P (PSTR ("<div style='font-size:10px;text-align:center;padding:2px 6px 6px 6px;background:#333333;border-radius:12px;'>\n"));
 
   // title display
-  WSContentSend_P (PSTR ("<div style='display:flex;margin:2px 0px 6px 0px;padding:0px;font-size:16px;'>\n"));
+  WSContentSend_P (PSTR ("<div style='display:flex;margin:2px 0px 0px 0px;padding:0px;font-size:16px;'>\n"));
   WSContentSend_P (PSTR ("<div style='width:25%%;padding:0px;text-align:left;font-weight:bold;'>Ecowatt</div>\n"));
   WSContentSend_P (PSTR ("<div style='width:75%%;padding:4px 0px 8px 0px;text-align:right;font-size:11px;font-style:italic;'>"));
 
   // set display message
   if (strlen (ecowatt_config.str_private_key) == 0) WSContentSend_P (PSTR ("private key missing"));
   else if (ecowatt_update.time_token == UINT32_MAX) WSContentSend_P (PSTR ("initialisation stage"));
-  else if (ecowatt_update.time_token < time_now + 10) WSContentSend_P (PSTR ("token updating soon"));
-  else if (ecowatt_update.time_signal < time_now + 10) WSContentSend_P (PSTR ("signal updating soon"));
-  else if (ecowatt_update.time_token < ecowatt_update.time_signal) WSContentSend_P (PSTR ("token updating in %d mn"), 1 + (ecowatt_update.time_token - time_now) / 60);
-  else if (ecowatt_update.time_signal != UINT32_MAX) WSContentSend_P (PSTR ("signal updating in %d mn"), 1 + (ecowatt_update.time_signal - time_now) / 60);
+  else if (ecowatt_update.time_token < time_now + 10) WSContentSend_P (PSTR ("token soon"));
+  else if (ecowatt_update.time_signal < time_now + 10) WSContentSend_P (PSTR ("signal soon"));
+  else if (ecowatt_update.time_token < ecowatt_update.time_signal) WSContentSend_P (PSTR ("token in %d mn"), 1 + (ecowatt_update.time_token - time_now) / 60);
+  else if (ecowatt_update.time_signal != UINT32_MAX) WSContentSend_P (PSTR ("signal in %d mn"), 1 + (ecowatt_update.time_signal - time_now) / 60);
 
   // end of title display
   WSContentSend_P (PSTR ("</div>\n</div>\n"));
 
   // if ecowatt signal has been received previously
-  if (strlen (ecowatt_status.arr_day[0].str_day) > 0)
+  if (ecowatt_status.arr_day[0].month != 0)
   {
     // loop thru days
     for (index = 0; index < ECOWATT_DAY_MAX; index ++)
     {
       if (index == 0) opacity = 100; else opacity = 75;
       WSContentSend_P (PSTR ("<div style='display:flex;margin:0px;padding:1px;height:14px;opacity:%u%%;'>\n"), opacity);
-      WSContentSend_P (PSTR ("<div style='width:20%%;padding:0px;text-align:left;'>%s</div>\n"), ecowatt_status.arr_day[index].str_day);
+
+      // display day
+      WSContentSend_P (PSTR ("<div style='width:8%%;padding:0px;text-align:left;'>%s</div>\n"), ecowatt_status.arr_day[index].str_day_of_week);
+      WSContentSend_P (PSTR ("<div style='width:12%%;padding:0px;text-align:left;'>%02u/%02u</div>\n"), ecowatt_status.arr_day[index].day_of_month, ecowatt_status.arr_day[index].month);
+
+      // display hourly slots
       for (slot = 0; slot < ECOWATT_SLOT_PER_DAY; slot ++)
       {
         // segment beginning

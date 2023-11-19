@@ -13,6 +13,9 @@
     25/08/2023 - v11.4 - Add serial reception in display loops to avoid errors
     20/10/2023 - v12.1 - Separate graphs
                          Add production graph
+    07/11/2023 - v12.2 - Remove daily graph to save RAM on ESP8266 1Mb
+                         Change daily filename to teleinfo-day-00.csv
+    19/11/2023 - v13.0 - Migrate all web from xnrg_15_teleinfo
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -53,8 +56,7 @@
 #define TELEINFO_COLOR_CONSO_PREV       "#069"
 
 // web URL
-const char D_TELEINFO_ICON_LINKY_SVG[]   PROGMEM = "/linky.svg";
-const char D_TELEINFO_PAGE_CONFIG[]      PROGMEM = "/config";
+const char D_TELEINFO_ICON_LINKY_PNG[]   PROGMEM = "/linky.png";
 const char D_TELEINFO_PAGE_TIC[]         PROGMEM = "/tic";
 const char D_TELEINFO_PAGE_TIC_UPD[]     PROGMEM = "/tic.upd";
 const char D_TELEINFO_PAGE_GRAPH[]       PROGMEM = "/graph";
@@ -66,7 +68,7 @@ const char D_TELEINFO_PAGE_GRAPH_CURVE[] PROGMEM = "/curve.upd";
 #ifdef USE_UFILESYS
 
 // configuration and history files
-const char D_TELEINFO_HISTO_FILE_DAY[]  PROGMEM = "/teleinfo-day-%u.csv";
+const char D_TELEINFO_HISTO_FILE_DAY[]  PROGMEM = "/teleinfo-day-%02u.csv";
 const char D_TELEINFO_HISTO_FILE_WEEK[] PROGMEM = "/teleinfo-week-%02u.csv";
 const char D_TELEINFO_HISTO_FILE_YEAR[] PROGMEM = "/teleinfo-year-%04d.csv";
 const char D_TELEINFO_HISTO_FILE_PROD[] PROGMEM = "/production-year-%04d.csv";
@@ -80,9 +82,9 @@ const long ARR_TELEINFO_PERIOD_WINDOW[] = { 300 / TELEINFO_GRAPH_SAMPLE, 86400 /
 #else
 
 // graph - periods
-enum TeleinfoGraphPeriod { TELEINFO_PERIOD_LIVE, TELEINFO_PERIOD_DAILY, TELEINFO_PERIOD_MAX };                    // available graph periods
-const char kTeleinfoGraphPeriod[] PROGMEM = "Live|Daily";                                                         // period labels
-const long ARR_TELEINFO_PERIOD_WINDOW[] = { 300 / TELEINFO_GRAPH_SAMPLE, 86400 / TELEINFO_GRAPH_SAMPLE, 1 };      // time window between samples (sec.)
+enum TeleinfoGraphPeriod { TELEINFO_PERIOD_LIVE, TELEINFO_PERIOD_MAX };                                           // available graph periods
+const char kTeleinfoGraphPeriod[] PROGMEM = "Live";                                                               // period labels
+const long ARR_TELEINFO_PERIOD_WINDOW[] = { 300 / TELEINFO_GRAPH_SAMPLE, 1 };                                     // time window between samples (sec.)
 
 #endif    // USE_UFILESYS
 
@@ -155,36 +157,37 @@ static struct {
   char    str_buffer[512];                        // buffer used for graph display 
 
   tic_graph data_live;                            // live last 10mn values
+
 #ifdef USE_UFILESYS
   uint8_t rotate_daily  = 0;                      // index of daily file to rotate
   uint8_t rotate_weekly = 0;                      // index of weekly file to rotate
-  char    str_filename[UFS_FILENAME_SIZE];        // littlefs filename
-#else
-  tic_graph data_daily;                           // daily last 24h values
 #endif    // USE_UFILESYS
 
 } teleinfo_graph;
 
 /****************************************\
  *               Icons
+ *
+ *      xxd -i -c 256 icon.png
 \****************************************/
 
+#ifdef USE_WEBSERVER
+
 // linky icon
-const char teleinfo_icon_tic_svg[] PROGMEM = 
-"<svg xmlns='http://www.w3.org/2000/svg' viewBox='250 65 290 450'>"
-"<defs><style>.cls-1{fill:#cedd64;}.cls-2{fill:#a3ba2b;}.cls-3{fill:#f1f2f3;}.cls-4{fill:#f0f3f6;stroke:#c1cbdf;stroke-miterlimit:10;stroke-width:2.54px;}.cls-5{fill:#a3ba2b;}.cls-6{opacity:0.6;}.cls-7{fill:#c1cbdf;}</style></defs>"
-"<rect class='cls-1' x='253.61' y='70.74' width='282.84' height='436.41' rx='11.85'/><rect class='cls-2' x='262.73' y='78.59' width='264.6' height='420.7' rx='4.47'/><rect class='cls-1' x='306.35' y='176.71' width='177.35' height='243.91' rx='8.93'/><rect class='cls-3' x='313.68' y='183.48' width='162.7' height='230.38' rx='5.89'/><rect class='cls-4' x='328.08' y='232.06' width='133.9' height='152.15' rx='4.35'/><rect class='cls-5' x='328.08' y='291.24' width='133.9' height='43.75'/>"
-"<g class='cls-6'><rect class='cls-7' x='333.47' y='201.96' width='23.88' height='4.77' rx='2.39'/><rect class='cls-7' x='364.28' y='201.96' width='23.88' height='4.77' rx='2.39'/><rect class='cls-7' x='393' y='201.96' width='62.41' height='4.77' rx='2.39'/></g>"
-"<g class='cls-6'><rect class='cls-7' x='429.16' y='214.94' width='8.07' height='4.77' rx='2.39' transform='matrix(-1, 0, 0, -1, 866.39, 434.65)'/><rect class='cls-7' x='406.26' y='214.94' width='15.98' height='4.77' rx='2.39' transform='translate(828.5 434.65) rotate(180)'/><rect class='cls-7' x='351.66' y='214.94' width='46.6' height='4.77' rx='2.39' transform='translate(749.91 434.65) rotate(180)'/></g>"
-"<path class='cls-7' d='M357.93,384.2h29.8a0,0,0,0,1,0,0v13.3a4.5,4.5,0,0,1-4.5,4.5h-20.8a4.5,4.5,0,0,1-4.5-4.5V384.2A0,0,0,0,1,357.93,384.2Z'/><path class='cls-7' d='M402.33,384.2h29.8a0,0,0,0,1,0,0v13.3a4.5,4.5,0,0,1-4.5,4.5h-20.8a4.5,4.5,0,0,1-4.5-4.5V384.2A0,0,0,0,1,402.33,384.2Z'/>"
-"<rect class='cls-1' x='369.17' y='460.37' width='21.93' height='6.18' rx='3.09'/><rect class='cls-1' x='398.97' y='460.37' width='21.93' height='6.18' rx='3.09'/><rect class='cls-1' x='387.2' y='103.75' width='15.66' height='15.66' rx='4.56'/>"
-"<path class='cls-1' d='M341.19,137.72c0,5.81,0,11.61,0,17.41a5.36,5.36,0,0,0,4.39,5.1,12.43,12.43,0,0,0,2.72.34c2,.05,4,0,6,.05a7,7,0,0,1,2.32.54,1.12,1.12,0,0,1,.16,2.14,5.61,5.61,0,0,1-2.45.66c-3.91,0-7.83,0-11.72-.29a12.59,12.59,0,0,1-7.51-3.28,7.64,7.64,0,0,1-2.33-4c-.07-.27-.16-.53-.24-.79V137.72Z'/>"
-"<path class='cls-1' d='M457.53,148.73c-2.45,2.36-4.83,4.82-7.4,7.07a4.58,4.58,0,0,0-1.81,4.47c0,.22,0,.45,0,.67a2.53,2.53,0,0,1-1.76,2.7,6.29,6.29,0,0,1-5.61-.25,2.19,2.19,0,0,1-1.24-2.11c0-1.05,0-2.11,0-3.16a2,2,0,0,0-.71-1.61q-3.72-3.51-7.43-7a2,2,0,0,1,.19-3c1.35-1.18,5.27-1.73,7.09.22,1.51,1.62,3.14,3.13,4.68,4.73.51.53.86.54,1.36,0,1.5-1.56,3-3.11,4.55-4.63a5.75,5.75,0,0,1,6.91-.49,8,8,0,0,1,1.16,1.29Z'/>"
-"<path class='cls-1' d='M409.83,157v3.87a2.46,2.46,0,0,1-1.86,2.79,6.22,6.22,0,0,1-5.39-.2,2.23,2.23,0,0,1-1.36-2.12c0-4.38,0-8.77,0-13.16a2.18,2.18,0,0,1,1.13-2.08,6.29,6.29,0,0,1,6.36,0,2.11,2.11,0,0,1,1.12,2c0,1.22,0,2.45,0,3.67,0,.3,0,.59.06,1,.38-.16.66-.25.91-.38,3.58-2,7.17-3.9,10.72-5.91a5.68,5.68,0,0,1,5.72-.07,2.43,2.43,0,0,1,1.59,2.07,2.22,2.22,0,0,1-1.39,2q-3.37,1.89-6.76,3.77c-.26.15-.51.31-.89.55a5.32,5.32,0,0,0,.68.56c2.2,1.24,4.42,2.45,6.62,3.69.85.48,1.77,1,1.73,2.13a2.66,2.66,0,0,1-1.89,2.32,5.54,5.54,0,0,1-5.34-.19c-3.51-2-7-3.89-10.57-5.83C410.72,157.38,410.38,157.26,409.83,157Z'/>"
-"<path class='cls-1' d='M372.06,156.06c0-1.55,0-3.11,0-4.66a4.79,4.79,0,0,1,2.66-4.63,11.15,11.15,0,0,1,5.32-1.48c3.25,0,6.5,0,9.74.12a9.55,9.55,0,0,1,5.3,2,4.65,4.65,0,0,1,1.74,4c0,3.3,0,6.61,0,9.91a2.05,2.05,0,0,1-1.25,2,6.63,6.63,0,0,1-6,0,2,2,0,0,1-1.25-2c0-3.47,0-6.94,0-10.41a2,2,0,0,0-2.13-2.25,19.42,19.42,0,0,0-3.41,0,2.14,2.14,0,0,0-2.21,2.47c0,3.08-.05,6.16,0,9.24,0,2.17-.15,2.76-2.8,3.47a6.09,6.09,0,0,1-4.45-.56,2.19,2.19,0,0,1-1.27-2.07v-5.25Z'/>"
-"<path class='cls-1' d='M359.22,154.64c0-2.11,0-4.22,0-6.33a2.31,2.31,0,0,1,1.4-2.34,6.32,6.32,0,0,1,6.07.14,2.06,2.06,0,0,1,1.13,1.9q0,6.7,0,13.4a2.16,2.16,0,0,1-1.22,2,6.12,6.12,0,0,1-6,.11,2.31,2.31,0,0,1-1.41-2.25c0-2.2,0-4.39,0-6.58Z'/>"
-"<path class='cls-1' d='M363.49,143.3a17.94,17.94,0,0,1-3.16-1,2.65,2.65,0,0,1-1.19-1.63c-.16-.76.51-1.32,1.18-1.64a6.94,6.94,0,0,1,6.32,0c.71.35,1.42.91,1.27,1.67a2.73,2.73,0,0,1-1.3,1.66A17.53,17.53,0,0,1,363.49,143.3Z'/>"
-"</svg>";
+char teleinfo_icon_linky_png[] PROGMEM = {
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x43, 0x00, 0x00, 0x00, 0x64, 0x08, 0x03, 0x00, 0x00, 0x00, 0xea, 0xbd, 0x7d, 0xcf, 0x00, 0x00, 0x00, 0xc6, 0x50, 0x4c, 0x54, 0x45, 0x00, 0x00, 0x00, 0xcc, 0xe8, 0x21, 0xd6, 0xd6, 0xd6, 0x58, 0x59, 0x58, 0x96, 0xab, 0x13, 0xff, 0xff, 0xff, 0xd7, 0xd5, 0xde, 0x4e, 0x4f, 0x4e, 0xcc, 0xe8, 0x18, 0xce, 0xe5, 0x46, 0xcf, 0xe3, 0x62, 0xd6, 0xd5, 0xdb, 0xcb, 0xe9, 0x00, 0xcc, 0xe9, 0x11, 0xd1, 0xe0, 0x87, 0xd6, 0xd5, 0xdd, 0xdb, 0xdb, 0xdb, 0x53, 0x54, 0x53, 0x8e, 0x8f, 0x8e, 0xc1, 0xc1, 0xc1, 0xad, 0xad, 0xad, 0xc9, 0xe5, 0x20, 0x9c, 0xb2, 0x15, 0x92, 0xa6, 0x12, 0xa1, 0xbb, 0x20, 0xba, 0xd4, 0x1d, 0xb4, 0xcd, 0x1b, 0xc5, 0xe0, 0x1f, 0x96, 0xac, 0x15, 0xb6, 0xd2, 0x25, 0xef, 0xf8, 0xcb, 0xfb, 0xfd, 0xf3, 0xa1, 0xbc, 0x20, 0xe4, 0xf3, 0xa2, 0xd0, 0xea, 0x3e, 0xad, 0xc7, 0x23, 0xc0, 0xde, 0x26, 0xd0, 0xe0, 0x7c, 0xd2, 0xdd, 0x9f, 0xce, 0xce, 0xce, 0xdd, 0xf0, 0x84, 0xeb, 0xf6, 0xb9, 0xd8, 0xed, 0x6c, 0xe0, 0xf1, 0x8e, 0xec, 0xf6, 0xbf, 0xe2, 0xf2, 0x96, 0xa9, 0xc1, 0x1a, 0xcd, 0xe7, 0x32, 0xd4, 0xd9, 0xb6, 0xd2, 0xde, 0x96, 0xd5, 0xd7, 0xcb, 0xd4, 0xd9, 0xb9, 0xf5, 0xfb, 0xdf, 0xda, 0xee, 0x76, 0xba, 0xdc, 0x33, 0xd0, 0xe1, 0x73, 0xd3, 0xdc, 0xa5, 0xcf, 0xe3, 0x5e, 0xd5, 0xd8, 0xc6, 0x84, 0x84, 0x84, 0x60, 0x61, 0x60, 0x9b, 0x9b, 0x9b, 0x77, 0x78, 0x77, 0x6b, 0x6c, 0x6b, 0xc3, 0xc4, 0xc3, 0xe8, 0xf4, 0xaf, 0x8d, 0x9e, 0xc9, 0x15, 0x00, 0x00, 0x00, 0x01, 0x74, 0x52, 0x4e, 0x53, 0x00, 0x40, 0xe6, 0xd8, 0x66,
+  0x00, 0x00, 0x00, 0x01, 0x62, 0x4b, 0x47, 0x44, 0x00, 0x88, 0x05, 0x1d, 0x48, 0x00, 0x00, 0x01, 0xb5, 0x49, 0x44, 0x41, 0x54, 0x58, 0xc3, 0xed, 0xd9, 0x4d, 0x6f, 0x82, 0x30, 0x18, 0x07, 0x70, 0x8a, 0xcf, 0xa5, 0x3b, 0x70, 0xc1, 0x36, 0x7d, 0xe1, 0xb0, 0xb8, 0x09, 0x09, 0x87, 0x32, 0xe7, 0x61, 0x92, 0xb9, 0x97, 0xef, 0xff, 0xa9, 0xf6, 0xa0, 0x5e, 0x8c, 0xa5, 0x2d, 0x94, 0xb9, 0x64, 0xe9, 0x3f, 0x31, 0x68, 0x22, 0x3f, 0xfa, 0x96, 0x5a, 0xdb, 0x2c, 0xc3, 0xf4, 0x3d, 0x25, 0x73, 0x42, 0xdb, 0x3e, 0xbb, 0xa4, 0x23, 0x11, 0x39, 0x13, 0x24, 0x2e, 0xd1, 0xa5, 0x38, 0x23, 0x7d, 0x2c, 0x41, 0x68, 0xd6, 0x46, 0x1b, 0xbd, 0xb7, 0x2a, 0xcc, 0x70, 0x2e, 0xb4, 0xbb, 0x32, 0xbe, 0xa7, 0xb0, 0x0a, 0x00, 0xd4, 0x44, 0x43, 0x33, 0xab, 0xc1, 0x26, 0x18, 0xaa, 0xe2, 0xd7, 0x06, 0x47, 0x43, 0x4e, 0x2b, 0x87, 0x82, 0x93, 0xa1, 0xb9, 0xb8, 0x3c, 0x59, 0x63, 0xc8, 0x2c, 0x83, 0x29, 0xc5, 0x82, 0x07, 0xc8, 0x98, 0x61, 0x0c, 0xd3, 0x46, 0x08, 0x61, 0x34, 0x51, 0x02, 0xeb, 0x22, 0x8d, 0x94, 0xc3, 0xf5, 0xf4, 0x21, 0xcc, 0x78, 0x86, 0x4a, 0x1b, 0xe0, 0x12, 0x5f, 0x4c, 0x80, 0xc2, 0xf7, 0x60, 0x14, 0x54, 0x52, 0x59, 0x1a, 0xc7, 0x65, 0x3c, 0x82, 0x21, 0x12, 0xaf, 0x02, 0x78, 0x85, 0x1c, 0x21, 0x06, 0x2a, 0x5b, 0x3f, 0x5b, 0x8c, 0x8a, 0xdd, 0x18, 0x78, 0xab, 0x19, 0x1a, 0xd6, 0x58, 0x87, 0xca, 0x8d, 0xa1, 0x39, 0x7e, 0x5d, 0x6b, 0x79, 0x65, 0x18, 0xc9, 0xb1, 0x1e, 0xd8, 0x28, 0x00, 0x2c, 0x68, 0x8c, 0xe1, 0xe0, 0xe6, 0x5c, 0x72, 0xce, 0x14, 0x96, 0x5f, 0x73, 0x83, 0xa3, 0x5d, 0x0e, 0x43, 0x5e, 0x9d, 0x7a, 0x7c, 0xce, 0x58, 0x9f, 0xd3, 0xb7,
+  0xff, 0xcb, 0xa0, 0x45, 0xed, 0xc8, 0xb6, 0xf3, 0x1b, 0x5d, 0x9d, 0xbb, 0xf3, 0x5a, 0xf8, 0x8c, 0xee, 0x25, 0xf7, 0x66, 0xe7, 0x31, 0xea, 0x3c, 0x20, 0x6f, 0x4e, 0x63, 0x13, 0x42, 0xe4, 0x7b, 0xa7, 0x51, 0x04, 0x19, 0x39, 0x75, 0x19, 0x75, 0x98, 0xf1, 0xe0, 0x32, 0x0e, 0xc9, 0x48, 0xc6, 0x9d, 0x8c, 0x72, 0xfd, 0x61, 0xc9, 0xba, 0x99, 0x60, 0xac, 0x57, 0xf6, 0x1c, 0xcb, 0x60, 0xe3, 0xfb, 0x38, 0x62, 0xac, 0x3e, 0x83, 0x8d, 0xb1, 0x62, 0x60, 0x9a, 0x64, 0x24, 0x23, 0x19, 0xc9, 0x70, 0x19, 0xe5, 0x02, 0x46, 0x33, 0x3a, 0x8f, 0xbd, 0x87, 0xcf, 0xa7, 0xe5, 0xd7, 0xc8, 0x54, 0xd8, 0x4c, 0x98, 0xd7, 0x9b, 0xd2, 0x9a, 0xbb, 0xfd, 0xbe, 0x2c, 0xb1, 0x0e, 0x5a, 0x62, 0x3d, 0x46, 0x17, 0x58, 0x17, 0x86, 0x35, 0xc8, 0xd6, 0xb3, 0x4e, 0xde, 0xfb, 0x89, 0xda, 0xb7, 0x5e, 0xdf, 0x1c, 0xa2, 0xd7, 0xeb, 0xc3, 0x5e, 0xc4, 0xee, 0xe0, 0x48, 0x41, 0xd3, 0x7f, 0xb1, 0x64, 0x24, 0xe3, 0x17, 0x0d, 0x65, 0x86, 0xc8, 0x28, 0x63, 0xd8, 0x61, 0x03, 0x78, 0x8a, 0x32, 0xf4, 0x39, 0xa9, 0x5f, 0x92, 0xf1, 0xb7, 0x46, 0xb7, 0x80, 0x11, 0xbf, 0x47, 0x4f, 0x17, 0x39, 0x2b, 0x88, 0x6f, 0x90, 0x05, 0xce, 0x4e, 0xda, 0xf8, 0x33, 0x9c, 0xf6, 0x72, 0x10, 0x44, 0xe7, 0x36, 0x6c, 0x4f, 0x87, 0xdb, 0x7f, 0x00, 0x63, 0xa4, 0x5e, 0x2f, 0x79, 0x81, 0xc2, 0xec, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82
+};
+const unsigned int teleinfo_icon_linky_png_size = 730;
+
+// icons
+void TeleinfoSensorLinkyIcon ()
+{ 
+  Webserver->send_P (200, PSTR ("image/png"), teleinfo_icon_linky_png, teleinfo_icon_linky_png_size);
+}
+
+#endif      // USE_WEBSERVER
 
 /*********************************************\
  *               Functions
@@ -253,16 +256,16 @@ void TeleinfoSensorGetCurrentDataDisplay (const int unit_type, const int phase, 
   switch (unit) 
   {
     case TELEINFO_UNIT_W:
-      value = teleinfo_phase[phase].pact;
+      value = teleinfo_conso.phase[phase].pact;
       break;
     case TELEINFO_UNIT_VA:
-      value = teleinfo_phase[phase].papp;
+      value = teleinfo_conso.phase[phase].papp;
       break;
     case TELEINFO_UNIT_V:
-      value = teleinfo_phase[phase].voltage;
+      value = teleinfo_conso.phase[phase].voltage;
       break;
     case TELEINFO_UNIT_COSPHI:
-      value = teleinfo_phase[phase].cosphi;
+      value = teleinfo_conso.phase[phase].cosphi;
       break;
   }
 
@@ -431,6 +434,7 @@ void TeleinfoSensorSaveDataHisto (const uint8_t period)
   uint32_t start_time, current_time, day_of_week, index;
   TIME_T   time_dst, start_dst;
   char     str_value[32];
+  char     str_filename[UFS_FILENAME_SIZE];
 
   // check boundaries
   if ((period != TELEINFO_PERIOD_DAY) && (period != TELEINFO_PERIOD_WEEK)) return;
@@ -443,7 +447,7 @@ void TeleinfoSensorSaveDataHisto (const uint8_t period)
   if (period == TELEINFO_PERIOD_DAY)
   {
     // set current weekly file name
-    sprintf_P (teleinfo_graph.str_filename, D_TELEINFO_HISTO_FILE_DAY, 0);
+    sprintf_P (str_filename, D_TELEINFO_HISTO_FILE_DAY, 0);
 
     // calculate index of daily line
     index = (time_dst.hour * 3600 + time_dst.minute * 60) * TELEINFO_GRAPH_SAMPLE / 86400;
@@ -453,7 +457,7 @@ void TeleinfoSensorSaveDataHisto (const uint8_t period)
   else if (period == TELEINFO_PERIOD_WEEK)
   {
     // set current weekly file name
-    sprintf_P (teleinfo_graph.str_filename, D_TELEINFO_HISTO_FILE_WEEK, 0);
+    sprintf_P (str_filename, D_TELEINFO_HISTO_FILE_WEEK, 0);
 
     // calculate start of current week
     start_dst = time_dst;
@@ -469,10 +473,10 @@ void TeleinfoSensorSaveDataHisto (const uint8_t period)
   }
 
   // if log file name has changed, flush data of previous file
-  if ((teleinfo_period[period].str_filename != "") && (teleinfo_period[period].str_filename != teleinfo_graph.str_filename)) TeleinfoSensorFlushDataHisto (period);
+  if ((teleinfo_period[period].str_filename != "") && (teleinfo_period[period].str_filename != str_filename)) TeleinfoSensorFlushDataHisto (period);
 
   // set new log filename
-  teleinfo_period[period].str_filename = teleinfo_graph.str_filename;
+  teleinfo_period[period].str_filename = str_filename;
 
   // line : index and date
   teleinfo_period[period].str_buffer += index;
@@ -514,7 +518,7 @@ void TeleinfoSensorSaveDataHisto (const uint8_t period)
   if (teleinfo_contract.period_qty < TIC_PERIOD_MAX) 
     for (index = 0; index < teleinfo_contract.period_qty; index++)
     {
-      lltoa (teleinfo_meter.conso_index_wh[index], str_value, 10); 
+      lltoa (teleinfo_conso.index_wh[index], str_value, 10); 
       teleinfo_period[period].str_buffer += ";";
       teleinfo_period[period].str_buffer += str_value;
     }
@@ -578,6 +582,7 @@ void TeleinfoSensorMidnightSaveTotal ()
   char      str_value[32];
   String    str_line;
   File      file;
+  char      str_filename[UFS_FILENAME_SIZE];
 
   // calculate last day filename (shift 30s before)
   current_time = LocalTime () - 30;
@@ -587,33 +592,33 @@ void TeleinfoSensorMidnightSaveTotal ()
   if (today_dst.year == 0) return;
 
   // if daily conso is available
-  if (teleinfo_meter.conso_total_wh > 0)
+  if (teleinfo_conso.total_wh > 0)
   {
     // calculate daily ahd hourly delta
-    delta = teleinfo_meter.conso_total_wh - teleinfo_graph.conso_last_day_wh;
-    teleinfo_graph.conso_hour_wh[today_dst.hour] += (long)(teleinfo_meter.conso_total_wh - teleinfo_graph.conso_last_hour_wh);
+    delta = teleinfo_conso.total_wh - teleinfo_graph.conso_last_day_wh;
+    teleinfo_graph.conso_hour_wh[today_dst.hour] += (long)(teleinfo_conso.total_wh - teleinfo_graph.conso_last_hour_wh);
 
     // update last day and hour total
-    teleinfo_graph.conso_last_day_wh  = teleinfo_meter.conso_total_wh;
-    teleinfo_graph.conso_last_hour_wh = teleinfo_meter.conso_total_wh;
+    teleinfo_graph.conso_last_day_wh  = teleinfo_conso.total_wh;
+    teleinfo_graph.conso_last_hour_wh = teleinfo_conso.total_wh;
 
     // get filename
-    sprintf_P (teleinfo_graph.str_filename, D_TELEINFO_HISTO_FILE_YEAR, 1970 + today_dst.year);
+    sprintf_P (str_filename, D_TELEINFO_HISTO_FILE_YEAR, 1970 + today_dst.year);
 
     // if file exists, open in append mode
-    if (ffsp->exists (teleinfo_graph.str_filename)) file = ffsp->open (teleinfo_graph.str_filename, "a");
+    if (ffsp->exists (str_filename)) file = ffsp->open (str_filename, "a");
 
     // else create file and add header
     else
     {
-      file = ffsp->open (teleinfo_graph.str_filename, "w");
+      file = ffsp->open (str_filename, "w");
       file.print (D_TELEINFO_HEADER_YEAR);
     }
 
     // generate today's line
     sprintf (str_value, "%u;%u;%u;", today_dst.day_of_year, today_dst.month, today_dst.day_of_month);
     str_line = str_value;
-    lltoa (teleinfo_meter.conso_total_wh, str_value, 10);
+    lltoa (teleinfo_conso.total_wh, str_value, 10);
     str_line += str_value;
     str_line += ";";
     lltoa (delta, str_value, 10);
@@ -637,33 +642,33 @@ void TeleinfoSensorMidnightSaveTotal ()
   }
 
   // if daily production is available
-  if (teleinfo_meter.prod_total_wh > 0)
+  if (teleinfo_prod.total_wh > 0)
   {
     // calculate daily ahd hourly delta
-    delta = teleinfo_meter.prod_total_wh - teleinfo_graph.prod_last_day_wh;
-    teleinfo_graph.prod_hour_wh[today_dst.hour] += (long)(teleinfo_meter.prod_total_wh - teleinfo_graph.prod_last_hour_wh);
+    delta = teleinfo_prod.total_wh - teleinfo_graph.prod_last_day_wh;
+    teleinfo_graph.prod_hour_wh[today_dst.hour] += (long)(teleinfo_prod.total_wh - teleinfo_graph.prod_last_hour_wh);
 
     // update last day and hour total
-    teleinfo_graph.prod_last_day_wh  = teleinfo_meter.prod_total_wh;
-    teleinfo_graph.prod_last_hour_wh = teleinfo_meter.prod_total_wh;
+    teleinfo_graph.prod_last_day_wh  = teleinfo_prod.total_wh;
+    teleinfo_graph.prod_last_hour_wh = teleinfo_prod.total_wh;
 
     // get filename
-    sprintf_P (teleinfo_graph.str_filename, D_TELEINFO_HISTO_FILE_PROD, 1970 + today_dst.year);
+    sprintf_P (str_filename, D_TELEINFO_HISTO_FILE_PROD, 1970 + today_dst.year);
 
     // if file exists, open in append mode
-    if (ffsp->exists (teleinfo_graph.str_filename)) file = ffsp->open (teleinfo_graph.str_filename, "a");
+    if (ffsp->exists (str_filename)) file = ffsp->open (str_filename, "a");
 
     // else create file and add header
     else
     {
-      file = ffsp->open (teleinfo_graph.str_filename, "w");
+      file = ffsp->open (str_filename, "w");
       file.print (D_TELEINFO_HEADER_YEAR);
     }
 
     // generate today's line
     sprintf (str_value, "%u;%u;%u;", today_dst.day_of_year, today_dst.month, today_dst.day_of_month);
     str_line = str_value;
-    lltoa (teleinfo_meter.prod_total_wh, str_value, 10);
+    lltoa (teleinfo_prod.total_wh, str_value, 10);
     str_line += str_value;
     str_line += ";";
     lltoa (delta, str_value, 10);
@@ -806,16 +811,6 @@ void TeleinfoSensorSaveDataMemory (const uint8_t period)
       teleinfo_graph.data_live.arr_volt[phase][cell_index]   = (uint8_t)voltage;
       teleinfo_graph.data_live.arr_cosphi[phase][cell_index] = teleinfo_graph.cosphi[phase];
     }
-
-#ifndef USE_UFILESYS
-    else
-    {
-      teleinfo_graph.data_daily.arr_papp[phase][cell_index]   = (uint8_t)apparent;
-      teleinfo_graph.data_daily.arr_pact[phase][cell_index]   = (uint8_t)active;
-      teleinfo_graph.data_daily.arr_volt[phase][cell_index]   = (uint8_t)voltage;
-      teleinfo_graph.data_daily.arr_cosphi[phase][cell_index] = teleinfo_graph.cosphi[phase];
-    }
-#endif    // USE_UFILESYS
   }
 
   // increase data index in the graph and set update flag
@@ -935,32 +930,32 @@ void TeleinfoSensorEverySecond ()
   if (teleinfo_graph.last_hour == UINT8_MAX) teleinfo_graph.last_hour = RtcTime.hour;
 
   // if conso is defined
-  if (teleinfo_meter.conso_total_wh > 0)
+  if (teleinfo_conso.total_wh > 0)
   {
     // if needed, init data
-    if (teleinfo_graph.conso_last_day_wh  == 0) teleinfo_graph.conso_last_day_wh  = teleinfo_meter.conso_total_wh;
-    if (teleinfo_graph.conso_last_hour_wh == 0) teleinfo_graph.conso_last_hour_wh = teleinfo_meter.conso_total_wh;
+    if (teleinfo_graph.conso_last_day_wh  == 0) teleinfo_graph.conso_last_day_wh  = teleinfo_conso.total_wh;
+    if (teleinfo_graph.conso_last_hour_wh == 0) teleinfo_graph.conso_last_hour_wh = teleinfo_conso.total_wh;
 
     // if hour change, save hourly increment
     if (teleinfo_graph.last_hour != RtcTime.hour)
     {
-      teleinfo_graph.conso_hour_wh[teleinfo_graph.last_hour] += (long)(teleinfo_meter.conso_total_wh - teleinfo_graph.conso_last_hour_wh);
-      teleinfo_graph.conso_last_hour_wh = teleinfo_meter.conso_total_wh;
+      teleinfo_graph.conso_hour_wh[teleinfo_graph.last_hour] += (long)(teleinfo_conso.total_wh - teleinfo_graph.conso_last_hour_wh);
+      teleinfo_graph.conso_last_hour_wh = teleinfo_conso.total_wh;
     }
   }
 
   // if production is defined
-  if (teleinfo_meter.prod_total_wh > 0)
+  if (teleinfo_prod.total_wh > 0)
   {
     // if needed, init data
-    if (teleinfo_graph.prod_last_day_wh  == 0) teleinfo_graph.prod_last_day_wh  = teleinfo_meter.prod_total_wh;
-    if (teleinfo_graph.prod_last_hour_wh == 0) teleinfo_graph.prod_last_hour_wh = teleinfo_meter.prod_total_wh;
+    if (teleinfo_graph.prod_last_day_wh  == 0) teleinfo_graph.prod_last_day_wh  = teleinfo_prod.total_wh;
+    if (teleinfo_graph.prod_last_hour_wh == 0) teleinfo_graph.prod_last_hour_wh = teleinfo_prod.total_wh;
 
     // if hour change, save hourly increment
     if (teleinfo_graph.last_hour != RtcTime.hour)
     {
-      teleinfo_graph.prod_hour_wh[teleinfo_graph.last_hour] += (long)(teleinfo_meter.prod_total_wh - teleinfo_graph.prod_last_hour_wh);
-      teleinfo_graph.prod_last_hour_wh = teleinfo_meter.prod_total_wh;
+      teleinfo_graph.prod_hour_wh[teleinfo_graph.last_hour] += (long)(teleinfo_prod.total_wh - teleinfo_graph.prod_last_hour_wh);
+      teleinfo_graph.prod_last_hour_wh = teleinfo_prod.total_wh;
     }
   }
 
@@ -974,22 +969,22 @@ void TeleinfoSensorEverySecond ()
     for (phase = 0; phase < teleinfo_contract.phase; phase++)
     {
       // if within range, update phase apparent power
-      if (teleinfo_phase[phase].papp != LONG_MAX)
+      if (teleinfo_conso.phase[phase].papp != LONG_MAX)
       {
         // add power to period total (for average calculation)
-        teleinfo_period[period].pact_sum[phase]   += (long long)teleinfo_phase[phase].pact;
-        teleinfo_period[period].papp_sum[phase]   += (long long)teleinfo_phase[phase].papp;
-        teleinfo_period[period].cosphi_sum[phase] += teleinfo_phase[phase].cosphi;
+        teleinfo_period[period].pact_sum[phase]   += (long long)teleinfo_conso.phase[phase].pact;
+        teleinfo_period[period].papp_sum[phase]   += (long long)teleinfo_conso.phase[phase].papp;
+        teleinfo_period[period].cosphi_sum[phase] += teleinfo_conso.phase[phase].cosphi;
 
         // if voltage defined, update lowest and highest voltage level
-        if (teleinfo_phase[phase].voltage > 0)
+        if (teleinfo_conso.phase[phase].voltage > 0)
         {
-          if (teleinfo_phase[phase].voltage < teleinfo_period[period].volt_low[phase])  teleinfo_period[period].volt_low[phase]  = teleinfo_phase[phase].voltage;
-          if (teleinfo_phase[phase].voltage > teleinfo_period[period].volt_peak[phase]) teleinfo_period[period].volt_peak[phase] = teleinfo_phase[phase].voltage;
+          if (teleinfo_conso.phase[phase].voltage < teleinfo_period[period].volt_low[phase])  teleinfo_period[period].volt_low[phase]  = teleinfo_conso.phase[phase].voltage;
+          if (teleinfo_conso.phase[phase].voltage > teleinfo_period[period].volt_peak[phase]) teleinfo_period[period].volt_peak[phase] = teleinfo_conso.phase[phase].voltage;
         }       
 
         // update highest apparent power level
-        if (teleinfo_phase[phase].papp > teleinfo_period[period].papp_peak[phase]) teleinfo_period[period].papp_peak[phase] = teleinfo_phase[phase].papp;
+        if (teleinfo_conso.phase[phase].papp > teleinfo_period[period].papp_peak[phase]) teleinfo_period[period].papp_peak[phase] = teleinfo_conso.phase[phase].papp;
       }
     }
 
@@ -1014,10 +1009,299 @@ void TeleinfoSensorEverySecond ()
 
 #ifdef USE_WEBSERVER
 
-// Display offload icons
-void TeleinfoSensorWebIconLinky () 
-{ 
-  Webserver->send_P (200, PSTR ("image/svg+xml"), teleinfo_icon_tic_svg, strlen (teleinfo_icon_tic_svg));
+// Append Teleinfo state to main page
+void TeleinfoSensorWebSensor ()
+{
+  uint8_t   phase, period;
+  long      value, red, green;
+  long long total;
+  char      str_text[32];
+  char      str_color[16];
+
+  // display according to serial receiver status
+  switch (teleinfo_meter.status_rx)
+  {
+    case TIC_SERIAL_INIT:
+      WSContentSend_P (PSTR ("{s}%s{m}Check configuration{e}"), D_TELEINFO);
+      break;
+
+    case TIC_SERIAL_FAILED:
+      WSContentSend_P (PSTR ("{s}%s{m}Init failed{e}"), D_TELEINFO);
+      break;
+
+    case TIC_SERIAL_STOPPED:
+      WSContentSend_P (PSTR ("{s}%s{m}Reception stopped{e}"), D_TELEINFO);
+      break;
+
+    case TIC_SERIAL_ACTIVE:
+      // start
+      WSContentSend_P (PSTR ("<div style='font-size:13px;text-align:center;padding:4px 6px;margin-bottom:5px;background:#333333;border-radius:12px;'>\n"));
+
+      // title
+      WSContentSend_P (PSTR ("<div style='display:flex;margin:2px 0px 6px 0px;padding:0px;font-size:16px;'>\n"));
+      WSContentSend_P (PSTR ("<div style='width:34%%;padding:0px;text-align:left;font-weight:bold;'>Teleinfo</div>\n"));
+      GetTextIndexed (str_text, sizeof (str_text), teleinfo_contract.mode, kTeleinfoModeIcon);
+      WSContentSend_P (PSTR ("<div style='width:32%%;padding:0px;'>%s</div>\n"), str_text);
+      if (teleinfo_contract.phase > 1) sprintf (str_text, "%u x ", teleinfo_contract.phase); else strcpy (str_text, ""); 
+      WSContentSend_P (PSTR ("<div style='width:22%%;padding:0px;text-align:right;font-weight:bold;'>%s%d</div>\n"), str_text, teleinfo_contract.ssousc / 1000);
+      WSContentSend_P (PSTR ("<div style='width:2%%;padding:0px;'></div><div style='width:10%%;padding:0px;text-align:left;'>kVA</div>\n"));
+      WSContentSend_P (PSTR ("</div>\n"));
+
+      // contract
+      if (teleinfo_contract.period_qty <= TELEINFO_INDEX_MAX) 
+        for (period = 0; period < teleinfo_contract.period_qty; period++)
+          if (teleinfo_conso.index_wh[period] > 0)
+          {
+            WSContentSend_P (PSTR ("<div style='display:flex;padding:2px 0px;'>\n"));
+
+            // period name
+            WSContentSend_P (PSTR ("<div style='width:16%%;padding:0px;'></div>\n"));
+            GetTextIndexed (str_text, sizeof (str_text), teleinfo_contract.period_first + period, kTeleinfoPeriodName);
+            if (teleinfo_contract.period_current == teleinfo_contract.period_first + period) WSContentSend_P (PSTR ("<div style='width:31%%;padding:1px 0px;font-size:12px;background-color:#09f;border-radius:6px;'>%s</div>\n"), str_text);
+              else WSContentSend_P (PSTR ("<div style='width:31%%;padding:0px;font-size:12px;'>%s</div>\n"), str_text);
+
+            // counter value
+            lltoa (teleinfo_conso.index_wh[period], str_text, 10);
+            WSContentSend_P (PSTR ("<div style='width:41%%;padding:0px;text-align:right;'>%s</div>\n"), str_text);
+            WSContentSend_P (PSTR ("<div style='width:2%%;padding:0px;'></div><div style='width:10%%;padding:0px;text-align:left;'>Wh</div>\n"));
+            WSContentSend_P (PSTR ("</div>\n"));
+          }
+
+      // production total
+      if (teleinfo_prod.total_wh != 0)
+      {
+        WSContentSend_P (PSTR ("<div style='display:flex;padding:2px 0px;'>\n"));
+
+        // period name
+        WSContentSend_P (PSTR ("<div style='width:16%%;padding:0px;'></div>\n"));
+        if (teleinfo_prod.papp == 0) WSContentSend_P (PSTR ("<div style='width:31%%;padding:0px;'>Production</div>\n"));
+          else WSContentSend_P (PSTR ("<div style='width:31%%;padding:0px;background-color:#080;border-radius:6px;'>Production</div>\n"));
+
+        // counter value
+        lltoa (teleinfo_prod.total_wh, str_text, 10);
+        WSContentSend_P (PSTR ("<div style='width:41%%;padding:0px;text-align:right;'>%s</div>\n"), str_text);
+        WSContentSend_P (PSTR ("<div style='width:2%%;padding:0px;'></div><div style='width:10%%;padding:0px;text-align:left;'>Wh</div>\n"));
+        WSContentSend_P (PSTR ("</div>\n"));
+      }
+
+      // if meter is running consommation mode
+      if (teleinfo_conso.total_wh > 0)
+      {
+        // separator
+        WSContentSend_P (PSTR ("<hr>\n"));
+
+        WSContentSend_P (PSTR ("<div style='padding:0px 0px 5px 0px;text-align:left;font-weight:bold;'>Consommation</div>\n"));
+
+        WSContentSend_P (PSTR ("<div style='display:flex;padding:2px 0px;'>\n"));
+
+        // conso header
+        WSContentSend_P (PSTR ("<div style='width:46%%;padding:0px;text-align:right;'>cosφ</div>\n"));
+        WSContentSend_P (PSTR ("<div style='width:2%%;padding:0px;'></div><div style='width:15%%;padding:0px;text-align:left;font-weight:bold;'>%u.%02u</div>\n"), teleinfo_conso.phase[0].cosphi / 100, teleinfo_conso.phase[0].cosphi % 100);
+        value = 0; 
+        for (phase = 0; phase < teleinfo_contract.phase; phase++) value += teleinfo_conso.phase[phase].pact;
+        WSContentSend_P (PSTR ("<div style='width:25%%;padding:0px;text-align:right;font-weight:bold;'>%d</div>\n"), value);
+        WSContentSend_P (PSTR ("<div style='width:2%%;padding:0px;'></div><div style='width:10%%;padding:0px;text-align:left;'>W</div>\n"));
+
+        WSContentSend_P (PSTR ("</div>\n"));
+
+        // percentage per phase
+        if (teleinfo_contract.ssousc > 0)
+          for (phase = 0; phase < teleinfo_contract.phase; phase++)
+          {
+            // calculate percentage and value
+            value = 100 * teleinfo_conso.phase[phase].papp / teleinfo_contract.ssousc;
+            if (value > 100) value = 100;
+            if (teleinfo_conso.phase[phase].papp > 0) ltoa (teleinfo_conso.phase[phase].papp, str_text, 10); 
+              else strcpy (str_text, "");
+
+            // calculate color
+            if (value < 50) green = TELEINFO_RGB_GREEN_MAX; else green = TELEINFO_RGB_GREEN_MAX * 2 * (100 - value) / 100;
+            if (value > 50) red = TELEINFO_RGB_RED_MAX; else red = TELEINFO_RGB_RED_MAX * 2 * value / 100;
+            sprintf (str_color, "#%02x%02x00", red, green);
+
+            // display bar graph percentage
+            WSContentSend_P (PSTR ("<div style='display:flex;margin:2px 0px;padding:1px;height:16px;opacity:75%%;'>\n"));
+            WSContentSend_P (PSTR ("<div style='width:16%%;padding:0px;text-align:left;'>%d V</div>\n"), teleinfo_conso.phase[phase].voltage);
+            WSContentSend_P (PSTR ("<div style='width:72%%;padding:0px;text-align:left;background-color:%s;border-radius:6px;'><div style='width:%d%%;height:16px;padding:0px;text-align:center;font-size:12px;background-color:%s;border-radius:6px;'>%s</div></div>\n"), COLOR_BACKGROUND, value, str_color, str_text);
+            WSContentSend_P (PSTR ("<div style='width:2%%;padding:0px;'></div><div style='width:10%%;padding:0px;text-align:left;'>VA</div>\n"));
+            WSContentSend_P (PSTR ("</div>\n"));
+          }
+
+        // today's total consumption
+        if (teleinfo_conso.midnight_wh != LONG_LONG_MAX)
+        {
+          WSContentSend_P (PSTR ("<div style='display:flex;padding:2px 0px;'>\n"));
+          WSContentSend_P (PSTR ("<div style='width:16%%;padding:0px;'></div>\n"));
+          WSContentSend_P (PSTR ("<div style='width:31%%;padding:0px;'>Aujourd'hui</div>\n"));
+          total = teleinfo_conso.total_wh - teleinfo_conso.midnight_wh;
+          WSContentSend_P (PSTR ("<div style='width:41%%;padding:0px;text-align:right;font-weight:bold;'>%d</div>\n"), (long)total);
+          WSContentSend_P (PSTR ("<div style='width:2%%;padding:0px;'></div><div style='width:10%%;padding:0px;text-align:left;'>Wh</div>\n"));
+          WSContentSend_P (PSTR ("</div>\n"));
+        }
+      }
+
+      // if meter is running production mode
+      if (teleinfo_prod.total_wh > 0)
+      {
+        // separator
+        WSContentSend_P (PSTR ("<hr>\n"));
+
+        WSContentSend_P (PSTR ("<div style='padding:0px 0px 5px 0px;text-align:left;font-weight:bold;'>Production</div>\n"));
+
+        // production
+        WSContentSend_P (PSTR ("<div style='display:flex;padding:2px 0px;'>\n"));
+        WSContentSend_P (PSTR ("<div style='width:46%%;padding:0px;text-align:right;'>cosφ</div>\n"));
+        WSContentSend_P (PSTR ("<div style='width:2%%;padding:0px;'></div><div style='width:15%%;padding:0px;text-align:left;font-weight:bold;'>cosφ %u.%02u</div>\n"), teleinfo_prod.cosphi / 100, teleinfo_prod.cosphi % 100);
+        WSContentSend_P (PSTR ("<div style='width:25%%;padding:0px;text-align:right;font-weight:bold;'>%d</div>\n"), teleinfo_prod.pact);
+        WSContentSend_P (PSTR ("<div style='width:2%%;padding:0px;'></div><div style='width:10%%;padding:0px;text-align:left;'>W</div>\n"));
+        WSContentSend_P (PSTR ("</div>\n"));
+
+        // calculate and display production bar graph percentage
+        if (teleinfo_contract.ssousc > 0)
+        {            
+          // calculate percentage and value
+          value = 100 * teleinfo_prod.papp / teleinfo_contract.ssousc;
+          if (value > 100) value = 100;
+          if (teleinfo_prod.papp > 0) ltoa (teleinfo_prod.papp, str_text, 10); 
+              else strcpy (str_text, "");
+
+          // calculate color
+          if (value < 50) red = TELEINFO_RGB_GREEN_MAX; else red = TELEINFO_RGB_GREEN_MAX * 2 * (100 - value) / 100;
+          if (value > 50) green = TELEINFO_RGB_RED_MAX; else green = TELEINFO_RGB_RED_MAX * 2 * value / 100;
+          sprintf (str_color, "#%02x%02x00", red, green);
+
+          // display bar graph percentage
+          WSContentSend_P (PSTR ("<div style='display:flex;margin:2px 0px;padding:1px;height:16px;opacity:75%%;'>\n"));
+          WSContentSend_P (PSTR ("<div style='width:16%%;padding:0px;text-align:left;'></div>\n"));
+          WSContentSend_P (PSTR ("<div style='width:72%%;padding:0px;text-align:left;background-color:%s;border-radius:6px;'><div style='width:%d%%;height:16px;padding:0px;text-align:center;font-size:12px;background-color:%s;border-radius:6px;'>%s</div></div>\n"), COLOR_BACKGROUND, value, str_color, str_text);
+          WSContentSend_P (PSTR ("<div style='width:2%%;padding:0px;'></div><div style='width:10%%;padding:0px;text-align:left;'>VA</div>\n"));
+          WSContentSend_P (PSTR ("</div>\n"));
+        }
+
+        // today's total production
+        if (teleinfo_prod.midnight_wh != LONG_LONG_MAX)
+        {
+          WSContentSend_P (PSTR ("<div style='display:flex;padding:2px 0px;'>\n"));
+          WSContentSend_P (PSTR ("<div style='width:16%%;padding:0px;'></div>\n"));
+          WSContentSend_P (PSTR ("<div style='width:31%%;padding:0px;'>Aujourd'hui</div>\n"));
+          total = teleinfo_prod.total_wh - teleinfo_prod.midnight_wh;
+          WSContentSend_P (PSTR ("<div style='width:41%%;padding:0px;text-align:right;font-weight:bold;'>%d</div>\n"), (long)total);
+          WSContentSend_P (PSTR ("<div style='width:2%%;padding:0px;'></div><div style='width:10%%;padding:0px;text-align:left;'>Wh</div>\n"));
+          WSContentSend_P (PSTR ("</div>\n"));
+        }
+      }
+
+      // separator
+      WSContentSend_P (PSTR ("<hr>\n"));
+
+      // counters
+      WSContentSend_P (PSTR ("<div style='display:flex;padding:2px 0px;'>\n"));
+      WSContentSend_P (PSTR ("<div style='width:50%%;padding:0px;'>%d trames</div>\n"), teleinfo_meter.nb_message);
+      WSContentSend_P (PSTR ("<div style='width:50%%;padding:0px;'>%d cosφ</div>\n"), teleinfo_meter.nb_update);
+      WSContentSend_P (PSTR ("</div>\n"));
+
+      // if reset or more than 1% errors, display counters
+      if ((teleinfo_meter.nb_reset > 0) || (teleinfo_meter.nb_error > teleinfo_meter.nb_line / 100))
+      {
+        WSContentSend_P (PSTR ("<div style='display:flex;padding:2px 0px;'>\n"));
+
+        // errors
+        if (teleinfo_meter.nb_error == 0) strcpy (str_text, "white"); else strcpy (str_text, "red");
+        WSContentSend_P (PSTR ("<div style='width:50%%;padding:0px;color:%s;'>%d erreurs</div>\n"), str_text, teleinfo_meter.nb_error);
+
+        // reset
+        if (teleinfo_meter.nb_reset == 0) strcpy (str_text, "white"); else strcpy (str_text, "orange");
+        WSContentSend_P (PSTR ("<div style='width:50%%;padding:0px;color:%s;'>%d reset</div>\n"), str_text, teleinfo_meter.nb_reset);
+
+        WSContentSend_P (PSTR ("</div>\n"));
+      }
+
+      // end
+      WSContentSend_P (PSTR ("</div>\n"));
+      break;
+  }
+}
+
+// Append Teleinfo configuration button to configuration page
+void TeleinfoSensorWebConfigButton ()
+{
+  // heater and meter configuration button
+  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>Configure Teleinfo</button></form></p>\n"), D_TELEINFO_PAGE_CONFIG);
+}
+
+// Teleinfo web page
+void TeleinfoSensorWebPageConfigure ()
+{
+  int  index;
+  char str_text[32];
+  char str_select[16];
+
+  // if access not allowed, close
+  if (!HttpCheckPriviledgedAccess ()) return;
+
+  // page comes from save button on configuration page
+  if (Webserver->hasArg ("save"))
+  {
+    // parameter 'rate' : set teleinfo rate
+    WebGetArg (D_CMND_TELEINFO_RATE, str_text, sizeof (str_text));
+    if (strlen (str_text) > 0) SetSerialBaudrate ((uint32_t)atoi (str_text));
+
+    // parameter 'msgpol' : set TIC messages diffusion policy
+    WebGetArg (D_CMND_TELEINFO_MSG_POLICY, str_text, sizeof (str_text));
+    if (strlen (str_text) > 0) teleinfo_config.msg_policy = atoi (str_text);
+
+    // parameter 'msgtype' : set TIC messages type diffusion policy
+    WebGetArg (D_CMND_TELEINFO_MSG_TYPE, str_text, sizeof (str_text));
+    if (strlen (str_text) > 0) teleinfo_config.msg_type = atoi (str_text);
+
+    // save configuration
+    TeleinfoSaveConfig ();
+  }
+
+  // beginning of form
+  WSContentStart_P (PSTR ("Configure Teleinfo"));
+  WSContentSendStyle ();
+  WSContentSend_P (PSTR ("<form method='get' action='%s'>\n"), D_TELEINFO_PAGE_CONFIG);
+
+  // speed selection form
+  WSContentSend_P (PSTR ("<p><fieldset><legend><b>&nbsp;%s %s&nbsp;</b></legend>\n"), "📨", PSTR ("Teleinfo (need restart)"));
+  if ((TasmotaGlobal.baudrate != 1200) && (TasmotaGlobal.baudrate != 9600)) strcpy_P (str_select, PSTR ("checked")); else strcpy (str_select, "");
+  WSContentSend_P (PSTR ("<p><input type='radio' name='%s' value='%d' %s>%s</p>\n"), D_CMND_TELEINFO_RATE, 115200, str_select, "Disabled");
+  if (TasmotaGlobal.baudrate == 1200) strcpy_P (str_select, PSTR ("checked")); else strcpy (str_select, "");
+  WSContentSend_P (PSTR ("<p><input type='radio' name='%s' value='%d' %s>%s</p>\n"), D_CMND_TELEINFO_RATE, 1200, str_select, "Mode Historique");
+  if (TasmotaGlobal.baudrate == 9600) strcpy_P (str_select, PSTR ("checked")); else strcpy (str_select, "");
+  WSContentSend_P (PSTR ("<p><input type='radio' name='%s' value='%d' %s>%s</p>\n"), D_CMND_TELEINFO_RATE, 9600, str_select, "Mode Standard");
+  WSContentSend_P (PSTR ("</fieldset></p>\n"));
+
+  // teleinfo message diffusion policy
+  WSContentSend_P (PSTR ("<p><fieldset><legend><b>&nbsp;%s %s&nbsp;</b></legend>\n"), "🧾", PSTR ("Message policy"));
+  for (index = 0; index < TELEINFO_POLICY_MAX; index++)
+  {
+    if (index == teleinfo_config.msg_policy) strcpy_P (str_select, PSTR ("checked")); else strcpy (str_select, "");
+    GetTextIndexed (str_text, sizeof (str_text), index, kTeleinfoMessagePolicy);
+    WSContentSend_P (PSTR ("<p><input type='radio' name='%s' value='%d' %s>%s</p>\n"), D_CMND_TELEINFO_MSG_POLICY, index, str_select, str_text);
+  }
+  WSContentSend_P (PSTR ("</fieldset></p>\n"));
+
+  // teleinfo message diffusion type
+  WSContentSend_P (PSTR ("<p><fieldset><legend><b>&nbsp;%s %s&nbsp;</b></legend>\n"), "📑", PSTR ("Message data"));
+  for (index = 0; index < TELEINFO_MSG_MAX; index++)
+  {
+    if (index == teleinfo_config.msg_type) strcpy_P (str_select, PSTR ("checked")); else strcpy (str_select, "");
+    GetTextIndexed (str_text, sizeof (str_text), index, kTeleinfoMessageType);
+    WSContentSend_P (PSTR ("<p><input type='radio' name='%s' value='%d' %s>%s</p>\n"), D_CMND_TELEINFO_MSG_TYPE, index, str_select, str_text);
+  }
+  WSContentSend_P (PSTR ("</fieldset></p>\n"));
+
+  // save button
+  WSContentSend_P (PSTR ("<br><button name='save' type='submit' class='button bgrn'>%s</button>"), D_SAVE);
+  WSContentSend_P (PSTR ("</form>\n"));
+
+  // configuration button
+  WSContentSpaceButton (BUTTON_CONFIGURATION);
+
+  // end of page
+  WSContentStop ();
 }
 
 // Get specific argument as a value with min and max
@@ -1047,97 +1331,13 @@ void TeleinfoSensorWebMainButton ()
   WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>Messages</button></form></p>\n"), D_TELEINFO_PAGE_TIC);
 
   // Teleinfo curve page button
-  if (teleinfo_meter.conso_total_wh > 0) WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>Courbes</button></form></p>\n"), D_TELEINFO_PAGE_GRAPH);
+  if (teleinfo_conso.total_wh > 0) WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>Courbes</button></form></p>\n"), D_TELEINFO_PAGE_GRAPH);
 
 #ifdef USE_UFILESYS
   // Teleinfo conso and prod
-  if (teleinfo_meter.conso_total_wh > 0) WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>Consommation</button></form></p>\n"), D_TELEINFO_PAGE_GRAPH_CONSO);
-  if (teleinfo_meter.prod_total_wh > 0)  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>Production</button></form></p>\n"), D_TELEINFO_PAGE_GRAPH_PROD);
+  if (teleinfo_conso.total_wh > 0) WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>Consommation</button></form></p>\n"), D_TELEINFO_PAGE_GRAPH_CONSO);
+  if (teleinfo_prod.total_wh > 0)  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>Production</button></form></p>\n"), D_TELEINFO_PAGE_GRAPH_PROD);
 #endif      // USE_UFILESYS
-}
-
-// Append Teleinfo configuration button to configuration page
-void TeleinfoSensorWebConfigButton ()
-{
-  // heater and meter configuration button
-  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>Configure Teleinfo</button></form></p>\n"), D_TELEINFO_PAGE_CONFIG);
-}
-
-// Teleinfo web page
-void TeleinfoSensorWebPageConfigure ()
-{
-  int  index;
-  char str_text[32];
-  char str_select[16];
-
-  // if access not allowed, close
-  if (!HttpCheckPriviledgedAccess ()) return;
-
-  // page comes from save button on configuration page
-  if (Webserver->hasArg ("save"))
-  {
-//    // parameter 'rate' : set teleinfo rate
-//    WebGetArg (D_CMND_TELEINFO_RATE, str_text, sizeof (str_text));
-//    if (strlen (str_text) > 0) teleinfo_config.baud_rate = (uint16_t)atoi (str_text);
-
-    // parameter 'msgpol' : set TIC messages diffusion policy
-    WebGetArg (D_CMND_TELEINFO_MSG_POLICY, str_text, sizeof (str_text));
-    if (strlen (str_text) > 0) teleinfo_config.msg_policy = atoi (str_text);
-
-    // parameter 'msgtype' : set TIC messages type diffusion policy
-    WebGetArg (D_CMND_TELEINFO_MSG_TYPE, str_text, sizeof (str_text));
-    if (strlen (str_text) > 0) teleinfo_config.msg_type = atoi (str_text);
-
-    // save configuration
-    TeleinfoSaveConfig ();
-  }
-
-  // beginning of form
-  WSContentStart_P (PSTR ("Configure Teleinfo"));
-  WSContentSendStyle ();
-  WSContentSend_P (PSTR ("<form method='get' action='%s'>\n"), D_TELEINFO_PAGE_CONFIG);
-
-/*
-  // speed selection form
-  WSContentSend_P (PSTR ("<p><fieldset><legend><b>&nbsp;%s %s&nbsp;</b></legend>\n"), "📨", PSTR ("TIC Rate"));
-  for (index = 0; index < nitems (ARR_TELEINFO_RATE); index++)
-  {
-    if (ARR_TELEINFO_RATE[index] == teleinfo_config.baud_rate) strcpy_P (str_select, PSTR ("checked")); else strcpy (str_select, "");
-    itoa (ARR_TELEINFO_RATE[index], str_text, 10);
-    WSContentSend_P (PSTR ("<p><input type='radio' name='%s' value='%d' %s>%s</p>\n"), D_CMND_TELEINFO_RATE, ARR_TELEINFO_RATE[index], str_select, str_text);
-  }
-  WSContentSend_P (PSTR ("</fieldset></p>\n"));
-*/
-
-  // teleinfo message diffusion policy
-  WSContentSend_P (PSTR ("<p><fieldset><legend><b>&nbsp;%s %s&nbsp;</b></legend>\n"), "🧾", PSTR ("Message policy"));
-  for (index = 0; index < TELEINFO_POLICY_MAX; index++)
-  {
-    if (index == teleinfo_config.msg_policy) strcpy_P (str_select, PSTR ("checked")); else strcpy (str_select, "");
-    GetTextIndexed (str_text, sizeof (str_text), index, kTeleinfoMessagePolicy);
-    WSContentSend_P (PSTR ("<p><input type='radio' name='%s' value='%d' %s>%s</p>\n"), D_CMND_TELEINFO_MSG_POLICY, index, str_select, str_text);
-  }
-  WSContentSend_P (PSTR ("</fieldset></p>\n"));
-
-  // teleinfo message diffusion type
-  WSContentSend_P (PSTR ("<p><fieldset><legend><b>&nbsp;%s %s&nbsp;</b></legend>\n"), "📑", PSTR ("Message data"));
-  for (index = 0; index < TELEINFO_MSG_MAX; index++)
-  {
-    if (index == teleinfo_config.msg_type) strcpy_P (str_select, PSTR ("checked")); else strcpy (str_select, "");
-    GetTextIndexed (str_text, sizeof (str_text), index, kTeleinfoMessageType);
-    WSContentSend_P (PSTR ("<p><input type='radio' name='%s' value='%d' %s>%s</p>\n"), D_CMND_TELEINFO_MSG_TYPE, index, str_select, str_text);
-  }
-  WSContentSend_P (PSTR ("</fieldset></p>\n"));
-
-  // save button
-  WSContentSend_P (PSTR ("<button name='save' type='submit' class='button bgrn'>%s</button>"), D_SAVE);
-  WSContentSend_P (PSTR ("</form>\n"));
-
-  // configuration button
-  WSContentSpaceButton (BUTTON_CONFIGURATION);
-
-  // end of page
-  WSContentStop ();
 }
 
 // TIC raw message data
@@ -1223,23 +1423,23 @@ void TeleinfoSensorWebPageTic ()
   // page style
   WSContentSend_P (PSTR ("<style>\n"));
 
-  WSContentSend_P (PSTR ("body {color:white;background-color:#252525;font-family:Arial, Helvetica, sans-serif;}\n"));
-  WSContentSend_P (PSTR ("div {width:100%%;margin:8px auto;padding:2px 0px;text-align:center;vertical-align:middle;}\n"));
+  WSContentSend_P (PSTR ("body {color:white;background-color:%s;font-family:Arial, Helvetica, sans-serif;}\n"), COLOR_BACKGROUND);
+  WSContentSend_P (PSTR ("div {width:100%%;margin:4px auto;padding:2px 0px;text-align:center;vertical-align:middle;}\n"));
 
   WSContentSend_P (PSTR ("a {text-decoration:none;}\n"));
-  WSContentSend_P (PSTR ("div.linky img {height:144px;}\n"));
-  WSContentSend_P (PSTR ("div.name {position:relative;top:-156px;width:96px;}\n"));
-  WSContentSend_P (PSTR ("div.count {position:relative;top:-74px;}\n"));
-  WSContentSend_P (PSTR ("div span {padding:0px 6px;border-radius:6px;}\n"));
-  WSContentSend_P (PSTR ("div.name span {font-size:16px;font-weight:bold;background:none;color:#4d82bd;}\n"));
-  WSContentSend_P (PSTR ("div.count span {font-size:12px;background:#4d82bd;color:white;}\n"));
 
-  WSContentSend_P (PSTR ("div.table {margin-top:-64px;}\n"));
+  WSContentSend_P (PSTR ("div.title {font-size:28px;}\n"));
+  WSContentSend_P (PSTR ("div.count {position:relative;top:-36px;}\n"));
+  WSContentSend_P (PSTR ("div.count span {font-size:12px;background:#4d82bd;color:white;padding:0px 6px;border-radius:6px;}\n"));
+
+  WSContentSend_P (PSTR ("div.table {margin-top:-24px;}\n"));
   WSContentSend_P (PSTR ("table {width:100%%;max-width:400px;margin:0px auto;border:none;background:none;color:#fff;border-collapse:collapse;}\n"));
   WSContentSend_P (PSTR ("th,td {font-size:1rem;padding:0.2rem 0.1rem;border:1px #666 solid;}\n"));
   WSContentSend_P (PSTR ("th {font-style:bold;background:#555;}\n"));
   WSContentSend_P (PSTR ("th.label {width:30%%;}\n"));
   WSContentSend_P (PSTR ("th.value {width:60%%;}\n"));
+
+  WSContentSend_P (PSTR ("button.menu {background:%s;color:%s;line-height:2rem;font-size:1.2rem;cursor:pointer;border:none;border-radius:0.3rem;width:150px;margin:2vh;}\n"), COLOR_BUTTON, COLOR_BUTTON_TEXT);
 
   WSContentSend_P (PSTR ("</style>\n\n"));
 
@@ -1250,12 +1450,11 @@ void TeleinfoSensorWebPageTic ()
   WSContentSend_P (PSTR ("</head>\n"));
   WSContentSend_P (PSTR ("<body>\n"));
 
-  // display counter
-  WSContentSend_P (PSTR ("<div>\n"));
-  WSContentSend_P (PSTR ("<div class='linky'><a href='/'><img src='%s'></a></div>\n"), D_TELEINFO_ICON_LINKY_SVG);
-  WSContentSend_P (PSTR ("<div class='name'><span>%s</span></div>\n"), SettingsText (SET_DEVICENAME));
-  WSContentSend_P (PSTR ("<div class='count'><span id='msg'>%u</span></div>\n"), teleinfo_meter.nb_message);
-  WSContentSend_P (PSTR ("</div>\n"));
+  // title
+  WSContentSend_P (PSTR ("<div class='title'>%s</div>\n"), SettingsText (SET_DEVICENAME));
+
+  // icon and counter
+  WSContentSend_P (PSTR ("<div><img src='%s'><div class='count'><span id='msg'>%u</span></div></div>\n"), D_TELEINFO_ICON_LINKY_PNG, teleinfo_meter.nb_message);
 
   // display table with header
   WSContentSend_P (PSTR ("<div class='table'><table>\n"));
@@ -1268,6 +1467,11 @@ void TeleinfoSensorWebPageTic ()
   // end of table and end of page
   WSContentSend_P (PSTR ("</table></div>\n"));
   WSContentSend_P (PSTR ("<div>\n"));
+
+  // main menu button
+  WSContentSend_P (PSTR ("<div><form action='/' method='get'><button class='menu'>%s</button></form></div>\n"), D_MAIN_MENU);
+  
+  // page end
   WSContentStop ();
 }
 
@@ -1293,34 +1497,7 @@ void TeleinfoSensorGraphDisplayTime (const uint8_t period, const uint8_t histo)
       }
       break;
 
-#ifndef USE_UFILESYS
-    case TELEINFO_PERIOD_DAILY:
-      // extract time data
-      current_time = LocalTime ();
-      BreakTime (current_time, time_dst);
-
-      // calculate horizontal shift
-      unit_width  = teleinfo_graph.width / 6;
-      shift_unit  = 3600 * (time_dst.hour % 4) + time_dst.minute * 60 + time_dst.second;
-      shift_width = unit_width - unit_width * shift_unit / 14400;
-
-      // calculate first time displayed by substracting 22h to current time
-      current_time = current_time - 72000 - shift_unit;
-
-      // display 1 mn separation lines with time
-      for (index = 0; index < 6; index++)
-      {
-        // convert back to date and increase time of 4h
-        BreakTime (current_time, time_dst);
-        current_time += 14400;
-
-        // display separation line and time
-        graph_x = teleinfo_graph.left + (index * unit_width) + shift_width ;
-        WSContentSend_P (PSTR ("<line class='time' x1='%d' y1='%d%%' x2='%d' y2='%d%%' />\n"), graph_x, 1, graph_x, 99);
-        WSContentSend_P (PSTR ("<text class='time base' x='%d' y='%u%%'>%02uh</text>\n"), graph_x, 3, time_dst.hour);
-      }
-      break;
-#else
+#ifdef USE_UFILESYS
     case TELEINFO_PERIOD_DAY:
       // calculate separator width
       unit_width  = teleinfo_graph.width / 6;
@@ -1351,6 +1528,7 @@ void TeleinfoSensorGraphDisplayTime (const uint8_t period, const uint8_t histo)
       }
       break;
 #endif      // USE_UFILESYS
+
   }
 }
 
@@ -1409,45 +1587,17 @@ void TeleinfoSensorGraphDisplayCurve (const uint8_t phase, const uint8_t data)
       }
       break;
 
-#ifndef USE_UFILESYS
-    case TELEINFO_PERIOD_DAILY:
-      for (index = 0; index < TELEINFO_GRAPH_SAMPLE; index++)
-      {
-        // get current array index if in live memory mode
-        index_array = (teleinfo_period[teleinfo_graph.period].index + index) % TELEINFO_GRAPH_SAMPLE;
-
-        // display according to data type
-        switch (data)
-        {
-          case TELEINFO_UNIT_VA:
-            if (teleinfo_graph.data_live.arr_papp[phase][index_array] != UINT8_MAX) arr_value[index] = (long)teleinfo_graph.data_daily.arr_papp[phase][index_array] * teleinfo_contract.ssousc / 200;
-            break;
-
-          case TELEINFO_UNIT_W:
-            if (teleinfo_graph.data_live.arr_pact[phase][index_array] != UINT8_MAX) arr_value[index] = (long)teleinfo_graph.data_daily.arr_pact[phase][index_array] * teleinfo_contract.ssousc / 200;
-            break;
-
-          case TELEINFO_UNIT_V:
-            if (teleinfo_graph.data_live.arr_volt[phase][index_array] != UINT8_MAX) arr_value[index] = (long)TELEINFO_VOLTAGE - 128 + teleinfo_graph.data_daily.arr_volt[phase][index_array];
-            break;
-
-          case TELEINFO_UNIT_COSPHI:
-            if (teleinfo_graph.data_live.arr_cosphi[phase][index_array] != UINT8_MAX) arr_value[index] = (long)teleinfo_graph.data_daily.arr_cosphi[phase][index_array];
-            break;
-        }
-      }
-      break;
-
-#else
+#ifdef USE_UFILESYS
     case TELEINFO_PERIOD_DAY:
     case TELEINFO_PERIOD_WEEK:
       uint8_t  column;
       uint32_t len_buffer, size_buffer;
       char    *pstr_token, *pstr_buffer, *pstr_line;
+      char     str_filename[UFS_FILENAME_SIZE];
       File     file;
 
       // if data file exists
-      if (TeleinfoSensorHistoGetFilename (teleinfo_graph.period, teleinfo_graph.histo, teleinfo_graph.str_filename))
+      if (TeleinfoSensorHistoGetFilename (teleinfo_graph.period, teleinfo_graph.histo, str_filename))
       {
         // init
         strcpy (teleinfo_graph.str_buffer, "");
@@ -1456,7 +1606,7 @@ void TeleinfoSensorGraphDisplayCurve (const uint8_t phase, const uint8_t data)
         column = 3 + (phase * 6) + data;
 
         // open file and skip header
-        file = ffsp->open (teleinfo_graph.str_filename, "r");
+        file = ffsp->open (str_filename, "r");
         while (file.available ())
         {
           // read next block
@@ -1520,6 +1670,7 @@ void TeleinfoSensorGraphDisplayCurve (const uint8_t phase, const uint8_t data)
       }
       break;
 #endif    // USE_UFILESYS
+
   }
 
   // display values
@@ -1663,6 +1814,7 @@ void TeleinfoSensorGraphDisplayBar (const uint8_t histo, const bool is_productio
   char     str_value[16];
   char    *pstr_token, *pstr_buffer, *pstr_line, *pstr_error;
   File     file;
+  char     str_filename[UFS_FILENAME_SIZE];
 
   // init array
   for (index = 0; index < TELEINFO_GRAPH_MAX_BARGRAPH; index ++) arr_value[index] = LONG_MAX;
@@ -1714,8 +1866,8 @@ void TeleinfoSensorGraphDisplayBar (const uint8_t histo, const bool is_productio
   if ((histo == 0) && (teleinfo_graph.month == RtcTime.month) && (teleinfo_graph.day == RtcTime.day_of_month))
   {
     // update last hour increment
-    teleinfo_graph.conso_hour_wh[RtcTime.hour] += (long)(teleinfo_meter.conso_total_wh - teleinfo_graph.conso_last_hour_wh);
-    teleinfo_graph.conso_last_hour_wh = teleinfo_meter.conso_total_wh;
+    teleinfo_graph.conso_hour_wh[RtcTime.hour] += (long)(teleinfo_conso.total_wh - teleinfo_graph.conso_last_hour_wh);
+    teleinfo_graph.conso_last_hour_wh = teleinfo_conso.total_wh;
 
     // init hour slots from live values
     for (index = 0; index < 24; index ++) if (teleinfo_graph.conso_hour_wh[index] > 0) arr_value[index] = teleinfo_graph.conso_hour_wh[index];
@@ -1728,14 +1880,14 @@ void TeleinfoSensorGraphDisplayBar (const uint8_t histo, const bool is_productio
   if (!is_main) { graph_x +=4; graph_x_end -= 4; }
 
   // if data file exists
-  if (TeleinfoSensorHistoGetFilename (teleinfo_graph.period, histo, teleinfo_graph.str_filename))
+  if (TeleinfoSensorHistoGetFilename (teleinfo_graph.period, histo, str_filename))
   {
     // init
     strcpy (teleinfo_graph.str_buffer, "");
     pstr_buffer = teleinfo_graph.str_buffer;
 
     //open file and skip header
-    file = ffsp->open (teleinfo_graph.str_filename, "r");
+    file = ffsp->open (str_filename, "r");
     while (file.available ())
     {
       // read next block
@@ -1927,16 +2079,17 @@ bool TeleinfoSensorGraphPreviousPeriod (const bool update)
   uint8_t  day   = teleinfo_graph.day;
   uint32_t year;
   TIME_T   time_dst;
+  char     str_filename[UFS_FILENAME_SIZE];
 
   // handle next according to period type
   switch (teleinfo_graph.period)
   {
     case TELEINFO_PERIOD_DAY:
-      while (!is_file && (histo < teleinfo_config.param[TELEINFO_CONFIG_NBDAY])) is_file = TeleinfoSensorHistoGetFilename (TELEINFO_PERIOD_DAY, ++histo, teleinfo_graph.str_filename);
+      while (!is_file && (histo < teleinfo_config.param[TELEINFO_CONFIG_NBDAY])) is_file = TeleinfoSensorHistoGetFilename (TELEINFO_PERIOD_DAY, ++histo, str_filename);
       break;
 
     case TELEINFO_PERIOD_WEEK:
-      while (!is_file && (histo < teleinfo_config.param[TELEINFO_CONFIG_NBWEEK])) is_file = TeleinfoSensorHistoGetFilename (TELEINFO_PERIOD_WEEK, ++histo, teleinfo_graph.str_filename);
+      while (!is_file && (histo < teleinfo_config.param[TELEINFO_CONFIG_NBWEEK])) is_file = TeleinfoSensorHistoGetFilename (TELEINFO_PERIOD_WEEK, ++histo, str_filename);
       break;
 
     case TELEINFO_PERIOD_YEAR:
@@ -1967,7 +2120,7 @@ bool TeleinfoSensorGraphPreviousPeriod (const bool update)
       }
 
       // check if yearly file is available
-      is_file = TeleinfoSensorHistoGetFilename (teleinfo_graph.period, histo, teleinfo_graph.str_filename);
+      is_file = TeleinfoSensorHistoGetFilename (teleinfo_graph.period, histo, str_filename);
       break;
   }
 
@@ -1993,16 +2146,17 @@ bool TeleinfoSensorGraphNextPeriod (const bool update)
   uint8_t  day   = teleinfo_graph.day;
   uint32_t year;
   TIME_T   time_dst;
+  char     str_filename[UFS_FILENAME_SIZE];
 
   // handle next according to period type
   switch (teleinfo_graph.period)
   {
     case TELEINFO_PERIOD_DAY:
-      while (!is_file && (histo > 0)) is_file = TeleinfoSensorHistoGetFilename (TELEINFO_PERIOD_DAY, --histo, teleinfo_graph.str_filename);
+      while (!is_file && (histo > 0)) is_file = TeleinfoSensorHistoGetFilename (TELEINFO_PERIOD_DAY, --histo, str_filename);
       break;
 
     case TELEINFO_PERIOD_WEEK:
-      while (!is_file && (histo > 0)) is_file = TeleinfoSensorHistoGetFilename (TELEINFO_PERIOD_WEEK, --histo, teleinfo_graph.str_filename);
+      while (!is_file && (histo > 0)) is_file = TeleinfoSensorHistoGetFilename (TELEINFO_PERIOD_WEEK, --histo, str_filename);
       break;
 
     case TELEINFO_PERIOD_YEAR:
@@ -2036,7 +2190,7 @@ bool TeleinfoSensorGraphNextPeriod (const bool update)
         else if (is_next) histo--;
 
       // check if yearly file is available
-      is_file = TeleinfoSensorHistoGetFilename (teleinfo_graph.period, histo, teleinfo_graph.str_filename);
+      is_file = TeleinfoSensorHistoGetFilename (teleinfo_graph.period, histo, str_filename);
       break;
   }
 
@@ -2157,6 +2311,7 @@ void TeleinfoSensorWebGraph ()
 #ifdef USE_UFILESYS
     if (teleinfo_graph.period >= TELEINFO_PERIOD_YEAR) teleinfo_graph.period = TELEINFO_PERIOD_LIVE;
 #endif      // USE_UFILESYS
+
     choice = (uint8_t)TeleinfoSensorWebGetArgValue (D_CMND_TELEINFO_PERIOD, 0, TELEINFO_PERIOD_MAX - 1, teleinfo_graph.period);
     if (choice != teleinfo_graph.period) teleinfo_graph.histo = 0;
     teleinfo_graph.period = choice;  
@@ -2279,21 +2434,19 @@ void TeleinfoSensorWebGraph ()
 
     // page style
     WSContentSend_P (PSTR ("<style>\n"));
-    WSContentSend_P (PSTR ("body {color:white;background-color:#252525;font-family:Arial, Helvetica, sans-serif;}\n"));
-    WSContentSend_P (PSTR ("div {margin:8px auto;padding:2px 0px;text-align:center;vertical-align:top;}\n"));
+    WSContentSend_P (PSTR ("body {color:white;background-color:%s;font-family:Arial, Helvetica, sans-serif;}\n"), COLOR_BACKGROUND);
+    WSContentSend_P (PSTR ("div {margin:4px auto;padding:2px 0px;text-align:center;vertical-align:top;}\n"));
 
     WSContentSend_P (PSTR ("a {text-decoration:none;}\n"));
     WSContentSend_P (PSTR ("div a {color:white;}\n"));
 
-    WSContentSend_P (PSTR ("div.linky img {height:144px;}\n"));
-    WSContentSend_P (PSTR ("div.name {position:relative;top:-156px;width:96px;}\n"));
-    WSContentSend_P (PSTR ("div.count {position:relative;top:-76px;}\n"));
-    WSContentSend_P (PSTR ("div.name span {font-size:16px;font-weight:bold;background:none;color:#4d82bd;}\n"));
+    WSContentSend_P (PSTR ("div.title {font-size:28px;}\n"));
+    WSContentSend_P (PSTR ("div.count {position:relative;top:-36px;}\n"));
     WSContentSend_P (PSTR ("div.count span {font-size:12px;background:#4d82bd;color:white;}\n"));
     WSContentSend_P (PSTR ("div span {padding:0px 6px;border-radius:6px;}\n"));
 
-    WSContentSend_P (PSTR ("div.inline {display:inline-block;}\n"));
-    WSContentSend_P (PSTR ("div.live {width:25%%;padding-top:36px;margin-left:1%%;}\n"));
+    WSContentSend_P (PSTR ("div.inline {display:flex;}\n"));
+    WSContentSend_P (PSTR ("div.live {width:40%%;margin:0px;padding:0px;}\n"));
     WSContentSend_P (PSTR ("div.phase {width:90px;padding:0.2rem;margin:0.5rem;border-radius:8px;}\n"));
     WSContentSend_P (PSTR ("div.phase span {font-size:1rem;font-weight:bold;}\n"));
 
@@ -2305,9 +2458,7 @@ void TeleinfoSensorWebGraph ()
 
     WSContentSend_P (PSTR ("div.disabled {color:#666;border-color:#666;}\n"));
 
-    WSContentSend_P (PSTR ("div.level1 {margin-top:-82px;}\n"));
-    WSContentSend_P (PSTR ("div.level2 {margin-top:-4px;}\n"));
-    WSContentSend_P (PSTR ("div.level3 {margin-top:-4px;}\n"));
+    WSContentSend_P (PSTR ("div.level1 {margin-top:-40px;}\n"));
 
     WSContentSend_P (PSTR ("div.choice {display:inline-block;padding:0px 2px;margin:0px;background:none;color:#fff;border:1px #666 solid;border-radius:6px;}\n"));
     WSContentSend_P (PSTR ("div.choice div {background:#666;}\n"));
@@ -2317,9 +2468,9 @@ void TeleinfoSensorWebGraph ()
     WSContentSend_P (PSTR ("div a div.item:hover {background:#aaa;}\n"));
     WSContentSend_P (PSTR ("div.histo {font-size:0.9rem;padding:0px;margin-top:0px;}\n"));
 
-    WSContentSend_P (PSTR ("div.prev {position:absolute;top:16px;left:2%%;padding:0px;}\n"));
-    WSContentSend_P (PSTR ("div.next {position:absolute;top:16px;right:2%%;padding:0px;}\n"));
-    WSContentSend_P (PSTR ("div.range {position:absolute;top:186px;left:2%%;padding:0px;}\n"));
+    WSContentSend_P (PSTR ("div.prev {position:absolute;top:8px;left:2%%;padding:0px;}\n"));
+    WSContentSend_P (PSTR ("div.next {position:absolute;top:8px;right:2%%;padding:0px;}\n"));
+    WSContentSend_P (PSTR ("div.range {position:absolute;top:160px;left:2%%;padding:0px;}\n"));
     
     WSContentSend_P (PSTR ("div.period {width:60px;margin-top:2px;}\n"));
     WSContentSend_P (PSTR ("div.month {width:28px;font-size:0.85rem;}\n"));
@@ -2331,11 +2482,13 @@ void TeleinfoSensorWebGraph ()
 
     WSContentSend_P (PSTR ("select {background:#666;color:white;font-size:1rem;margin:1px;border:1px #666 solid;border-radius:6px;}\n"));
 
-    WSContentSend_P (PSTR ("button {padding:2px;font-size:1rem;background:#444;color:#fff;border:none;border-radius:6px;}\n"));
+    WSContentSend_P (PSTR ("button {padding:2px;font-size:1rem;background:#444;color:%s;border:none;border-radius:6px;}\n"), COLOR_BUTTON_TEXT);
     WSContentSend_P (PSTR ("button.navi {padding:2px 16px;}\n"));
     WSContentSend_P (PSTR ("button.range {width:24px;margin-bottom:8px;}\n"));
     WSContentSend_P (PSTR ("button:hover {background:#aaa;}\n"));
-    WSContentSend_P (PSTR ("button:disabled {background:#252525;color:#252525;}\n"));
+    WSContentSend_P (PSTR ("button:disabled {background:%s;color:%s;}\n"), COLOR_BACKGROUND, COLOR_BACKGROUND);
+
+    WSContentSend_P (PSTR ("button.menu {background:%s;color:%s;line-height:2rem;font-size:1.2rem;cursor:pointer;border:none;border-radius:0.3rem;width:150px;margin:2vh;}\n"), COLOR_BUTTON, COLOR_BUTTON_TEXT);
 
     WSContentSend_P (PSTR ("div.graph {width:100%%;margin:auto;margin-top:4px;}\n"));
     WSContentSend_P (PSTR ("svg.graph {width:100%%;height:60vh;}\n"));
@@ -2353,9 +2506,9 @@ void TeleinfoSensorWebGraph ()
     // -------------------
 
     WSContentSend_P (PSTR ("<div class='range'>\n"));
-    WSContentSend_P (PSTR ("<button class='range' name='%s' id='%s' value=1>+</button><br>\n"), D_CMND_TELEINFO_PLUS, D_CMND_TELEINFO_PLUS);
-    WSContentSend_P (PSTR ("<button class='range' name='%s' id='%s' value=1>-</button><br>\n"), D_CMND_TELEINFO_MINUS, D_CMND_TELEINFO_MINUS);
-    WSContentSend_P (PSTR ("</div>\n"));
+    WSContentSend_P (PSTR ("<button class='range' name='%s' id='%s' value=1>+</button><br>"), D_CMND_TELEINFO_PLUS,  D_CMND_TELEINFO_PLUS);
+    WSContentSend_P (PSTR ("<button class='range' name='%s' id='%s' value=1>-</button>\n"),   D_CMND_TELEINFO_MINUS, D_CMND_TELEINFO_MINUS);
+    WSContentSend_P (PSTR ("</div>\n"));        // range
 
     // --------------------------
     //      Previous and Next
@@ -2376,25 +2529,22 @@ void TeleinfoSensorWebGraph ()
     }
 #endif      // USE_UFILESYS
 
-    // -----------------
-    //    Linky icon
-    // -----------------
+    // title
+    WSContentSend_P (PSTR ("<div class='title'>%s</div>\n"), SettingsText (SET_DEVICENAME));
 
-    WSContentSend_P (PSTR ("<div>\n"));
+    // -------------------------
+    //    Icon and Live values
+    // -------------------------
+    
+    WSContentSend_P (PSTR ("<div class='inline'>\n"));
 
-    WSContentSend_P (PSTR ("<div class='inline live'>&nbsp;</div>\n"));
+    WSContentSend_P (PSTR ("<div class='live'>&nbsp;</div>\n"));
 
-    WSContentSend_P (PSTR ("<div class='inline'><a href='/'>\n"));
-    WSContentSend_P (PSTR ("<div class='linky'><img src='%s'></div>\n"), D_TELEINFO_ICON_LINKY_SVG);
-    WSContentSend_P (PSTR ("<div class='name'><span>%s</span></div>\n"), SettingsText (SET_DEVICENAME));
-    WSContentSend_P (PSTR ("<div class='count'><span id='msg'>%u</span></div>\n"), teleinfo_meter.nb_message);
-    WSContentSend_P (PSTR ("</a></div>\n"));
+    // icon and counter
+    WSContentSend_P (PSTR ("<div><img src='%s'><div class='count'><span id='msg'>%u</span></div></div>\n"), D_TELEINFO_ICON_LINKY_PNG, teleinfo_meter.nb_message);
 
-    // -----------------
-    //    Live Values 
-    // -----------------
-
-    WSContentSend_P (PSTR ("<div class='inline live'>\n"));
+    // live values
+    WSContentSend_P (PSTR ("<div class='live'>\n"));
     for (phase = 0; phase < teleinfo_contract.phase; phase++)
     {
       // display phase inverted link
@@ -2408,20 +2558,16 @@ void TeleinfoSensorWebGraph ()
       WSContentSend_P (PSTR ("<div class='phase ph%u%s'><span id='v%u'>&nbsp;</span></div></a>\n"), phase, str_text, phase);    
     }
 
-    WSContentSend_P (PSTR ("</div>\n"));
+    WSContentSend_P (PSTR ("</div>\n"));      // live
 
-    WSContentSend_P (PSTR ("</div>\n"));
+    WSContentSend_P (PSTR ("</div>\n"));      // inline
 
-    // --------------------------
-    //    Level 1 : Navigation
-    // --------------------------
+    // --------------
+    //    Level 1
+    // --------------
 
     WSContentSend_P (PSTR ("<div class='level1'>\n"));
     WSContentSend_P (PSTR ("<div class='choice'>\n"));
-
-    // ---------------------
-    //    Level 1 - Period 
-    // ---------------------
 
     // Live button
     GetTextIndexed (str_text, sizeof (str_text), TELEINFO_PERIOD_LIVE, kTeleinfoGraphPeriod);
@@ -2430,16 +2576,9 @@ void TeleinfoSensorWebGraph ()
     if (teleinfo_graph.period != TELEINFO_PERIOD_LIVE) WSContentSend_P (PSTR ("</a>"));
     WSContentSend_P (PSTR ("\n"));
 
-#ifndef USE_UFILESYS
-
-    // 24h button
-    GetTextIndexed (str_text, sizeof (str_text), TELEINFO_PERIOD_DAILY, kTeleinfoGraphPeriod);
-    if (teleinfo_graph.period != TELEINFO_PERIOD_DAILY) WSContentSend_P (PSTR ("<a href='%s?period=%d'>"), D_TELEINFO_PAGE_GRAPH, TELEINFO_PERIOD_DAILY);
-    WSContentSend_P (PSTR ("<div class='item period'>%s</div>"), str_text);
-    if (teleinfo_graph.period != TELEINFO_PERIOD_DAILY) WSContentSend_P (PSTR ("</a>"));
-    WSContentSend_P (PSTR ("\n"));
-
-#else
+    // other periods button
+#ifdef USE_UFILESYS
+    char str_filename[UFS_FILENAME_SIZE];
 
     for (index = TELEINFO_PERIOD_DAY; index < TELEINFO_PERIOD_YEAR; index++)
     {
@@ -2459,7 +2598,7 @@ void TeleinfoSensorWebGraph ()
         for (counter = 0; counter < choice; counter++)
         {
           // check if file exists
-          if (TeleinfoSensorHistoGetFilename (teleinfo_graph.period, counter, teleinfo_graph.str_filename))
+          if (TeleinfoSensorHistoGetFilename (teleinfo_graph.period, counter, str_filename))
           {
             TeleinfoSensorHistoGetDate (teleinfo_graph.period, counter, str_date);
             if (counter == teleinfo_graph.histo) strcpy_P (str_text, PSTR (" selected")); 
@@ -2472,7 +2611,6 @@ void TeleinfoSensorWebGraph ()
       }
       else WSContentSend_P (PSTR ("<a href='%s?period=%d&histo=%d'><div class='item period'>%s</div></a>\n"), D_TELEINFO_PAGE_GRAPH, index, teleinfo_graph.histo, str_text);
     }
-
 # endif     // USE_UFILESYS
 
     WSContentSend_P (PSTR ("</div></div>\n"));        // choice & level1
@@ -2500,24 +2638,22 @@ void TeleinfoSensorWebGraph ()
 
     WSContentSend_P (PSTR ("</form>\n"));
 
-    // ---------------
-    //   SVG : Start 
-    // ---------------
+    // ------------
+    //     SVG
+    // ------------
 
+    // svg : start 
     WSContentSend_P (PSTR ("<div class='graph'>\n"));
     WSContentSend_P (PSTR ("<svg class='graph' viewBox='0 0 1200 %d' preserveAspectRatio='none'>\n"), TELEINFO_GRAPH_HEIGHT);
 
-    // ---------------
-    //   SVG : Style 
-    // ---------------
-
+    // svg : style 
     WSContentSend_P (PSTR ("<style type='text/css'>\n"));
 
     WSContentSend_P (PSTR ("rect {stroke:grey;fill:none;}\n"));
     WSContentSend_P (PSTR ("line.dash {stroke:grey;stroke-width:1;stroke-dasharray:2 8;}\n"));
     WSContentSend_P (PSTR ("text.power {font-size:1.2rem;fill:white;}\n"));
 
-    // phase colors
+    // svg : phase colors
     WSContentSend_P (PSTR ("path {stroke-width:1.5;opacity:0.8;fill-opacity:0.6;}\n"));
     for (phase = 0; phase < teleinfo_contract.phase; phase++) 
     {
@@ -2531,7 +2667,7 @@ void TeleinfoSensorWebGraph ()
       WSContentSend_P (PSTR ("path.pk%d {stroke:%s;fill:none;stroke-dasharray:1 3;}\n"), phase, str_text);
     }
 
-    // text
+    // svg : text style
     WSContentSend_P (PSTR ("text {fill:white;text-anchor:middle;dominant-baseline:middle;}\n"));
     WSContentSend_P (PSTR ("text.value {font-style:italic;}}\n"));
     WSContentSend_P (PSTR ("text.time {font-size:1.2rem;}\n"));
@@ -2539,27 +2675,18 @@ void TeleinfoSensorWebGraph ()
     WSContentSend_P (PSTR ("text.day {font-size:0.9rem;}\n"));
     WSContentSend_P (PSTR ("text.hour {font-size:1rem;}\n"));
 
-    // time line
+    // svg : time line
     WSContentSend_P (PSTR ("line.time {stroke-width:1;stroke:white;stroke-dasharray:1 8;}\n"));
 
     WSContentSend_P (PSTR ("</style>\n"));
 
-    // ---------------
-    //   SVG : Frame
-    // ---------------
-
+    // svg : frame
     TeleinfoSensorGraphDisplayFrame ();
 
-    // --------------
-    //   SVG : Time 
-    // --------------
-
+    // svg : time 
     TeleinfoSensorGraphDisplayTime (teleinfo_graph.period, teleinfo_graph.histo);
 
-    // ----------------
-    //   SVG : Curves
-    // ----------------
-
+    // svg : curves
 #ifdef USE_UFILESYS
     // if data is for current period file, force flush for the period
     if ((teleinfo_graph.histo == 0) && (teleinfo_graph.period != TELEINFO_PERIOD_LIVE)) TeleinfoSensorFlushDataHisto (teleinfo_graph.period);
@@ -2577,10 +2704,7 @@ void TeleinfoSensorWebGraph ()
       WSContentSend_P (PSTR ("<path id='p%u' class='%s%u' d='' />\n"), phase, "pk",     phase);     // peak curve
     }
 
-    // -----------------
-    //   SVG : End 
-    // -----------------
-
+    // svg : end
     WSContentSend_P (PSTR ("</svg>\n"));
     WSContentSend_P (PSTR ("</div>\n"));
 
@@ -2588,6 +2712,9 @@ void TeleinfoSensorWebGraph ()
     teleinfo_graph.serving = false;
   }
 
+  // main menu button
+  WSContentSend_P (PSTR ("<div><form action='/' method='get'><button class='menu'>%s</button></form></div>\n"), D_MAIN_MENU);
+  
   // end of page
   WSContentStop ();
 
@@ -2608,6 +2735,7 @@ void TeleinfoSensorWebHisto (const bool is_production)
   char     str_text[16];
   char     str_date[16];
   char     str_active[16];
+  char     str_filename[UFS_FILENAME_SIZE];
 
   // timestamp
   timestart = millis ();
@@ -2677,7 +2805,7 @@ void TeleinfoSensorWebHisto (const bool is_production)
     // page style
     WSContentSend_P (PSTR ("<style>\n"));
 
-    WSContentSend_P (PSTR ("body {color:white;background-color:#252525;font-family:Arial, Helvetica, sans-serif;}\n"));
+    WSContentSend_P (PSTR ("body {color:white;background-color:%s;font-family:Arial, Helvetica, sans-serif;}\n"), COLOR_BACKGROUND);
     WSContentSend_P (PSTR ("div {margin:8px auto;padding:2px 0px;text-align:center;vertical-align:top;}\n"));
 
     WSContentSend_P (PSTR ("a {text-decoration:none;}\n"));
@@ -2711,7 +2839,9 @@ void TeleinfoSensorWebHisto (const bool is_production)
     WSContentSend_P (PSTR ("button.navi {padding:2px 16px;}\n"));
     WSContentSend_P (PSTR ("button.range {width:24px;margin-bottom:8px;}\n"));
     WSContentSend_P (PSTR ("button:hover {background:#aaa;}\n"));
-    WSContentSend_P (PSTR ("button:disabled {background:#252525;color:#252525;}\n"));
+    WSContentSend_P (PSTR ("button:disabled {background:%s;color:%s;}\n"), COLOR_BACKGROUND, COLOR_BACKGROUND);
+
+    WSContentSend_P (PSTR ("button.menu {background:%s;color:%s;line-height:2rem;font-size:1.2rem;cursor:pointer;border:none;border-radius:0.3rem;width:150px;margin:2vh;}\n"), COLOR_BUTTON, COLOR_BUTTON_TEXT);
 
     WSContentSend_P (PSTR ("div.graph {width:100%%;margin:auto;margin-top:4px;}\n"));
     WSContentSend_P (PSTR ("svg.graph {width:100%%;height:60vh;}\n"));
@@ -2755,7 +2885,7 @@ void TeleinfoSensorWebHisto (const bool is_production)
 
     WSContentSend_P (PSTR ("<div>\n"));
 
-    WSContentSend_P (PSTR ("<div class='title'><a href='/'>%s</a></div>\n"), SettingsText (SET_DEVICENAME));
+    WSContentSend_P (PSTR ("<div class='title'>%s</div>\n"), SettingsText (SET_DEVICENAME));
     if (is_production) strcpy (str_text, "Production"); else strcpy (str_text, "Consommation");
     WSContentSend_P (PSTR ("<div class='type'>%s</div>\n"), str_text);
 
@@ -2773,7 +2903,7 @@ void TeleinfoSensorWebHisto (const bool is_production)
     for (counter = 0; counter < 20; counter++)
     {
       // check if file exists
-      if (TeleinfoSensorHistoGetFilename (teleinfo_graph.period, counter, teleinfo_graph.str_filename))
+      if (TeleinfoSensorHistoGetFilename (teleinfo_graph.period, counter, str_filename))
       {
         TeleinfoSensorHistoGetDate (teleinfo_graph.period, counter, str_date);
         if (counter == teleinfo_graph.histo) strcpy_P (str_text, PSTR (" selected")); 
@@ -2849,17 +2979,15 @@ void TeleinfoSensorWebHisto (const bool is_production)
 
     WSContentSend_P (PSTR ("</form>\n"));
 
-    // ---------------
-    //   SVG : Start 
-    // ---------------
+    // -------------
+    //      SVG
+    // -------------
 
+    // svg : start
     WSContentSend_P (PSTR ("<div class='graph'>\n"));
     WSContentSend_P (PSTR ("<svg class='graph' viewBox='0 0 1200 %d' preserveAspectRatio='none'>\n"), TELEINFO_GRAPH_HEIGHT);
 
-    // ---------------
-    //   SVG : Style 
-    // ---------------
-
+     // svg : style
     WSContentSend_P (PSTR ("<style type='text/css'>\n"));
 
     WSContentSend_P (PSTR ("rect {stroke:grey;fill:none;}\n"));
@@ -2887,35 +3015,26 @@ void TeleinfoSensorWebHisto (const bool is_production)
 
     WSContentSend_P (PSTR ("</style>\n"));
 
-    // ---------------
-    //   SVG : Frame
-    // ---------------
-
+    // svg : frame
     TeleinfoSensorGraphDisplayFrame ();
 
-    // --------------
-    //   SVG : Time 
-    // --------------
-
+    // svg : time
     TeleinfoSensorGraphDisplayTime (teleinfo_graph.period, teleinfo_graph.histo);
 
-    // ----------------
-    //   SVG : Curves
-    // ----------------
+    // svg : curves
+    TeleinfoSensorGraphDisplayBar (teleinfo_graph.histo + 1, is_production, false);       // previous period
+    TeleinfoSensorGraphDisplayBar (teleinfo_graph.histo,     is_production, true);        // current period
 
-      TeleinfoSensorGraphDisplayBar (teleinfo_graph.histo + 1, is_production, false);       // previous period
-      TeleinfoSensorGraphDisplayBar (teleinfo_graph.histo,     is_production, true);        // current period
-
-    // -----------------
-    //   SVG : End 
-    // -----------------
-
+    // svg : end
     WSContentSend_P (PSTR ("</svg>\n"));
     WSContentSend_P (PSTR ("</div>\n"));
 
     // end of serving
     teleinfo_graph.serving = false;
   }
+
+  // main menu button
+  WSContentSend_P (PSTR ("<div><form action='/' method='get'><button class='menu'>%s</button></form></div>\n"), D_MAIN_MENU);
 
   // end of page
   WSContentStop ();
@@ -3049,24 +3168,27 @@ bool Xsns104 (uint32_t function)
 #endif      // USE_UFILESYS
 
 #ifdef USE_WEBSERVER
-    case FUNC_WEB_ADD_HANDLER:
-      Webserver->on (FPSTR (D_TELEINFO_PAGE_CONFIG), TeleinfoSensorWebPageConfigure);
-      Webserver->on (FPSTR (D_TELEINFO_ICON_LINKY_SVG), TeleinfoSensorWebIconLinky);
-      Webserver->on (FPSTR (D_TELEINFO_PAGE_TIC), TeleinfoSensorWebPageTic);
-      Webserver->on (FPSTR (D_TELEINFO_PAGE_TIC_UPD), TeleinfoSensorWebTicUpdate);
-      Webserver->on (FPSTR (D_TELEINFO_PAGE_GRAPH),TeleinfoSensorWebGraph);
-      Webserver->on (FPSTR (D_TELEINFO_PAGE_GRAPH_DATA),TeleinfoSensorWebGraphUpdateData);
-      Webserver->on (FPSTR (D_TELEINFO_PAGE_GRAPH_CURVE),TeleinfoSensorWebGraphUpdateCurve);
-#ifdef USE_UFILESYS
-      Webserver->on (FPSTR (D_TELEINFO_PAGE_GRAPH_CONSO),TeleinfoSensorWebConso);
-      Webserver->on (FPSTR (D_TELEINFO_PAGE_GRAPH_PROD),TeleinfoSensorWebProd);
-#endif      // USE_UFILESYS
+     case FUNC_WEB_SENSOR:
+      TeleinfoSensorWebSensor ();
       break;
     case FUNC_WEB_ADD_BUTTON:
       TeleinfoSensorWebConfigButton ();
       break;
-    case FUNC_WEB_ADD_MAIN_BUTTON:
+     case FUNC_WEB_ADD_MAIN_BUTTON:
       TeleinfoSensorWebMainButton ();
+      break;
+    case FUNC_WEB_ADD_HANDLER:
+      Webserver->on (FPSTR (D_TELEINFO_ICON_LINKY_PNG),   TeleinfoSensorLinkyIcon);
+      Webserver->on (FPSTR (D_TELEINFO_PAGE_CONFIG),      TeleinfoSensorWebPageConfigure);
+      Webserver->on (FPSTR (D_TELEINFO_PAGE_TIC),         TeleinfoSensorWebPageTic);
+      Webserver->on (FPSTR (D_TELEINFO_PAGE_TIC_UPD),     TeleinfoSensorWebTicUpdate);
+      Webserver->on (FPSTR (D_TELEINFO_PAGE_GRAPH),       TeleinfoSensorWebGraph);
+      Webserver->on (FPSTR (D_TELEINFO_PAGE_GRAPH_DATA),  TeleinfoSensorWebGraphUpdateData);
+      Webserver->on (FPSTR (D_TELEINFO_PAGE_GRAPH_CURVE), TeleinfoSensorWebGraphUpdateCurve);
+#ifdef USE_UFILESYS
+      Webserver->on (FPSTR (D_TELEINFO_PAGE_GRAPH_CONSO), TeleinfoSensorWebConso);
+      Webserver->on (FPSTR (D_TELEINFO_PAGE_GRAPH_PROD),  TeleinfoSensorWebProd);
+#endif      // USE_UFILESYS
       break;
 #endif  // USE_WEBSERVER
   }
