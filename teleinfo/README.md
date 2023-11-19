@@ -296,24 +296,31 @@ Finaly, in **Configure Teleinfo** you need to select your Teleinfo adapter proto
   * **Historique** (original white meter or green Linky in historic mode, 1200 bauds)
   * **Standard** (green Linky in standard mode, 9600 bauds)
 
-## Screenshot ##
+## Main screen ##
 
 ![Monophasé](./screen/tasmota-teleinfo-main.png)
 ![Triphasé](./screen/tasmota-teleinfo-main-triphase.png)
+
+If you want to remove default Tasmota energy display, you just need to run this command in console :
+
+    websensor3 0
+
+## Configuration##
+
 ![Config page](./screen/tasmota-teleinfo-config.png)
 
 ### Realtime messages ###
 
 ![Grah message](./screen/tasmota-teleinfo-message.png) 
 
-### Power, Voltage and Cos φ ###
+### Graph for Power, Voltage and Cos φ ###
 
 ![Grah monophase power](./screen/tasmota-teleinfo-graph-daily.png)
 ![Grah monophase power](./screen/tasmota-teleinfo-graph-weekly.png)
 ![Grah monophase voltage](./screen/tasmota-teleinfo-graph-voltage.png) 
 ![Grah monophase Cos phi](./screen/tasmota-teleinfo-graph-cosphi.png) 
  
-### Totals (kWh) ###
+### Totals Counters (kWh) ###
 
 ![Yearly total](./screen/tasmota-teleinfo-total-year.png)
 ![Monthly total](./screen/tasmota-teleinfo-total-month.png)
