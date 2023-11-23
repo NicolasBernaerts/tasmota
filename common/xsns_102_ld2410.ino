@@ -12,7 +12,6 @@
   Call LD2410InitDevice (timeout) to declare the device and make it operational
 
   Settings are stored using unused parameters :
-    - Settings->free_ea6[23] : Presence detection timeout (sec.)
     - Settings->free_ea6[24] : Presence detection number of samples to average
 
   Version history :
@@ -68,7 +67,7 @@ const char D_LD2410_NAME[] PROGMEM =    "HLK-LD2410";
 // ----------------
 
 enum LD2410StepCommand { LD2410_STEP_NONE, LD2410_STEP_BEFORE_START, LD2410_STEP_AFTER_START, LD2410_STEP_BEFORE_COMMAND, LD2410_STEP_AFTER_COMMAND, LD2410_STEP_BEFORE_STOP, LD2410_STEP_AFTER_STOP };       // steps to run a command
-enum LD2410ListCommand { LD2410_CMND_START, LD2410_CMND_STOP, LD2410_CMND_READ_PARAM, LD2410_CMND_DIST_TIMEOUT, LD2410_CMND_SENSITIVITY, LD2410_CMND_READ_FIRMWARE, LD2410_CMND_RESET, LD2410_CMND_RESTART, LD2410_CMND_CLOSE_ENGINEER, LD2410_CMND_OPEN_ENGINEER, LD2410_CMND_DATA, LD2410_CMND_MAX };       // list of available commands
+enum LD2410ListCommand { LD2410_CMND_START, LD2410_CMND_STOP, LD2410_CMND_READ_PARAM, LD2410_CMND_DIST_TIMEOUT, LD2410_CMND_SENSITIVITY, LD2410_CMND_READ_FIRMWARE, LD2410_CMND_RESET, LD2410_CMND_RESTART, LD2410_CMND_CLOSE_ENGINEER, LD2410_CMND_OPEN_ENGINEER, LD2410_CMND_DATA, LD2410_CMND_BLUETOOTH_ON, LD2410_CMND_BLUETOOTH_OFF, LD2410_CMND_MAX };       // list of available commands
 
 // commands
 uint8_t ld2410_cmnd_header[]         PROGMEM = { 0xfd, 0xfc, 0xfb, 0xfa };
@@ -84,10 +83,12 @@ uint8_t ld2410_cmnd_reset[]          PROGMEM = { 0x02, 0x00, 0xa2, 0x00 };
 uint8_t ld2410_cmnd_restart[]        PROGMEM = { 0x02, 0x00, 0xa3, 0x00 };
 uint8_t ld2410_cmnd_open_engineer[]  PROGMEM = { 0x02, 0x00, 0x62, 0x00 };
 uint8_t ld2410_cmnd_close_engineer[] PROGMEM = { 0x02, 0x00, 0x63, 0x00 };
+uint8_t ld2410_cmnd_bluetooth_on[]   PROGMEM = { 0x04, 0x00, 0xa4, 0x00, 0x01, 0x00 };
+uint8_t ld2410_cmnd_bluetooth_off[]  PROGMEM = { 0x04, 0x00, 0xa4, 0x00, 0x00, 0x00 };
 
 // MQTT commands : ld_help and ld_send
-const char kHLKLD2410Commands[]         PROGMEM = "ld2410_|help|timeout|sample|param|eng|reset|restart|firmware|gate|max";
-void (* const HLKLD2410Command[])(void) PROGMEM = { &CmndLD2410Help, &CmndLD2410Timeout, &CmndLD2410Sample, &CmndLD2410ReadParam, &CmndLD2410EngineeringMode, &CmndLD2410Reset, &CmndLD2410Restart, &CmndLD2410Firmware, &CmndLD2410SetGateParam, &CmndLD2410SetGateMax };
+const char kHLKLD2410Commands[]         PROGMEM = "ld2410_|help|timeout|sample|param|eng|reset|restart|firmware|gate|max|bluetooth";
+void (* const HLKLD2410Command[])(void) PROGMEM = { &CmndLD2410Help, &CmndLD2410Timeout, &CmndLD2410Sample, &CmndLD2410ReadParam, &CmndLD2410EngineeringMode, &CmndLD2410Reset, &CmndLD2410Restart, &CmndLD2410Firmware, &CmndLD2410SetGateParam, &CmndLD2410SetGateMax, &CmndLD2410Bluetooth };
 
 /****************************************\
  *                 Data
@@ -111,7 +112,6 @@ static struct {
 // LD2410 configuration
 struct {
   uint8_t sample  = LD2410_DEFAULT_SAMPLE;          // default running mode
-  uint8_t timeout = LD2410_DEFAULT_TIMEOUT;         // target humidity level
 } ld2410_config;
 
 // LD2410 status
@@ -136,6 +136,7 @@ static struct {
   TasmotaSerial  *pserial   = nullptr;                  // pointer to serial port
   bool            enabled   = false;                    // sensor enabled
   uint32_t        timestamp = 0;                        // timestamp of last detection
+  uint16_t        timeout   = LD2410_DEFAULT_TIMEOUT;   // ld2410 timeout
   ld2410_firmware firmware; 
   ld2410_sensor   motion; 
   ld2410_sensor   presence; 
@@ -158,6 +159,7 @@ void CmndLD2410Help ()
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ld2410_restart    = restart sensor"));
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ld2410_gate <gate,pres,motion> = set gate sensitivity"));
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ld2410_max <pres,motion>       = set detection max gate "));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ld2410_bluetooth <0/1>  = set bluetooth"));
  
   ResponseCmndDone ();
 }
@@ -166,11 +168,10 @@ void CmndLD2410Timeout ()
 {
   if (XdrvMailbox.payload > 0)
   {
-    ld2410_config.timeout = XdrvMailbox.payload;
-    LD2410SaveConfig ();
+    ld2410_status.timeout = XdrvMailbox.payload;
     LD2410AppendCommand (LD2410_CMND_DIST_TIMEOUT);
   }
-  ResponseCmndNumber (ld2410_config.timeout);
+  ResponseCmndNumber (ld2410_status.timeout);
 }
 
 void CmndLD2410Sample ()
@@ -309,6 +310,13 @@ void CmndLD2410SetGateMax ()
   ResponseCmndChar (str_data);
 }
 
+void CmndLD2410Bluetooth ()
+{
+  if (XdrvMailbox.payload == 1) LD2410AppendCommand (LD2410_CMND_BLUETOOTH_ON);
+    else LD2410AppendCommand (LD2410_CMND_BLUETOOTH_OFF);
+  ResponseCmndDone ();
+}
+
 /**************************************************\
  *                  Config
 \**************************************************/
@@ -317,18 +325,15 @@ void CmndLD2410SetGateMax ()
 void LD2410LoadConfig ()
 {
   // read parameters
-  ld2410_config.timeout = Settings->free_ea6[23];
   ld2410_config.sample  = Settings->free_ea6[24];
 
   // check parameters
-  if (ld2410_config.timeout == 0) ld2410_config.timeout = LD2410_DEFAULT_TIMEOUT;
   if (ld2410_config.sample  == 0) ld2410_config.sample  = LD2410_DEFAULT_SAMPLE;
 }
 
 // Save configuration into flash memory
 void LD2410SaveConfig ()
 {
-  Settings->free_ea6[23] = ld2410_config.timeout;
   Settings->free_ea6[24] = ld2410_config.sample;
 }
 
@@ -344,7 +349,7 @@ bool LD2410GetDetectionStatus (const uint32_t delay)
   if (ld2410_status.timestamp == 0) return false;
   
   // if no timeout given, use default one
-  if ((timeout == 0) || (timeout == UINT32_MAX)) timeout = ld2410_config.timeout;
+  if ((timeout == 0) || (timeout == UINT32_MAX)) timeout = ld2410_status.timeout;
 
   // return timeout status
   return (ld2410_status.timestamp + timeout > LocalTime ());
@@ -431,8 +436,8 @@ void LD2410SendCommand (const uint8_t command)
       memcpy_P (arr_buffer, ld2410_cmnd_dist_timeout, size_buffer);
       arr_buffer[6]  = ld2410_status.motion.max_gate;
       arr_buffer[12] = ld2410_status.presence.max_gate;
-      arr_buffer[18] = ld2410_config.timeout;
-      AddLog (LOG_LEVEL_INFO, PSTR ("HLK: cmnd set max gate pres %u, motion %u & timeout %u"), ld2410_status.presence.max_gate, ld2410_status.motion.max_gate, ld2410_config.timeout);
+      ((uint16_t*)(arr_buffer + 18))[0] = ld2410_status.timeout;
+      AddLog (LOG_LEVEL_INFO, PSTR ("HLK: cmnd set max gate pres %u, motion %u & timeout %u"), ld2410_status.presence.max_gate, ld2410_status.motion.max_gate, ld2410_status.timeout);
       break;
 
     case LD2410_CMND_SENSITIVITY:
@@ -472,6 +477,18 @@ void LD2410SendCommand (const uint8_t command)
       size_buffer = sizeof (ld2410_cmnd_close_engineer);
       memcpy_P (arr_buffer, ld2410_cmnd_close_engineer, size_buffer);
       AddLog (LOG_LEVEL_INFO, PSTR ("HLK: cmnd engineering OFF"));
+      break;
+
+    case LD2410_CMND_BLUETOOTH_ON:
+      size_buffer = sizeof (ld2410_cmnd_bluetooth_on);
+      memcpy_P (arr_buffer, ld2410_cmnd_bluetooth_on, size_buffer);
+      AddLog (LOG_LEVEL_INFO, PSTR ("HLK: cmnd bluetooth ON"));
+      break;
+
+    case LD2410_CMND_BLUETOOTH_OFF:
+      size_buffer = sizeof (ld2410_cmnd_bluetooth_off);
+      memcpy_P (arr_buffer, ld2410_cmnd_bluetooth_off, size_buffer);
+      AddLog (LOG_LEVEL_INFO, PSTR ("HLK: cmnd bluetooth OFF"));
       break;
   }
 
@@ -537,6 +554,8 @@ void LD2410HandleReceivedMessage ()
           ld2410_status.presence.max_gate = ld2410_received.arr_body[13];
           for (index = 0; index < LD2410_GATE_MAX; index ++) ld2410_status.motion.arr_sensitivity[index] = ld2410_received.arr_body[14 + index];
           for (index = 0; index < LD2410_GATE_MAX; index ++) ld2410_status.presence.arr_sensitivity[index] = ld2410_received.arr_body[23 + index];
+          pvalue = (uint16_t*)(ld2410_received.arr_body + 32);
+          ld2410_status.timeout = *pvalue;
           break;
 
         // set max gate and timeout
@@ -583,6 +602,10 @@ void LD2410HandleReceivedMessage ()
         // close engineering mode
         case 0x0163:
           AddLog (LOG_LEVEL_INFO, PSTR ("HLK: engineering mode is OFF"));
+          break;
+        // bluetooth
+        case 0x01a4:
+          AddLog (LOG_LEVEL_INFO, PSTR ("HLK: bluetooth command sent"));
           break;
       }
       break;
@@ -818,7 +841,7 @@ void LD2410ShowJSON (bool append)
 
     // firmware
     ResponseAppend_P (PSTR ("\"firm\":\"%02u.%02u.%u\""), ld2410_status.firmware.major, ld2410_status.firmware.minor, ld2410_status.firmware.revision);
-    ResponseAppend_P (PSTR (",\"timeout\":%u"), ld2410_config.timeout);
+    ResponseAppend_P (PSTR (",\"timeout\":%u"), ld2410_status.timeout);
 
     // motion
     ResponseAppend_P (PSTR (",\"move\":{"));
