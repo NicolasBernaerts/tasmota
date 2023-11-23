@@ -12,13 +12,16 @@
   Call LD2410InitDevice (timeout) to declare the device and make it operational
 
   Settings are stored using unused parameters :
-    - Settings->free_ea6[24] : Presence detection number of samples to average
+    - Settings->rf_code[2][2] : Presence detection timeout (sec.)
+    - Settings->rf_code[2][3] : Presence detection number of samples to average
 
   Version history :
     28/06/2022 - v1.0 - Creation
     15/01/2023 - v2.0 - Complete rewrite
     03/04/2023 - v2.1 - Add trigger to avoid false detection
     12/09/2023 - v2.2 - Switch to LD2410 Rx & LD2410 Tx
+    20/11/2023 - v2.3 - Tasmota 13.2 compatibility
+    23/11/2023 - v2.4 - Add bluetooth command (thanks to protectivedad)
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -136,7 +139,7 @@ static struct {
   TasmotaSerial  *pserial   = nullptr;                  // pointer to serial port
   bool            enabled   = false;                    // sensor enabled
   uint32_t        timestamp = 0;                        // timestamp of last detection
-  uint16_t        timeout   = LD2410_DEFAULT_TIMEOUT;   // ld2410 timeout
+  uint16_t        timeout = LD2410_DEFAULT_TIMEOUT;     // target humidity level
   ld2410_firmware firmware; 
   ld2410_sensor   motion; 
   ld2410_sensor   presence; 
@@ -159,7 +162,7 @@ void CmndLD2410Help ()
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ld2410_restart    = restart sensor"));
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ld2410_gate <gate,pres,motion> = set gate sensitivity"));
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ld2410_max <pres,motion>       = set detection max gate "));
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ld2410_bluetooth <0/1>  = set bluetooth"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: ld2410_bluetooth <0/1>         = set bluetooth"));
  
   ResponseCmndDone ();
 }
@@ -169,6 +172,7 @@ void CmndLD2410Timeout ()
   if (XdrvMailbox.payload > 0)
   {
     ld2410_status.timeout = XdrvMailbox.payload;
+    LD2410SaveConfig ();
     LD2410AppendCommand (LD2410_CMND_DIST_TIMEOUT);
   }
   ResponseCmndNumber (ld2410_status.timeout);
@@ -325,16 +329,18 @@ void CmndLD2410Bluetooth ()
 void LD2410LoadConfig ()
 {
   // read parameters
-  ld2410_config.sample  = Settings->free_ea6[24];
+//  ld2410_status.timeout = Settings->rf_code[2][2];
+  ld2410_config.sample  = Settings->rf_code[2][3];
 
   // check parameters
-  if (ld2410_config.sample  == 0) ld2410_config.sample  = LD2410_DEFAULT_SAMPLE;
+  if (ld2410_config.sample == 0) ld2410_config.sample = LD2410_DEFAULT_SAMPLE;
 }
 
 // Save configuration into flash memory
 void LD2410SaveConfig ()
 {
-  Settings->free_ea6[24] = ld2410_config.sample;
+//  Settings->rf_code[2][2] = ld2410_status.timeout;
+  Settings->rf_code[2][3] = ld2410_config.sample;
 }
 
 /**************************************************\
@@ -603,6 +609,7 @@ void LD2410HandleReceivedMessage ()
         case 0x0163:
           AddLog (LOG_LEVEL_INFO, PSTR ("HLK: engineering mode is OFF"));
           break;
+
         // bluetooth
         case 0x01a4:
           AddLog (LOG_LEVEL_INFO, PSTR ("HLK: bluetooth command sent"));
