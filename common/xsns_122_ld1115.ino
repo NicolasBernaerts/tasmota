@@ -603,7 +603,7 @@ void LD1115WebSensor ()
   // check status
   if (!ld1115_status.enabled) return;
 
-  WSContentSend_P (PSTR ("<div style='font-size:10px;text-align:center;margin-top:4px;padding:2px 6px;background:#333333;border-radius:8px;'>\n"));
+  WSContentSend_P (PSTR ("<div style='font-size:10px;text-align:center;margin:4px 0px;padding:2px 6px;background:#333333;border-radius:8px;'>\n"));
 
   // scale
   WSContentSend_P (PSTR ("<div style='display:flex;padding:0px;'>\n"));

@@ -21,6 +21,7 @@
     03/04/2023 - v2.1 - Add trigger to avoid false detection
     12/09/2023 - v2.2 - Switch to LD2410 Rx & LD2410 Tx
     20/11/2023 - v2.3 - Tasmota 13.2 compatibility
+                        Switch parameters to rf_code[2]
     23/11/2023 - v2.4 - Add bluetooth command (thanks to protectivedad)
 
   This program is free software: you can redistribute it and/or modify
@@ -885,7 +886,7 @@ void LD2410WebSensor ()
   // check if enabled
   if (!ld2410_status.enabled) return;
 
-  WSContentSend_PD (PSTR ("<div style='font-size:10px;text-align:center;margin-top:4px;padding:2px 6px;background:#333333;border-radius:8px;'>\n"));
+  WSContentSend_PD (PSTR ("<div style='font-size:10px;text-align:center;margin:4px 0px;padding:2px 6px;background:#333333;border-radius:8px;'>\n"));
 
   // scale
   WSContentSend_PD (PSTR ("<div style='display:flex;padding:0px;'>\n"));

@@ -62,8 +62,8 @@ void CmndFTPServerHelp ()
 {
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: FTP server commands :"));
   AddLog (LOG_LEVEL_INFO, PSTR (" - ftp_status = status (running port or 0 if not running)"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - ftp_start = start FTP server on port %u"), FTP_CTRL_PORT);
-  AddLog (LOG_LEVEL_INFO, PSTR (" - ftp_stop  = stop FTP server"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - ftp_start  = start FTP server on port %u"), FTP_CTRL_PORT);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - ftp_stop   = stop FTP server"));
   AddLog (LOG_LEVEL_INFO, PSTR ("   Server allows only 1 concurrent connexion"));
   AddLog (LOG_LEVEL_INFO, PSTR ("   Please configure your FTP client accordingly to connect"));
   ResponseCmndDone ();

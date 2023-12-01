@@ -6,6 +6,8 @@
   Version history :
     03/09/2023 - v1.0 - Creation
     12/09/2023 - v1.1 - Switch to LD2410 Rx & LD2410 Tx
+    20/11/2023 - v1.2 - Tasmota 13.2 compatibility
+                        Switch parameters to rf_code[2]
 
   Connexions :
     * GPIO1 should be declared as LD2410 Tx and connected to HLK-LD2450 Rx
@@ -14,11 +16,11 @@
   Call LD2450InitDevice (timeout) to declare the device and make it operational
 
   Settings are stored using unused parameters :
-    - Settings->free_ea6[25] : Presence detection timeout (sec.)
-    - Settings->free_ea6[26] : x1 detection point (x10cm)
-    - Settings->free_ea6[27] : x2 detection point (x10cm)
-    - Settings->free_ea6[28] : y1 detection point (x10cm)
-    - Settings->free_ea6[29] : y2 detection point (x10cm)
+    - Settings->rf_code[2][3] : Presence detection timeout (sec.)
+    - Settings->rf_code[2][4] : x1 detection point (x10cm)
+    - Settings->rf_code[2][5] : x2 detection point (x10cm)
+    - Settings->rf_code[2][6] : y1 detection point (x10cm)
+    - Settings->rf_code[2][7] : y2 detection point (x10cm)
 
             -       sensor      +
 
@@ -247,11 +249,11 @@ void CmndLD2450Zone ()
 void LD2450LoadConfig ()
 {
   // read parameters
-  ld2450_config.timeout  = Settings->free_ea6[25];
-  ld2450_config.x1 = ((int16_t)Settings->free_ea6[26] - 128) * 100;
-  ld2450_config.x2 = ((int16_t)Settings->free_ea6[27] - 128) * 100;
-  ld2450_config.y1 = ((int16_t)Settings->free_ea6[28] - 128) * 100;
-  ld2450_config.y2 = ((int16_t)Settings->free_ea6[29] - 128) * 100;
+  ld2450_config.timeout      = Settings->rf_code[2][3];
+  ld2450_config.x1 = ((int16_t)Settings->rf_code[2][4] - 128) * 100;
+  ld2450_config.x2 = ((int16_t)Settings->rf_code[2][5] - 128) * 100;
+  ld2450_config.y1 = ((int16_t)Settings->rf_code[2][6] - 128) * 100;
+  ld2450_config.y2 = ((int16_t)Settings->rf_code[2][7] - 128) * 100;
 
   // check parameters
   if (ld2450_config.timeout == 0) ld2450_config.timeout = LD2450_DEFAULT_TIMEOUT;
@@ -266,11 +268,11 @@ void LD2450LoadConfig ()
 // Save configuration into flash memory
 void LD2450SaveConfig ()
 {
-  Settings->free_ea6[25] = ld2450_config.timeout;
-  Settings->free_ea6[26] = (uint8_t)((ld2450_config.x1 / 100) + 128);
-  Settings->free_ea6[27] = (uint8_t)((ld2450_config.x2 / 100) + 128);
-  Settings->free_ea6[28] = (uint8_t)((ld2450_config.y1 / 100) + 128);
-  Settings->free_ea6[29] = (uint8_t)((ld2450_config.y2 / 100) + 128);
+  Settings->rf_code[2][3] = ld2450_config.timeout;
+  Settings->rf_code[2][4] = (uint8_t)((ld2450_config.x1 / 100) + 128);
+  Settings->rf_code[2][5] = (uint8_t)((ld2450_config.x2 / 100) + 128);
+  Settings->rf_code[2][6] = (uint8_t)((ld2450_config.y1 / 100) + 128);
+  Settings->rf_code[2][7] = (uint8_t)((ld2450_config.y2 / 100) + 128);
 }
 
 /**************************************************\
@@ -504,19 +506,19 @@ void LD2450WebSensor ()
   if (!ld2450_status.enabled) return;
 
   // start of display
-  WSContentSend_PD (PSTR ("<div style='font-size:10px;text-align:center;margin-top:4px;padding:2px 6px;background:#333333;border-radius:8px;'>\n"));
+  WSContentSend_P (PSTR ("<div style='font-size:10px;text-align:center;margin:4px 0px;padding:2px 6px;background:#333333;border-radius:8px;'>\n"));
 
   // scale
-  WSContentSend_PD (PSTR ("<div style='display:flex;padding:0px;'>\n"));
-  WSContentSend_PD (PSTR ("<div style='width:28%%;padding:0px;text-align:left;font-size:12px;font-weight:bold;'>LD2450</div>\n"));
-  WSContentSend_PD (PSTR ("<div style='width:6%%;padding:0px;text-align:left;'>0m</div>\n"));
-  for (index = 1; index < 6; index ++) WSContentSend_PD (PSTR ("<div style='width:12%%;padding:0px;'>%um</div>\n"), index);
-  WSContentSend_PD (PSTR ("<div style='width:6%%;padding:0px;text-align:right;'>6m</div>\n"));
-  WSContentSend_PD (PSTR ("</div>\n"));
+  WSContentSend_P (PSTR ("<div style='display:flex;padding:0px;'>\n"));
+  WSContentSend_P (PSTR ("<div style='width:28%%;padding:0px;text-align:left;font-size:12px;font-weight:bold;'>LD2450</div>\n"));
+  WSContentSend_P (PSTR ("<div style='width:6%%;padding:0px;text-align:left;'>0m</div>\n"));
+  for (index = 1; index < 6; index ++) WSContentSend_P (PSTR ("<div style='width:12%%;padding:0px;'>%um</div>\n"), index);
+  WSContentSend_P (PSTR ("<div style='width:6%%;padding:0px;text-align:right;'>6m</div>\n"));
+  WSContentSend_P (PSTR ("</div>\n"));
 
   // targets
-  WSContentSend_PD (PSTR ("<div style='display:flex;padding:0px;background:none;'>\n"));
-  WSContentSend_PD (PSTR ("<div style='width:25%%;padding:0px;text-align:left;color:white;'>&nbsp;&nbsp;Presence</div>\n"));
+  WSContentSend_P (PSTR ("<div style='display:flex;padding:0px;background:none;'>\n"));
+  WSContentSend_P (PSTR ("<div style='width:25%%;padding:0px;text-align:left;color:white;'>&nbsp;&nbsp;Presence</div>\n"));
 
   // calculate target position
   for (index = 0; index < LD2450_TARGET_MAX; index ++)
@@ -566,7 +568,7 @@ void LD2450WebSensor ()
   if (position < 100) WSContentSend_P (PSTR ("<div style='width:%u%%;padding:0px;background:none;'>&nbsp;</div>\n"), 100 - position);
 
   // end of display
-  WSContentSend_PD (PSTR ("</div>\n"));
+  WSContentSend_P (PSTR ("</div>\n"));
 }
 
 #ifdef USE_LD2450_RADAR

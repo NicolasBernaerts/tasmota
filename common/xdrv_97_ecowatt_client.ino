@@ -260,43 +260,45 @@ void EcowattWebSensor ()
   // if topic is missing, nothing to display
   if (ecowatt_config.str_topic.length () == 0) return;
 
-  // ecpwatt display style
-  WSContentSend_PD (PSTR ("<div style='font-size:10px;text-align:center;margin-top:4px;padding:2px 6px;background:#333333;border-radius:8px;'>\n"));
-  WSContentSend_PD (PSTR ("<div style='display:flex;padding:0px;'>\n"));
-  WSContentSend_PD (PSTR ("<div style='width:28%%;padding:0px;margin-bottom:-4px;text-align:left;font-size:16px;font-weight:bold;'>Ecowatt</div>\n"));
+  WSContentSend_P (PSTR ("<div style='font-size:10px;text-align:center;margin:4px 0px;padding:2px 6px;background:#333333;border-radius:8px;'>\n"));
 
-  // if ecowatt signal has never been received
-  if (ecowatt_status.hour == UINT8_MAX) WSContentSend_PD (PSTR ("<div style='width:72%%;padding:3px 0px;'>Waiting for %s</div>\n"), ecowatt_config.str_topic.c_str ());
+  // ecowatt header
+  WSContentSend_P (PSTR ("<div style='display:flex;padding:0px;margin-bottom:4px;'>\n"));
+  WSContentSend_P (PSTR ("<div style='width:28%%;padding:0px;margin-bottom:-4px;text-align:left;font-size:16px;font-weight:bold;'>Ecowatt</div>\n"));
+  if (ecowatt_status.hour == UINT8_MAX) WSContentSend_P (PSTR ("<div style='width:72%%;padding:0px;'>Waiting for %s</div>\n"), ecowatt_config.str_topic.c_str ());
+    else WSContentSend_P (PSTR ("<div style='width:72%%;padding:0px;'></div>\n"));
+  WSContentSend_P (PSTR ("</div>\n"));
 
-  // else, display today ecowatt chart
-  else
+  // ecowatt chart
+  WSContentSend_P (PSTR ("<div style='display:flex;padding:0px;'>\n"));
+  WSContentSend_P (PSTR ("<div style='width:15%%;padding:0px;'></div>\n"));
+  WSContentSend_P (PSTR ("<div style='width:85%%;padding:0px;display:flex;font-size:9px;'>\n"));
+  for (slot = 0; slot < ECOWATT_SLOT_PER_DAY; slot ++)
   {
-    // scale
-    WSContentSend_PD (PSTR ("<div style='width:6%%;padding:0px;text-align:left;'>%uh</div>\n"), 0);
-    for (slot = 1; slot < 6; slot ++) WSContentSend_PD (PSTR ("<div style='width:12%%;padding:0px;'>%uh</div>\n"), slot * 4);
-    WSContentSend_PD (PSTR ("<div style='width:6%%;padding:0px;text-align:right;'>%uh</div>\n"), 24);
-    WSContentSend_PD (PSTR ("</div>\n"));
-
-    // daily ecowatt slots
-    WSContentSend_PD (PSTR ("<div style='display:flex;margin:0px;padding:0px;font-size:8px;'>\n"));
-    WSContentSend_PD (PSTR ("<div style='width:28%%;padding:0px;'>&nbsp;</div>\n"));
-    for (slot = 0; slot < ECOWATT_SLOT_PER_DAY; slot ++)
-    {
-      // display segment
-      GetTextIndexed (str_color, sizeof (str_color), ecowatt_status.arr_day[0].arr_hvalue[slot], kEcowattStateColor);
-      WSContentSend_PD (PSTR ("<div style='width:3%%;padding:1px 0px;background:%s;"), str_color);
-      if (slot == 0) WSContentSend_PD (PSTR ("border-top-left-radius:4px;border-bottom-left-radius:4px;"));
-        else if (slot == ECOWATT_SLOT_PER_DAY - 1) WSContentSend_PD (PSTR ("border-top-right-radius:4px;border-bottom-right-radius:4px;"));
-        
-      // display current status
-      if (slot == ecowatt_status.hour) WSContentSend_P (PSTR ("font-size:9px;'>⚪</div>\n"), str_text);
-          else WSContentSend_P (PSTR ("'></div>\n"));
-    }
-    WSContentSend_PD (PSTR ("</div>\n"));
+    GetTextIndexed (str_color, sizeof (str_color), ecowatt_status.arr_day[0].arr_hvalue[slot], kEcowattStateColor);
+    WSContentSend_P (PSTR ("<div style='width:4%%;padding:0px;background:%s;"), str_color);
+    if (slot == 0) WSContentSend_P (PSTR ("border-top-left-radius:4px;border-bottom-left-radius:4px;"));
+      else if (slot == ECOWATT_SLOT_PER_DAY - 1) WSContentSend_P (PSTR ("border-top-right-radius:4px;border-bottom-right-radius:4px;"));
+    WSContentSend_P (PSTR ("'>"));
+    if (slot == ecowatt_status.hour) WSContentSend_P (PSTR ("⚪"));
+    WSContentSend_P (PSTR ("</div>\n"));
   }
+  WSContentSend_P (PSTR ("<div style='width:2%%;padding:0px;'></div>\n"));
+  WSContentSend_P (PSTR ("</div>\n"));
+  WSContentSend_P (PSTR ("</div>\n"));
 
-  WSContentSend_PD (PSTR ("</div>\n"));
-  WSContentSend_PD (PSTR ("</div>\n"));
+  // hour scale
+  WSContentSend_P (PSTR ("<div style='display:flex;padding:0px;'>\n"));
+  WSContentSend_P (PSTR ("<div style='width:15%%;padding:0px;'></div>\n"));
+  WSContentSend_P (PSTR ("<div style='width:85%%;padding:0px;display:flex;'>\n"));
+  WSContentSend_P (PSTR ("<div style='width:8.2%%;padding:0px;text-align:left;'>%uh</div>\n"), 0);
+  for (slot = 1; slot < 6; slot ++) WSContentSend_P (PSTR ("<div style='width:16.3%%;padding:0px;'>%uh</div>\n"), slot * 4);
+  WSContentSend_P (PSTR ("<div style='width:8.3%%;padding:0px;text-align:right;'>%uh</div>\n"), 24);
+  WSContentSend_P (PSTR ("<div style='width:2%%;padding:0px;'></div>\n"));
+  WSContentSend_P (PSTR ("</div>\n"));
+  WSContentSend_P (PSTR ("</div>\n"));
+
+  WSContentSend_P (PSTR ("</div>\n"));
 }
 
 #endif  // USE_WEBSERVER
