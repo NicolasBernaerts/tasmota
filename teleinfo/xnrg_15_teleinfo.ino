@@ -1848,7 +1848,7 @@ void TeleinfoReceiveData ()
               else Energy->current[phase] = 0;
             teleinfo_conso.phase[phase].current = (long)(Energy->current[phase] * 100);
           } 
-
+/*
 #ifdef USE_LIGHT
           // ----------------------------------
           //   control RGB lignt
@@ -1873,7 +1873,7 @@ void TeleinfoReceiveData ()
           // update light controller
           light_controller.changeRGB ((uint8_t)red, (uint8_t)green, 0, false);
 #endif      // USE_LIGHT
-
+*/
           // declare received message and update previous message timestamp
           teleinfo_message.received = true;
           teleinfo_message.time_previous = teleinfo_message.timestamp;
