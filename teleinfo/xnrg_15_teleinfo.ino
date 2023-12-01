@@ -200,6 +200,8 @@ TasmotaSerial *teleinfo_serial = nullptr;
 #define D_CMND_TELEINFO_NEXT            "next"
 #define D_CMND_TELEINFO_MINUS           "minus"
 #define D_CMND_TELEINFO_PLUS            "plus"
+#define D_CMND_TELEINFO_TODAY_CONSO     "today-conso"
+#define D_CMND_TELEINFO_TODAY_PROD      "today-prod"
 
 // JSON TIC extensions
 #define TELEINFO_JSON_TIC               "TIC"
@@ -271,11 +273,11 @@ const char kTeleinfoPeriodName[] PROGMEM = "Toutes|Creuses|Pleines|Normales|Poin
 enum TeleinfoMessagePolicy { TELEINFO_POLICY_TELEMETRY, TELEINFO_POLICY_PERCENT, TELEINFO_POLICY_MESSAGE, TELEINFO_POLICY_MAX };
 const char kTeleinfoMessagePolicy[] PROGMEM = "Telemetry only|± 5% Power Change|Every TIC message";
 enum TeleinfoMessageType { TELEINFO_MSG_NONE, TELEINFO_MSG_METER, TELEINFO_MSG_TIC, TELEINFO_MSG_BOTH, TELEINFO_MSG_MAX };
-const char kTeleinfoMessageType[] PROGMEM = "None|METER only|TIC only|METER and TIC";
+const char kTeleinfoMessageType[] PROGMEM = "None|METER & PROD|TIC|All";
 
 // config
-enum TeleinfoConfigKey { TELEINFO_CONFIG_NBDAY, TELEINFO_CONFIG_NBWEEK, TELEINFO_CONFIG_MAX_HOUR, TELEINFO_CONFIG_MAX_DAY, TELEINFO_CONFIG_MAX_MONTH, TELEINFO_CONFIG_MAX };     // configuration parameters
-const char kTeleinfoConfigKey[] PROGMEM = D_CMND_TELEINFO_LOG_DAY "|" D_CMND_TELEINFO_LOG_WEEK "|" D_CMND_TELEINFO_MAX_KWH_HOUR "|" D_CMND_TELEINFO_MAX_KWH_DAY "|" D_CMND_TELEINFO_MAX_KWH_MONTH;      // configuration keys
+enum TeleinfoConfigKey { TELEINFO_CONFIG_NBDAY, TELEINFO_CONFIG_NBWEEK, TELEINFO_CONFIG_MAX_HOUR, TELEINFO_CONFIG_MAX_DAY, TELEINFO_CONFIG_MAX_MONTH, TELEINFO_CONFIG_TODAY_CONSO, TELEINFO_CONFIG_TODAY_PROD, TELEINFO_CONFIG_MAX };     // configuration parameters
+const char kTeleinfoConfigKey[] PROGMEM = D_CMND_TELEINFO_LOG_DAY "|" D_CMND_TELEINFO_LOG_WEEK "|" D_CMND_TELEINFO_MAX_KWH_HOUR "|" D_CMND_TELEINFO_MAX_KWH_DAY "|" D_CMND_TELEINFO_MAX_KWH_MONTH "|" D_CMND_TELEINFO_TODAY_CONSO "|" D_CMND_TELEINFO_TODAY_PROD;      // configuration keys
 
 // power calculation modes
 enum TeleinfoPowerCalculationMethod { TIC_METHOD_GLOBAL_COUNTER, TIC_METHOD_INCREMENT };
@@ -300,7 +302,7 @@ static struct {
   uint8_t  msg_type   = TELEINFO_MSG_METER;              // type of data to publish (METER and/or TIC)
   long     max_volt   = TELEINFO_GRAPH_DEF_VOLTAGE;      // maximum voltage on graph
   long     max_power  = TELEINFO_GRAPH_DEF_POWER;        // maximum power on graph
-  long     param[TELEINFO_CONFIG_MAX] = { TELEINFO_HISTO_DAY_DEFAULT, TELEINFO_HISTO_WEEK_DEFAULT, TELEINFO_GRAPH_DEF_WH_HOUR, TELEINFO_GRAPH_DEF_WH_DAY, TELEINFO_GRAPH_DEF_WH_MONTH };      // graph configuration
+  long     param[TELEINFO_CONFIG_MAX] = { TELEINFO_HISTO_DAY_DEFAULT, TELEINFO_HISTO_WEEK_DEFAULT, TELEINFO_GRAPH_DEF_WH_HOUR, TELEINFO_GRAPH_DEF_WH_DAY, TELEINFO_GRAPH_DEF_WH_MONTH, 0, 0 };      // graph configuration
 } teleinfo_config;
 
 // TIC : current message
@@ -357,8 +359,8 @@ struct tic_phase {
   long  current;                                    // instant current (x100)
   long  papp;                                       // instant apparent power
   long  pact;                                       // instant active power
-  long  papp_last;                                  // last published apparent power
   long  cosphi;                                     // cos phi (x100)
+  long  papp_last;                                  // last published apparent power
   float papp_inc;                                   // apparent power counter increment per phase (in vah)
 }; 
 
@@ -370,7 +372,7 @@ static struct {
   long      papp         = 0;                       // current conso apparent power 
   long long total_wh     = 0;                       // active conso total
   long long delta_wh     = 0;                       // active conso delta since last total
-  long long midnight_wh  = LONG_LONG_MAX;           // active conso total at previous midnight
+  long long midnight_wh  = 0;                       // active conso total at previous midnight
   long long index_wh[TELEINFO_INDEX_MAX];           // array of conso total of different tarif periods
 
   // active power calculation data
@@ -389,15 +391,16 @@ static struct {
   // global data
   long      papp        = 0;                        // production instant apparent power 
   long      pact        = 0;                        // production instant active power
-  long      papp_last   = 0;                        // last published apparent power
   long      cosphi      = 100;                      // cos phi (x100)
+  long      papp_last   = 0;                        // last published apparent power
+  float     papp_inc    = 0;                        // apparent power counter increment (in vah)
+
   long long total_wh    = 0;                        // active production total
   long long delta_wh    = 0;                        // active production delta since last total
-  long long midnight_wh = LONG_LONG_MAX;            // active production total last midnight
+  long long midnight_wh = 0;                        // active production total last midnight
 
   // active power calculation data
   uint32_t  time_previous = UINT32_MAX;             // timestamp of previous global counter increase
-  float     papp_inc;                               // apparent power counter increment (in vah)
 } teleinfo_prod;
 
 /**************************************************\
@@ -738,10 +741,10 @@ void TeleinfoLoadConfig ()
       }
     }
   }
+
 # endif     // USE_UFILESYS
 
   // validate boundaries
-//  if (Settings->baudrate == 0) Settings->baudrate = 9600 / 300;
   if ((teleinfo_config.msg_policy < 0) || (teleinfo_config.msg_policy >= TELEINFO_POLICY_MAX)) teleinfo_config.msg_policy = TELEINFO_POLICY_TELEMETRY;
   if (teleinfo_config.msg_type >= TELEINFO_MSG_MAX) teleinfo_config.msg_type = TELEINFO_MSG_METER;
   if ((teleinfo_config.percent < TELEINFO_PERCENT_MIN) || (teleinfo_config.percent > TELEINFO_PERCENT_MAX)) teleinfo_config.percent = 100;
@@ -753,6 +756,8 @@ void TeleinfoLoadConfig ()
 // Save configuration to Settings or to LittleFS
 void TeleinfoSaveConfig () 
 {
+  long long today_wh;
+
   // save standard settings
   Settings->teleinfo.percent    = teleinfo_config.percent;
   Settings->teleinfo.msg_policy = teleinfo_config.msg_policy;
@@ -766,6 +771,16 @@ void TeleinfoSaveConfig ()
   char    str_value[16];
   char    str_text[32];
   File    file;
+
+  // update today conso
+  if ((teleinfo_conso.total_wh != 0) && (teleinfo_conso.midnight_wh != 0)) today_wh = teleinfo_conso.total_wh - teleinfo_conso.midnight_wh;
+    else today_wh = 0;
+  teleinfo_config.param[TELEINFO_CONFIG_TODAY_CONSO] = (long)today_wh;
+
+  // update today production
+  if ((teleinfo_prod.total_wh != 0) && (teleinfo_prod.midnight_wh != 0)) today_wh = teleinfo_prod.total_wh - teleinfo_prod.midnight_wh;
+    else today_wh = 0;
+  teleinfo_config.param[TELEINFO_CONFIG_TODAY_PROD] = (long)today_wh;
 
   // open file and write content
   file = ffsp->open (D_TELEINFO_CFG, "w");
@@ -1185,7 +1200,7 @@ void TeleinfoInit ()
 
   // log default method & help command
   AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Using default Global Counter method"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: EnergyConfig to get help on all Teleinfo commands"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Type EnergyConfig to get help on all Teleinfo commands"));
 }
 
 // Handling of received teleinfo data
@@ -1597,7 +1612,7 @@ void TeleinfoReceiveData ()
             // global apparent power is provided and active power calculated from global counter
             // ---------------------------------------------------------------------------------
             case TIC_METHOD_GLOBAL_COUNTER:
-              // slit apparent power between phases, based on current per phase
+              // loop thru phase to calculate apparent power increment
               papp_inc = 0;
               for (phase = 0; phase < teleinfo_contract.phase; phase++)
               {
@@ -1612,29 +1627,38 @@ void TeleinfoReceiveData ()
                 papp_inc += teleinfo_conso.phase[phase].papp_inc;
               }
 
-              // if global counter increment start is known
+              // if active power calculation timestamp is defined
+              cosphi = teleinfo_conso.phase[0].cosphi;
               if (teleinfo_conso.time_previous != UINT32_MAX)
               {
-                cosphi = teleinfo_conso.phase[0].cosphi;
 
-                // if global counter has got incremented, calculate new cos phi, averaging with previous one to avoid peaks
-                // new cosphi = 3/4 previous one + 1/4 calculated one, if new cosphi > 1, new cosphi = 1
+                // if global counter has got incremented, calculate new cos phi, averaging with previous one to avoid spike
                 if (teleinfo_conso.delta_wh > 0)
                 {
-                  if (papp_inc > 0) cosphi = cosphi * 3 / 4 + (long)(teleinfo_conso.delta_wh * 25 / papp_inc);
-                  teleinfo_meter.nb_update++;
+                  // if global apparent power has increased (should not be other ...)
+                  if (papp_inc > 0)
+                  {
+                    // cosphi = 3/4 previous one + 1/4 calculated one, max is 1.00
+                    cosphi = min (cosphi * 3 / 4 + (long)(teleinfo_conso.delta_wh * 25 / papp_inc), (long)100);
+
+                    // cosphi calculation counter increase
+                    teleinfo_meter.nb_update++;
+                  }
                 }
 
-                // else if no power at all, reduce cosphi
-                else if (papp_inc == 0) cosphi = cosphi * 3 / 4;
-
-                // apply cos phi to each phase
-                cosphi = min (cosphi, (long)100);
-                for (phase = 0; phase < teleinfo_contract.phase; phase++) teleinfo_conso.phase[phase].cosphi = cosphi;
+                // else if no power at all, init cosphi calculation timastamp
+                else if (papp_inc == 0) teleinfo_conso.time_previous = UINT32_MAX;
               }
 
-              // calculate active power per phase
-              for (phase = 0; phase < teleinfo_contract.phase; phase++) teleinfo_conso.phase[phase].pact = teleinfo_conso.phase[phase].papp * teleinfo_conso.phase[phase].cosphi / 100;
+              // loop thru phase
+              for (phase = 0; phase < teleinfo_contract.phase; phase++)
+              {
+                // apply cos phi to current phase
+                teleinfo_conso.phase[phase].cosphi = cosphi;
+
+                // calculate active power per phase
+                teleinfo_conso.phase[phase].pact = teleinfo_conso.phase[phase].papp * teleinfo_conso.phase[phase].cosphi / 100;
+              }
 
               // update calculation timestamp
               if (teleinfo_conso.delta_wh > 0)
@@ -1744,29 +1768,31 @@ void TeleinfoReceiveData ()
           teleinfo_prod.papp_inc += (float)(teleinfo_prod.papp * message_ms) / 3600000;
           papp_inc = teleinfo_prod.papp_inc;
 
-          // if global counter increment start is known
+          // if active power calculation timestamp is defined
+          cosphi = teleinfo_prod.cosphi;
           if (teleinfo_prod.time_previous != UINT32_MAX)
           {
-            // if global counter has got incremented, calculate new cos phi, averaging with previous one to avoid peaks
-            cosphi = teleinfo_prod.cosphi;
+            // if global counter has got incremented, calculate new cos phi, averaging with previous one to avoid spike
             if (teleinfo_prod.delta_wh > 0)
             {
-              // new cosphi = 3/4 previous one + 1/4 calculated one, if new cosphi > 1, new cosphi = 1
-              if (papp_inc > 0) cosphi = cosphi * 3 / 4 + (long)(teleinfo_prod.delta_wh * 25 / papp_inc);
+              // if global apparent power has increased (should not be other ...)
+              if (papp_inc > 0)
+              {
+                // cosphi = 3/4 previous one + 1/4 calculated one, max is 1.00
+                cosphi = min (cosphi * 3 / 4 + (long)(teleinfo_prod.delta_wh * 25 / papp_inc), (long)100);
 
-              // cosphi update counter
-              teleinfo_meter.nb_update++;
+                // cosphi update counter
+                teleinfo_meter.nb_update++;
+              } 
             }
 
-            // else if no power at all, reduce cosphi
-            else if (papp_inc == 0) cosphi = cosphi * 3 / 4;
-
-            // update cosphi
-            teleinfo_prod.cosphi = min (cosphi, (long)100);
+            // else if no power at all, init cosphi calculation timastamp
+            else if (papp_inc == 0) teleinfo_prod.time_previous = UINT32_MAX;
           }
 
-          // calculate active power
-          teleinfo_prod.pact = teleinfo_prod.papp * teleinfo_prod.cosphi / 100;
+          // update cosphi and calculate active power
+          teleinfo_prod.cosphi = cosphi;
+          teleinfo_prod.pact   = teleinfo_prod.papp * cosphi / 100;
 
           // update calculation timestamp
           if (teleinfo_prod.delta_wh > 0)
@@ -1899,15 +1925,15 @@ void TeleinfoEverySecond ()
   uint8_t phase;
 
   // init daily counters
-  if ((teleinfo_conso.midnight_wh == LONG_LONG_MAX) && (teleinfo_conso.total_wh != 0)) teleinfo_conso.midnight_wh = teleinfo_conso.total_wh;
-  if ((teleinfo_prod.midnight_wh  == LONG_LONG_MAX) && (teleinfo_prod.total_wh  != 0)) teleinfo_prod.midnight_wh  = teleinfo_prod.total_wh;
+  if ((teleinfo_conso.midnight_wh == 0) && (teleinfo_conso.total_wh != 0)) teleinfo_conso.midnight_wh = teleinfo_conso.total_wh - (long long)teleinfo_config.param[TELEINFO_CONFIG_TODAY_CONSO];
+  if ((teleinfo_prod.midnight_wh  == 0) && (teleinfo_prod.total_wh  != 0)) teleinfo_prod.midnight_wh  = teleinfo_prod.total_wh  - (long long)teleinfo_config.param[TELEINFO_CONFIG_TODAY_PROD];
 
   // update daily counters if day changes
   if (teleinfo_meter.day_of_month != RtcTime.day_of_month)
   {
-    teleinfo_meter.day_of_month  = RtcTime.day_of_month;
-    if (teleinfo_conso.total_wh != 0) teleinfo_conso.midnight_wh = teleinfo_conso.total_wh;
-    if (teleinfo_prod.total_wh  != 0) teleinfo_prod.midnight_wh  = teleinfo_prod.total_wh;
+    teleinfo_meter.day_of_month = RtcTime.day_of_month;
+    teleinfo_conso.midnight_wh  = teleinfo_conso.total_wh;
+    teleinfo_prod.midnight_wh   = teleinfo_prod.total_wh;
   }
 
   // update today delta

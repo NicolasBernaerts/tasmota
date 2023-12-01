@@ -142,8 +142,7 @@
 #define USE_TIMEZONE_WEB_CONFIG               // Enable timezone web configuration page
 #define USE_TELEINFO_GRAPH                    // Enable Teleinfo sensor module for graph display
 
-#ifdef USE_UFILESYS
-#define USE_FTPSERVER                         // Enable embedded light FTP server
+#ifdef USE_FTPSERVER
 #define FTP_SERVER_LOGIN      "teleinfo"      // FTP server login
 #define FTP_SERVER_PASSWORD   "teleinfo"      // FTP server password
 #endif

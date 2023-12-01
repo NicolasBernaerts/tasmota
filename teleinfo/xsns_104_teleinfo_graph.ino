@@ -112,8 +112,8 @@ struct tic_period {
   long  long pact_sum[ENERGY_MAX_PHASES];           // sum of active power during refresh period
   float cosphi_sum[ENERGY_MAX_PHASES];              // sum of cos phi during refresh period
 
-  String   str_filename;                            // log filename
-  String   str_buffer;                              // buffer of data waiting to be logged
+  String str_filename;                              // log filename
+  String str_buffer;                                // buffer of data waiting to be logged
 }; 
 static tic_period teleinfo_period[TELEINFO_PERIOD_MAX];
 
@@ -124,6 +124,12 @@ struct tic_graph {
   uint8_t arr_volt[ENERGY_MAX_PHASES][TELEINFO_GRAPH_SAMPLE];     // array min and max voltage delta
   uint8_t arr_cosphi[ENERGY_MAX_PHASES][TELEINFO_GRAPH_SAMPLE];   // array of cos phi
 };
+struct tic_daily {
+  long      hour_wh[24];                          // hourly increments
+  long long last_day_wh  = 0;                     // previous daily total
+  long long last_hour_wh = 0;                     // previous hour total
+};
+
 static struct {
   bool    serving      = false;                   // flag set when serving graph page
   uint8_t period_curve = 0;                       // graph max period to display curve
@@ -145,16 +151,11 @@ static struct {
   long    pact[ENERGY_MAX_PHASES];                // active power to save
   uint8_t cosphi[ENERGY_MAX_PHASES];              // cosphi to save
 
-  long      conso_hour_wh[24];                    // conso hourly increments
-  long long conso_last_day_wh  = 0;               // conso previous daily total
-  long long conso_last_hour_wh = 0;               // conso previous hour total
-
-  long      prod_hour_wh[24];                     // production hourly increments
-  long long prod_last_day_wh  = 0;                // production previous daily total
-  long long prod_last_hour_wh = 0;                // production previous hour total
-
   char    str_phase[ENERGY_MAX_PHASES + 1];       // phases to displayed
   char    str_buffer[512];                        // buffer used for graph display 
+
+  tic_daily conso;                                // conso daily data
+  tic_daily prod;                                 // prod daily data
 
   tic_graph data_live;                            // live last 10mn values
 
@@ -362,8 +363,8 @@ bool TeleinfoSensorHistoGetFilename (const uint8_t period, const uint8_t histo, 
   strcpy (pstr_filename, "");
   if (period == TELEINFO_PERIOD_DAY) sprintf_P (pstr_filename, D_TELEINFO_HISTO_FILE_DAY, histo);
   else if (period == TELEINFO_PERIOD_WEEK) sprintf_P (pstr_filename, D_TELEINFO_HISTO_FILE_WEEK, histo);
-  else if (period == TELEINFO_PERIOD_YEAR) sprintf_P (pstr_filename, D_TELEINFO_HISTO_FILE_YEAR, RtcTime.year - histo);
-  else if (period == TELEINFO_PERIOD_PROD) sprintf_P (pstr_filename, D_TELEINFO_HISTO_FILE_PROD, RtcTime.year - histo);
+  else if (period == TELEINFO_PERIOD_YEAR) sprintf_P (pstr_filename, D_TELEINFO_HISTO_FILE_YEAR, RtcTime.year - (uint16_t)histo);
+  else if (period == TELEINFO_PERIOD_PROD) sprintf_P (pstr_filename, D_TELEINFO_HISTO_FILE_PROD, RtcTime.year - (uint16_t)histo);
 
   // if filename defined, check existence
   if (strlen (pstr_filename) > 0) exists = ffsp->exists (pstr_filename);
@@ -584,23 +585,23 @@ void TeleinfoSensorMidnightSaveTotal ()
   File      file;
   char      str_filename[UFS_FILENAME_SIZE];
 
+  // if date not defined, cancel
+  if (!RtcTime.valid) return;
+  
   // calculate last day filename (shift 30s before)
   current_time = LocalTime () - 30;
   BreakTime (current_time, today_dst);
-
-  // if date not defined, cancel
-  if (today_dst.year == 0) return;
 
   // if daily conso is available
   if (teleinfo_conso.total_wh > 0)
   {
     // calculate daily ahd hourly delta
-    delta = teleinfo_conso.total_wh - teleinfo_graph.conso_last_day_wh;
-    teleinfo_graph.conso_hour_wh[today_dst.hour] += (long)(teleinfo_conso.total_wh - teleinfo_graph.conso_last_hour_wh);
+    delta = teleinfo_conso.total_wh - teleinfo_graph.conso.last_day_wh;
+    teleinfo_graph.conso.hour_wh[today_dst.hour] += (long)(teleinfo_conso.total_wh - teleinfo_graph.conso.last_hour_wh);
 
     // update last day and hour total
-    teleinfo_graph.conso_last_day_wh  = teleinfo_conso.total_wh;
-    teleinfo_graph.conso_last_hour_wh = teleinfo_conso.total_wh;
+    teleinfo_graph.conso.last_day_wh  = teleinfo_conso.total_wh;
+    teleinfo_graph.conso.last_hour_wh = teleinfo_conso.total_wh;
 
     // get filename
     sprintf_P (str_filename, D_TELEINFO_HISTO_FILE_YEAR, 1970 + today_dst.year);
@@ -612,7 +613,8 @@ void TeleinfoSensorMidnightSaveTotal ()
     else
     {
       file = ffsp->open (str_filename, "w");
-      file.print (D_TELEINFO_HEADER_YEAR);
+      sprintf_P (teleinfo_graph.str_buffer, "%s\n", D_TELEINFO_HEADER_YEAR);
+      file.print (teleinfo_graph.str_buffer);
     }
 
     // generate today's line
@@ -629,10 +631,10 @@ void TeleinfoSensorMidnightSaveTotal ()
     {
       // append hourly increment to line
       str_line += ";";
-      str_line += teleinfo_graph.conso_hour_wh[index];
+      str_line += teleinfo_graph.conso.hour_wh[index];
 
       // reset hourly increment
-      teleinfo_graph.conso_hour_wh[index] = 0;
+      teleinfo_graph.conso.hour_wh[index] = 0;
     }
 
     // write line and close file
@@ -645,12 +647,12 @@ void TeleinfoSensorMidnightSaveTotal ()
   if (teleinfo_prod.total_wh > 0)
   {
     // calculate daily ahd hourly delta
-    delta = teleinfo_prod.total_wh - teleinfo_graph.prod_last_day_wh;
-    teleinfo_graph.prod_hour_wh[today_dst.hour] += (long)(teleinfo_prod.total_wh - teleinfo_graph.prod_last_hour_wh);
+    delta = teleinfo_prod.total_wh - teleinfo_graph.prod.last_day_wh;
+    teleinfo_graph.prod.hour_wh[today_dst.hour] += (long)(teleinfo_prod.total_wh - teleinfo_graph.prod.last_hour_wh);
 
     // update last day and hour total
-    teleinfo_graph.prod_last_day_wh  = teleinfo_prod.total_wh;
-    teleinfo_graph.prod_last_hour_wh = teleinfo_prod.total_wh;
+    teleinfo_graph.prod.last_day_wh  = teleinfo_prod.total_wh;
+    teleinfo_graph.prod.last_hour_wh = teleinfo_prod.total_wh;
 
     // get filename
     sprintf_P (str_filename, D_TELEINFO_HISTO_FILE_PROD, 1970 + today_dst.year);
@@ -662,7 +664,8 @@ void TeleinfoSensorMidnightSaveTotal ()
     else
     {
       file = ffsp->open (str_filename, "w");
-      file.print (D_TELEINFO_HEADER_YEAR);
+      sprintf_P (teleinfo_graph.str_buffer, "%s\n", D_TELEINFO_HEADER_YEAR);
+      file.print (teleinfo_graph.str_buffer);
     }
 
     // generate today's line
@@ -679,10 +682,10 @@ void TeleinfoSensorMidnightSaveTotal ()
     {
       // append hourly increment to line
       str_line += ";";
-      str_line += teleinfo_graph.prod_hour_wh[index];
+      str_line += teleinfo_graph.prod.hour_wh[index];
 
       // reset hourly increment
-      teleinfo_graph.prod_hour_wh[index] = 0;
+      teleinfo_graph.prod.hour_wh[index] = 0;
     }
 
     // write line and close file
@@ -845,8 +848,8 @@ void TeleinfoSensorInit ()
   // init hourly values
   for (index = 0; index < 24; index ++)
   {
-    teleinfo_graph.conso_hour_wh[index] = 0;
-    teleinfo_graph.prod_hour_wh[index]  = 0;
+    teleinfo_graph.conso.hour_wh[index] = 0;
+    teleinfo_graph.prod.hour_wh[index]  = 0;
   }
 
   // boundaries of SVG graph
@@ -899,19 +902,13 @@ void TeleinfoSensorInit ()
 // Save data before ESP restart
 void TeleinfoSensorSaveBeforeRestart ()
 {
-  // stop serial reception and disable Teleinfo Rx
-  TeleinfoDisableSerial ();
-
-  // save graph configuration
-  TeleinfoSaveConfig ();
-
   // update energy total (in kwh)
-  //EnergyUpdateToday ();
+  EnergyUpdateToday ();
 
 #ifdef USE_UFILESYS
   // flush logs
-  TeleinfoSensorFlushDataHisto ( TELEINFO_PERIOD_DAY);
-  TeleinfoSensorFlushDataHisto ( TELEINFO_PERIOD_WEEK);
+  TeleinfoSensorFlushDataHisto (TELEINFO_PERIOD_DAY);
+  TeleinfoSensorFlushDataHisto (TELEINFO_PERIOD_WEEK);
 
   // save daily total
   TeleinfoSensorMidnightSaveTotal ();
@@ -925,22 +922,20 @@ void TeleinfoSensorEverySecond ()
 
   // do nothing during energy setup time
   if (TasmotaGlobal.uptime < ENERGY_WATCHDOG) return;
-
-  // if needed, init last hour
-  if (teleinfo_graph.last_hour == UINT8_MAX) teleinfo_graph.last_hour = RtcTime.hour;
+  if (!RtcTime.valid) return;
 
   // if conso is defined
   if (teleinfo_conso.total_wh > 0)
   {
     // if needed, init data
-    if (teleinfo_graph.conso_last_day_wh  == 0) teleinfo_graph.conso_last_day_wh  = teleinfo_conso.total_wh;
-    if (teleinfo_graph.conso_last_hour_wh == 0) teleinfo_graph.conso_last_hour_wh = teleinfo_conso.total_wh;
+    if (teleinfo_graph.conso.last_day_wh  == 0) teleinfo_graph.conso.last_day_wh  = teleinfo_conso.total_wh;
+    if (teleinfo_graph.conso.last_hour_wh == 0) teleinfo_graph.conso.last_hour_wh = teleinfo_conso.total_wh;
 
     // if hour change, save hourly increment
-    if (teleinfo_graph.last_hour != RtcTime.hour)
+    if (teleinfo_conso.total_wh > teleinfo_graph.conso.last_hour_wh)
     {
-      teleinfo_graph.conso_hour_wh[teleinfo_graph.last_hour] += (long)(teleinfo_conso.total_wh - teleinfo_graph.conso_last_hour_wh);
-      teleinfo_graph.conso_last_hour_wh = teleinfo_conso.total_wh;
+      teleinfo_graph.conso.hour_wh[RtcTime.hour] += (long)(teleinfo_conso.total_wh - teleinfo_graph.conso.last_hour_wh);
+      teleinfo_graph.conso.last_hour_wh = teleinfo_conso.total_wh;
     }
   }
 
@@ -948,19 +943,16 @@ void TeleinfoSensorEverySecond ()
   if (teleinfo_prod.total_wh > 0)
   {
     // if needed, init data
-    if (teleinfo_graph.prod_last_day_wh  == 0) teleinfo_graph.prod_last_day_wh  = teleinfo_prod.total_wh;
-    if (teleinfo_graph.prod_last_hour_wh == 0) teleinfo_graph.prod_last_hour_wh = teleinfo_prod.total_wh;
+    if (teleinfo_graph.prod.last_day_wh  == 0) teleinfo_graph.prod.last_day_wh  = teleinfo_prod.total_wh;
+    if (teleinfo_graph.prod.last_hour_wh == 0) teleinfo_graph.prod.last_hour_wh = teleinfo_prod.total_wh;
 
     // if hour change, save hourly increment
-    if (teleinfo_graph.last_hour != RtcTime.hour)
+    if (teleinfo_prod.total_wh > teleinfo_graph.prod.last_hour_wh)
     {
-      teleinfo_graph.prod_hour_wh[teleinfo_graph.last_hour] += (long)(teleinfo_prod.total_wh - teleinfo_graph.prod_last_hour_wh);
-      teleinfo_graph.prod_last_hour_wh = teleinfo_prod.total_wh;
+      teleinfo_graph.prod.hour_wh[RtcTime.hour] += (long)(teleinfo_prod.total_wh - teleinfo_graph.prod.last_hour_wh);
+      teleinfo_graph.prod.last_hour_wh = teleinfo_prod.total_wh;
     }
   }
-
-  // set last hour
-  teleinfo_graph.last_hour = RtcTime.hour;
 
   // loop thru the periods and the phases, to update all values over the period
   for (period = 0; period < teleinfo_graph.period_curve; period++)
@@ -1087,24 +1079,11 @@ void TeleinfoSensorWebSensor ()
       // if meter is running consommation mode
       if (teleinfo_conso.total_wh > 0)
       {
-        // separator
+        // consumption : separator and header
         WSContentSend_P (PSTR ("<hr>\n"));
-
         WSContentSend_P (PSTR ("<div style='padding:0px 0px 5px 0px;text-align:left;font-weight:bold;'>Consommation</div>\n"));
 
-        WSContentSend_P (PSTR ("<div style='display:flex;padding:2px 0px;'>\n"));
-
-        // conso header
-        WSContentSend_P (PSTR ("<div style='width:46%%;padding:0px;text-align:right;'>cosφ</div>\n"));
-        WSContentSend_P (PSTR ("<div style='width:2%%;padding:0px;'></div><div style='width:15%%;padding:0px;text-align:left;font-weight:bold;'>%u.%02u</div>\n"), teleinfo_conso.phase[0].cosphi / 100, teleinfo_conso.phase[0].cosphi % 100);
-        value = 0; 
-        for (phase = 0; phase < teleinfo_contract.phase; phase++) value += teleinfo_conso.phase[phase].pact;
-        WSContentSend_P (PSTR ("<div style='width:25%%;padding:0px;text-align:right;font-weight:bold;'>%d</div>\n"), value);
-        WSContentSend_P (PSTR ("<div style='width:2%%;padding:0px;'></div><div style='width:10%%;padding:0px;text-align:left;'>W</div>\n"));
-
-        WSContentSend_P (PSTR ("</div>\n"));
-
-        // percentage per phase
+        // consumption : bar graph per phase
         if (teleinfo_contract.ssousc > 0)
           for (phase = 0; phase < teleinfo_contract.phase; phase++)
           {
@@ -1127,14 +1106,24 @@ void TeleinfoSensorWebSensor ()
             WSContentSend_P (PSTR ("</div>\n"));
           }
 
-        // today's total consumption
-        if (teleinfo_conso.midnight_wh != LONG_LONG_MAX)
+        // consumption : active power
+        value = 0; 
+        for (phase = 0; phase < teleinfo_contract.phase; phase++) value += teleinfo_conso.phase[phase].pact;
+        WSContentSend_P (PSTR ("<div style='display:flex;padding:2px 0px;'>\n"));
+        WSContentSend_P (PSTR ("<div style='width:16%%;padding:0px;'></div>\n"));
+        WSContentSend_P (PSTR ("<div style='width:47%%;padding:0px;text-align:left;'>cosφ <b>%u.%02u</b></div>\n"), teleinfo_conso.phase[0].cosphi / 100, teleinfo_conso.phase[0].cosphi % 100);
+        WSContentSend_P (PSTR ("<div style='width:25%%;padding:0px;text-align:right;font-weight:bold;'>%d</div>\n"), value);
+        WSContentSend_P (PSTR ("<div style='width:2%%;padding:0px;'></div><div style='width:10%%;padding:0px;text-align:left;'>W</div>\n"));
+        WSContentSend_P (PSTR ("</div>\n"));
+
+        // consumption : today's total
+        if (teleinfo_conso.midnight_wh != 0)
         {
+          total = teleinfo_conso.total_wh - teleinfo_conso.midnight_wh;
           WSContentSend_P (PSTR ("<div style='display:flex;padding:2px 0px;'>\n"));
           WSContentSend_P (PSTR ("<div style='width:16%%;padding:0px;'></div>\n"));
-          WSContentSend_P (PSTR ("<div style='width:31%%;padding:0px;'>Aujourd'hui</div>\n"));
-          total = teleinfo_conso.total_wh - teleinfo_conso.midnight_wh;
-          WSContentSend_P (PSTR ("<div style='width:41%%;padding:0px;text-align:right;font-weight:bold;'>%d</div>\n"), (long)total);
+          WSContentSend_P (PSTR ("<div style='width:37%%;padding:0px;text-align:left;'>Aujourd'hui</div>\n"));
+          WSContentSend_P (PSTR ("<div style='width:35%%;padding:0px;text-align:right;font-weight:bold;'>%d</div>\n"), (long)total);
           WSContentSend_P (PSTR ("<div style='width:2%%;padding:0px;'></div><div style='width:10%%;padding:0px;text-align:left;'>Wh</div>\n"));
           WSContentSend_P (PSTR ("</div>\n"));
         }
@@ -1143,20 +1132,11 @@ void TeleinfoSensorWebSensor ()
       // if meter is running production mode
       if (teleinfo_prod.total_wh > 0)
       {
-        // separator
+        // production : separator and header
         WSContentSend_P (PSTR ("<hr>\n"));
-
         WSContentSend_P (PSTR ("<div style='padding:0px 0px 5px 0px;text-align:left;font-weight:bold;'>Production</div>\n"));
 
-        // production
-        WSContentSend_P (PSTR ("<div style='display:flex;padding:2px 0px;'>\n"));
-        WSContentSend_P (PSTR ("<div style='width:46%%;padding:0px;text-align:right;'>cosφ</div>\n"));
-        WSContentSend_P (PSTR ("<div style='width:2%%;padding:0px;'></div><div style='width:15%%;padding:0px;text-align:left;font-weight:bold;'>cosφ %u.%02u</div>\n"), teleinfo_prod.cosphi / 100, teleinfo_prod.cosphi % 100);
-        WSContentSend_P (PSTR ("<div style='width:25%%;padding:0px;text-align:right;font-weight:bold;'>%d</div>\n"), teleinfo_prod.pact);
-        WSContentSend_P (PSTR ("<div style='width:2%%;padding:0px;'></div><div style='width:10%%;padding:0px;text-align:left;'>W</div>\n"));
-        WSContentSend_P (PSTR ("</div>\n"));
-
-        // calculate and display production bar graph percentage
+        // production : bar graph percentage
         if (teleinfo_contract.ssousc > 0)
         {            
           // calculate percentage and value
@@ -1178,14 +1158,22 @@ void TeleinfoSensorWebSensor ()
           WSContentSend_P (PSTR ("</div>\n"));
         }
 
-        // today's total production
-        if (teleinfo_prod.midnight_wh != LONG_LONG_MAX)
+        // production : active power
+        WSContentSend_P (PSTR ("<div style='display:flex;padding:2px 0px;'>\n"));
+        WSContentSend_P (PSTR ("<div style='width:16%%;padding:0px;'></div>\n"));
+        WSContentSend_P (PSTR ("<div style='width:47%%;padding:0px;text-align:left;'>cosφ <b>%u.%02u</b></div>\n"), teleinfo_prod.cosphi / 100, teleinfo_prod.cosphi % 100);
+        WSContentSend_P (PSTR ("<div style='width:25%%;padding:0px;text-align:right;font-weight:bold;'>%d</div>\n"), teleinfo_prod.pact);
+        WSContentSend_P (PSTR ("<div style='width:2%%;padding:0px;'></div><div style='width:10%%;padding:0px;text-align:left;'>W</div>\n"));
+        WSContentSend_P (PSTR ("</div>\n"));
+
+        // production : today's total
+        if (teleinfo_prod.midnight_wh != 0)
         {
+          total = teleinfo_prod.total_wh - teleinfo_prod.midnight_wh;
           WSContentSend_P (PSTR ("<div style='display:flex;padding:2px 0px;'>\n"));
           WSContentSend_P (PSTR ("<div style='width:16%%;padding:0px;'></div>\n"));
-          WSContentSend_P (PSTR ("<div style='width:31%%;padding:0px;'>Aujourd'hui</div>\n"));
-          total = teleinfo_prod.total_wh - teleinfo_prod.midnight_wh;
-          WSContentSend_P (PSTR ("<div style='width:41%%;padding:0px;text-align:right;font-weight:bold;'>%d</div>\n"), (long)total);
+          WSContentSend_P (PSTR ("<div style='width:37%%;padding:0px;text-align:left;'>Aujourd'hui</div>\n"));
+          WSContentSend_P (PSTR ("<div style='width:35%%;padding:0px;text-align:right;font-weight:bold;'>%d</div>\n"), (long)total);
           WSContentSend_P (PSTR ("<div style='width:2%%;padding:0px;'></div><div style='width:10%%;padding:0px;text-align:left;'>Wh</div>\n"));
           WSContentSend_P (PSTR ("</div>\n"));
         }
@@ -1204,15 +1192,10 @@ void TeleinfoSensorWebSensor ()
       if ((teleinfo_meter.nb_reset > 0) || (teleinfo_meter.nb_error > teleinfo_meter.nb_line / 100))
       {
         WSContentSend_P (PSTR ("<div style='display:flex;padding:2px 0px;'>\n"));
-
-        // errors
         if (teleinfo_meter.nb_error == 0) strcpy (str_text, "white"); else strcpy (str_text, "red");
         WSContentSend_P (PSTR ("<div style='width:50%%;padding:0px;color:%s;'>%d erreurs</div>\n"), str_text, teleinfo_meter.nb_error);
-
-        // reset
         if (teleinfo_meter.nb_reset == 0) strcpy (str_text, "white"); else strcpy (str_text, "orange");
         WSContentSend_P (PSTR ("<div style='width:50%%;padding:0px;color:%s;'>%d reset</div>\n"), str_text, teleinfo_meter.nb_reset);
-
         WSContentSend_P (PSTR ("</div>\n"));
       }
 
@@ -1268,9 +1251,9 @@ void TeleinfoSensorWebPageConfigure ()
   if ((TasmotaGlobal.baudrate != 1200) && (TasmotaGlobal.baudrate != 9600)) strcpy_P (str_select, PSTR ("checked")); else strcpy (str_select, "");
   WSContentSend_P (PSTR ("<p><input type='radio' name='%s' value='%d' %s>%s</p>\n"), D_CMND_TELEINFO_RATE, 115200, str_select, "Disabled");
   if (TasmotaGlobal.baudrate == 1200) strcpy_P (str_select, PSTR ("checked")); else strcpy (str_select, "");
-  WSContentSend_P (PSTR ("<p><input type='radio' name='%s' value='%d' %s>%s</p>\n"), D_CMND_TELEINFO_RATE, 1200, str_select, "Mode Historique");
+  WSContentSend_P (PSTR ("<p><input type='radio' name='%s' value='%d' %s>%s</p>\n"), D_CMND_TELEINFO_RATE, 1200, str_select, "Historique (1200 bauds)");
   if (TasmotaGlobal.baudrate == 9600) strcpy_P (str_select, PSTR ("checked")); else strcpy (str_select, "");
-  WSContentSend_P (PSTR ("<p><input type='radio' name='%s' value='%d' %s>%s</p>\n"), D_CMND_TELEINFO_RATE, 9600, str_select, "Mode Standard");
+  WSContentSend_P (PSTR ("<p><input type='radio' name='%s' value='%d' %s>%s</p>\n"), D_CMND_TELEINFO_RATE, 9600, str_select, "Standard (9600 bauds)");
   WSContentSend_P (PSTR ("</fieldset></p>\n"));
 
   // teleinfo message diffusion policy
@@ -1796,9 +1779,9 @@ void TeleinfoSensorGraphDisplayCurve (const uint8_t phase, const uint8_t data)
 #ifdef USE_UFILESYS
 
 // Display bar graph
-void TeleinfoSensorGraphDisplayBar (const uint8_t histo, const bool is_production, const bool is_main)
+void TeleinfoSensorGraphDisplayBar (const uint8_t histo, const bool is_main)
 {
-  bool    analyse;
+  bool     analyse;
   int      index, count;
   int      month, day, hour;
   long     value, value_x, value_y;
@@ -1862,24 +1845,13 @@ void TeleinfoSensorGraphDisplayBar (const uint8_t histo, const bool is_productio
     strcpy (str_type, "hour");
   }
 
-  // if current day, collect live values
-  if ((histo == 0) && (teleinfo_graph.month == RtcTime.month) && (teleinfo_graph.day == RtcTime.day_of_month))
-  {
-    // update last hour increment
-    teleinfo_graph.conso_hour_wh[RtcTime.hour] += (long)(teleinfo_conso.total_wh - teleinfo_graph.conso_last_hour_wh);
-    teleinfo_graph.conso_last_hour_wh = teleinfo_conso.total_wh;
-
-    // init hour slots from live values
-    for (index = 0; index < 24; index ++) if (teleinfo_graph.conso_hour_wh[index] > 0) arr_value[index] = teleinfo_graph.conso_hour_wh[index];
-  }
-
   // calculate graph height and graph start
   graph_height = TELEINFO_GRAPH_HEIGHT;
   graph_x      = teleinfo_graph.left + graph_delta / 2;
   graph_x_end  = graph_x + graph_width - graph_delta;
   if (!is_main) { graph_x +=4; graph_x_end -= 4; }
 
-  // if data file exists
+  // load data from file
   if (TeleinfoSensorHistoGetFilename (teleinfo_graph.period, histo, str_filename))
   {
     // init
@@ -1940,7 +1912,9 @@ void TeleinfoSensorGraphDisplayBar (const uint8_t histo, const bool is_productio
           {
             analyse = false;
             if (month > graph_stop) month = TELEINFO_GRAPH_MAX_BARGRAPH - 1;
-            if (arr_value[month] == LONG_MAX) arr_value[month] = value; else arr_value[month] += value;
+            if (value != 0)
+              if (arr_value[month] == LONG_MAX) arr_value[month] = value; 
+                else arr_value[month] += value;
           }
 
           // if line deals with target month, display days
@@ -1948,14 +1922,18 @@ void TeleinfoSensorGraphDisplayBar (const uint8_t histo, const bool is_productio
           {
             analyse = false;
             if (day > graph_stop) day = TELEINFO_GRAPH_MAX_BARGRAPH - 1;
-            if (arr_value[day] == LONG_MAX) arr_value[day] = value; else arr_value[day] += value;
+            if (value != 0)
+              if (arr_value[day] == LONG_MAX) arr_value[day] = value; 
+                else arr_value[day] += value;
           }
 
           // if line deals with target month and target day, display hours
           else if ((teleinfo_graph.month == month) && (teleinfo_graph.day == day) && (index > 4) && (index < 24 + 5))
           {
             hour = index - 5;
-            if (arr_value[hour] == LONG_MAX) arr_value[hour] = value; else arr_value[hour] += value;
+            if (value != 0)             
+              if (arr_value[hour] == LONG_MAX) arr_value[hour] = value;
+                else arr_value[hour] += value;
           }
 
           // stop after max token
@@ -1983,6 +1961,62 @@ void TeleinfoSensorGraphDisplayBar (const uint8_t histo, const bool is_productio
     file.close ();
   }
 
+  // if current year data
+  if (histo == 0)
+  {
+    // if displaying production data
+    if (teleinfo_graph.period == TELEINFO_PERIOD_PROD)
+    {
+      // if dealing with current day, add live values to hourly slots
+      if ((teleinfo_graph.month == RtcTime.month) && (teleinfo_graph.day == RtcTime.day_of_month))
+      {
+        for (index = 0; index < 24; index ++)
+          if (teleinfo_graph.prod.hour_wh[index] != 0) 
+          {
+            if (arr_value[index] == LONG_MAX) arr_value[index] = teleinfo_graph.prod.hour_wh[index];
+              else arr_value[index] += teleinfo_graph.prod.hour_wh[index];
+          }
+      }
+
+      // else if current monthly data, init current day slot from live values sum
+      else if (teleinfo_graph.month == RtcTime.month)
+      {
+        for (index = 0; index < 24; index ++)
+          if (teleinfo_graph.prod.hour_wh[index] != 0)
+          {
+            if (arr_value[RtcTime.day_of_month] == LONG_MAX) arr_value[RtcTime.day_of_month] = teleinfo_graph.prod.hour_wh[index];
+              else arr_value[RtcTime.day_of_month] += teleinfo_graph.prod.hour_wh[index];
+          }
+      }
+    } 
+
+    // else displaying conso data
+    else if (teleinfo_graph.period == TELEINFO_PERIOD_YEAR)
+    {
+      // if current daily data, init previous hour slot from live values
+      if ((teleinfo_graph.month == RtcTime.month) && (teleinfo_graph.day == RtcTime.day_of_month))
+      {
+        for (index = 0; index < 24; index ++)
+          if (teleinfo_graph.conso.hour_wh[index] != 0)
+          {
+            if (arr_value[index] == LONG_MAX) arr_value[index] = teleinfo_graph.conso.hour_wh[index];
+              else arr_value[index] += teleinfo_graph.conso.hour_wh[index]; 
+          }
+      }
+
+      // else if current monthly data, init current day slot from live values sum
+      else if (teleinfo_graph.month == RtcTime.month)
+      {
+        for (index = 0; index < 24; index ++) 
+          if (teleinfo_graph.conso.hour_wh[index] != 0)
+          {
+            if (arr_value[RtcTime.day_of_month] == LONG_MAX) arr_value[RtcTime.day_of_month] = teleinfo_graph.conso.hour_wh[index];
+              else arr_value[RtcTime.day_of_month] += teleinfo_graph.conso.hour_wh[index];
+          }
+      }
+    } 
+  }
+
   // bar graph
   // ---------
 
@@ -1996,7 +2030,7 @@ void TeleinfoSensorGraphDisplayBar (const uint8_t histo, const bool is_productio
       if (graph_y < 0) graph_y = 0;
 
       // display link
-      if (is_production) strcpy (str_value, D_TELEINFO_PAGE_GRAPH_PROD); else strcpy (str_value, D_TELEINFO_PAGE_GRAPH_CONSO);
+      if (teleinfo_graph.period == TELEINFO_PERIOD_PROD) strcpy (str_value, D_TELEINFO_PAGE_GRAPH_PROD); else strcpy (str_value, D_TELEINFO_PAGE_GRAPH_CONSO);
       if (is_main && (teleinfo_graph.month == 0)) WSContentSend_P (PSTR ("<a href='%s?month=%d&day=0'>"), str_value, index);
       else if (is_main && (teleinfo_graph.day == 0)) WSContentSend_P (PSTR ("<a href='%s?day=%d'>"), str_value, index);
 
@@ -2725,9 +2759,9 @@ void TeleinfoSensorWebGraph ()
 #ifdef USE_UFILESYS
 
 // Graph public page
-void TeleinfoSensorWebConso () { TeleinfoSensorWebHisto (false); }
-void TeleinfoSensorWebProd () { TeleinfoSensorWebHisto (true); }
-void TeleinfoSensorWebHisto (const bool is_production)
+void TeleinfoSensorWebConso () { TeleinfoSensorWebHisto (TELEINFO_PERIOD_YEAR); }
+void TeleinfoSensorWebProd () { TeleinfoSensorWebHisto (TELEINFO_PERIOD_PROD); }
+void TeleinfoSensorWebHisto (const uint8_t period_type)
 {
   uint8_t  choice, counter, index;  
   uint32_t timestart;
@@ -2750,8 +2784,7 @@ void TeleinfoSensorWebHisto (const bool is_production)
     teleinfo_graph.serving = true;
 
     // get numerical argument values
-    if (is_production) teleinfo_graph.period = TELEINFO_PERIOD_PROD;
-      else teleinfo_graph.period = TELEINFO_PERIOD_YEAR;
+    teleinfo_graph.period = period_type;
     teleinfo_graph.data   = TELEINFO_UNIT_WH;
     teleinfo_graph.day    = (uint8_t)TeleinfoSensorWebGetArgValue (D_CMND_TELEINFO_DAY,   0, 31, teleinfo_graph.day);
     teleinfo_graph.month  = (uint8_t)TeleinfoSensorWebGetArgValue (D_CMND_TELEINFO_MONTH, 0, 12, teleinfo_graph.month);
@@ -2816,7 +2849,7 @@ void TeleinfoSensorWebHisto (const bool is_production)
     WSContentSend_P (PSTR ("div.next {position:absolute;top:16px;right:2%%;padding:0px;}\n"));
 
     WSContentSend_P (PSTR ("div.title {font-size:28px;}\n"));
-    if (is_production) strcpy (str_text, TELEINFO_COLOR_PROD); else strcpy (str_text, TELEINFO_COLOR_CONSO);
+    if (teleinfo_graph.period == TELEINFO_PERIOD_PROD) strcpy (str_text, TELEINFO_COLOR_PROD); else strcpy (str_text, TELEINFO_COLOR_CONSO);
     WSContentSend_P (PSTR ("div.type {font-size:24px;font-weight:bold;color:%s;}\n"), str_text);
 
     WSContentSend_P (PSTR ("div.level {margin-top:-4px;}\n"));
@@ -2853,7 +2886,7 @@ void TeleinfoSensorWebHisto (const bool is_production)
     WSContentSend_P (PSTR ("<body>\n"));
 
     // form start
-    if (is_production) strcpy (str_text, D_TELEINFO_PAGE_GRAPH_PROD); else strcpy (str_text, D_TELEINFO_PAGE_GRAPH_CONSO);
+    if (teleinfo_graph.period == TELEINFO_PERIOD_PROD) strcpy (str_text, D_TELEINFO_PAGE_GRAPH_PROD); else strcpy (str_text, D_TELEINFO_PAGE_GRAPH_CONSO);
     WSContentSend_P (PSTR ("<form method='get' action='%s'>\n"), str_text);
 
     // -------------------
@@ -2886,7 +2919,7 @@ void TeleinfoSensorWebHisto (const bool is_production)
     WSContentSend_P (PSTR ("<div>\n"));
 
     WSContentSend_P (PSTR ("<div class='title'>%s</div>\n"), SettingsText (SET_DEVICENAME));
-    if (is_production) strcpy (str_text, "Production"); else strcpy (str_text, "Consommation");
+    if (teleinfo_graph.period == TELEINFO_PERIOD_PROD) strcpy (str_text, "Production"); else strcpy (str_text, "Consommation");
     WSContentSend_P (PSTR ("<div class='type'>%s</div>\n"), str_text);
 
     WSContentSend_P (PSTR ("</div>\n"));
@@ -2938,7 +2971,7 @@ void TeleinfoSensorWebHisto (const bool is_production)
       }
 
       // display month selection
-      if (is_production) strcpy (str_text, D_TELEINFO_PAGE_GRAPH_PROD); else strcpy (str_text, D_TELEINFO_PAGE_GRAPH_CONSO);
+      if (teleinfo_graph.period == TELEINFO_PERIOD_PROD) strcpy (str_text, D_TELEINFO_PAGE_GRAPH_PROD); else strcpy (str_text, D_TELEINFO_PAGE_GRAPH_CONSO);
       WSContentSend_P (PSTR ("<a href='%s?month=%u&day=0'><div class='item month%s'>%s</div></a>\n"), str_text, index, str_active, str_date);       
     }
 
@@ -2967,7 +3000,7 @@ void TeleinfoSensorWebHisto (const bool is_production)
         if ((teleinfo_graph.day == counter) && (teleinfo_graph.day != 0)) index = 0;
 
         // display day selection
-        if (is_production) strcpy (str_text, D_TELEINFO_PAGE_GRAPH_PROD); else strcpy (str_text, D_TELEINFO_PAGE_GRAPH_CONSO);
+        if (teleinfo_graph.period == TELEINFO_PERIOD_PROD) strcpy (str_text, D_TELEINFO_PAGE_GRAPH_PROD); else strcpy (str_text, D_TELEINFO_PAGE_GRAPH_CONSO);
         WSContentSend_P (PSTR ("<a href='%s?day=%u'><div class='item day%s'>%u</div></a>\n"), str_text, index, str_active, counter);
       }
 
@@ -2996,9 +3029,9 @@ void TeleinfoSensorWebHisto (const bool is_production)
 
     // bar graph
     WSContentSend_P (PSTR ("path {stroke-width:1.5;opacity:0.8;fill-opacity:0.6;}\n"));
-    if (is_production) strcpy (str_text, TELEINFO_COLOR_PROD_PREV); else strcpy (str_text, TELEINFO_COLOR_CONSO_PREV);
+    if (teleinfo_graph.period == TELEINFO_PERIOD_PROD) strcpy (str_text, TELEINFO_COLOR_PROD_PREV); else strcpy (str_text, TELEINFO_COLOR_CONSO_PREV);
     WSContentSend_P (PSTR ("path.prev {stroke:%s;fill:%s;fill-opacity:1;}\n"), str_text, str_text);
-    if (is_production) strcpy (str_text, TELEINFO_COLOR_PROD); else strcpy (str_text, TELEINFO_COLOR_CONSO);
+    if (teleinfo_graph.period == TELEINFO_PERIOD_PROD) strcpy (str_text, TELEINFO_COLOR_PROD); else strcpy (str_text, TELEINFO_COLOR_CONSO);
     WSContentSend_P (PSTR ("path.now {stroke:%s;fill:%s;}\n"), str_text, str_text);
     if (teleinfo_graph.day == 0) WSContentSend_P (PSTR ("path.now:hover {fill-opacity:0.8;}\n"));
 
@@ -3022,8 +3055,8 @@ void TeleinfoSensorWebHisto (const bool is_production)
     TeleinfoSensorGraphDisplayTime (teleinfo_graph.period, teleinfo_graph.histo);
 
     // svg : curves
-    TeleinfoSensorGraphDisplayBar (teleinfo_graph.histo + 1, is_production, false);       // previous period
-    TeleinfoSensorGraphDisplayBar (teleinfo_graph.histo,     is_production, true);        // current period
+    TeleinfoSensorGraphDisplayBar (teleinfo_graph.histo + 1, false);       // previous period
+    TeleinfoSensorGraphDisplayBar (teleinfo_graph.histo,     true);        // current period
 
     // svg : end
     WSContentSend_P (PSTR ("</svg>\n"));
@@ -3154,6 +3187,8 @@ bool Xsns104 (uint32_t function)
       TeleinfoSensorInit ();
       break;
     case FUNC_SAVE_BEFORE_RESTART:
+      TeleinfoDisableSerial ();
+      TeleinfoSaveConfig ();
       TeleinfoSensorSaveBeforeRestart ();
       break;
     case FUNC_EVERY_SECOND:
