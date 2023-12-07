@@ -1,8 +1,6 @@
 # Teleinfo Tasmota firmware (with Tempo & Ecowatt)
 
-**ATTENTION**
-
-From **version 13** onward, partitionning has changed on **ESP32 family**, it uses new **safeboot** partitionning.
+⚠️ From **version 13** onward, partitionning has changed on **ESP32 family**, it uses new **safeboot** partitionning.
 
 If you upgrade ESP32 from previous version, you need to do a serial flash in **erase** mode. If you do OTA, you may encounter serious instabilities. Of course you need to do it once. You'll be able to update futur versions using OTA.
 
