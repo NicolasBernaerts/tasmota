@@ -64,6 +64,11 @@ If your linky in in historic mode, it doesn't provide instant voltage. Voltage i
 
 If you are using an **ESP32** board with Ethernet, you can use the wired connexion by selection the proper board model in **Configuration/ESP32 board**.
 
+
+If you want to remove default Tasmota Energy display on the main page, you just need to run this console command :
+
+    websensor3 0
+
 Teleinfo protocol is described in [this document](https://www.enedis.fr/sites/default/files/Enedis-NOI-CPT_54E.pdf)
 
 #### MQTT data
@@ -133,10 +138,6 @@ This Teleinfo firmware can be configured thru some **EnergyConfig** console comm
 You can use few commands at once :
 
       EnergyConfig percent=110 nbday=8 nbweek=12
-
-If you want to remove default Tasmota Energy display on the main page, you just need to run this console command :
-
-    websensor3 0
 
 #### Log files
 
