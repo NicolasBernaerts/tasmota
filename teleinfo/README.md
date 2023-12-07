@@ -134,6 +134,10 @@ You can use few commands at once :
 
       EnergyConfig percent=110 nbday=8 nbweek=12
 
+If you want to remove default Tasmota Energy display on the main page, you just need to run this console command :
+
+    websensor3 0
+
 #### Log files
 
 If you run this firmware on an ESP having a LittleFS partition, it will generate 3 types of energy logs :
