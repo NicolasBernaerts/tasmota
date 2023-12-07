@@ -71,8 +71,8 @@
 
 // URL
 #define ECOWATT_URL_OAUTH2          "https://digital.iservices.rte-france.com/token/oauth/"
-#define ECOWATT_URL_DATA            "https://digital.iservices.rte-france.com/open_api/ecowatt/v4/signals"
-#define ECOWATT_URL_SANDBOX         "https://digital.iservices.rte-france.com/open_api/ecowatt/v4/sandbox/signals"
+#define ECOWATT_URL_DATA            "https://digital.iservices.rte-france.com/open_api/ecowatt/v5/signals"
+#define ECOWATT_URL_SANDBOX         "https://digital.iservices.rte-france.com/open_api/ecowatt/v5/sandbox/signals"
 
 // MQTT commands
 const char kEcowattCommands[] PROGMEM = "eco_" "|" "help" "|" D_CMND_ECOWATT_ENABLE "|" D_CMND_ECOWATT_KEY "|" D_CMND_ECOWATT_UPDATE "|" D_CMND_ECOWATT_PUBLISH "|" D_CMND_ECOWATT_SANDBOX "|" D_CMND_ECOWATT_TOKEN;
