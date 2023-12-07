@@ -1,4 +1,4 @@
-# Teleinfo & Ecowatt Tasmota firmware
+# Teleinfo Tasmota firmware (with Tempo & Ecowatt)
 
 **ATTENTION**
 
