@@ -90,6 +90,8 @@
     19/11/2023 - v13.0 - Tasmota 13 compatibility
                          Switch to safeboot partitionning
                          Calculate active power for production
+    05/12/2023 - v13.1 - Add RTE Tempo calendar
+    07/12/2023 - v13.2 - Handle both Ecowatt v4 and v5 (command eco_version)
     
 
   This program is free software: you can redistribute it and/or modify
@@ -170,7 +172,10 @@
 // extension data
 #define EXTENSION_NAME    "Teleinfo"          // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
-#define EXTENSION_VERSION "13.0"              // version
+#define EXTENSION_VERSION "13.2"              // version
+
+// teleinfo display is in French
+#define MY_LANGUAGE        fr_FR
 
 // MQTT default
 #undef MQTT_HOST

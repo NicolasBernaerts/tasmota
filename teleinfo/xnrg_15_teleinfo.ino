@@ -247,7 +247,7 @@ const uint32_t TeleinfoRxBuffer = 256;
 const uint32_t TeleinfoRxBuffer = 64;
 #endif
 
-// MQTT commands : EnergyConfig Historique, Standard, Stats, l, tic_msgtype, tic_percent, tic_nbday, tic_nbweek, tic_maxv, tic_maxva, tic_maxhour, tic_maxday and tic_maxmonth
+// MQTT EnergyConfig commands
 const char kTeleinfoCommands[] PROGMEM = D_CMND_TELEINFO_HISTORIQUE "|" D_CMND_TELEINFO_STANDARD "|" D_CMND_TELEINFO_STATS "|" D_CMND_TELEINFO_PERCENT "|" D_CMND_TELEINFO_MSG_POLICY "|" D_CMND_TELEINFO_MSG_TYPE "|" D_CMND_TELEINFO_LOG_DAY "|" D_CMND_TELEINFO_LOG_WEEK "|" D_CMND_TELEINFO_MAX_V "|" D_CMND_TELEINFO_MAX_VA "|" D_CMND_TELEINFO_MAX_KWH_HOUR "|" D_CMND_TELEINFO_MAX_KWH_DAY "|" D_CMND_TELEINFO_MAX_KWH_MONTH;
 enum TeleinfoCommand                   { TIC_CMND_HISTORIQUE,           TIC_CMND_STANDARD,           TIC_CMND_STATS,           TIC_CMND_PERCENT,           TIC_CMND_MSG_POLICY,           TIC_CMND_MSG_TYPE,           TIC_CMND_LOG_DAY,           TIC_CMND_LOG_WEEK,           TIC_CMND_MAX_V,           TIC_CMND_MAX_VA,           TIC_CMND_MAX_KWH_HOUR,           TIC_CMND_MAX_KWH_DAY,           TIC_CMND_MAX_KWH_MONTH };
 
