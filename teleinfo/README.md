@@ -152,6 +152,8 @@ These files are used to generate all graphs other than **Live** ones.
 
 This evolution of Tasmota firmware allows to collect [**France RTE**](https://data.rte-france.com/) **Tempo** and **Ecowatt** data thru SSL API and to publish them thru MQTT.
 
+![RTE applications](./screen/tasmota-rte-display.png)
+
 It is only enabled on **ESP32** familiies, as SSL connexions are using too much memory for ESP8266.
 
 RTE configuration is saved under **rte.cfg** at the root of littlefs partition.
@@ -173,29 +175,30 @@ To get all available commands, just run **rte_help** in console :
      - tempo_update       = force tempo update from RTE server
      - tempo_publish      = publish tempo data now
 
-You first need to declare your **RTE Base64 private** that you create from your account on RTE site [https://data.rte-france.com/]
+You first need to create **RTE account** from RTE site [https://data.rte-france.com/]
 
-On RTE site make sure to enable **Ecowatt** and / or **Tempo** application to be able to access its API.
+Then enable enable **Ecowatt** and / or **Tempo** application to be able to access its API.
 
+![RTE applications](./screen/rte-application-list.png) 
 
+Once your applications have been enabled, copy and declare your **private Base64 key** in console mode :
 
-Once you've declared your key, you need to enable Ecowatt module as it is disabled by default.
+    rte_key your_rte_key_in_base64
 
-    eco_key your_rte_key_in_base64
+You can then enable **Tempo** and / or **Ecowatt** data collection : 
+
     eco_enable 1
+    tempo_enable 1
 
-You'll see that you ESP32 first gets a token and then gets the Ecowatt signal data. Every step is traced in the console logs.
+By default, Ecowatt API is version 5. If you have only enabled version 4, you can force it with :
 
-    ECO: Token - abcdefghiL23OeISCK50tsGKzYD60hUt2TeESE1kBEe38x0MH0apF0y valid for 7200 seconds
+    eco_version 4
 
-**Root CA** is included in the source code, but connexion is currently done in unsecure mode, not using the certificate.
+After a restart you'll see that you ESP32 first gets a token and then gets the data. Every step is traced in the console logs.
 
-If you want to get Root CA from RTE site https://data.rte-france.com/ you need to follow these steps in Firefox :
- - on the home page, click on the lock just before the URL
- - select the certificate in the menu and select more information
- - on the page, select display the certificate
- - on the new page, select Global Sign tab
- - click to download PEM(cert)
+    RTE: Token - abcdefghiL23OeISCK50tsGKzYD60hUt2TeESE1kBEe38x0MH0apF0y valid for 7200 seconds
+    RTE: Ecowatt - Success 200
+    RTE: Tempo - Update done (2/1/1)
 
 Ecowatt data are published as a specific MQTT message :
 
@@ -205,6 +208,9 @@ Ecowatt data are published as a specific MQTT message :
       "day2":{"jour":"2022-10-08","dval":3,"0":1,"1":1,"2":1,"3":1,"4":1,"5":3,"6":1,...,"23":1},
       "day3":{"jour":"2022-10-09","dval":2,"0":1,"1":1,"2":1,"3":2,"4":1,"5":1,"6":1,...,"23":1}}}
 
+Tempo data are published as a specific MQTT message :
+
+    your-device/tele/TEMPO = {"Time":"2023-12-07T20:32:42","J-1":"rouge","J":"blanc","J+1":"blanc","Icon":"⬜"}
 
 ## TCP server
 
@@ -277,7 +283,7 @@ Files should be taken from this repository and from **tasmota/common** :
 | tasmota/tasmota_drv_driver/**xdrv_97_tcp_server.ino** | Embedded TCP stream server |
 | tasmota/tasmota_drv_driver/**xdrv_98_esp32_board.ino** | Configuration of Ethernet ESP32 boards |
 | tasmota/tasmota_sns_sensor/**xsns_104_teleinfo_graph.ino** | Teleinfo Graphs |
-| tasmota/tasmota_sns_sensor/**xsns_119_ecowatt_server.ino** | Ecowatt server |
+| tasmota/tasmota_sns_sensor/**xsns_119_rte_server.ino** | RTE Tempo and Ecowatt data collection |
 | tasmota/tasmota_sns_sensor/**xsns_126_timezone.ino** | Timezone Web configuration |
 | lib/default/**ArduinoJSON** | JSON handling library used by Ecowatt server, extract content of **ArduinoJson.zip** |
 | lib/default/**FTPClientServer** | FTP server library, extract content of **FTPClientServer.zip** |
