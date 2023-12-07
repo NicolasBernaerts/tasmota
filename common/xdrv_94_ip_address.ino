@@ -27,7 +27,7 @@
 
 #ifdef USE_IPADDRESS
 
-#define XDRV_94                   94
+#define XDRV_94             94
 
 // web URL
 const char D_IPADDRESS_PAGE_CONFIG[] PROGMEM = "/ip";
@@ -99,21 +99,21 @@ bool IPAddressUpdateSetup (const uint8_t index, const char* pstr_address)
 // Show JSON status (for MQTT)
 void IPAddressShowJSON ()
 {
-  char str_adapter[16];
+//  char str_adapter[16];
 
   // IP address
-  ResponseAppend_P (PSTR (",\"IP\":\"%s\""), IPAddressGetIP ().c_str ());
+//  ResponseAppend_P (PSTR (",\"IP\":\"%s\""), IPAddressGetIP ().c_str ());
 
   // network adapter
-  GetTextIndexed (str_adapter, sizeof (str_adapter), IPAddressGetSource (), kIPAddressSources);
-  ResponseAppend_P (PSTR (",\"Net\":\"%s\""), str_adapter);
+//  GetTextIndexed (str_adapter, sizeof (str_adapter), IPAddressGetSource (), kIPAddressSources);
+//  ResponseAppend_P (PSTR (",\"Net\":\"%s\""), str_adapter);
 
   // wifi MAC
-  if (WiFi.getMode() != WIFI_OFF) ResponseAppend_P (PSTR (",\"Wifi-mac\":\"%s\""), WiFi.macAddress ().c_str ());
+//  if (WiFi.getMode () != WIFI_OFF) ResponseAppend_P (PSTR (",\"Wifi-mac\":\"%s\""), WiFi.macAddress ().c_str ());
 
 #ifdef USE_ETHERNET
   // ethenet MAC
-  if (Settings->flag4.network_ethernet == 1) ResponseAppend_P (PSTR (",\"Eth-mac\":\"%s\""), EthernetMacAddress ().c_str ());
+  if (Settings->flag4.network_ethernet == 1) ResponseAppend_P (PSTR (",\"Eth\":\"%s\""), EthernetMacAddress ().c_str ());
 #endif // USE_ETHERNET
 }
 
@@ -146,7 +146,6 @@ void IPAddressWebPageConfigure ()
   WebGetArg ("ip1", str_argument, sizeof (str_argument));
   if (strlen (str_argument) > 0) updated |= IPAddressUpdateSetup (1, str_argument);
 
-
   // net mask
   WebGetArg ("ip2", str_argument, sizeof (str_argument));
   if (strlen (str_argument) > 0) updated |= IPAddressUpdateSetup (2, str_argument);
@@ -172,11 +171,11 @@ void IPAddressWebPageConfigure ()
   WSContentSend_P (D_IPADDRESS_FIELD_INPUT, PSTR ("Netmask"),                                   PSTR ("ip2"), Settings->ipv4_address[2]);
   WSContentSend_P (D_IPADDRESS_FIELD_INPUT, PSTR ("DNS"),                                       PSTR ("ip3"), Settings->ipv4_address[3]);
 
-  WSContentSend_P (PSTR ("</fieldset></p><br>\n"));
+  WSContentSend_P (PSTR ("</fieldset></p>\n"));
 
   // save button  
   // --------------
-  WSContentSend_P (PSTR ("<p><button name='save' type='submit' class='button bgrn'>%s</button></p>\n"), D_SAVE);
+  WSContentSend_P (PSTR ("<br><p><button name='save' type='submit' class='button bgrn'>%s</button></p>\n"), D_SAVE);
   WSContentSend_P (PSTR ("</form>\n"));
 
   // configuration button
