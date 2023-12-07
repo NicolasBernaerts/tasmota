@@ -2,17 +2,18 @@
 
 **ATTENTION**
 
-With **version 13** partitionning has changed on **ESP32 family**. From version **13.0** onward it uses new **safeboot** partitionning.
+From **version 13** onward, partitionning has changed on **ESP32 family**, it uses new **safeboot** partitionning.
 
 If you upgrade ESP32 from previous version, you need to do a serial flash in **erase** mode. If you do OTA, you may encounter serious instabilities. Of course you need to do it once. You'll be able to update futur versions using OTA.
 
-ESP8266 family keep the same partitionning.
+ESP8266 family partitionning hasn't changed.
 
 ## Presentation
 
 This evolution of **Tasmota 13.2.0** firmware has been enhanced to :
   * handle France energy meters known as **Linky** using **Teleinfo** protocol
-  * implements an **Ecowatt** server to publish RTE Ecowatt signals
+  * publish RTE **Tempo** data
+  * publish RTE **Ecowatt** data
 
 This firmware has been developped and tested on  :
   * **Sagem Classic Monophase** with TIC **Historique**
@@ -147,33 +148,36 @@ Every CSV file includes a header.
 
 These files are used to generate all graphs other than **Live** ones.
 
-## Ecowatt
+## RTE Tempo and Ecowatt
 
-This evolution of Tasmota firmware allows to collect [**France RTE Ecowatt**](https://data.rte-france.com/catalog/-/api/doc/user-guide/Ecowatt/4.0) signals and to publish them thru MQTT.
-
-It uses SSL RTE API and update Ecowatt signals every hour.
+This evolution of Tasmota firmware allows to collect [**France RTE**](https://data.rte-france.com/) **Tempo** and **Ecowatt** data thru SSL API and to publish them thru MQTT.
 
 It is only enabled on **ESP32** familiies, as SSL connexions are using too much memory for ESP8266.
 
-Ecowatt data are published as a specific MQTT message :
+RTE configuration is saved under **rte.cfg** at the root of littlefs partition.
 
-    your-device/tele/ECOWATT = {"Time":"2022-10-10T23:51:09","Ecowatt":{"dval":2,"hour":14,"now":1,"next":2,
-      "day0":{"jour":"2022-10-06","dval":1,"0":1,"1":1,"2":1,"3":1,"4":1,"5":1,"6":1,...,"23":1},
-      "day1":{"jour":"2022-10-07","dval":2,"0":1,"1":1,"2":2,"3":1,"4":1,"5":1,"6":1,...,"23":1},
-      "day2":{"jour":"2022-10-08","dval":3,"0":1,"1":1,"2":1,"3":1,"4":1,"5":3,"6":1,...,"23":1},
-      "day3":{"jour":"2022-10-09","dval":2,"0":1,"1":1,"2":1,"3":2,"4":1,"5":1,"6":1,...,"23":1}}}
- 
-#### Configuration
+To get all available commands, just run **rte_help** in console :
 
-**eco_help** in console lists all Ecowatt commands available :
+    HLP: RTE server commands
+    RTE global commands :
+     - rte_key <key>      = set RTE base64 private key
+     - rte_token          = display current token
+     - rte_sandbox <0/1>  = set sandbox mode (0/1)
+    ECOWATT commands :
+     - eco_enable <0/1>   = enable/disable ecowatt server
+     - eco_version <4/5>  = set ecowatt API version to use
+     - eco_update         = force ecowatt update from RTE server 
+     - eco_publish        = publish ecowatt data now
+    TEMPO commands :
+     - tempo_enable <0/1> = enable/disable tempo server
+     - tempo_update       = force tempo update from RTE server
+     - tempo_publish      = publish tempo data now
 
-    eco_enable <0/1>  = enable/disable ecowatt server
-    eco_sandbox <0/1> = set sandbox mode (0/1)
-    eco_key <key>     = set RTE base64 private key
-    eco_update        = force ecowatt update from RTE server
-    eco_publish       = publish ecowatt data now
+You first need to declare your **RTE Base64 private** that you create from your account on RTE site [https://data.rte-france.com/]
 
-You first need to declare your **Ecowatt Base64 private** that you create from your account on RTE site https://data.rte-france.com/
+On RTE site make sure to enable **Ecowatt** and / or **Tempo** application to be able to access its API.
+
+
 
 Once you've declared your key, you need to enable Ecowatt module as it is disabled by default.
 
@@ -192,6 +196,15 @@ If you want to get Root CA from RTE site https://data.rte-france.com/ you need t
  - on the page, select display the certificate
  - on the new page, select Global Sign tab
  - click to download PEM(cert)
+
+Ecowatt data are published as a specific MQTT message :
+
+    your-device/tele/ECOWATT = {"Time":"2022-10-10T23:51:09","Ecowatt":{"dval":2,"hour":14,"now":1,"next":2,
+      "day0":{"jour":"2022-10-06","dval":1,"0":1,"1":1,"2":1,"3":1,"4":1,"5":1,"6":1,...,"23":1},
+      "day1":{"jour":"2022-10-07","dval":2,"0":1,"1":1,"2":2,"3":1,"4":1,"5":1,"6":1,...,"23":1},
+      "day2":{"jour":"2022-10-08","dval":3,"0":1,"1":1,"2":1,"3":1,"4":1,"5":3,"6":1,...,"23":1},
+      "day3":{"jour":"2022-10-09","dval":2,"0":1,"1":1,"2":1,"3":2,"4":1,"5":1,"6":1,...,"23":1}}}
+
 
 ## TCP server
 
