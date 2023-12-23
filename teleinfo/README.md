@@ -1,4 +1,4 @@
-# Teleinfo Tasmota firmware (with Tempo & Ecowatt)
+# Teleinfo Tasmota firmware (with RTE Tempo, Pointe & Ecowatt)
 
 ⚠️ From **version 13** onward, partitionning has changed on **ESP32 family**, it uses new **safeboot** partitionning.
 
