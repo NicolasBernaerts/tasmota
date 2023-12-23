@@ -156,7 +156,11 @@ These files are used to generate all graphs other than **Live** ones.
 
 ## RTE Tempo, Pointe and Ecowatt
 
-This evolution of Tasmota firmware allows to collect [**France RTE**](https://data.rte-france.com/) **Tempo**, **Pointe** and **Ecowatt** data thru SSL API and to publish them thru MQTT.
+This evolution of Tasmota firmware allows to collect [**France RTE**](https://data.rte-france.com/) data thru their Web Services :
+  * **Tempo**
+  * **Pointe**
+  * **Ecowatt**
+These data are then published thru MQTT.
 
 ![RTE applications](./screen/tasmota-rte-display.png)
 
