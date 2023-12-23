@@ -38,11 +38,11 @@ Pre-compiled versions are available in the [**binary**](./binary) folder.
 
 Please note that it is a completly different implementation than the one published early 2020 by Charles Hallard and actually on the official Tasmota repository. 
 
-This tasmota firmware handles consommation and production modes :
-  * Consommation publishes standard **ENERGY** and specific **METER** JSON section
-  * Production publishes specific **PROD** JSON section
-  * Alerts (Tempo / EJP change, overload, over voltage, ...) are published under **ALERT** JSON section
-  * You can also publish a specific **TIC** section to have all Teleinfo keys
+This tasmota firmware handles consommation and production modes. Data are published thru some specific JSON sections :
+  * Consommation is published thru default **ENERGY** and specific **METER** sections
+  * Production is published thru specific **PROD** section
+  * Alerts (Tempo / EJP change, overload, over voltage, ...) are published under **ALERT** section
+  * You can also publish a specific **TIC** section to have all Teleinfo keys of last received message
 
 Some of these firmware versions are using a LittleFS partition to store graph data. Il allows to keep historical data over reboots.
 To take advantage of this feature, make sure to follow partitioning procedure given in the **readme** of the **binary** folder.
