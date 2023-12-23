@@ -16,6 +16,7 @@
     07/11/2023 - v12.2 - Remove daily graph to save RAM on ESP8266 1Mb
                          Change daily filename to teleinfo-day-00.csv
     19/11/2023 - v13.0 - Migrate all web from xnrg_15_teleinfo
+    19/12/2023 - v13.3 - Handle Tempo and EJP from STGE
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -94,6 +95,14 @@ const char kTeleinfoGraphDisplay[] PROGMEM = "VA|W|V|cosφ|VA|V|Wh";            
 
 // week days name for history
 static const char kWeekdayNames[] = D_DAY3LIST;
+
+// phase colors
+const char kTeleinfoColorPhase[] PROGMEM = "#09f|#f90|#093";                   // phase colors (blue, orange, green)
+const char kTeleinfoColorPeak[]  PROGMEM = "#5ae|#eb6|#2a6";                   // peak colors (blue, orange, green)
+
+// contract colors
+const char kTeleinfoTempoDot[]   PROGMEM = "⚪|⚪|⚫|⚪";
+const char kTeleinfoTempoColor[] PROGMEM = "#252525|#06b|#ccc|#b00";
 
 /****************************************\
  *                 Data
@@ -559,6 +568,11 @@ void TeleinfoSensorFileRotate (const char* pstr_filename, const uint8_t index)
 // Rotation of log files
 void TeleinfoSensorMidnightRotate ()
 {
+  // rotate tempo data
+  teleinfo_meter.tempo.yesterday = teleinfo_meter.tempo.today;
+  teleinfo_meter.tempo.today     = teleinfo_meter.tempo.tomorrow;
+  teleinfo_meter.tempo.tomorrow  = TIC_TEMPO_NONE;
+
   // flush daily file and prepare rotation of daily files
   TeleinfoSensorFlushDataHisto (TELEINFO_PERIOD_DAY);
   teleinfo_graph.rotate_daily  = (uint8_t)teleinfo_config.param[TELEINFO_CONFIG_NBDAY];
@@ -1004,11 +1018,12 @@ void TeleinfoSensorEverySecond ()
 // Append Teleinfo state to main page
 void TeleinfoSensorWebSensor ()
 {
-  uint8_t   phase, period;
+  bool      display_mode = true;
+  uint8_t   index, phase, period, slot, color;
   long      value, red, green;
   long long total;
-  char      str_text[32];
-  char      str_color[16];
+  char      str_color[24];
+  char      str_text[64];
 
   // display according to serial receiver status
   switch (teleinfo_meter.status_rx)
@@ -1031,11 +1046,27 @@ void TeleinfoSensorWebSensor ()
 
       // title
       WSContentSend_P (PSTR ("<div style='display:flex;margin:2px 0px 6px 0px;padding:0px;font-size:16px;'>\n"));
-      WSContentSend_P (PSTR ("<div style='width:34%%;padding:0px;text-align:left;font-weight:bold;'>Teleinfo</div>\n"));
-      GetTextIndexed (str_text, sizeof (str_text), teleinfo_contract.mode, kTeleinfoModeIcon);
-      WSContentSend_P (PSTR ("<div style='width:32%%;padding:0px;'>%s</div>\n"), str_text);
-      if (teleinfo_contract.phase > 1) sprintf (str_text, "%u x ", teleinfo_contract.phase); else strcpy (str_text, ""); 
-      WSContentSend_P (PSTR ("<div style='width:22%%;padding:0px;text-align:right;font-weight:bold;'>%s%d</div>\n"), str_text, teleinfo_contract.ssousc / 1000);
+      WSContentSend_P (PSTR ("<div style='width:28%%;padding:0px;text-align:left;font-weight:bold;'>Teleinfo</div>\n"));
+
+      // over voltage
+      if (teleinfo_meter.stge.overvolt != 0) { strcpy (str_color, "background:#d70;"); strcpy (str_text, "V"); }
+        else { strcpy (str_color, ""); strcpy (str_text, ""); }
+      WSContentSend_P (PSTR ("<div style='width:12%%;padding:2px 0px;border-radius:12px;font-size:12px;%s'>%s</div>\n"), str_color, str_text);
+
+      // over load
+      if (teleinfo_meter.stge.overvolt != 0) { strcpy (str_color, "background:#900;"); strcpy (str_text, "VA"); }
+        else { strcpy (str_color, ""); strcpy (str_text, ""); }
+      WSContentSend_P (PSTR ("<div style='width:12%%;padding:2px 0px;border-radius:12px;font-size:12px;%s'>%s</div>\n"), str_color, str_text);
+
+      // status icons (EJP)
+      if (teleinfo_meter.ejp.active != 0) { strcpy (str_color, "background:#900;"); strcpy (str_text, "EJP"); }
+        else if (teleinfo_meter.ejp.preavis != 0) { strcpy (str_color, "background:#d70;"); strcpy (str_text, "EJP"); }
+        else { strcpy (str_color, ""); strcpy (str_text, ""); }
+      WSContentSend_P (PSTR ("<div style='width:16%%;padding:2px 0px;border-radius:12px;font-size:12px;%s'>%s</div>\n"), str_color, str_text);
+      
+      // contract supply
+      if (teleinfo_contract.phase > 1) sprintf (str_text, "%ux", teleinfo_contract.phase); else strcpy (str_text, ""); 
+      WSContentSend_P (PSTR ("<div style='width:20%%;padding:0px;text-align:right;font-weight:bold;'>%s%d</div>\n"), str_text, teleinfo_contract.ssousc / 1000);
       WSContentSend_P (PSTR ("<div style='width:2%%;padding:0px;'></div><div style='width:10%%;padding:0px;text-align:left;'>kVA</div>\n"));
       WSContentSend_P (PSTR ("</div>\n"));
 
@@ -1046,8 +1077,16 @@ void TeleinfoSensorWebSensor ()
           {
             WSContentSend_P (PSTR ("<div style='display:flex;padding:2px 0px;'>\n"));
 
+            // linky mode
+            if (display_mode)
+            {
+              GetTextIndexed (str_text, sizeof (str_text), teleinfo_contract.mode, kTeleinfoModeIcon);
+              WSContentSend_P (PSTR ("<div style='width:16%%;padding:0px;font-size:16px;'>%s</div>\n"), str_text);
+              display_mode = false;
+            }
+            else WSContentSend_P (PSTR ("<div style='width:16%%;padding:0px;'></div>\n"));
+
             // period name
-            WSContentSend_P (PSTR ("<div style='width:16%%;padding:0px;'></div>\n"));
             GetTextIndexed (str_text, sizeof (str_text), teleinfo_contract.period_first + period, kTeleinfoPeriodName);
             if (teleinfo_contract.period_current == teleinfo_contract.period_first + period) WSContentSend_P (PSTR ("<div style='width:31%%;padding:1px 0px;font-size:12px;background-color:#09f;border-radius:6px;'>%s</div>\n"), str_text);
               else WSContentSend_P (PSTR ("<div style='width:31%%;padding:0px;font-size:12px;'>%s</div>\n"), str_text);
@@ -1087,6 +1126,12 @@ void TeleinfoSensorWebSensor ()
         if (teleinfo_contract.ssousc > 0)
           for (phase = 0; phase < teleinfo_contract.phase; phase++)
           {
+            WSContentSend_P (PSTR ("<div style='display:flex;margin:2px 0px;padding:1px;height:16px;opacity:75%%;'>\n"));
+
+            // display voltage
+            if (teleinfo_meter.stge.overvolt == 1) strcpy (str_text, "font-weight:bold;color:red;"); else strcpy (str_text, "");
+            WSContentSend_P (PSTR ("<div style='width:16%%;padding:0px;text-align:left;%s'>%d V</div>\n"), str_text, teleinfo_conso.phase[phase].voltage);
+
             // calculate percentage and value
             value = 100 * teleinfo_conso.phase[phase].papp / teleinfo_contract.ssousc;
             if (value > 100) value = 100;
@@ -1099,8 +1144,6 @@ void TeleinfoSensorWebSensor ()
             sprintf (str_color, "#%02x%02x00", red, green);
 
             // display bar graph percentage
-            WSContentSend_P (PSTR ("<div style='display:flex;margin:2px 0px;padding:1px;height:16px;opacity:75%%;'>\n"));
-            WSContentSend_P (PSTR ("<div style='width:16%%;padding:0px;text-align:left;'>%d V</div>\n"), teleinfo_conso.phase[phase].voltage);
             WSContentSend_P (PSTR ("<div style='width:72%%;padding:0px;text-align:left;background-color:%s;border-radius:6px;'><div style='width:%d%%;height:16px;padding:0px;text-align:center;font-size:12px;background-color:%s;border-radius:6px;'>%s</div></div>\n"), COLOR_BACKGROUND, value, str_color, str_text);
             WSContentSend_P (PSTR ("<div style='width:2%%;padding:0px;'></div><div style='width:10%%;padding:0px;text-align:left;'>VA</div>\n"));
             WSContentSend_P (PSTR ("</div>\n"));
@@ -1148,7 +1191,7 @@ void TeleinfoSensorWebSensor ()
           // calculate color
           if (value < 50) red = TELEINFO_RGB_GREEN_MAX; else red = TELEINFO_RGB_GREEN_MAX * 2 * (100 - value) / 100;
           if (value > 50) green = TELEINFO_RGB_RED_MAX; else green = TELEINFO_RGB_RED_MAX * 2 * value / 100;
-          sprintf (str_color, "#%02x%02x00", red, green);
+          sprintf (str_color, "#%02x%02x%02x", red, green, 0);
 
           // display bar graph percentage
           WSContentSend_P (PSTR ("<div style='display:flex;margin:2px 0px;padding:1px;height:16px;opacity:75%%;'>\n"));
@@ -1175,6 +1218,62 @@ void TeleinfoSensorWebSensor ()
           WSContentSend_P (PSTR ("<div style='width:37%%;padding:0px;text-align:left;'>Aujourd'hui</div>\n"));
           WSContentSend_P (PSTR ("<div style='width:35%%;padding:0px;text-align:right;font-weight:bold;'>%d</div>\n"), (long)total);
           WSContentSend_P (PSTR ("<div style='width:2%%;padding:0px;'></div><div style='width:10%%;padding:0px;text-align:left;'>Wh</div>\n"));
+          WSContentSend_P (PSTR ("</div>\n"));
+        }
+      }
+
+      // if using tempo
+      if (teleinfo_meter.tempo.today != TIC_TEMPO_NONE)
+      {
+        // separator and header
+        WSContentSend_P (PSTR ("<hr>\n"));
+
+        // hour scale
+        WSContentSend_P (PSTR ("<div style='display:flex;margin:0px;padding:0px;font-size:10px;'>\n"));
+        WSContentSend_P (PSTR ("<div style='width:20.8%%;padding:0px;text-align:left;font-weight:bold;font-size:12px;'>Tempo</div>\n"), 0);
+        WSContentSend_P (PSTR ("<div style='width:13.2%%;padding:0px;text-align:left;'>%uh</div>\n"), 0);
+        WSContentSend_P (PSTR ("<div style='width:13.2%%;padding:0px;'>%uh</div>\n"), 6);
+        WSContentSend_P (PSTR ("<div style='width:26.4%%;padding:0px;'>%uh</div>\n"), 12);
+        WSContentSend_P (PSTR ("<div style='width:13.2%%;padding:0px;'>%uh</div>\n"), 18);
+        WSContentSend_P (PSTR ("<div style='width:13.2%%;padding:0px;'>%uh</div>\n"), 22);
+        WSContentSend_P (PSTR ("</div>\n"));
+
+        // loop thru days
+        for (index = 0; index < 2; index ++)
+        {
+          WSContentSend_P (PSTR ("<div style='display:flex;margin:0px;padding:1px;height:14px;'>\n"));
+
+          // display day
+          if (index == 0) strcpy (str_text, "Aujourd'hui"); else strcpy (str_text, "Demain");
+          WSContentSend_P (PSTR ("<div style='width:20.8%%;padding:0px;font-size:10px;text-align:left;'>%s</div>\n"), str_text);
+
+          // display hourly slots
+          for (slot = 0; slot < 24; slot ++)
+          {
+            // calculate color of current slot
+            if ((index == 0) && (slot < 6)) color = teleinfo_meter.tempo.yesterday;
+              else if ((index == 1) && (slot >= 6)) color = teleinfo_meter.tempo.tomorrow;
+              else color = teleinfo_meter.tempo.today;
+            GetTextIndexed (str_color, sizeof (str_color), color, kTeleinfoTempoColor);  
+
+            // segment beginning
+            WSContentSend_P (PSTR ("<div style='width:3.3%%;padding:1px 0px;background-color:%s;"), str_color);
+
+            // set opacity for HC
+            if ((slot < 6) || (slot >= 22)) WSContentSend_P (PSTR ("opacity:75%%;"));
+
+            // first and last segment specificities
+            if (slot == 0) WSContentSend_P (PSTR ("border-top-left-radius:6px;border-bottom-left-radius:6px;"));
+              else if (slot == 23) WSContentSend_P (PSTR ("border-top-right-radius:6px;border-bottom-right-radius:6px;"));
+
+            // segment end
+            if ((index == 0) && (slot == RtcTime.hour))
+            {
+              GetTextIndexed (str_text, sizeof (str_text), color, kTeleinfoTempoDot);  
+              WSContentSend_P (PSTR ("font-size:9px;'>%s</div>\n"), str_text);
+            }
+            else WSContentSend_P (PSTR ("'></div>\n"));
+          }
           WSContentSend_P (PSTR ("</div>\n"));
         }
       }

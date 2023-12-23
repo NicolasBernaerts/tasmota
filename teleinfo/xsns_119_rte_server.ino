@@ -12,8 +12,10 @@
     04/12/2023 - v3.0 - Rename to xsns_119_rte_server.ino
                         Rename ecowatt.cfg to rte.cfg
                         Add Tempo calendar
+    07/12/2023 - v3.1 - Handle Ecowatt v4 and v5
+    19/12/2023 - v3.2 - Add Pointe calendar
 
-  This module connects to french RTE server to retrieve Ecowatt and Tempo electricity production forecast.
+  This module connects to french RTE server to retrieve Ecowatt, Tempo and Pointe electricity production forecast.
 
   It publishes Ecowatt prediction under following MQTT topic :
   
@@ -60,7 +62,6 @@
 #define RTE_STARTUP_DELAY           10         // ecowatt connexion delay
 #define RTE_HTTP_TIMEOUT            5000       // HTTP connexion timeout (ms)
 #define RTE_TOKEN_RETRY             300        // token retry timeout (sec.)
-#define RTE_SLOT_PER_DAY            24         // maximum number of 1h slots per day
 
 // ecowatt constant
 #define RTE_ECOWATT_UPDATE_JSON     900        // publish JSON every 15 mn
@@ -73,6 +74,11 @@
 #define RTE_TEMPO_RENEW_KNOWN       21600      // tempo renew period when tomorrow is known (6h)
 #define RTE_TEMPO_RENEW_UNKNOWN     1800       // tempo renew period when tomorrow is unknown (30mn)
 
+// pointe constant
+#define RTE_POINTE_UPDATE_JSON      900        // publish JSON every 15 mn
+#define RTE_POINTE_RETRY            300        // pointe retry timeout (5mn)
+#define RTE_POINTE_RENEW            21600      // pointe renew period when tomorrow is known (6h)
+
 // configuration file
 #define D_RTE_CFG                   "/rte.cfg"
 
@@ -83,6 +89,7 @@
 #define D_CMND_RTE_VERSION          "version"
 #define D_CMND_RTE_ECOWATT          "ecowatt"
 #define D_CMND_RTE_TEMPO            "tempo"
+#define D_CMND_RTE_POINTE           "pointe"
 #define D_CMND_RTE_ENABLE           "enable"
 #define D_CMND_RTE_SANDBOX          "sandbox"
 #define D_CMND_RTE_UPDATE           "update"
@@ -93,6 +100,7 @@
 #define RTE_URL_ECOWATT_DATA        "https://digital.iservices.rte-france.com/open_api/ecowatt/v%u/signals"
 #define RTE_URL_ECOWATT_SANDBOX     "https://digital.iservices.rte-france.com/open_api/ecowatt/v%u/sandbox/signals"
 #define RTE_URL_TEMPO_DATA          "https://digital.iservices.rte-france.com/open_api/tempo_like_supply_contract/v1/tempo_like_calendars"
+#define RTE_URL_POINTE_DATA            "https://digital.iservices.rte-france.com/open_api/demand_response_signal/v2/signals"
 
 // Commands
 const char kRteCommands[] PROGMEM = "rte_" "|" D_CMND_RTE_HELP "|" D_CMND_RTE_KEY "|" D_CMND_RTE_TOKEN "|" D_CMND_RTE_SANDBOX;
@@ -104,30 +112,37 @@ void (* const EcowattCommand[])(void) PROGMEM = { &CmndEcowattEnable, &CmndEcowa
 const char kTempoCommands[] PROGMEM = "tempo_" "|" D_CMND_RTE_ENABLE "|" D_CMND_RTE_UPDATE "|" D_CMND_RTE_PUBLISH;
 void (* const TempoCommand[])(void) PROGMEM = { &CmndTempoEnable, &CmndTempoUpdate, &CmndTempoPublish };
 
+const char kPointeCommands[] PROGMEM = "pointe_" "|" D_CMND_RTE_ENABLE "|" D_CMND_RTE_UPDATE "|" D_CMND_RTE_PUBLISH;
+void (* const PointeCommand[])(void) PROGMEM = { &CmndPointeEnable, &CmndPointeUpdate, &CmndPointePublish };
+
 // https stream status
-enum EcowattHttpsUpdate { RTE_UPDATE_NONE, RTE_UPDATE_TOKEN_BEGIN, RTE_UPDATE_TOKEN_GET, RTE_UPDATE_TOKEN_END, RTE_UPDATE_TEMPO_BEGIN, RTE_UPDATE_TEMPO_GET, RTE_UPDATE_TEMPO_END, RTE_UPDATE_ECOWATT_BEGIN, RTE_UPDATE_ECOWATT_GET, RTE_UPDATE_ECOWATT_END, RTE_UPDATE_MAX};
+enum RteHttpsUpdate { RTE_UPDATE_NONE, RTE_UPDATE_TOKEN_BEGIN, RTE_UPDATE_TOKEN_GET, RTE_UPDATE_TOKEN_END, RTE_UPDATE_TEMPO_BEGIN, RTE_UPDATE_TEMPO_GET, RTE_UPDATE_TEMPO_END, RTE_UPDATE_ECOWATT_BEGIN, RTE_UPDATE_ECOWATT_GET, RTE_UPDATE_ECOWATT_END, RTE_UPDATE_POINTE_BEGIN, RTE_UPDATE_POINTE_GET, RTE_UPDATE_POINTE_END, RTE_UPDATE_MAX};
 
 // config
-enum EcowattConfigKey { RTE_CONFIG_KEY, RTE_CONFIG_SANDBOX, RTE_CONFIG_ECOWATT, RTE_CONFIG_TEMPO, RTE_CONFIG_ECO_VERSION, RTE_CONFIG_MAX };                   // configuration parameters
-const char kEcowattConfigKey[] PROGMEM = D_CMND_RTE_KEY "|" D_CMND_RTE_SANDBOX "|" D_CMND_RTE_ECOWATT "|" D_CMND_RTE_TEMPO "|" D_CMND_RTE_ECOWATT "-" D_CMND_RTE_VERSION;        // configuration keys
+enum RteConfigKey { RTE_CONFIG_KEY, RTE_CONFIG_SANDBOX, RTE_CONFIG_ECOWATT, RTE_CONFIG_TEMPO, RTE_CONFIG_POINTE, RTE_CONFIG_ECO_VERSION, RTE_CONFIG_MAX };                   // configuration parameters
+const char kEcowattConfigKey[] PROGMEM = D_CMND_RTE_KEY "|" D_CMND_RTE_SANDBOX "|" D_CMND_RTE_ECOWATT "|" D_CMND_RTE_TEMPO "|" D_CMND_RTE_POINTE "|" D_CMND_RTE_ECOWATT "-" D_CMND_RTE_VERSION;        // configuration keys
 
-// ecowatt type of days
-enum EcowattDays { ECOWATT_DAY_TODAY, ECOWATT_DAY_TOMORROW, ECOWATT_DAY_DAYAFTER, ECOWATT_DAY_DAYAFTER2, ECOWATT_DAY_MAX };
+enum RtePeriod { RTE_PERIOD_PLEINE, RTE_PERIOD_CREUSE, RTE_PERIOD_MAX };
 
-// Ecowatt states
-enum EcowattLevels { ECOWATT_LEVEL_NONE, ECOWATT_LEVEL_NORMAL, ECOWATT_LEVEL_WARNING, ECOWATT_LEVEL_POWERCUT, ECOWATT_LEVEL_MAX };
-const char kEcowattLevelColor[] PROGMEM = "|#080|#F80|#A00";
+// tempo data
+enum TempoDays   { RTE_TEMPO_YESTERDAY, RTE_TEMPO_TODAY, RTE_TEMPO_TOMORROW, RTE_TEMPO_MAX};
+enum TempoColor  { RTE_TEMPO_COLOR_BLUE, RTE_TEMPO_COLOR_WHITE, RTE_TEMPO_COLOR_RED, RTE_TEMPO_COLOR_UNKNOWN, RTE_TEMPO_COLOR_MAX };
+const char kRteTempoStream[] PROGMEM = "BLUE|WHITE|RED|";
+const char kRteTempoJSON[]   PROGMEM = "bleu|blanc|rouge|inconnu";
+const char kRteTempoColor[]  PROGMEM = "#06b|#ccc|#b00|#252525";
+const char kRteTempoDot[]    PROGMEM = "⚪|⚫|⚪|⚪";
+const char kRteTempoIcon[]   PROGMEM = "🟦|⬜|🟥|❔|🔵|⚪|🔴|❔";
 
-// Tempo type of days
-enum TempoDays { TEMPO_DAY_YESTERDAY, TEMPO_DAY_TODAY, TEMPO_DAY_TOMORROW, TEMPO_DAY_MAX};
+// pointe data
+enum PointeDays   { RTE_POINTE_YESTERDAY, RTE_POINTE_TODAY, RTE_POINTE_TOMORROW, RTE_POINTE_MAX};
+enum PointeColor  { RTE_POINTE_COLOR_GREEN, RTE_POINTE_COLOR_RED, RTE_POINTE_COLOR_UNKNOWN, RTE_POINTE_COLOR_MAX };
+const char kRtePointeColor[] PROGMEM = "#0a0|#900|#a00|#a00|#252525";
+const char kRtePointeIcon[]  PROGMEM = "🟩|🟥|🟥|🟥|❔";
 
-// Tempo states
-enum TempoPeriod { TEMPO_PERIOD_PLEINE, TEMPO_PERIOD_CREUSE, TEMPO_PERIOD_MAX };
-enum TempoColor { TEMPO_COLOR_BLUE, TEMPO_COLOR_WHITE, TEMPO_COLOR_RED, TEMPO_COLOR_UNKNOWN, TEMPO_COLOR_MAX };
-const char kTempoColorRTE[]   PROGMEM = "BLUE|WHITE|RED|";
-const char kTempoColorJSON[]  PROGMEM = "bleu|blanc|rouge|inconnu";
-const char kTempoColorRGB[]   PROGMEM = "#06b|#ccc|#b00|#252525";
-const char kTempoPeriodIcon[] PROGMEM = "🟦|⬜|🟥|❔|🔵|⚪|🔴|❔";
+// ecowatt data
+enum EcowattDays { RTE_ECOWATT_DAY_TODAY, RTE_ECOWATT_DAY_TOMORROW, RTE_ECOWATT_DAY_PLUS2, RTE_ECOWATT_DAY_DAYPLUS3, RTE_ECOWATT_DAY_MAX };
+enum EcowattLevels { RTE_ECOWATT_LEVEL_CARBONFREE, RTE_ECOWATT_LEVEL_NORMAL, RTE_ECOWATT_LEVEL_WARNING, RTE_ECOWATT_LEVEL_POWERCUT, RTE_ECOWATT_LEVEL_MAX };
+const char kRteEcowattLevelColor[] PROGMEM = "#0a0|#080|#F80|#A00";
 
 /***********************************************************\
  *                        Data
@@ -135,7 +150,8 @@ const char kTempoPeriodIcon[] PROGMEM = "🟦|⬜|🟥|❔|🔵|⚪|🔴|❔";
 
 // RTE configuration
 static struct {
-  bool    tempo   = false;                            // flag to enable ecowatt server
+  bool    tempo   = false;                            // flag to enable tempo period server
+  bool    pointe  = false;                            // flag to enable pointe period server
   bool    ecowatt = false;                            // flag to enable ecowatt server
   bool    sandbox = false;                            // flag to use RTE sandbox
   uint8_t eco_version = 5;                            // version of ecowatt API
@@ -148,6 +164,7 @@ static struct {
   uint32_t    time_token   = UINT32_MAX;            // timestamp of token update
   uint32_t    time_ecowatt = UINT32_MAX;            // timestamp of signal update
   uint32_t    time_tempo   = UINT32_MAX;            // timestamp of tempo update
+  uint32_t    time_pointe  = UINT32_MAX;            // timestamp of pointe period update
   char        str_token[128];                       // token value
 } rte_update;
 
@@ -157,20 +174,30 @@ struct ecowatt_day {
   char    str_day_of_week[4];                       // day of week (mon, Tue, ...)
   uint8_t day_of_month;                             // dd
   uint8_t month;                                    // mm
-  uint8_t arr_hvalue[RTE_SLOT_PER_DAY];             // hourly slots
+  uint8_t arr_hvalue[24];                           // hourly slots
 };
 static struct {
-  uint32_t    time_json   = UINT32_MAX;             // timestamp of next JSON update
-  ecowatt_day arr_day[ECOWATT_DAY_MAX];             // slots for today and next days
+  bool     publish   = false;                       // flag to publish JSON
+  uint32_t time_json = UINT32_MAX;                  // timestamp of next JSON update
+  ecowatt_day arr_day[RTE_ECOWATT_DAY_MAX];             // slots for today and next days
 } ecowatt_status;
 
 // Tempo status
 static struct {
-  uint8_t  last_period = TEMPO_PERIOD_MAX;          // last period
-  uint8_t  last_color  = TEMPO_COLOR_MAX;           // last color
+  bool     publish = false;                         // flag to publish JSON
+  uint8_t  last_period = RTE_PERIOD_MAX;            // last period
+  uint8_t  last_color  = RTE_TEMPO_COLOR_MAX;             // last color
   uint32_t time_json   = UINT32_MAX;                // timestamp of next JSON update
-  int  arr_day[TEMPO_DAY_MAX];                      // days status
+  int arr_day[RTE_TEMPO_MAX];                         // days status
 } tempo_status;
+
+// Pointe status
+static struct {
+  bool     publish    = false;                      // flag to publish JSON
+  uint8_t  last_color = RTE_POINTE_COLOR_MAX;              // last color
+  uint32_t time_json  = UINT32_MAX;                 // timestamp of next JSON update
+  int  arr_day[RTE_POINTE_MAX];                        // days status
+} pointe_status;
 
 /***********************************************************\
  *                       SSL client
@@ -212,20 +239,24 @@ HTTPClient                       rte_http;                      // https client
 // Ecowatt server help
 void CmndRteHelp ()
 {
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: RTE server commands"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: commands about RTE server"));
   AddLog (LOG_LEVEL_INFO, PSTR (" RTE global commands :"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - rte_key <key>      = set RTE base64 private key"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - rte_token          = display current token"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - rte_sandbox <0/1>  = set sandbox mode (0/1)"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" ECOWATT commands :"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - eco_enable <0/1>   = enable/disable ecowatt server"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - eco_version <4/5>  = set ecowatt API version to use"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - eco_update         = force ecowatt update from RTE server"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - eco_publish        = publish ecowatt data now"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" TEMPO commands :"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - tempo_enable <0/1> = enable/disable tempo server"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - tempo_update       = force tempo update from RTE server"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - tempo_publish      = publish tempo data now"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - rte_key <key>       = set RTE base64 private key"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - rte_token           = display current token"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - rte_sandbox <0/1>   = set sandbox mode (0/1)"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" Tempo commands :"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - tempo_enable <0/1>  = enable/disable tempo server"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - tempo_update        = force tempo update from RTE server"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - tempo_publish       = publish tempo data now"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" Pointe commands :"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - pointe_enable <0/1> = enable/disable pointe period server"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - pointe_update       = force pointe period update from RTE server"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - pointe_publish      = publish pointe period data now"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" Ecowatt commands :"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - eco_enable <0/1>    = enable/disable ecowatt server"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - eco_version <4/5>   = set ecowatt API version to use"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - eco_update          = force ecowatt update from RTE server"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - eco_publish         = publish ecowatt data now"));
   ResponseCmndDone ();
 }
 
@@ -384,6 +415,57 @@ void CmndTempoPublish ()
   ResponseCmndDone ();
 }
 
+/**********************************\
+ *      Pointe Period commands
+\**********************************/
+
+// Enable pointe period server
+void CmndPointeEnable ()
+{
+  bool changed = false;
+
+  if (XdrvMailbox.data_len > 0)
+  {
+    // if enabling the service, force update and log
+    if (!rte_config.pointe && (XdrvMailbox.payload != 0))
+    {
+      changed = true;
+      rte_update.time_pointe = LocalTime ();
+      AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Pointe signal enabled"));
+    }
+
+    // else if disabling the service, log
+    else if (rte_config.pointe && (XdrvMailbox.payload == 0))
+    {
+      changed = true;
+      AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Pointe signal disabled"));
+    }
+
+    // if changed, set new status and save
+    if (changed)
+    {
+      rte_config.pointe = (XdrvMailbox.payload != 0);
+      RteSaveConfig ();
+    }
+  }
+  
+  ResponseCmndNumber (rte_config.pointe);
+}
+
+// Pointe period forced update from RTE server
+void CmndPointeUpdate ()
+{
+  rte_update.time_pointe = LocalTime ();
+  ResponseCmndDone ();
+}
+
+// Pointe period publish data
+void CmndPointePublish ()
+{
+  pointe_status.time_json = LocalTime ();
+  ResponseCmndDone ();
+}
+
 /***********************************************************\
  *                      Configuration
 \***********************************************************/
@@ -427,6 +509,12 @@ void RteLoadConfig ()
          case RTE_CONFIG_TEMPO:
             rte_config.tempo = (bool)atoi (pstr_value);
             break;
+         case RTE_CONFIG_POINTE:
+            rte_config.pointe = (bool)atoi (pstr_value);
+            break;
+         case RTE_CONFIG_ECO_VERSION:
+            rte_config.eco_version = (uint8_t)atoi (pstr_value);
+            break;
         }
       }
     }
@@ -443,6 +531,7 @@ void RteLoadConfig ()
 void RteSaveConfig () 
 {
   uint8_t index;
+  char    str_number[4];
   char    str_line[128];
   File    file;
 
@@ -473,6 +562,14 @@ void RteSaveConfig ()
             if (rte_config.tempo) strcat (str_line, "1");
               else strcat (str_line, "0");
             break;
+         case RTE_CONFIG_POINTE:
+            if (rte_config.pointe) strcat (str_line, "1");
+              else strcat (str_line, "0");
+            break;
+         case RTE_CONFIG_ECO_VERSION:
+            itoa (rte_config.eco_version, str_number, 10);
+            strcat (str_line, str_number);
+            break;
         }
 
       // write to file
@@ -489,85 +586,103 @@ void RteSaveConfig ()
  *           JSON publication
 \***************************************/
 
-// publish Ecowatt JSON thru MQTT
-void RtePublishEcowattJson ()
+// publish RTE data thru MQTT
+void RtePublishJson ()
 {
   uint8_t  index, slot;
   uint8_t  slot_day, slot_hour;
   uint32_t time_now;
-  TIME_T   dst_now;
   char     str_text[16];
 
-  // current time
+  // get current time
   time_now = LocalTime ();
-  BreakTime (time_now, dst_now);
-  slot_day  = ECOWATT_DAY_TODAY;
-  slot_hour = dst_now.hour;
 
-  // Start Ecowatt section
-  Response_P (PSTR ("{\"Time\":\"%s\""), GetDateAndTime (DT_LOCAL).c_str ());
+  // Start {"Time":"xxxxxxxx"
+  ResponseClear ();
+  ResponseAppendTime ();
 
-  // publish day global status
-  ResponseAppend_P (PSTR (",\"dval\":%u"), ecowatt_status.arr_day[slot_day].dvalue);
-
-  // publish hour slot index
-  ResponseAppend_P (PSTR (",\"hour\":%u"), slot_hour);
-
-  // publish current slot
-  ResponseAppend_P (PSTR (",\"now\":%u"), ecowatt_status.arr_day[slot_day].arr_hvalue[slot_hour]);
-
-  // publish next slot
-  if (slot_hour == 23) { slot_hour = 0; slot_day++; }
-    else slot_hour++;
-  ResponseAppend_P (PSTR (",\"next\":%u"), ecowatt_status.arr_day[slot_day].arr_hvalue[slot_hour]);
-
-  // loop thru number of slots to publish
-  for (index = 0; index < ECOWATT_DAY_MAX; index ++)
+  // RTE Tempo
+  if (tempo_status.publish)
   {
-    ResponseAppend_P (PSTR (",\"day%u\":{\"jour\":\"%s\",\"date\":\"%u:%u\",\"dval\":%u"), index, ecowatt_status.arr_day[index].str_day_of_week, ecowatt_status.arr_day[index].day_of_month, ecowatt_status.arr_day[index].month, ecowatt_status.arr_day[index].dvalue);
-    for (slot = 0; slot < RTE_SLOT_PER_DAY; slot ++) ResponseAppend_P (PSTR (",\"%u\":%u"), slot, ecowatt_status.arr_day[index].arr_hvalue[slot]);
-    ResponseAppend_P (PSTR ("}"));
+    // start tempo section
+    ResponseAppend_P (PSTR (",\"TEMPO\":{"));
+
+    // publish yesterday
+    GetTextIndexed (str_text, sizeof (str_text), tempo_status.arr_day[RTE_TEMPO_YESTERDAY], kRteTempoJSON);
+    ResponseAppend_P (PSTR ("\"Hier\":\"%s\""), str_text);
+
+    // publish today
+    GetTextIndexed (str_text, sizeof (str_text), tempo_status.arr_day[RTE_TEMPO_TODAY], kRteTempoJSON);
+    ResponseAppend_P (PSTR (",\"Aujour\":\"%s\""), str_text);
+
+    // publish tomorrow
+    GetTextIndexed (str_text, sizeof (str_text), tempo_status.arr_day[RTE_TEMPO_TOMORROW], kRteTempoJSON);
+    ResponseAppend_P (PSTR (",\"Demain\":\"%s\""), str_text);
+
+    // period icon
+    RteTempoGetIcon (str_text, sizeof (str_text));
+    ResponseAppend_P (PSTR (",\"Icon\":\"%s\"}"), str_text);
+
+    // plan next update
+    tempo_status.publish   = false;
+    tempo_status.time_json = time_now + RTE_TEMPO_UPDATE_JSON;
   }
 
-  // end of Ecowatt section and publish JSON
-  ResponseAppend_P (PSTR ("}"));
+  // RTE Pointe
+  if (pointe_status.publish)
+  {
+    // pointe section
+    GetTextIndexed (str_text, sizeof (str_text), pointe_status.arr_day[RTE_POINTE_TODAY], kRtePointeIcon);
+    ResponseAppend_P (PSTR (",\"POINTE\":{\"Aujour\":%u,\"Demain\":%u,\"Icon\":\"%s\"}"), pointe_status.arr_day[RTE_POINTE_TODAY], pointe_status.arr_day[RTE_POINTE_TOMORROW], str_text);
 
-  // publish under tele/ECOWATT
-  MqttPublishPrefixTopicRulesProcess_P (TELE, PSTR("ECOWATT"), Settings->flag.mqtt_sensor_retain);
+    // plan next update
+    pointe_status.publish   = false;
+    pointe_status.time_json = time_now + RTE_POINTE_UPDATE_JSON;
+  }
 
-  // plan next update
-  ecowatt_status.time_json = time_now + RTE_ECOWATT_UPDATE_JSON;
-}
+  // RTE Ecowatt
+  if (ecowatt_status.publish)
+  {
+    // current time
+    slot_day  = RTE_ECOWATT_DAY_TODAY;
+    slot_hour = RtcTime.hour;
 
-// publish Tempo JSON thru MQTT
-void RtePublishTempoJson ()
-{
-  char str_text[16];
+    // start ecowatt section
+    ResponseAppend_P (PSTR (",\"ECOWATT\":{"));
 
-  // Start Tempo section
-  Response_P (PSTR ("{\"Time\":\"%s\""), GetDateAndTime (DT_LOCAL).c_str ());
+    // publish day global status
+    ResponseAppend_P (PSTR ("\"dval\":%u"), ecowatt_status.arr_day[slot_day].dvalue);
 
-  // publish yesterday
-  GetTextIndexed (str_text, sizeof (str_text), tempo_status.arr_day[TEMPO_DAY_YESTERDAY], kTempoColorJSON);
-  ResponseAppend_P (PSTR (",\"J-1\":\"%s\""), str_text);
+    // publish hour slot index
+    ResponseAppend_P (PSTR (",\"hour\":%u"), slot_hour);
 
-  // publish today
-  GetTextIndexed (str_text, sizeof (str_text), tempo_status.arr_day[TEMPO_DAY_TODAY], kTempoColorJSON);
-  ResponseAppend_P (PSTR (",\"J\":\"%s\""), str_text);
+    // publish current slot
+    ResponseAppend_P (PSTR (",\"now\":%u"), ecowatt_status.arr_day[slot_day].arr_hvalue[slot_hour]);
 
-  // publish tomorrow
-  GetTextIndexed (str_text, sizeof (str_text), tempo_status.arr_day[TEMPO_DAY_TOMORROW], kTempoColorJSON);
-  ResponseAppend_P (PSTR (",\"J+1\":\"%s\""), str_text);
+    // publish next slot
+    if (slot_hour == 23) { slot_hour = 0; slot_day++; }
+      else slot_hour++;
+    ResponseAppend_P (PSTR (",\"next\":%u"), ecowatt_status.arr_day[slot_day].arr_hvalue[slot_hour]);
 
-  // period icon
-  RteTempoGetIcon (str_text, sizeof (str_text));
-  ResponseAppend_P (PSTR (",\"Icon\":\"%s\"}"), str_text);
+    // loop thru number of slots to publish
+    for (index = 0; index < RTE_ECOWATT_DAY_MAX; index ++)
+    {
+      ResponseAppend_P (PSTR (",\"day%u\":{\"jour\":\"%s\",\"date\":\"%u:%u\",\"dval\":%u"), index, ecowatt_status.arr_day[index].str_day_of_week, ecowatt_status.arr_day[index].day_of_month, ecowatt_status.arr_day[index].month, ecowatt_status.arr_day[index].dvalue);
+      for (slot = 0; slot < 24; slot ++) ResponseAppend_P (PSTR (",\"%u\":%u"), slot, ecowatt_status.arr_day[index].arr_hvalue[slot]);
+      ResponseAppend_P (PSTR ("}"));
+    }
 
-  // publish under tele/TEMPO
-  MqttPublishPrefixTopicRulesProcess_P (TELE, PSTR("TEMPO"), Settings->flag.mqtt_sensor_retain);
+    // end of Ecowatt section
+    ResponseAppend_P (PSTR ("}"));
 
-  // plan next update
-  tempo_status.time_json = LocalTime () + RTE_TEMPO_UPDATE_JSON;
+    // plan next update
+    ecowatt_status.publish   = false;
+    ecowatt_status.time_json = time_now + RTE_ECOWATT_UPDATE_JSON;
+  }
+
+  // publish
+  ResponseJsonEnd ();
+  MqttPublishTeleSensor ();
 }
 
 /***********************************\
@@ -793,10 +908,10 @@ bool RteEcowattStreamEnd ()
   size = arr_day.size ();
 
   // loop thru all 4 days to get today's and tomorrow's index
-  if (size <= ECOWATT_DAY_MAX) for (index = 0; index < size; index ++)
+  if (size <= RTE_ECOWATT_DAY_MAX) for (index = 0; index < size; index ++)
   {
     // if sandbox, shift array index to avoid current day fully ok
-    if (rte_config.sandbox) index_array = (index + ECOWATT_DAY_MAX - 1) % ECOWATT_DAY_MAX;
+    if (rte_config.sandbox) index_array = (index + RTE_ECOWATT_DAY_MAX - 1) % RTE_ECOWATT_DAY_MAX;
       else index_array = index;
 
     // get global status
@@ -821,10 +936,10 @@ bool RteEcowattStreamEnd ()
 
     // loop to populate the slots
     arr_slot = arr_day[index]["values"].as<JsonArray>();
-    for (slot = 0; slot < RTE_SLOT_PER_DAY; slot ++)
+    for (slot = 0; slot < 24; slot ++)
     {
       value = arr_slot[slot]["hvalue"];
-      if ((value == ECOWATT_LEVEL_NONE) || (value >= ECOWATT_LEVEL_MAX)) value = ECOWATT_LEVEL_NORMAL;
+      if (value >= RTE_ECOWATT_LEVEL_MAX) value = RTE_ECOWATT_LEVEL_NORMAL;
       ecowatt_status.arr_day[index_array].arr_hvalue[slot] = value;
     }
   }
@@ -848,14 +963,14 @@ bool RteEcowattStreamEnd ()
 
 uint8_t RteTempoGetPeriod ()
 {
-  if ((RtcTime.hour < 6) || (RtcTime.hour > 21)) return TEMPO_PERIOD_CREUSE;
-    else return TEMPO_PERIOD_PLEINE;
+  if ((RtcTime.hour < 6) || (RtcTime.hour > 21)) return RTE_PERIOD_CREUSE;
+    else return RTE_PERIOD_PLEINE;
 }
 
 uint8_t RteTempoGetColor ()
 {
-  if (RtcTime.hour < 6) return tempo_status.arr_day[TEMPO_DAY_YESTERDAY];
-    else return tempo_status.arr_day[TEMPO_DAY_TODAY];
+  if (RtcTime.hour < 6) return tempo_status.arr_day[RTE_TEMPO_YESTERDAY];
+    else return tempo_status.arr_day[RTE_TEMPO_TODAY];
 }
 
 void RteTempoGetIcon (char* pstr_icon, const uint8_t size_icon)
@@ -867,8 +982,8 @@ void RteTempoGetIcon (char* pstr_icon, const uint8_t size_icon)
   color  = RteTempoGetColor ();
 
   // calculate index adn get icon
-  index = period * TEMPO_COLOR_MAX + color;
-  GetTextIndexed (pstr_icon, size_icon, index, kTempoPeriodIcon); 
+  index = period * RTE_TEMPO_COLOR_MAX + color;
+  GetTextIndexed (pstr_icon, size_icon, index, kRteTempoIcon); 
 }
 
 // plan ecowatt retry
@@ -977,25 +1092,149 @@ bool RteTempoStreamEnd ()
   // if tomorrow is not available
   if (size == 2)
   {
-    tempo_status.arr_day[TEMPO_DAY_TOMORROW]  = TEMPO_COLOR_UNKNOWN;
-    tempo_status.arr_day[TEMPO_DAY_TODAY]     = GetCommandCode (str_color, sizeof (str_color), arr_day[0]["value"], kTempoColorRTE);
-    tempo_status.arr_day[TEMPO_DAY_YESTERDAY] = GetCommandCode (str_color, sizeof (str_color), arr_day[1]["value"], kTempoColorRTE);
+    tempo_status.arr_day[RTE_TEMPO_TOMORROW]  = RTE_TEMPO_COLOR_UNKNOWN;
+    tempo_status.arr_day[RTE_TEMPO_TODAY]     = GetCommandCode (str_color, sizeof (str_color), arr_day[0]["value"], kRteTempoStream);
+    tempo_status.arr_day[RTE_TEMPO_YESTERDAY] = GetCommandCode (str_color, sizeof (str_color), arr_day[1]["value"], kRteTempoStream);
   }
 
   // else tomorrow is available
   else if (size == 3)
   {
-    tempo_status.arr_day[TEMPO_DAY_TOMORROW]  = GetCommandCode (str_color, sizeof (str_color), arr_day[0]["value"], kTempoColorRTE);
-    tempo_status.arr_day[TEMPO_DAY_TODAY]     = GetCommandCode (str_color, sizeof (str_color), arr_day[1]["value"], kTempoColorRTE);
-    tempo_status.arr_day[TEMPO_DAY_YESTERDAY] = GetCommandCode (str_color, sizeof (str_color), arr_day[2]["value"], kTempoColorRTE);
+    tempo_status.arr_day[RTE_TEMPO_TOMORROW]  = GetCommandCode (str_color, sizeof (str_color), arr_day[0]["value"], kRteTempoStream);
+    tempo_status.arr_day[RTE_TEMPO_TODAY]     = GetCommandCode (str_color, sizeof (str_color), arr_day[1]["value"], kRteTempoStream);
+    tempo_status.arr_day[RTE_TEMPO_YESTERDAY] = GetCommandCode (str_color, sizeof (str_color), arr_day[2]["value"], kRteTempoStream);
   }
 
   // set signal next update
-  if (tempo_status.arr_day[TEMPO_DAY_TOMORROW] == TEMPO_COLOR_UNKNOWN) rte_update.time_tempo = LocalTime () + RTE_TEMPO_RENEW_UNKNOWN;
+  if (tempo_status.arr_day[RTE_TEMPO_TOMORROW] == RTE_TEMPO_COLOR_UNKNOWN) rte_update.time_tempo = LocalTime () + RTE_TEMPO_RENEW_UNKNOWN;
     else rte_update.time_tempo = LocalTime () + RTE_TEMPO_RENEW_KNOWN;
 
   // log
-  AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Tempo - Update done (%d/%d/%d)"), tempo_status.arr_day[TEMPO_DAY_YESTERDAY], tempo_status.arr_day[TEMPO_DAY_TODAY], tempo_status.arr_day[TEMPO_DAY_TOMORROW]);
+  AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Tempo - Update done (%d/%d/%d)"), tempo_status.arr_day[RTE_TEMPO_YESTERDAY], tempo_status.arr_day[RTE_TEMPO_TODAY], tempo_status.arr_day[RTE_TEMPO_TOMORROW]);
+
+  // end connexion
+  rte_http.end ();
+  rte_wifi.stop ();
+
+  return true;
+}
+
+/***********************************\
+ *          Pointe reception
+\***********************************/
+
+// plan pointe retry
+void RtePointeStreamRetry ()
+{
+  rte_update.step       = RTE_UPDATE_NONE;
+  rte_update.time_tempo = LocalTime () + RTE_POINTE_RETRY;
+}
+
+// start of pointe period reception
+bool RtePointeStreamBegin ()
+{
+  bool is_ok;
+  char str_text[256];
+
+  // check token
+  is_ok = (strlen (rte_update.str_token) > 0);
+  if (!is_ok) AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Pointe - Token missing"));
+
+  // prepare connexion
+  if (is_ok) 
+  {
+    // connexion
+    sprintf (str_text, "%s", RTE_URL_POINTE_DATA);
+    is_ok = rte_http.begin (rte_wifi, str_text);
+
+    // connexion report
+    if (is_ok) AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Pointe - Connexion done (%s)"), str_text);
+    else
+    {
+      AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Pointe - Connexion refused (%s)"), str_text);
+      rte_http.end ();
+      rte_wifi.stop ();
+    }
+  }
+
+  // set headers
+  if (is_ok)
+  {
+    // set authorisation
+    strcpy (str_text, "Bearer ");
+    strlcat (str_text, rte_update.str_token, sizeof (str_text));
+
+    // set headers
+    rte_http.addHeader ("Authorization", str_text, false, true);
+    rte_http.addHeader ("Content-Type", "application/x-www-form-urlencoded", false, true);
+
+    // set http timeout
+    rte_http.setTimeout (RTE_HTTP_TIMEOUT);
+  }
+
+  return is_ok;
+}
+
+// start of pointe period data reception
+bool RtePointeStreamGet ()
+{
+  bool is_ok;
+  int  http_code;
+
+#ifdef USE_TELEINFO
+    // to avoid reception errors, flush reception buffer before long GET
+    TeleinfoDataUpdate ();
+#endif    // USE_TELEINFO
+
+  // connexion
+  http_code = rte_http.GET ();
+
+  // check if connexion failed
+  is_ok = ((http_code == HTTP_CODE_OK) || (http_code == HTTP_CODE_MOVED_PERMANENTLY));
+  if (is_ok) AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Pointe - Success %d"), http_code);
+  else
+  {
+    AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Pointe - Error %d (%s)"), http_code, rte_http.errorToString (http_code).c_str());
+    rte_http.end ();
+    rte_wifi.stop ();
+  }
+
+  return is_ok;
+}
+
+// handle end of signals page reception
+bool RtePointeStreamEnd ()
+{
+  uint8_t   index;
+  uint16_t  size;
+  char      str_color[16];
+  JsonArray arr_day;
+  DynamicJsonDocument json_result(2048);
+
+  // extract token from JSON
+  deserializeJson (json_result, rte_http.getString ().c_str ());
+
+  // check array size
+  arr_day = json_result["signals"][0]["signaled_dates"].as<JsonArray>();
+  size = arr_day.size ();
+
+  // if both days are available
+  if (size == 2)
+  {
+    // set tomorrow
+    pointe_status.arr_day[RTE_POINTE_TOMORROW] = arr_day[0]["aoe_signals"];
+    if (pointe_status.arr_day[RTE_POINTE_TOMORROW] > RTE_POINTE_COLOR_RED) pointe_status.arr_day[RTE_POINTE_TOMORROW] = RTE_POINTE_COLOR_RED;
+
+    // set today
+    pointe_status.arr_day[RTE_POINTE_TODAY] = arr_day[1]["aoe_signals"];
+    if (pointe_status.arr_day[RTE_POINTE_TODAY] > RTE_POINTE_COLOR_RED) pointe_status.arr_day[RTE_POINTE_TODAY] = RTE_POINTE_COLOR_RED;
+  }
+
+  // set signal next update
+  rte_update.time_pointe = LocalTime () + RTE_POINTE_RENEW;
+
+  // log
+  AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Pointe - Update done (%d/%d/%d)"), pointe_status.arr_day[RTE_POINTE_YESTERDAY], pointe_status.arr_day[RTE_POINTE_TODAY], pointe_status.arr_day[RTE_POINTE_TOMORROW]);
 
   // end connexion
   rte_http.end ();
@@ -1028,18 +1267,19 @@ void RteInit ()
   RteLoadConfig ();
 
   // tempo initialisation
-  for (index = 0; index < TEMPO_DAY_MAX; index ++) tempo_status.arr_day[index] = TEMPO_COLOR_UNKNOWN;
+  for (index = 0; index < RTE_TEMPO_MAX; index ++) tempo_status.arr_day[index] = RTE_TEMPO_COLOR_UNKNOWN;
+
+  // pointe initialisation
+  for (index = 0; index < RTE_POINTE_MAX; index ++) pointe_status.arr_day[index] = RTE_POINTE_COLOR_UNKNOWN;
 
   // ecowatt initialisation
-  for (index = 0; index < ECOWATT_DAY_MAX; index ++)
+  for (index = 0; index < RTE_ECOWATT_DAY_MAX; index ++)
   {
-    // init date
     strcpy (ecowatt_status.arr_day[index].str_day_of_week, "");
     ecowatt_status.arr_day[index].day_of_month = 0;
     ecowatt_status.arr_day[index].month        = 0;
-
-    // slot initialisation to normal state
-    for (slot = 0; slot < RTE_SLOT_PER_DAY; slot ++) ecowatt_status.arr_day[index].arr_hvalue[slot] = ECOWATT_LEVEL_NORMAL;
+    ecowatt_status.arr_day[index].dvalue       = RTE_ECOWATT_LEVEL_NORMAL;
+    for (slot = 0; slot < 24; slot ++) ecowatt_status.arr_day[index].arr_hvalue[slot] = RTE_ECOWATT_LEVEL_NORMAL;
   }
 
   // set insecure mode to access RTE server
@@ -1053,8 +1293,6 @@ void RteInit ()
 void RteEverySecond ()
 {
   bool     result;
-  bool     tempo_publish = false;
-  bool     eco_publish = false;
   uint8_t  period, color;
   uint32_t time_now;
 
@@ -1064,6 +1302,7 @@ void RteEverySecond ()
   // if needed, plan initial ecowatt and tempo updates
   if (rte_config.ecowatt && (rte_update.time_ecowatt == UINT32_MAX)) rte_update.time_ecowatt = time_now + 30;
   if (rte_config.tempo && (rte_update.time_tempo == UINT32_MAX)) rte_update.time_tempo = time_now + 60;
+  if (rte_config.pointe && (rte_update.time_pointe == UINT32_MAX)) rte_update.time_pointe = time_now + 90;
 
   // Handle stream recetion steps
   time_now = LocalTime ();
@@ -1082,6 +1321,9 @@ void RteEverySecond ()
 
       // else, priority 3 : check for need of tempo update
       else if (rte_config.tempo && (rte_update.time_tempo <= time_now)) rte_update.step = RTE_UPDATE_TEMPO_BEGIN;
+
+      // else, priority 4 : check for need of pointe update
+      else if (rte_config.pointe && (rte_update.time_pointe <= time_now)) rte_update.step = RTE_UPDATE_POINTE_BEGIN;
       break;
 
     // begin token reception
@@ -1173,6 +1415,36 @@ void RteEverySecond ()
       if (result) rte_update.step = RTE_UPDATE_NONE;
         else RteTempoStreamRetry ();
       break;
+
+    // init pointe period reception
+    case RTE_UPDATE_POINTE_BEGIN:
+      // init tempo update
+      result = RtePointeStreamBegin ();
+      
+      // if success, set next step else plan retry
+      if (result) rte_update.step = RTE_UPDATE_POINTE_GET; 
+        else RtePointeStreamRetry ();
+      break;
+
+    // start pointe period reception
+    case RTE_UPDATE_POINTE_GET:
+      // init tempo reception
+      result = RtePointeStreamGet ();
+      
+      // if success, set next step else plan retry
+      if (result) rte_update.step = RTE_UPDATE_POINTE_END;
+        else RtePointeStreamRetry ();
+      break;
+
+    // end of pointe period reception
+    case RTE_UPDATE_POINTE_END:
+      // manage received data
+      result = RtePointeStreamEnd ();
+
+      // if tempo not received, plan retry
+      if (result) rte_update.step = RTE_UPDATE_NONE;
+        else RtePointeStreamRetry ();
+      break;
   }
 
   // if tempo is enabled, check for JSON publication
@@ -1183,27 +1455,38 @@ void RteEverySecond ()
     color  = RteTempoGetColor ();
 
     // check for tempo JSON update
-    if (tempo_status.time_json == UINT32_MAX) tempo_publish = true;
-      else if (tempo_status.time_json < time_now) tempo_publish = true;
-      else if (tempo_status.last_period != period) tempo_publish = true;
-      else if (tempo_status.last_color != color) tempo_publish = true;
+    if (tempo_status.time_json == UINT32_MAX) tempo_status.publish = true;
+      else if (tempo_status.time_json < time_now) tempo_status.publish = true;
+      else if (tempo_status.last_period != period) tempo_status.publish = true;
+      else if (tempo_status.last_color != color) tempo_status.publish = true;
 
     // update tempo period and color
     tempo_status.last_period = period;
     tempo_status.last_color = color;
   }
 
+  // if pointe period is enabled, check for JSON publication
+  if (rte_config.pointe)
+  {
+    // check for tempo JSON update
+    if (pointe_status.time_json == UINT32_MAX) pointe_status.publish = true;
+      else if (pointe_status.time_json < time_now) pointe_status.publish = true;
+      else if (pointe_status.last_color != pointe_status.arr_day[RTE_POINTE_TOMORROW]) pointe_status.publish = true;
+
+    // update pointe color
+    pointe_status.last_color = pointe_status.arr_day[RTE_POINTE_TOMORROW];
+  }
+
   // if ecowatt is enabled, check for JSON publication
   if (rte_config.ecowatt)
   {
     // check for ecowatt JSON update
-    if (ecowatt_status.time_json == UINT32_MAX) eco_publish = true;
-      else if (ecowatt_status.time_json < time_now) eco_publish = true;
+    if (ecowatt_status.time_json == UINT32_MAX) ecowatt_status.publish = true;
+      else if (ecowatt_status.time_json < time_now) ecowatt_status.publish = true;
   }
 
   // check JSON publication flag
-  if (tempo_publish) RtePublishTempoJson ();
-    else if (eco_publish) RtePublishEcowattJson ();
+  if (tempo_status.publish || pointe_status.publish || ecowatt_status.publish) RtePublishJson ();
 }
 
 // called every day at midnight
@@ -1217,38 +1500,50 @@ void RteMidnigth ()
   if (rte_config.ecowatt)
   {
     // shift day's data from 0 to day+2
-    for (index = 0; index < ECOWATT_DAY_MAX - 1; index ++)
+    for (index = 0; index < RTE_ECOWATT_DAY_MAX - 1; index ++)
     {
       // shift date, global status and slots for day, day+1 and day+2
       strcpy (ecowatt_status.arr_day[index].str_day_of_week, ecowatt_status.arr_day[index + 1].str_day_of_week);
       ecowatt_status.arr_day[index].day_of_month = ecowatt_status.arr_day[index + 1].day_of_month;
       ecowatt_status.arr_day[index].month        = ecowatt_status.arr_day[index + 1].month;
       ecowatt_status.arr_day[index].dvalue       = ecowatt_status.arr_day[index + 1].dvalue;
-      for (slot = 0; slot < RTE_SLOT_PER_DAY; slot ++) ecowatt_status.arr_day[index].arr_hvalue[slot] = ecowatt_status.arr_day[index + 1].arr_hvalue[slot];
+      for (slot = 0; slot < 24; slot ++) ecowatt_status.arr_day[index].arr_hvalue[slot] = ecowatt_status.arr_day[index + 1].arr_hvalue[slot];
     }
 
     // init date, global status and slots for day+3
-    index = ECOWATT_DAY_MAX - 1;
+    index = RTE_ECOWATT_DAY_MAX - 1;
     strcpy (ecowatt_status.arr_day[index].str_day_of_week, "");
     ecowatt_status.arr_day[index].day_of_month = 0;
     ecowatt_status.arr_day[index].month        = 0;
-    ecowatt_status.arr_day[index].dvalue       = ECOWATT_LEVEL_NORMAL;
-    for (slot = 0; slot < RTE_SLOT_PER_DAY; slot ++) ecowatt_status.arr_day[index].arr_hvalue[slot] = ECOWATT_LEVEL_NORMAL;
+    ecowatt_status.arr_day[index].dvalue       = RTE_ECOWATT_LEVEL_NORMAL;
+    for (slot = 0; slot < 24; slot ++) ecowatt_status.arr_day[index].arr_hvalue[slot] = RTE_ECOWATT_LEVEL_NORMAL;
 
     // publish data change
-    RtePublishEcowattJson ();
+    ecowatt_status.publish = true;
   }
 
   // handle tempo data rotation
   if (rte_config.tempo)
   {
     // rotate days
-    tempo_status.arr_day[TEMPO_DAY_YESTERDAY] = tempo_status.arr_day[TEMPO_DAY_TODAY];
-    tempo_status.arr_day[TEMPO_DAY_TODAY]     = tempo_status.arr_day[TEMPO_DAY_TOMORROW];
-    tempo_status.arr_day[TEMPO_DAY_TOMORROW]  = TEMPO_COLOR_UNKNOWN;
+    tempo_status.arr_day[RTE_TEMPO_YESTERDAY] = tempo_status.arr_day[RTE_TEMPO_TODAY];
+    tempo_status.arr_day[RTE_TEMPO_TODAY]     = tempo_status.arr_day[RTE_TEMPO_TOMORROW];
+    tempo_status.arr_day[RTE_TEMPO_TOMORROW]  = RTE_TEMPO_COLOR_UNKNOWN;
 
     // publish data change
-    RtePublishTempoJson ();
+    tempo_status.publish = true;
+  }
+
+  // handle pointe data rotation
+  if (rte_config.pointe)
+  {
+    // rotate days
+    pointe_status.arr_day[RTE_POINTE_YESTERDAY] = pointe_status.arr_day[RTE_POINTE_TODAY];
+    pointe_status.arr_day[RTE_POINTE_TODAY]     = pointe_status.arr_day[RTE_POINTE_TOMORROW];
+    pointe_status.arr_day[RTE_POINTE_TOMORROW]  = RTE_POINTE_COLOR_UNKNOWN;
+
+    // publish data change
+    pointe_status.publish = true;
   }
 }
 
@@ -1262,9 +1557,10 @@ void RteMidnigth ()
 void RteWebSensor ()
 {
   bool     ca_ready, pk_ready;
-  uint8_t  index, slot, day, opacity;
-  uint32_t time_now;   //, time_next;
+  uint8_t  index, slot, color, day;
+  uint32_t time_now;
   TIME_T   dst_now;
+  char     str_color[8];
   char     str_text[16];
 
   // wait for startup delay
@@ -1274,7 +1570,8 @@ void RteWebSensor ()
   time_now = LocalTime ();
   BreakTime (time_now, dst_now);
 
-  // tempo diaplay
+  // tempo display
+  // -------------
   if (rte_config.tempo)
   {
 #ifdef USE_TELEINFO
@@ -1288,7 +1585,8 @@ void RteWebSensor ()
     // title display
     WSContentSend_P (PSTR ("<div style='display:flex;margin:2px 0px 0px 0px;padding:0px;font-size:16px;'>\n"));
     WSContentSend_P (PSTR ("<div style='width:25%%;padding:0px;text-align:left;font-weight:bold;'>Tempo</div>\n"));
-    WSContentSend_P (PSTR ("<div style='width:73%%;padding:4px 0px 8px 0px;text-align:right;font-size:10px;font-style:italic;'>"));
+    WSContentSend_P (PSTR ("<div style='width:13%%;padding:4px 0px;text-align:left;font-size:10px;font-style:italic;'>RTE v1</div>\n"));
+    WSContentSend_P (PSTR ("<div style='width:60%%;padding:4px 0px 8px 0px;text-align:right;font-size:10px;font-style:italic;'>"));
 
     // set display message
     if (strlen (rte_config.str_private_key) == 0) WSContentSend_P (PSTR ("clé privée RTE manquante"));
@@ -1302,7 +1600,7 @@ void RteWebSensor ()
     WSContentSend_P (PSTR ("</div>\n"));
 
     // if data are available
-    if (tempo_status.arr_day[TEMPO_DAY_TODAY] != TEMPO_COLOR_UNKNOWN)
+    if (tempo_status.arr_day[RTE_TEMPO_TODAY] != RTE_TEMPO_COLOR_UNKNOWN)
     {
       // loop thru days
       for (index = 0; index < 2; index ++)
@@ -1314,24 +1612,31 @@ void RteWebSensor ()
         WSContentSend_P (PSTR ("<div style='width:20.8%%;padding:0px;text-align:left;'>%s</div>\n"), str_text);
 
         // display hourly slots
-        for (slot = 0; slot < RTE_SLOT_PER_DAY; slot ++)
+        for (slot = 0; slot < 24; slot ++)
         {
           // calculate color of current slot
-          if ((index == 0) && (slot < 6)) day = TEMPO_DAY_YESTERDAY;
-            else if ((index == 1) && (slot >= 6)) day = TEMPO_DAY_TOMORROW;
-            else day = TEMPO_DAY_TODAY;
-          GetTextIndexed (str_text, sizeof (str_text), tempo_status.arr_day[day], kTempoColorRGB);  
+          if ((index == 0) && (slot < 6)) day = RTE_TEMPO_YESTERDAY;
+            else if ((index == 1) && (slot >= 6)) day = RTE_TEMPO_TOMORROW;
+            else day = RTE_TEMPO_TODAY;
+          GetTextIndexed (str_color, sizeof (str_color), tempo_status.arr_day[day], kRteTempoColor);  
 
           // segment beginning
-          WSContentSend_P (PSTR ("<div style='width:3.3%%;padding:1px 0px;background-color:%s;"), str_text);
+          WSContentSend_P (PSTR ("<div style='width:3.3%%;padding:1px 0px;background-color:%s;"), str_color);
+
+          // set opacity for HC
+          if ((slot < 6) || (slot >= 22)) WSContentSend_P (PSTR ("opacity:75%%;"));
 
           // first and last segment specificities
           if (slot == 0) WSContentSend_P (PSTR ("border-top-left-radius:6px;border-bottom-left-radius:6px;"));
-            else if (slot == RTE_SLOT_PER_DAY - 1) WSContentSend_P (PSTR ("border-top-right-radius:6px;border-bottom-right-radius:6px;"));
+            else if (slot == 23) WSContentSend_P (PSTR ("border-top-right-radius:6px;border-bottom-right-radius:6px;"));
 
-          // segment end
-          if ((index == 0) && (slot == dst_now.hour)) WSContentSend_P (PSTR ("font-size:9px;'>⚫</div>\n"), str_text);
-            else WSContentSend_P (PSTR ("'></div>\n"));
+          // current hour dot and hourly segment end
+          if ((index == 0) && (slot == dst_now.hour))
+          {
+            GetTextIndexed (str_text, sizeof (str_text), tempo_status.arr_day[day], kRteTempoDot);  
+            WSContentSend_P (PSTR ("font-size:9px;'>%s</div>\n"), str_text);
+          }
+          else WSContentSend_P (PSTR ("'></div>\n"));
         }
         WSContentSend_P (PSTR ("</div>\n"));
       }
@@ -1351,7 +1656,90 @@ void RteWebSensor ()
     WSContentSend_P (PSTR ("</div>\n")); 
   }
 
+  // pointe period display
+  // ---------------------
+  if (rte_config.pointe)
+  {
+#ifdef USE_TELEINFO
+    // to avoid reception errors, flush reception buffer before display
+    TeleinfoDataUpdate ();
+#endif    // USE_TELEINFO
+
+    // start of pointe data
+    WSContentSend_P (PSTR ("<div style='font-size:10px;text-align:center;padding:2px 6px 6px 6px;margin-bottom:5px;background:#333333;border-radius:12px;'>\n"));
+
+    // title display
+    WSContentSend_P (PSTR ("<div style='display:flex;margin:2px 0px 0px 0px;padding:0px;font-size:16px;'>\n"));
+    WSContentSend_P (PSTR ("<div style='width:25%%;padding:0px;text-align:left;font-weight:bold;'>Pointe</div>\n"));
+    WSContentSend_P (PSTR ("<div style='width:13%%;padding:4px 0px;text-align:left;font-size:10px;font-style:italic;'>RTE v2</div>\n"));
+    WSContentSend_P (PSTR ("<div style='width:60%%;padding:4px 0px 8px 0px;text-align:right;font-size:10px;font-style:italic;'>"));
+
+    // set display message
+    if (strlen (rte_config.str_private_key) == 0) WSContentSend_P (PSTR ("clé privée RTE manquante"));
+    else if (rte_update.time_token == UINT32_MAX) WSContentSend_P (PSTR ("initialisation"));
+    else if (rte_update.time_pointe < time_now + 10) WSContentSend_P (PSTR ("maj imminente"));
+    else if (rte_update.time_pointe != UINT32_MAX) WSContentSend_P (PSTR ("maj dans %d mn"), 1 + (rte_update.time_pointe - time_now) / 60);
+
+    // end of title display
+    WSContentSend_P (PSTR ("</div>\n"));
+    WSContentSend_P (PSTR ("<div style='width:2%%;padding:0px;'></div>\n"));
+    WSContentSend_P (PSTR ("</div>\n"));
+
+    // if data are available
+    if (pointe_status.arr_day[RTE_POINTE_TODAY] != RTE_POINTE_COLOR_UNKNOWN)
+    {
+      // loop thru days
+      for (index = 0; index < 2; index ++)
+      {
+        WSContentSend_P (PSTR ("<div style='display:flex;margin:0px;padding:1px;height:14px;'>\n"));
+
+        // display day
+        if (index == 0) strcpy (str_text, "Aujourd'hui"); else strcpy (str_text, "Demain");
+        WSContentSend_P (PSTR ("<div style='width:20.8%%;padding:0px;text-align:left;'>%s</div>\n"), str_text);
+
+        // display hourly slots
+        for (slot = 0; slot < 24; slot ++)
+        {
+          // calculate color of current slot
+          if ((slot >= 1) && (slot < 7)) color = RTE_POINTE_COLOR_GREEN;
+            else if ((index == 0) && (slot < 1)) color = pointe_status.arr_day[RTE_POINTE_YESTERDAY];
+            else if (index == 0) color = pointe_status.arr_day[RTE_POINTE_TODAY];
+            else if ((index == 1) && (slot < 1)) color = pointe_status.arr_day[RTE_POINTE_TODAY];
+            else color = pointe_status.arr_day[RTE_POINTE_TOMORROW];
+          GetTextIndexed (str_color, sizeof (str_color), color, kRtePointeColor);  
+
+          // segment beginning
+          WSContentSend_P (PSTR ("<div style='width:3.3%%;padding:1px 0px;background-color:%s;"), str_color);
+
+          // first and last segment specificities
+          if (slot == 0) WSContentSend_P (PSTR ("border-top-left-radius:6px;border-bottom-left-radius:6px;"));
+            else if (slot == 23) WSContentSend_P (PSTR ("border-top-right-radius:6px;border-bottom-right-radius:6px;"));
+
+          // segment end
+          if ((index == 0) && (slot == dst_now.hour)) WSContentSend_P (PSTR ("font-size:9px;'>⚪</div>\n"));
+            else WSContentSend_P (PSTR ("'></div>\n"));
+        }
+        WSContentSend_P (PSTR ("</div>\n"));
+      }
+
+      // hour scale
+      WSContentSend_P (PSTR ("<div style='display:flex;margin:0px;padding:0px;'>\n"));
+      WSContentSend_P (PSTR ("<div style='width:20.8%%;padding:0px;'></div>\n"), 0);
+      WSContentSend_P (PSTR ("<div style='width:6.6%%;padding:0px;'>%uh</div>\n"), 1);
+      WSContentSend_P (PSTR ("<div style='width:13.2%%;padding:0px;'></div>\n"));
+      WSContentSend_P (PSTR ("<div style='width:6.6%%;padding:0px;'>%uh</div>\n"), 7);
+      WSContentSend_P (PSTR ("<div style='width:26.4%%;padding:0px;'>%uh</div>\n"), 12);
+      WSContentSend_P (PSTR ("<div style='width:13.2%%;padding:0px;'>%uh</div>\n"), 18);
+      WSContentSend_P (PSTR ("<div style='width:13.2%%;padding:0px;text-align:right;'>%uh</div>\n"), 24);
+      WSContentSend_P (PSTR ("</div>\n"));
+    }
+
+    // end of pointe data
+    WSContentSend_P (PSTR ("</div>\n")); 
+  }
+
   // ecowatt display
+  // ---------------
   if (rte_config.ecowatt)
   {
 #ifdef USE_TELEINFO
@@ -1365,7 +1753,7 @@ void RteWebSensor ()
     // title display
     WSContentSend_P (PSTR ("<div style='display:flex;margin:2px 0px 0px 0px;padding:0px;font-size:16px;'>\n"));
     WSContentSend_P (PSTR ("<div style='width:25%%;padding:0px;text-align:left;font-weight:bold;'>Ecowatt</div>\n"));
-    WSContentSend_P (PSTR ("<div style='width:13%%;padding:4px 0px;text-align:left;font-size:10px;font-style:italic;'>v%u</div>\n"), rte_config.eco_version);
+    WSContentSend_P (PSTR ("<div style='width:13%%;padding:4px 0px;text-align:left;font-size:10px;font-style:italic;'>RTE v%u</div>\n"), rte_config.eco_version);
     WSContentSend_P (PSTR ("<div style='width:60%%;padding:4px 0px 8px 0px;text-align:right;font-size:10px;font-style:italic;'>"));
 
     // set display message
@@ -1383,33 +1771,29 @@ void RteWebSensor ()
     if (ecowatt_status.arr_day[0].month != 0)
     {
       // loop thru days
-      for (index = 0; index < ECOWATT_DAY_MAX; index ++)
+      for (index = 0; index < RTE_ECOWATT_DAY_MAX; index ++)
       {
-        if (index == 0) opacity = 100; else opacity = 75;
-        WSContentSend_P (PSTR ("<div style='display:flex;margin:0px;padding:1px;height:14px;opacity:%u%%;'>\n"), opacity);
+        WSContentSend_P (PSTR ("<div style='display:flex;margin:0px;padding:1px;height:14px;opacity:%u%%;'>\n"), 100);
 
         // display day
         if (index == 0) WSContentSend_P (PSTR ("<div style='width:20.8%%;padding:0px;text-align:left;'>%s</div>\n"), "Aujourd'hui");
           else if (index == 1) WSContentSend_P (PSTR ("<div style='width:20.8%%;padding:0px;text-align:left;'>%s</div>\n"), "Demain");
-          else
-          {
-            WSContentSend_P (PSTR ("<div style='width:8.4%%;padding:0px;text-align:left;'>%s</div>\n"), ecowatt_status.arr_day[index].str_day_of_week);
-            WSContentSend_P (PSTR ("<div style='width:12.4%%;padding:0px;text-align:left;'>%02u/%02u</div>\n"), ecowatt_status.arr_day[index].day_of_month, ecowatt_status.arr_day[index].month);
-          }
+          else if (ecowatt_status.arr_day[index].str_day_of_week == 0) WSContentSend_P (PSTR ("<div style='width:20.8%%;padding:0px;text-align:left;'>%s</div>\n"), "");
+          else WSContentSend_P (PSTR ("<div style='width:8.4%%;padding:0px;text-align:left;'>%s</div><div style='width:12.4%%;padding:0px;text-align:left;'>%02u/%02u</div>\n"), ecowatt_status.arr_day[index].str_day_of_week, ecowatt_status.arr_day[index].day_of_month, ecowatt_status.arr_day[index].month);
 
         // display hourly slots
-        for (slot = 0; slot < RTE_SLOT_PER_DAY; slot ++)
+        for (slot = 0; slot < 24; slot ++)
         {
           // segment beginning
-          GetTextIndexed (str_text, sizeof (str_text), ecowatt_status.arr_day[index].arr_hvalue[slot], kEcowattLevelColor);
-          WSContentSend_P (PSTR ("<div style='width:3.3%%;padding:1px 0px;background-color:%s;"), str_text);
+          GetTextIndexed (str_color, sizeof (str_color), ecowatt_status.arr_day[index].arr_hvalue[slot], kRteEcowattLevelColor);
+          WSContentSend_P (PSTR ("<div style='width:3.3%%;padding:1px 0px;background-color:%s;"), str_color);
 
           // first and last segment specificities
           if (slot == 0) WSContentSend_P (PSTR ("border-top-left-radius:6px;border-bottom-left-radius:6px;"));
-            else if (slot == RTE_SLOT_PER_DAY - 1) WSContentSend_P (PSTR ("border-top-right-radius:6px;border-bottom-right-radius:6px;"));
+            else if (slot == 23) WSContentSend_P (PSTR ("border-top-right-radius:6px;border-bottom-right-radius:6px;"));
 
           // segment end
-          if ((index == ECOWATT_DAY_TODAY) && (slot == dst_now.hour)) WSContentSend_P (PSTR ("font-size:9px;'>⚫</div>\n"), str_text);
+          if ((index == RTE_ECOWATT_DAY_TODAY) && (slot == dst_now.hour)) WSContentSend_P (PSTR ("font-size:9px;'>⚪</div>\n"));
             else WSContentSend_P (PSTR ("'></div>\n"));
         }
         WSContentSend_P (PSTR ("</div>\n"));
@@ -1449,9 +1833,10 @@ bool Xsns119 (uint32_t function)
       RteInit ();
       break;
     case FUNC_COMMAND:
-      result = DecodeCommand (kRteCommands, RteCommand);
+      result  = DecodeCommand (kRteCommands,     RteCommand);
       result |= DecodeCommand (kEcowattCommands, EcowattCommand);
-      result |= DecodeCommand (kTempoCommands, TempoCommand);
+      result |= DecodeCommand (kTempoCommands,   TempoCommand);
+      result |= DecodeCommand (kPointeCommands,  PointeCommand);
       break;
     case FUNC_EVERY_SECOND:
       RteEverySecond ();

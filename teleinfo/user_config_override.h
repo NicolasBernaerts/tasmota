@@ -92,10 +92,12 @@
                          Calculate active power for production
     05/12/2023 - v13.1 - Add RTE Tempo calendar
     07/12/2023 - v13.2 - Handle both Ecowatt v4 and v5 (command eco_version)
+    09/12/2023 - v13.3 - Add RTE pointe API
+                         Start STGE management
     
 
   This program is free software: you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
+  it under the terms of the GNU General Public License aStart STGE managements published by
   the Free Software Foundation, either version 3 of the License, or
   (at your option) any later version.
 
@@ -172,7 +174,7 @@
 // extension data
 #define EXTENSION_NAME    "Teleinfo"          // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
-#define EXTENSION_VERSION "13.2"              // version
+#define EXTENSION_VERSION "13.3"              // version
 
 // teleinfo display is in French
 #define MY_LANGUAGE        fr_FR

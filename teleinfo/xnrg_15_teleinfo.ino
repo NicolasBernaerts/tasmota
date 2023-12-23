@@ -90,6 +90,8 @@
                          Display all periods with total
     07/11/2023 - v12.2 - Handle RGB color according to total power
     19/11/2023 - v13.0 - Tasmota 13 compatibility
+    09/12/2023 - v13.3 - Add RTE pointe API
+                         Start STGE management
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -207,6 +209,7 @@ TasmotaSerial *teleinfo_serial = nullptr;
 #define TELEINFO_JSON_TIC               "TIC"
 #define TELEINFO_JSON_METER             "METER"
 #define TELEINFO_JSON_PROD              "PROD"
+#define TELEINFO_JSON_ALERT             "ALERT"
 #define TELEINFO_JSON_PHASE             "PH"
 #define TELEINFO_JSON_ISUB              "ISUB"
 #define TELEINFO_JSON_PSUB              "PSUB"
@@ -252,8 +255,8 @@ const char kTeleinfoCommands[] PROGMEM = D_CMND_TELEINFO_HISTORIQUE "|" D_CMND_T
 enum TeleinfoCommand                   { TIC_CMND_HISTORIQUE,           TIC_CMND_STANDARD,           TIC_CMND_STATS,           TIC_CMND_PERCENT,           TIC_CMND_MSG_POLICY,           TIC_CMND_MSG_TYPE,           TIC_CMND_LOG_DAY,           TIC_CMND_LOG_WEEK,           TIC_CMND_MAX_V,           TIC_CMND_MAX_VA,           TIC_CMND_MAX_KWH_HOUR,           TIC_CMND_MAX_KWH_DAY,           TIC_CMND_MAX_KWH_MONTH };
 
 // Specific etiquettes
-enum TeleinfoEtiquette { TIC_NONE, TIC_ADCO, TIC_ADSC, TIC_PTEC, TIC_NGTF, TIC_EAIT, TIC_IINST, TIC_IINST1, TIC_IINST2, TIC_IINST3, TIC_ISOUSC, TIC_PS, TIC_PAPP, TIC_SINSTS, TIC_SINSTI, TIC_BASE, TIC_EAST, TIC_HCHC, TIC_HCHP, TIC_EJPHN, TIC_EJPHPM, TIC_BBRHCJB, TIC_BBRHPJB, TIC_BBRHCJW, TIC_BBRHPJW, TIC_BBRHCJR, TIC_BBRHPJR, TIC_ADPS, TIC_ADIR1, TIC_ADIR2, TIC_ADIR3, TIC_URMS1, TIC_URMS2, TIC_URMS3, TIC_UMOY1, TIC_UMOY2, TIC_UMOY3, TIC_IRMS1, TIC_IRMS2, TIC_IRMS3, TIC_SINSTS1, TIC_SINSTS2, TIC_SINSTS3, TIC_PTCOUR, TIC_PTCOUR1, TIC_PTCOUR2, TIC_PREF, TIC_PCOUP, TIC_LTARF, TIC_EASF01, TIC_EASF02, TIC_EASF03, TIC_EASF04, TIC_EASF05, TIC_EASF06, TIC_EASF07, TIC_EASF08, TIC_EASF09, TIC_EASF10, TIC_ADS, TIC_CONFIG, TIC_EAPS, TIC_EAS, TIC_EAPPS, TIC_PREAVIS, TIC_MAX };
-const char kTeleinfoEtiquetteName[] PROGMEM = "|ADCO|ADSC|PTEC|NGTF|EAIT|IINST|IINST1|IINST2|IINST3|ISOUSC|PS|PAPP|SINSTS|SINSTI|BASE|EAST|HCHC|HCHP|EJPHN|EJPHPM|BBRHCJB|BBRHPJB|BBRHCJW|BBRHPJW|BBRHCJR|BBRHPJR|ADPS|ADIR1|ADIR2|ADIR3|URMS1|URMS2|URMS3|UMOY1|UMOY2|UMOY3|IRMS1|IRMS2|IRMS3|SINSTS1|SINSTS2|SINSTS3|PTCOUR|PTCOUR1|PTCOUR2|PREF|PCOUP|LTARF|EASF01|EASF02|EASF03|EASF04|EASF05|EASF06|EASF07|EASF08|EASF09|EASF10|ADS|CONFIG|EAP_s|EA_s|EAPP_s|PREAVIS";
+enum TeleinfoEtiquette { TIC_NONE, TIC_ADCO, TIC_ADSC, TIC_PTEC, TIC_NGTF, TIC_EAIT, TIC_IINST, TIC_IINST1, TIC_IINST2, TIC_IINST3, TIC_ISOUSC, TIC_PS, TIC_PAPP, TIC_SINSTS, TIC_SINSTI, TIC_BASE, TIC_EAST, TIC_HCHC, TIC_HCHP, TIC_EJPHN, TIC_EJPHPM, TIC_BBRHCJB, TIC_BBRHPJB, TIC_BBRHCJW, TIC_BBRHPJW, TIC_BBRHCJR, TIC_BBRHPJR, TIC_ADPS, TIC_ADIR1, TIC_ADIR2, TIC_ADIR3, TIC_URMS1, TIC_URMS2, TIC_URMS3, TIC_UMOY1, TIC_UMOY2, TIC_UMOY3, TIC_IRMS1, TIC_IRMS2, TIC_IRMS3, TIC_SINSTS1, TIC_SINSTS2, TIC_SINSTS3, TIC_PTCOUR, TIC_PTCOUR1, TIC_PTCOUR2, TIC_PREF, TIC_PCOUP, TIC_LTARF, TIC_EASF01, TIC_EASF02, TIC_EASF03, TIC_EASF04, TIC_EASF05, TIC_EASF06, TIC_EASF07, TIC_EASF08, TIC_EASF09, TIC_EASF10, TIC_ADS, TIC_CONFIG, TIC_EAPS, TIC_EAS, TIC_EAPPS, TIC_PREAVIS, TIC_STGE, TIC_MAX };
+const char kTeleinfoEtiquetteName[] PROGMEM = "|ADCO|ADSC|PTEC|NGTF|EAIT|IINST|IINST1|IINST2|IINST3|ISOUSC|PS|PAPP|SINSTS|SINSTI|BASE|EAST|HCHC|HCHP|EJPHN|EJPHPM|BBRHCJB|BBRHPJB|BBRHCJW|BBRHPJW|BBRHCJR|BBRHPJR|ADPS|ADIR1|ADIR2|ADIR3|URMS1|URMS2|URMS3|UMOY1|UMOY2|UMOY3|IRMS1|IRMS2|IRMS3|SINSTS1|SINSTS2|SINSTS3|PTCOUR|PTCOUR1|PTCOUR2|PREF|PCOUP|LTARF|EASF01|EASF02|EASF03|EASF04|EASF05|EASF06|EASF07|EASF08|EASF09|EASF10|ADS|CONFIG|EAP_s|EA_s|EAPP_s|PREAVIS|STGE";
 
 // TIC - modes and rates
 enum TeleinfoType { TIC_TYPE_UNDEFINED, TIC_TYPE_CONSO, TIC_TYPE_PROD, TIC_TYPE_MAX };
@@ -262,17 +265,17 @@ enum TeleinfoMode { TIC_MODE_UNDEFINED, TIC_MODE_HISTORIC, TIC_MODE_STANDARD, TI
 const char kTeleinfoModeName[] PROGMEM = "|Historique|Standard|PME";
 const char kTeleinfoModeIcon[] PROGMEM = "|🇭|🇸|🇵";
 
-// Tarifs                                  [  Toutes   ]   [ Creuses       Pleines   ] [ Normales   PointeMobile ] [CreusesBleu  PleinesBleu   CreusesBlanc   PleinesBlanc CreusesRouge   PleinesRouge] [ Pointe   PointeMobile  Hiver      Pleines     Creuses    PleinesHiver CreusesHiver PleinesEte   CreusesEte   Pleines1/2S  Creuses1/2S  JuilletAout] [Pointe PleinesHiver CreusesHiver PleinesEte CreusesEte] [ Base  ]  [ Pleines    Creuses   ] [ Creuses bleu      Pleine Bleu    Creuse Blanc       Pleine Blanc     Creuse Rouge       Pleine Rouge ]  [ Normale      Pointe  ]  [Production]
-enum TeleinfoPeriod                        { TIC_HISTO_TH, TIC_HISTO_HC, TIC_HISTO_HP, TIC_HISTO_HN, TIC_HISTO_PM, TIC_HISTO_CB, TIC_HISTO_PB, TIC_HISTO_CW, TIC_HISTO_PW, TIC_HISTO_CR, TIC_HISTO_PR, TIC_STD_P, TIC_STD_PM, TIC_STD_HH, TIC_STD_HP, TIC_STD_HC, TIC_STD_HPH, TIC_STD_HCH, TIC_STD_HPE, TIC_STD_HCE, TIC_STD_HPD, TIC_STD_HCD, TIC_STD_JA, TIC_STD_1, TIC_STD_2, TIC_STD_3, TIC_STD_4, TIC_STD_5, TIC_STD_BASE, TIC_STD_HPL, TIC_STD_HCR, TIC_STD_HC_BLEU, TIC_STD_HP_BLEU, TIC_STD_HC_BLANC, TIC_STD_HP_BLANC, TIC_STD_HC_ROUGE, TIC_STD_HP_ROUGE, TIC_STD_HNO, TIC_STD_HPT, TIC_STD_PROD, TIC_PERIOD_MAX };
-const int ARR_TELEINFO_PERIOD_FIRST[]    = { TIC_HISTO_TH, TIC_HISTO_HC, TIC_HISTO_HC, TIC_HISTO_HN, TIC_HISTO_HN, TIC_HISTO_CB, TIC_HISTO_CB, TIC_HISTO_CB, TIC_HISTO_CB, TIC_HISTO_CB, TIC_HISTO_CB, TIC_STD_P, TIC_STD_P,  TIC_STD_P,  TIC_STD_P,  TIC_STD_P,  TIC_STD_P,   TIC_STD_P,   TIC_STD_P,   TIC_STD_P,   TIC_STD_P,   TIC_STD_P,   TIC_STD_P,  TIC_STD_1, TIC_STD_1, TIC_STD_1, TIC_STD_1, TIC_STD_1, TIC_STD_BASE, TIC_STD_HPL, TIC_STD_HPL, TIC_STD_HC_BLEU, TIC_STD_HC_BLEU, TIC_STD_HC_BLEU,  TIC_STD_HC_BLEU,  TIC_STD_HC_BLEU,  TIC_STD_HC_BLEU,  TIC_STD_HNO, TIC_STD_HNO, TIC_STD_PROD };
-const int ARR_TELEINFO_PERIOD_QUANTITY[] = { 1,            2,            2,            2,            2,            6,            6,            6,            6,            6,            6,            12,        12,         12,         12,         12,         12,          12,          12,          12,          12,          12,          12,         5,         5,         5,         5,         5,         1,            2,           2          ,         6      ,       6         ,       6        ,        6        ,       6        ,         6       ,       2     ,      2     ,      1       };
+// Tarifs                                  [  Toutes   ]   [ Creuses       Pleines   ] [ Normales           PointeMobile ] [CreusesBleu  PleinesBleu   CreusesBlanc   PleinesBlanc CreusesRouge   PleinesRouge] [ Pointe   PointeMobile  Hiver      Pleines     Creuses    PleinesHiver CreusesHiver PleinesEte   CreusesEte   Pleines1/2S  Creuses1/2S  JuilletAout] [Pointe PleinesHiver CreusesHiver PleinesEte CreusesEte] [ Base  ]  [ Pleines    Creuses   ] [ Creuses bleu      Pleine Bleu    Creuse Blanc       Pleine Blanc     Creuse Rouge       Pleine Rouge ]  [ Normale               Pointe  ]  [Production]
+enum TeleinfoPeriod                        { TIC_HISTO_TH, TIC_HISTO_HC, TIC_HISTO_HP, TIC_HISTO_EJP_HN, TIC_HISTO_EJP_PM, TIC_HISTO_CB, TIC_HISTO_PB, TIC_HISTO_CW, TIC_HISTO_PW, TIC_HISTO_CR, TIC_HISTO_PR, TIC_STD_P, TIC_STD_PM, TIC_STD_HH, TIC_STD_HP, TIC_STD_HC, TIC_STD_HPH, TIC_STD_HCH, TIC_STD_HPE, TIC_STD_HCE, TIC_STD_HPD, TIC_STD_HCD, TIC_STD_JA, TIC_STD_1, TIC_STD_2, TIC_STD_3, TIC_STD_4, TIC_STD_5, TIC_STD_BASE, TIC_STD_HPL, TIC_STD_HCR, TIC_STD_HC_BLEU, TIC_STD_HP_BLEU, TIC_STD_HC_BLANC, TIC_STD_HP_BLANC, TIC_STD_HC_ROUGE, TIC_STD_HP_ROUGE, TIC_STD_EJP_HNO, TIC_STD_EJP_HPT, TIC_STD_PROD, TIC_PERIOD_MAX };
+const int ARR_TELEINFO_PERIOD_FIRST[]    = { TIC_HISTO_TH, TIC_HISTO_HC, TIC_HISTO_HC, TIC_HISTO_EJP_HN, TIC_HISTO_EJP_HN, TIC_HISTO_CB, TIC_HISTO_CB, TIC_HISTO_CB, TIC_HISTO_CB, TIC_HISTO_CB, TIC_HISTO_CB, TIC_STD_P, TIC_STD_P,  TIC_STD_P,  TIC_STD_P,  TIC_STD_P,  TIC_STD_P,   TIC_STD_P,   TIC_STD_P,   TIC_STD_P,   TIC_STD_P,   TIC_STD_P,   TIC_STD_P,  TIC_STD_1, TIC_STD_1, TIC_STD_1, TIC_STD_1, TIC_STD_1, TIC_STD_BASE, TIC_STD_HPL, TIC_STD_HPL, TIC_STD_HC_BLEU, TIC_STD_HC_BLEU, TIC_STD_HC_BLEU,  TIC_STD_HC_BLEU,  TIC_STD_HC_BLEU,  TIC_STD_HC_BLEU,  TIC_STD_EJP_HNO, TIC_STD_EJP_HNO, TIC_STD_PROD };
+const int ARR_TELEINFO_PERIOD_QUANTITY[] = { 1,            2,            2,            2,                2,                6,            6,            6,            6,            6,            6,            12,        12,         12,         12,         12,         12,          12,          12,          12,          12,          12,          12,         5,         5,         5,         5,         5,         1,            2,           2          ,         6      ,       6         ,       6        ,        6        ,       6        ,         6       ,       2     ,      2     ,      1       };
 const char kTeleinfoPeriod[] PROGMEM     = "TH..|HC..|HP..|HN..|PM..|HCJB|HPJB|HCJW|HPJW|HCJR|HPJR|P|PM|HH|HP|HC|HPH|HCH|HPE|HCE|HPD|HCD|JA|1|2|3|4|5|BASE|HEURE PLEINE|HEURE CREUSE|HC BLEU|HP BLEU|HC BLANC|HP BLANC|HC ROUGE|HP ROUGE|HEURE NORMALE|HEURE POINTE|INDEX NON CONSO";
-const char kTeleinfoPeriodName[] PROGMEM = "Toutes|Creuses|Pleines|Normales|Pointe Mobile|Creuses Bleu|Pleines Bleu|Creuses Blanc|Pleines Blanc|Creuses Rouge|Pleines Rouge|Pointe|Pointe Mobile|Hiver|Pleines|Creuses|Pleines Hiver|Creuses Hiver|Pleines Ete|Creuses Ete|Pleines 1/2s.|Creuses 1/2s.|Juillet-Aout|Pointe|Pleines Hiver|Creuses Hiver|Pleines Ete|Creuses Ete|Base|Pleines|Creuses|Creuses Bleu|Pleines Bleu|Creuses Blanc|Pleines Blanc|Creuses Rouge|Pleines Rouge|Normaux|Pointe|Production";
+const char kTeleinfoPeriodName[] PROGMEM = "Toutes|Creuses|Pleines|EJP Normal|EJP Pointe|Creuses Bleu|Pleines Bleu|Creuses Blanc|Pleines Blanc|Creuses Rouge|Pleines Rouge|Pointe|Pointe Mobile|Hiver|Pleines|Creuses|Pleines Hiver|Creuses Hiver|Pleines Ete|Creuses Ete|Pleines 1/2s.|Creuses 1/2s.|Juillet-Aout|Pointe|Pleines Hiver|Creuses Hiver|Pleines Ete|Creuses Ete|Base|Pleines|Creuses|Creuses Bleu|Pleines Bleu|Creuses Blanc|Pleines Blanc|Creuses Rouge|Pleines Rouge|EJP Normal|EJP Pointe|Production";
 
 // Data diffusion policy
 enum TeleinfoMessagePolicy { TELEINFO_POLICY_TELEMETRY, TELEINFO_POLICY_PERCENT, TELEINFO_POLICY_MESSAGE, TELEINFO_POLICY_MAX };
 const char kTeleinfoMessagePolicy[] PROGMEM = "Telemetry only|± 5% Power Change|Every TIC message";
-enum TeleinfoMessageType { TELEINFO_MSG_NONE, TELEINFO_MSG_METER, TELEINFO_MSG_TIC, TELEINFO_MSG_BOTH, TELEINFO_MSG_MAX };
+enum TeleinfoMessageType { TELEINFO_MSG_NONE, TELEINFO_MSG_DATA, TELEINFO_MSG_TIC, TELEINFO_MSG_BOTH, TELEINFO_MSG_MAX };
 const char kTeleinfoMessageType[] PROGMEM = "None|METER & PROD|TIC|All";
 
 // config
@@ -283,12 +286,12 @@ const char kTeleinfoConfigKey[] PROGMEM = D_CMND_TELEINFO_LOG_DAY "|" D_CMND_TEL
 enum TeleinfoPowerCalculationMethod { TIC_METHOD_GLOBAL_COUNTER, TIC_METHOD_INCREMENT };
 enum TeleinfoPowerTarget { TIC_POWER_UPDATE_COUNTER, TIC_POWER_UPDATE_PAPP, TIC_POWER_UPDATE_PACT };
 
+// contract periods
+enum TeleinfoPeriodDay   {TIC_DAY_YESTERDAY, TIC_DAY_TODAY, TIC_DAY_TOMORROW, TIC_DAY_MAX};
+enum TeleinfoPeriodTempo { TIC_TEMPO_NONE, TIC_TEMPO_BLEU, TIC_TEMPO_BLANC, TIC_TEMPO_ROUGE, TIC_TEMPO_MAX };
+
 // serial port management
 enum TeleinfoSerialStatus { TIC_SERIAL_INIT, TIC_SERIAL_ACTIVE, TIC_SERIAL_STOPPED, TIC_SERIAL_FAILED };
-
-// phase colors
-const char kTeleinfoColorPhase[] PROGMEM = "#09f|#f90|#093";                   // phase colors (blue, orange, green)
-const char kTeleinfoColorPeak[]  PROGMEM = "#5ae|#eb6|#2a6";                   // peak colors (blue, orange, green)
 
 /****************************************\
  *                 Data
@@ -299,7 +302,7 @@ static struct {
   bool     restart    = false;                           // flag to ask for restart
   uint8_t  percent    = 100;                             // maximum acceptable power in percentage of contract power
   uint8_t  msg_policy = TELEINFO_POLICY_TELEMETRY;       // publishing policy for data
-  uint8_t  msg_type   = TELEINFO_MSG_METER;              // type of data to publish (METER and/or TIC)
+  uint8_t  msg_type   = TELEINFO_MSG_DATA;               // type of data to publish (METER and/or TIC)
   long     max_volt   = TELEINFO_GRAPH_DEF_VOLTAGE;      // maximum voltage on graph
   long     max_power  = TELEINFO_GRAPH_DEF_POWER;        // maximum power on graph
   long     param[TELEINFO_CONFIG_MAX] = { TELEINFO_HISTO_DAY_DEFAULT, TELEINFO_HISTO_WEEK_DEFAULT, TELEINFO_GRAPH_DEF_WH_HOUR, TELEINFO_GRAPH_DEF_WH_DAY, TELEINFO_GRAPH_DEF_WH_MONTH, 0, 0 };      // graph configuration
@@ -311,17 +314,14 @@ struct tic_line {
   String str_donnee;                                // TIC line donnee
   char checksum;
 };
+
 static struct {
-  bool     overload      = false;                   // overload has been detected
-  bool     received      = false;                   // one full message has been received
-  bool     percent       = false;                   // power has changed of more than 1% on one phase
-  bool     publish_tic   = false;                   // flag to ask to publish TIC JSON
-  bool     publish_meter = false;                   // flag to ask to publish Meter JSON
   int      line_index    = 0;                       // index of current received message line
   int      line_max      = 0;                       // max number of lines in a message
   int      length        = INT_MAX;                 // length of message     
   uint32_t timestamp     = UINT32_MAX;              // timestamp of message (ms)
   uint32_t time_previous = UINT32_MAX;              // timestamp of previous message
+  char     str_line[TELEINFO_LINE_MAX];             // reception buffer for current line
   tic_line line[TELEINFO_LINE_QTY];                 // array of message lines
 } teleinfo_message;
 
@@ -332,7 +332,7 @@ static struct {
   uint8_t   type           = TIC_TYPE_UNDEFINED;    // meter running type (conso or prod)
   uint8_t   period_current = UINT8_MAX;             // actual tarif period
   uint8_t   period_first   = UINT8_MAX;             // first index of contract periods
-  uint8_t   period_qty     = UINT8_MAX;             // number of periods in current contract      
+  uint8_t   period_qty     = UINT8_MAX;             // number of periods in current contract
   long      voltage        = TELEINFO_VOLTAGE;      // contract reference voltage
   long      isousc         = 0;                     // contract max current per phase
   long      ssousc         = 0;                     // contract max power per phase
@@ -340,16 +340,36 @@ static struct {
 } teleinfo_contract;
 
 // teleinfo : power meter
+struct tic_stge {
+  uint8_t  overload;                                // currently overloaded
+  uint8_t  overvolt;                                // voltage overload on one phase
+};
+struct tic_ejp {
+  uint8_t  preavis;                                 // ejp signal announced
+  uint8_t  active;                                  // ejp signal active
+};
+struct tic_tempo {
+  uint8_t  yesterday;                               // status of yesterday
+  uint8_t  today;                                   // status of today
+  uint8_t  tomorrow;                                // status of tomorrow
+};
 static struct {
-  uint8_t   status_rx      = TIC_SERIAL_INIT;       // Teleinfo Rx initialisation status
-  uint8_t   day_of_month   = UINT8_MAX;             // Current day of month
-  long      nb_message     = 0;                     // total number of messages sent by the meter
-  long      nb_reset       = 0;                     // total number of message reset sent by the meter
-  long      nb_update      = 0;                     // number of cosphi calculation updates
-  long long nb_line        = 0;                     // total number of received lines
-  long long nb_error       = 0;                     // total number of checksum errors
-  char      sep_line = 0;                           // detected line separator
-  char      str_line[TELEINFO_LINE_MAX];            // reception buffer for current line
+  uint8_t   status_rx    = TIC_SERIAL_INIT;         // Teleinfo Rx initialisation status
+  uint8_t   day_of_month = UINT8_MAX;               // Current day of month
+  uint8_t   message      = 0;                       // full message has been received
+  uint8_t   alert        = 0;                       // alert has been detected
+  uint8_t   percent      = 0;                       // power has changed of more than 1% on one phase
+  uint8_t   tic          = 0;                       // flag to ask to publish TIC JSON
+  uint8_t   data         = 0;                       // flag to ask to publish Data JSON (ALERT, METER and/or PROD)
+  long      nb_message   = 0;                       // total number of messages sent by the meter
+  long      nb_reset     = 0;                       // total number of message reset sent by the meter
+  long      nb_update    = 0;                       // number of cosphi calculation updates
+  long long nb_line      = 0;                       // total number of received lines
+  long long nb_error     = 0;                       // total number of checksum errors
+  char      sep_line     = 0;                       // detected line separator
+  tic_stge  stge;                                   // STGE data
+  tic_ejp   ejp;                                    // EJP data
+  tic_tempo tempo;                                  // TEMPO data
 } teleinfo_meter;
 
 // teleinfo : actual data per phase
@@ -746,7 +766,7 @@ void TeleinfoLoadConfig ()
 
   // validate boundaries
   if ((teleinfo_config.msg_policy < 0) || (teleinfo_config.msg_policy >= TELEINFO_POLICY_MAX)) teleinfo_config.msg_policy = TELEINFO_POLICY_TELEMETRY;
-  if (teleinfo_config.msg_type >= TELEINFO_MSG_MAX) teleinfo_config.msg_type = TELEINFO_MSG_METER;
+  if (teleinfo_config.msg_type >= TELEINFO_MSG_MAX) teleinfo_config.msg_type = TELEINFO_MSG_DATA;
   if ((teleinfo_config.percent < TELEINFO_PERCENT_MIN) || (teleinfo_config.percent > TELEINFO_PERCENT_MAX)) teleinfo_config.percent = 100;
 
   // log
@@ -1156,7 +1176,7 @@ void TeleinfoInit ()
   // initialise message timestamp
   teleinfo_message.timestamp = UINT32_MAX;
 
-  // loop thru all possible phases
+  // init conso data for all phases
   for (phase = 0; phase < ENERGY_MAX_PHASES; phase++)
   {
     // tasmota energy counters
@@ -1174,29 +1194,40 @@ void TeleinfoInit ()
     teleinfo_conso.phase[phase].papp_last = 0;
     teleinfo_conso.phase[phase].papp_inc  = 0;
     teleinfo_conso.phase[phase].cosphi    = 100;
-
-    // initialise conso calculation data
-
-    // initialise production data
-    teleinfo_prod.papp      = 0;
-    teleinfo_prod.pact      = 0;
-    teleinfo_prod.papp_last = 0;
-    teleinfo_prod.papp_inc  = 0;
-    teleinfo_prod.cosphi    = 100;
   }
 
-  // initialise meter data
-  for (index = 0; index < TELEINFO_INDEX_MAX; index ++) teleinfo_conso.index_wh[index] = 0;
-  teleinfo_meter.sep_line = ' ';
+  // initialise production data
+  teleinfo_prod.papp      = 0;
+  teleinfo_prod.pact      = 0;
+  teleinfo_prod.papp_last = 0;
+  teleinfo_prod.papp_inc  = 0;
+  teleinfo_prod.cosphi    = 100;
 
   // initialise message data
-  strcpy (teleinfo_meter.str_line, "");
+  strcpy (teleinfo_message.str_line, "");
   for (index = 0; index < TELEINFO_LINE_QTY; index ++) 
   {
     teleinfo_message.line[index].str_etiquette = "";
     teleinfo_message.line[index].str_donnee = "";
     teleinfo_message.line[index].checksum = 0;
   }
+
+  // initialise meter indexes
+  for (index = 0; index < TELEINFO_INDEX_MAX; index ++) teleinfo_conso.index_wh[index] = 0;
+  teleinfo_meter.sep_line = ' ';
+
+  // init meter stge data
+  teleinfo_meter.stge.overload = 0;
+  teleinfo_meter.stge.overvolt = 0;
+
+  // init meter ejp period
+  teleinfo_meter.ejp.active  = 0;
+  teleinfo_meter.ejp.preavis = 0;
+  
+  // init meter tempo period
+  teleinfo_meter.tempo.yesterday = TIC_TEMPO_NONE;
+  teleinfo_meter.tempo.today     = TIC_TEMPO_NONE;
+  teleinfo_meter.tempo.tomorrow  = TIC_TEMPO_NONE;
 
   // log default method & help command
   AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Using default Global Counter method"));
@@ -1206,11 +1237,12 @@ void TeleinfoInit ()
 // Handling of received teleinfo data
 void TeleinfoReceiveData ()
 {
-  uint8_t   phase, period;
+  uint8_t   phase, period, signal;
   uint32_t  time_over;
   int       index;
   long      value, total, increment, total_current, cosphi, green, red;
   long long counter, counter_wh;
+  uint32_t  calc;
   uint32_t  timeout, timestamp, message_ms;
   float     papp_inc, daily_kwh;
   char      checksum;
@@ -1247,7 +1279,7 @@ void TeleinfoReceiveData ()
           teleinfo_message.length = 1;
 
           // init current line
-          strcpy (teleinfo_meter.str_line, "");
+          strcpy (teleinfo_message.str_line, "");
 
           // reset voltage flags
           for (phase = 0; phase < teleinfo_contract.phase; phase++) teleinfo_conso.phase[phase].volt_set = false;
@@ -1263,7 +1295,7 @@ void TeleinfoReceiveData ()
           teleinfo_message.line_index = 0;
 
           // init current line
-          strcpy (teleinfo_meter.str_line, "");
+          strcpy (teleinfo_message.str_line, "");
 
           // log
           AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Message reset"));
@@ -1276,7 +1308,7 @@ void TeleinfoReceiveData ()
 
         case 0x0A:
         case 0x0E:
-          strcpy (teleinfo_meter.str_line, "");
+          strcpy (teleinfo_message.str_line, "");
           break;
 
         // ------------------------------
@@ -1285,7 +1317,7 @@ void TeleinfoReceiveData ()
 
         case 0x09:
           teleinfo_meter.sep_line = 0x09;
-          strlcat (teleinfo_meter.str_line, str_byte, TELEINFO_LINE_MAX);
+          strlcat (teleinfo_message.str_line, str_byte, TELEINFO_LINE_MAX);
           break;
           
         // ------------------
@@ -1300,7 +1332,7 @@ void TeleinfoReceiveData ()
           if (teleinfo_meter.nb_line > 1)
           {
             // if checksum is ok, handle the line
-            checksum = TeleinfoCalculateChecksum (teleinfo_meter.str_line, str_etiquette, str_donnee);
+            checksum = TeleinfoCalculateChecksum (teleinfo_message.str_line, str_etiquette, str_donnee);
             if (checksum != 0)
             {
               // get etiquette type
@@ -1534,7 +1566,51 @@ void TeleinfoReceiveData ()
                 case TIC_ADIR2:
                 case TIC_ADIR3:
                 case TIC_PREAVIS:
-                  teleinfo_message.overload = true;
+                  teleinfo_meter.stge.overload = true;
+                  break;
+
+                // STGE flags
+                case TIC_STGE:
+                  value = strtol (str_donnee, nullptr, 16);
+
+                  // get phase over voltage
+                  calc   = (uint32_t)value >> 6;
+                  signal = (uint8_t)calc & 0x01;
+                  if (teleinfo_meter.stge.overvolt != signal) teleinfo_meter.alert = 1;
+                  teleinfo_meter.stge.overvolt = signal;
+
+                  // get phase overload
+                  calc   = (uint32_t)value >> 7;
+                  signal = (uint8_t)calc & 0x01;
+                  if (teleinfo_meter.stge.overload != signal) teleinfo_meter.alert = 1;
+                  teleinfo_meter.stge.overload = signal;
+
+                  // get preavis ejp signal
+                  calc   = (uint32_t)value >> 28;
+                  signal = (uint8_t)calc & 0x03;
+                  if (teleinfo_meter.ejp.preavis != signal) teleinfo_meter.alert = 1;
+                  teleinfo_meter.ejp.preavis = signal;
+
+                  // get active ejp signal
+                  calc   = (uint32_t)value >> 30;
+                  signal = (uint8_t)calc & 0x03;
+                  if (teleinfo_meter.ejp.active != signal) teleinfo_meter.alert = 1;
+                  teleinfo_meter.ejp.active = signal;
+
+                  // if defined, get today's tempo signal
+                  calc   = (uint32_t)value >> 24;
+                  signal = (uint8_t)calc & 0x03;
+                  if (signal != TIC_TEMPO_NONE)
+                  {
+                    if (teleinfo_meter.tempo.today != signal) teleinfo_meter.alert = 1;
+                    teleinfo_meter.tempo.today = signal;
+                  }
+
+                  // if defined, get tomorrow's tempo signal
+                  calc   = (uint32_t)value >> 26;
+                  signal = (uint8_t)calc & 0x03;
+                  if (teleinfo_meter.tempo.tomorrow != signal) teleinfo_meter.alert = 1;
+                  teleinfo_meter.tempo.tomorrow = signal;
                   break;
               }
 
@@ -1553,7 +1629,7 @@ void TeleinfoReceiveData ()
           }
           
           // init current line
-          strcpy (teleinfo_meter.str_line, "");
+          strcpy (teleinfo_message.str_line, "");
           break;
 
         // ---------------------
@@ -1813,17 +1889,17 @@ void TeleinfoReceiveData ()
 
           // loop thru phases to detect overload
           for (phase = 0; phase < teleinfo_contract.phase; phase++)
-            if (teleinfo_conso.phase[phase].papp > teleinfo_contract.ssousc * (long)teleinfo_config.percent / 100) teleinfo_message.overload = true;
+            if (teleinfo_conso.phase[phase].papp > teleinfo_contract.ssousc * (long)teleinfo_config.percent / 100) teleinfo_meter.alert = 1;
 
           // loop thru phase to detect % power change (should be > to handle 0 conso)
           for (phase = 0; phase < teleinfo_contract.phase; phase++) 
-            if (abs (teleinfo_conso.phase[phase].papp_last - teleinfo_conso.phase[phase].papp) > (teleinfo_contract.ssousc * TELEINFO_PERCENT_CHANGE / 100)) teleinfo_message.percent = true;
+            if (abs (teleinfo_conso.phase[phase].papp_last - teleinfo_conso.phase[phase].papp) > (teleinfo_contract.ssousc * TELEINFO_PERCENT_CHANGE / 100)) teleinfo_meter.percent = 1;
 
           // detect % power change on production (should be > to handle 0 prod)
-          if (abs (teleinfo_prod.papp_last - teleinfo_prod.papp) > (teleinfo_contract.ssousc * TELEINFO_PERCENT_CHANGE / 100)) teleinfo_message.percent = true;
+          if (abs (teleinfo_prod.papp_last - teleinfo_prod.papp) > (teleinfo_contract.ssousc * TELEINFO_PERCENT_CHANGE / 100)) teleinfo_meter.percent = 1;
 
           // if % power change detected, save values
-          if (teleinfo_message.percent)
+          if (teleinfo_meter.percent != 0)
           {
             for (phase = 0; phase < teleinfo_contract.phase; phase++) teleinfo_conso.phase[phase].papp_last = teleinfo_conso.phase[phase].papp;
             teleinfo_prod.papp_last = teleinfo_prod.papp;
@@ -1848,40 +1924,17 @@ void TeleinfoReceiveData ()
               else Energy->current[phase] = 0;
             teleinfo_conso.phase[phase].current = (long)(Energy->current[phase] * 100);
           } 
-/*
-#ifdef USE_LIGHT
-          // ----------------------------------
-          //   control RGB lignt
-          //     green : low power
-          //     red   : full contract power
-          // ----------------------------------
 
-          // calculate color according to power
-          value = total = 0;
-          for (phase = 0; phase < teleinfo_contract.phase; phase++)
-          {
-            value += teleinfo_conso.phase[phase].papp;
-            total += teleinfo_contract.ssousc;
-          }
-          if (total > 0) value = 100 * value / total;
-            else value = 0;
-
-          // calculate color
-          if (value < 50) green = TELEINFO_RGB_GREEN_MAX; else green = TELEINFO_RGB_GREEN_MAX * 2 * (100 - value) / 100;
-          if (value > 50) red = TELEINFO_RGB_RED_MAX; else red = TELEINFO_RGB_RED_MAX * 2 * value / 100;
-
-          // update light controller
-          light_controller.changeRGB ((uint8_t)red, (uint8_t)green, 0, false);
-#endif      // USE_LIGHT
-*/
-          // declare received message and update previous message timestamp
-          teleinfo_message.received = true;
+          // update previous message timestamp
           teleinfo_message.time_previous = teleinfo_message.timestamp;
+
+          // declare received message 
+          teleinfo_meter.message = 1;
           break;
 
         // add other caracters to current line
         default:
-            strlcat (teleinfo_meter.str_line, str_byte, TELEINFO_LINE_MAX);
+            strlcat (teleinfo_message.str_line, str_byte, TELEINFO_LINE_MAX);
           break;
       }
 
@@ -1896,27 +1949,37 @@ void TeleinfoReceiveData ()
 // Publish JSON if candidate
 void TeleinfoUpdatePublication ()
 {
-  bool publish;
+  bool publish = false;
 
-  // check if message should be published
-  publish  = teleinfo_message.overload;
-  publish |= (teleinfo_message.received && (teleinfo_config.msg_policy == TELEINFO_POLICY_MESSAGE));
-  publish |= (teleinfo_message.percent  && (teleinfo_config.msg_policy == TELEINFO_POLICY_PERCENT));
+  // check for percentage change
+  publish |= ((teleinfo_meter.percent != 0) && (teleinfo_config.msg_policy == TELEINFO_POLICY_PERCENT));
+  teleinfo_meter.percent = 0;
 
-  // set publishing flags
-  if (publish && (teleinfo_config.msg_type == TELEINFO_MSG_BOTH))  teleinfo_message.publish_meter = true;
-  if (publish && (teleinfo_config.msg_type == TELEINFO_MSG_METER)) teleinfo_message.publish_meter = true;
-  if (publish && (teleinfo_config.msg_type == TELEINFO_MSG_BOTH))  teleinfo_message.publish_tic = true;
-  if (publish && (teleinfo_config.msg_type == TELEINFO_MSG_TIC))   teleinfo_message.publish_tic = true;
+  // check for publication every message
+  publish |= ((teleinfo_meter.message != 0) && (teleinfo_config.msg_policy == TELEINFO_POLICY_MESSAGE));
+  teleinfo_meter.message = 0;
 
-  // reset message flags
-  teleinfo_message.overload = false;
-  teleinfo_message.received = false;
-  teleinfo_message.percent  = false;
+  // check for alerts
+  publish |= (teleinfo_meter.alert != 0); 
 
-  // if needed, publish METER or TIC JSON
-  if (teleinfo_message.publish_meter) TeleinfoPublishJsonMeter ();
-    else if (teleinfo_message.publish_tic) TeleinfoPublishJsonTic ();
+  // if data should be published
+  if (publish) switch (teleinfo_config.msg_type)
+  {
+    case TELEINFO_MSG_TIC:
+      teleinfo_meter.tic = 1;
+      break;
+    case TELEINFO_MSG_DATA:
+      teleinfo_meter.data = 1;
+      break;
+    case TELEINFO_MSG_BOTH:
+      teleinfo_meter.data = 1;
+      teleinfo_meter.tic  = 1;
+      break;
+  }
+
+  // if needed, publish METER, TIC or ALERT JSON
+  if (teleinfo_meter.data != 0)  TeleinfoPublishJsonData ();
+    else if (teleinfo_meter.tic != 0) TeleinfoPublishJsonTic ();
 }
 
 // Calculate if some JSON should be published (called every second)
@@ -1959,8 +2022,6 @@ void TeleinfoPublishJsonTic ()
   ResponseAppendTime ();
   ResponseAppend_P (PSTR (",\"%s\":{"), TELEINFO_JSON_TIC);
 
-//  Response_P (PSTR ("{\"%s\":\"%s\",\"%s\":{"), D_JSON_TIME, GetDateAndTime (DT_LOCAL).c_str (), TELEINFO_JSON_TIC);
-
   // loop thru TIC message lines
   for (index = 0; index < TELEINFO_LINE_QTY; index ++)
     if (teleinfo_message.line[index].checksum != 0)
@@ -1975,21 +2036,30 @@ void TeleinfoPublishJsonTic ()
   MqttPublishTeleSensor ();
 
   // TIC has been published
-  teleinfo_message.publish_tic = false;
+  teleinfo_meter.tic = 0;
 }
 
-// Generate JSON with Meter informations
-void TeleinfoPublishJsonMeter ()
+// Generate JSON data with Meter and/or Prod
+void TeleinfoPublishJsonData ()
 {
   uint8_t   phase, value;
   long      current, power_app, power_act;
   char      str_text[32];
 
-  // Start {"Time":"xxxxxxxx","METER":{
+  // Start {"Time":"xxxxxxxx"
   ResponseClear ();
   ResponseAppendTime ();
 
-  // if meter handles conso mode
+  // alerts = ,"ALERT":{"Load"=1,"Volt"=0,"Tempo":{"Aujour"=2,"Demain"=1},"EJP":{"Aujour"=1,"Demain"=0}}
+  if (teleinfo_meter.alert)
+  {
+    ResponseAppend_P (PSTR (",\"%s\":{\"Load\":%u,\"Volt\":%u"), TELEINFO_JSON_ALERT, teleinfo_meter.stge.overload, teleinfo_meter.stge.overvolt);
+    if (teleinfo_meter.tempo.today != TIC_TEMPO_NONE) ResponseAppend_P (PSTR (",\"Tempo\":{\"Aujour\":%u,\"Demain\":%u}"), teleinfo_meter.tempo.today, teleinfo_meter.tempo.tomorrow);
+    ResponseAppend_P (PSTR (",\"EJP\":{\"Preavis\":%u,\"Actif\":%u}"), teleinfo_meter.ejp.preavis, teleinfo_meter.ejp.active);
+    ResponseAppend_P (PSTR ("}"));
+  }
+
+  // conso data = ,"METER":{...}
   if (teleinfo_conso.total_wh != 0)
   {
     ResponseAppend_P (PSTR (",\"%s\":{"), TELEINFO_JSON_METER);
@@ -2031,25 +2101,54 @@ void TeleinfoPublishJsonMeter ()
 
     // Total Papp, Pact and Current
     ResponseAppend_P (PSTR (",\"P\":%d,\"W\":%d,\"I\":%d.%02d"), power_app, power_act, current / 100, current % 100);
-
-    ResponseAppend_P (PSTR ("}"));
+    ResponseJsonEnd ();
   }
 
-  // if meter handles production mode
+  // production data = ,"PROD":{...}
   if (teleinfo_prod.total_wh != 0)
   {
     ResponseAppend_P (PSTR (",\"%s\":{"), TELEINFO_JSON_PROD);
     ResponseAppend_P (PSTR ("\"VA\":%d,\"W\":%d"), teleinfo_prod.papp, teleinfo_prod.pact);
-    ResponseAppend_P (PSTR ("}"));
+    ResponseJsonEnd ();
   }
 
   // end of METER section, publish JSON and process rules
-  ResponseAppend_P (PSTR ("}"));
+  ResponseJsonEnd ();
   MqttPublishTeleSensor ();
 
-  // Meter has been published
-  teleinfo_message.publish_meter = false;
+  // data have been published
+  teleinfo_meter.data  = 0;
+  teleinfo_meter.alert = 0;
 }
+
+/*
+// Generate JSON data for Alert
+void TeleinfoPublishJsonAlert ()
+{
+  uint8_t phase;
+
+  // Start {"Time":"xxxxxxxx"
+  ResponseClear ();
+  ResponseAppendTime ();
+
+  // ALERT data =   ,"ALERT":{"Load"=1,"Volt"=0,"Tempo":{"Aujour"=2,"Demain"=1},"EJP":{"Aujour"=1,"Demain"=0}}
+  ResponseAppend_P (PSTR (",\"%s\":{\"Load\":%u,\"Volt\":%u"), TELEINFO_JSON_ALERT, teleinfo_meter.stge.overload, teleinfo_meter.stge.overvolt);
+  if (teleinfo_meter.tempo.today != TIC_TEMPO_NONE) ResponseAppend_P (PSTR (",\"Tempo\":{\"Aujour\":%u,\"Demain\":%u}"), teleinfo_meter.tempo.today, teleinfo_meter.tempo.tomorrow);
+  ResponseAppend_P (PSTR (",\"EJP\":{\"Preavis\":%u,\"Actif\":%u}"), teleinfo_meter.ejp.preavis, teleinfo_meter.ejp.active);
+  ResponseAppend_P (PSTR ("}"));
+
+  // METER minimal power data
+  //   ,"METER":{"PMAX"=1000,"V1"=250,"P1"=800,...}
+  ResponseAppend_P (PSTR (",\"%s\":{"), TELEINFO_JSON_METER);
+  ResponseAppend_P (PSTR ("\"%s\":%d"), TELEINFO_JSON_PMAX, (long)teleinfo_config.percent * teleinfo_contract.ssousc / 100);
+  for (phase = 0; phase < teleinfo_contract.phase; phase++) ResponseAppend_P (PSTR (",\"V%u\":%d,\"P%u\":%d"), phase + 1, teleinfo_conso.phase[phase].voltage, phase + 1, teleinfo_conso.phase[phase].papp);
+  ResponseAppend_P (PSTR ("}"));
+
+  // end of JSON, publish and process rules
+  ResponseJsonEnd ();
+  MqttPublishTeleSensor ();
+}
+*/
 
 // Show JSON status (for MQTT)
 void TeleinfoJSONTeleperiod ()
@@ -2061,8 +2160,8 @@ void TeleinfoJSONTeleperiod ()
   if (TasmotaGlobal.tele_period > 0) return;
 
   // check for JSON update according to update policy
-  teleinfo_message.publish_meter = ((teleinfo_config.msg_type == TELEINFO_MSG_BOTH) || (teleinfo_config.msg_type == TELEINFO_MSG_METER));
-  teleinfo_message.publish_tic   = ((teleinfo_config.msg_type == TELEINFO_MSG_BOTH) || (teleinfo_config.msg_type == TELEINFO_MSG_TIC));
+  if ((teleinfo_config.msg_type == TELEINFO_MSG_BOTH) || (teleinfo_config.msg_type == TELEINFO_MSG_DATA)) teleinfo_meter.data = 1;
+  if ((teleinfo_config.msg_type == TELEINFO_MSG_BOTH) || (teleinfo_config.msg_type == TELEINFO_MSG_TIC))  teleinfo_meter.tic  = 1;
 }
 
 /***************************************\
