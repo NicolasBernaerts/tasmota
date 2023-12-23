@@ -11,6 +11,7 @@ ESP8266 family partitionning hasn't changed.
 This evolution of **Tasmota 13.2.0** firmware has been enhanced to :
   * handle France energy meters known as **Linky** using **Teleinfo** protocol
   * publish RTE **Tempo** data
+  * publish RTE **Pointe** data
   * publish RTE **Ecowatt** data
 
 This firmware has been developped and tested on  :
@@ -40,6 +41,7 @@ Please note that it is a completly different implementation than the one publish
 This tasmota firmware handles consommation and production modes :
   * Consommation publishes standard **ENERGY** and specific **METER** JSON section
   * Production publishes specific **PROD** JSON section
+  * Alerts (Tempo / EJP change, overload, over voltage, ...) are published under **ALERT** JSON section
   * You can also publish a specific **TIC** section to have all Teleinfo keys
 
 Some of these firmware versions are using a LittleFS partition to store graph data. Il allows to keep historical data over reboots.
@@ -79,6 +81,7 @@ You can also publish energy data under 2 different sections :
   * **TIC** : Teleinfo data are publish as is
   * **METER** : Consommation energy data are in a condensed form
   * **PROD** : Production energy data
+  * **ALERT** : Alert flags (Tempo, EJP, Overload, Over voltage, ...)
 
 These options can be enabled in **Configure Teleinfo** page.
 
@@ -151,9 +154,9 @@ Every CSV file includes a header.
 
 These files are used to generate all graphs other than **Live** ones.
 
-## RTE Tempo and Ecowatt
+## RTE Tempo, Pointe and Ecowatt
 
-This evolution of Tasmota firmware allows to collect [**France RTE**](https://data.rte-france.com/) **Tempo** and **Ecowatt** data thru SSL API and to publish them thru MQTT.
+This evolution of Tasmota firmware allows to collect [**France RTE**](https://data.rte-france.com/) **Tempo**, **Pointe** and **Ecowatt** data thru SSL API and to publish them thru MQTT.
 
 ![RTE applications](./screen/tasmota-rte-display.png)
 
@@ -168,19 +171,23 @@ To get all available commands, just run **rte_help** in console :
      - rte_key <key>      = set RTE base64 private key
      - rte_token          = display current token
      - rte_sandbox <0/1>  = set sandbox mode (0/1)
-    ECOWATT commands :
+    Ecowatt commands :
      - eco_enable <0/1>   = enable/disable ecowatt server
      - eco_version <4/5>  = set ecowatt API version to use
      - eco_update         = force ecowatt update from RTE server 
      - eco_publish        = publish ecowatt data now
-    TEMPO commands :
+    Tempo commands :
      - tempo_enable <0/1> = enable/disable tempo server
      - tempo_update       = force tempo update from RTE server
      - tempo_publish      = publish tempo data now
-
+    Pointe commands :
+     - pointe_enable <0/1> = enable/disable pointe period server
+     - pointe_update       = force pointe period update from RTE server
+     - pointe_publish      = publish pointe period data now
+  
 You first need to create **RTE account** from RTE site [https://data.rte-france.com/]
 
-Then enable enable **Ecowatt** and / or **Tempo** application to be able to access its API.
+Then enable **Tempo**, **Demand Response Signal** and/or **Ecowatt** application to be able to access its API.
 
 ![RTE applications](./screen/rte-application-list.png) 
 
@@ -188,12 +195,13 @@ Once your applications have been enabled, copy and declare your **private Base64
 
     rte_key your_rte_key_in_base64
 
-You can then enable **Tempo** and / or **Ecowatt** data collection : 
+You can then enable **Tempo**, **Pointe**  and/or **Ecowatt** data collection : 
 
     eco_enable 1
     tempo_enable 1
+    pointe_enable 1
 
-By default, Ecowatt API is version 5. If you have only enabled version 4, you can force it with :
+By default, Ecowatt API is version 5. If you have enabled version 4, you can force it with :
 
     eco_version 4
 
@@ -203,17 +211,17 @@ After a restart you'll see that you ESP32 first gets a token and then gets the d
     RTE: Ecowatt - Success 200
     RTE: Tempo - Update done (2/1/1)
 
-Ecowatt data are published as a specific MQTT message :
+Tempo, Pointe and Ecowatt data are published as SENSOR data :
 
-    your-device/tele/ECOWATT = {"Time":"2022-10-10T23:51:09","Ecowatt":{"dval":2,"hour":14,"now":1,"next":2,
+    your-device/tele/SENSOR = {"Time":"2023-12-20T07:23:39","TEMPO":{"Hier":"blanc","Aujour":"bleu","Demain":"rouge","Icon":"🟦"}}
+
+    your-device/tele/SENSOR = {"Time":"2023-12-20T07:36:02","POINTE":{"Aujour":0,"Demain":0,"Icon":"🟩"}}
+
+    your-device/tele/SENSOR = {"Time":"2022-10-10T23:51:09","ECOWATT":{"dval":2,"hour":14,"now":1,"next":2,
       "day0":{"jour":"2022-10-06","dval":1,"0":1,"1":1,"2":1,"3":1,"4":1,"5":1,"6":1,...,"23":1},
       "day1":{"jour":"2022-10-07","dval":2,"0":1,"1":1,"2":2,"3":1,"4":1,"5":1,"6":1,...,"23":1},
       "day2":{"jour":"2022-10-08","dval":3,"0":1,"1":1,"2":1,"3":1,"4":1,"5":3,"6":1,...,"23":1},
       "day3":{"jour":"2022-10-09","dval":2,"0":1,"1":1,"2":1,"3":2,"4":1,"5":1,"6":1,...,"23":1}}}
-
-Tempo data are published as a specific MQTT message :
-
-    your-device/tele/TEMPO = {"Time":"2023-12-07T20:32:42","J-1":"rouge","J":"blanc","J+1":"blanc","Icon":"⬜"}
 
 ## TCP server
 
