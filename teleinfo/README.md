@@ -78,7 +78,7 @@ Teleinfo protocol is described in [this document](https://www.enedis.fr/sites/de
 Standard **ENERGY** section is published during **Telemetry**.
 
 You can also publish energy data under 2 different sections :
-  * **TIC** : Teleinfo data are publish as is
+  * **TIC** : Teleinfo data are publish as is. Data will vary according to your contract and to your meter.
   * **METER** : Consommation energy data are in a condensed form
   * **PROD** : Production energy data
   * **ALERT** : Alert flags (Tempo, EJP, Overload, Over voltage, ...)
