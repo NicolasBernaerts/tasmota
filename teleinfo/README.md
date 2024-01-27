@@ -87,15 +87,7 @@ You can also publish energy data under 2 different sections :
 
 All these options can be enabled in the **Configure Teleinfo** page.
 
-Here are some example of what you'll get if you publish **TIC** section :
-  * **ADCO**, **ADCS** = contract number
-  * **ISOUSC** = max contract current per phase 
-  * **SSOUSC** = max contract power per phase
-  * **IINST**, **IINST1**, **IINST2**, **IINST3** = instant current per phase
-  * **ADIR1**, **ADIR2**, **ADIR3** = overload message
-  * ...
-
-Here are some example of what you'll get if you publish **METER** section :
+Here are the data you'll get in the **METER** section :
   * **PH** = number of phases
   * **PSUB** = power per phase in the contract (VA) 
   * **ISUB** = current per phase in the contract 
@@ -109,21 +101,21 @@ Here are some example of what you'll get if you publish **METER** section :
   * **Wx** = instant active power on phase **x** 
   * **Cx** = current calculated power factor (cos φ) on phase **x** 
 
-Here is what you'll get in **PROD** section if your Linky is in production mode :
+Here are the data you'll get in the **PROD** section if your Linky is in production mode :
   * **VA**  = instant apparent power
   * **W**   = instant active power 
   * **COS** = current calculated power factor (cos φ)
 
-Here is what you'll get in **CAL** section :
+Here are the data you'll get in the **CAL** section :
   * **lv** = current period level (0 unknown, 1 bleu, 2 blanc, 3 rouge)
   * **hp** = current type (0:heure creuse, 1 heure pleine) 
 
-Here is what you'll get in **RELAY** section :
+Here are the data you'll get in the **RELAY** section :
   * **R1** = virtual relay n°1 status (0:open, 1:closed)
   * **R2** = virtual relay n°2 status (0:open, 1:closed)
   * .. 
 
-Here is what you'll get in **ALERT** section :
+Here are the data you'll get in the **ALERT** section :
   * **Load** = overload status (0:all is right, 1:overload)
   * **Volt** = overvoltage status (0:all is right, 1:one phase is currently having overvoltage)
   * **Preavis/Level** = Next level announced as preavis (used in EJP)
