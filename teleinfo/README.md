@@ -82,8 +82,10 @@ You can also publish energy data under 2 different sections :
   * **METER** : Consommation energy data are in a condensed form
   * **PROD** : Production energy data
   * **ALERT** : Alert flags (Tempo, EJP, Overload, Over voltage, ...)
+  * **CAL** : Calendar data (tempo bleu, blanc, rouge - EJP bleu, rouge - heures pleines, heures creuses)
+  * **RELAY** : Virtual relay status
 
-These options can be enabled in **Configure Teleinfo** page.
+All these options can be enabled in the **Configure Teleinfo** page.
 
 Here are some example of what you'll get if you publish **TIC** section :
   * **ADCO**, **ADCS** = contract number
@@ -111,6 +113,20 @@ Here is what you'll get in **PROD** section if your Linky is in production mode 
   * **VA**  = instant apparent power
   * **W**   = instant active power 
   * **COS** = current calculated power factor (cos φ)
+
+Here is what you'll get in **CAL** section :
+  * **lv** = current period level (0 unknown, 1 bleu, 2 blanc, 3 rouge)
+  * **hp** = current type (0:heure creuse, 1 heure pleine) 
+
+Here is what you'll get in **RELAY** section :
+  * **R1** = virtual relay n°1 status (0:open, 1:closed)
+  * **R2** = virtual relay n°2 status (0:open, 1:closed)
+  * .. 
+
+Here is what you'll get in **ALERT** section :
+  * **Load** = overload status (0:all is right, 1:overload)
+  * **Volt** = overvoltage status (0:all is right, 1:one phase is currently having overvoltage)
+  * **Preavis/Level** = Next level announced as preavis (used in EJP)
 
 MQTT result should look like that :
 
