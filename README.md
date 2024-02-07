@@ -1,7 +1,7 @@
 # Tasmota Firmware Extensions
 
 Some Tasmota firmware extensions :
-  * **teleinfo** : manage **Teleinfo** protocol (Linky) & RTE **Ecowatt** protocol
+  * **teleinfo** : manage **Teleinfo** protocol (Linky) & RTE API for **Tempo** and **Ecowatt** protocol
   * **gazpar** : manage french gaz smart meters (Gazpar)
   * **intercom** : manage building gate opening upon flat intercom rings
   * **motion** : handle motion detectors and push buttons in parallel to light circuit
