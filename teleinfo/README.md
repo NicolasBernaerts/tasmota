@@ -10,15 +10,14 @@ ESP8266 family partitionning hasn't changed.
 
 This evolution of **Tasmota 13.2.0** firmware has been enhanced to :
   * handle France energy meters known as **Linky** using **Teleinfo** protocol
-  * publish RTE **Tempo** data
-  * publish RTE **Pointe** data
-  * publish RTE **Ecowatt** data
+  * publish RTE **Tempo**, **Pointe** and **Ecowatt** data
 
 This firmware has been developped and tested on  :
   * **Sagem Classic Monophase** with TIC **Historique**
   * **Linky Monophase** with TIC **Historique** & **Standard**
   * **Linky Triphase** with TIC **Historique** & **Standard**
   * **Ace6000 Triphase** with TIC **PME/PMI**
+  * **Emeraude 2 quadrants**tasmota-dis 
 
 It has been compiled and tested on the following devices :
   * **ESP8266** 1Mb
