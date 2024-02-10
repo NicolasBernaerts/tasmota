@@ -17,7 +17,7 @@ This firmware has been developped and tested on  :
   * **Linky Monophase** with TIC **Historique** & **Standard**
   * **Linky Triphase** with TIC **Historique** & **Standard**
   * **Ace6000 Triphase** with TIC **PME/PMI**
-  * **Emeraude 2 quadrants**tasmota-dis 
+  * **Emeraude 2 quadrants**
 
 It has been compiled and tested on the following devices :
   * **ESP8266** 1Mb
