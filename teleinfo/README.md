@@ -25,6 +25,7 @@ It has been compiled and tested on the following devices :
   * **ESP12F** 4Mb and 16Mb
   * **ESP32** 4Mb (safeboot)
   * **Denky D4** 8Mb (safeboot)
+  * **ESP32C3** 4Mb (safeboot)
   * **ESP32S2** 4Mb (safeboot)
   * **ESP32S3** 16Mb (safeboot)
 
@@ -39,10 +40,12 @@ Pre-compiled versions are available in the [**binary**](./binary) folder.
 Please note that it is a completly different implementation than the one published early 2020 by Charles Hallard and actually on the official Tasmota repository. 
 
 This tasmota firmware handles consommation and production modes. Data are published thru some specific JSON sections :
-  * Consommation is published thru default **ENERGY** and specific **METER** sections
-  * Production is published thru specific **PROD** section
+  * Consommation / production is published thru default **ENERGY** and specific **METER** sections
   * Alerts (Tempo / EJP change, overload, over voltage, ...) are published under **ALERT** section
-  * You can also publish a specific **TIC** section to have all Teleinfo keys of last received message
+  * Global consommation and production counters are published under **TOTAL** section
+  * Calendar data (Tempo, EJP, RTE) are published under **CAL** section
+  * Virtual relays state are published under **RELAY** section
+  * You can also publish a specific **TIC** section to have all **valid** Teleinfo keys of last received message
 
 Some of these firmware versions are using a LittleFS partition to store graph data. Il allows to keep historical data over reboots.
 To take advantage of this feature, make sure to follow partitioning procedure given in the **readme** of the **binary** folder.
@@ -64,9 +67,6 @@ If you are using a LittleFS version, you'll also get peak apparent power and pea
 
 If your linky in in historic mode, it doesn't provide instant voltage. Voltage is then forced to 230V.
 
-If you are using an **ESP32** board with Ethernet, you can use the wired connexion by selection the proper board model in **Configuration/ESP32 board**.
-
-
 If you want to remove default Tasmota Energy display on the main page, you just need to run this console command :
 
     websensor3 0
@@ -78,12 +78,11 @@ Teleinfo protocol is described in [this document](https://www.enedis.fr/sites/de
 Standard **ENERGY** section is published during **Telemetry**.
 
 You can also publish energy data under 2 different sections :
-  * **TIC** : Teleinfo data are publish as is. Data will vary according to your contract and to your meter.
-  * **METER** : Consommation energy data are in a condensed form
-  * **PROD** : Production energy data
+  * **METER** : Consommation and prduction energy data are in a condensed form
   * **ALERT** : Alert flags (Tempo, EJP, Overload, Over voltage, ...)
   * **CAL** : Calendar data (tempo bleu, blanc, rouge - EJP bleu, rouge - heures pleines, heures creuses)
   * **RELAY** : Virtual relay status
+  * **TIC** : Teleinfo valid data are publish as is. Data will vary according to your contract and to your meter.
 
 All these options can be enabled in the **Configure Teleinfo** page.
 
@@ -100,15 +99,15 @@ Here are the data you'll get in the **METER** section :
   * **Px** = instant apparent power on phase **x** 
   * **Wx** = instant active power on phase **x** 
   * **Cx** = current calculated power factor (cos φ) on phase **x** 
-
-Here are the data you'll get in the **PROD** section if your Linky is in production mode :
-  * **VA**  = instant apparent power
-  * **W**   = instant active power 
-  * **COS** = current calculated power factor (cos φ)
+  * **PP** = production instant apparent power
+  * **PW** = production instant active power 
+  * **PC** = production calculated power factor (cos φ)
 
 Here are the data you'll get in the **CAL** section :
   * **lv** = current period level (0 unknown, 1 bleu, 2 blanc, 3 rouge)
-  * **hp** = current type (0:heure creuse, 1 heure pleine) 
+  * **hp** = current type (0:heure creuse, 1 heure pleine)
+  * **today** = section with period level and type for 24 today's hourly slots
+  * **tomorrow** = section with period level and type for 24 tomorrow's hourly slots
 
 Here are the data you'll get in the **RELAY** section :
   * **R1** = virtual relay n°1 status (0:open, 1:closed)
@@ -118,14 +117,14 @@ Here are the data you'll get in the **RELAY** section :
 Here are the data you'll get in the **ALERT** section :
   * **Load** = overload status (0:all is right, 1:overload)
   * **Volt** = overvoltage status (0:all is right, 1:one phase is currently having overvoltage)
-  * **Preavis/Level** = Next level announced as preavis (used in EJP)
+  * **Preavis** = next level announced as preavis (used in EJP)
+  * **Label** = preavis label
 
 MQTT result should look like that :
 
     compteur/tele/SENSOR = {"Time":"2021-03-13T09:20:26","ENERGY":{"TotalStartTime":"2021-03-13T09:20:26","Total":7970.903,"Yesterday":3.198,"Today":6.024,"Period":63,"Power":860,"Current":4.000},"IP":"192.168.xx.xx","MAC":"50:02:91:xx:xx:xx"}
     compteur/tele/SENSOR = {"Time":"2021-03-13T09:20:30","TIC":{"ADCO":"061964xxxxxx","OPTARIF":"BASE","ISOUSC":"30","BASE":"007970903","PTEC":"TH..","IINST":"003","IMAX":"090","PAPP":"00780","HHPHC":"A","MOTDETAT":"000000","PHASE":1,"SSOUSC":"6000","IINST1":"3","SINSTS1":"780"}}
-    compteur/tele/SENSOR = {"Time":"2023-03-10T13:53:42","METER":{"PH":1,"ISUB":45,"PSUB":9000,"PMAX":8910,"U1":235,"P1":1470,"W1":1470,"I1":6.0,"C1":1.00,"P":1470,"W":1470,"I":6.0}}
-    compteur/tele/SENSOR = {"Time":"2023-03-10T13:54:42","PROD":{"VA":1470,"W":1470,"COS":1.00}}
+    compteur/tele/SENSOR = {"Time":"2023-03-10T13:53:42","METER":{"PH":1,"ISUB":45,"PSUB":9000,"PMAX":8910,"U1":235,"P1":1470,"W1":1470,"I1":6.0,"C1":1.00,"P":1470,"W":1470,"I":6.0,"PP":1470,"PW":1470,"PC":1.00}}
 
 #### Commands
 
@@ -185,15 +184,18 @@ To get all available commands, just run **rte_help** in console :
      - rte_sandbox <0/1>  = set sandbox mode (0/1)
     Ecowatt commands :
      - eco_enable <0/1>   = enable/disable ecowatt server
+     - eco_display <0/1>  = display ecowatt calendra in main page
      - eco_version <4/5>  = set ecowatt API version to use
      - eco_update         = force ecowatt update from RTE server 
      - eco_publish        = publish ecowatt data now
     Tempo commands :
-     - tempo_enable <0/1> = enable/disable tempo server
-     - tempo_update       = force tempo update from RTE server
-     - tempo_publish      = publish tempo data now
+     - tempo_enable <0/1>  = enable/disable tempo server
+     - tempo_display <0/1> = display tempo calendra in main page
+     - tempo_update        = force tempo update from RTE server
+     - tempo_publish       = publish tempo data now
     Pointe commands :
      - pointe_enable <0/1> = enable/disable pointe period server
+     - pointe_display <0/1 = display pointe calendra in main page
      - pointe_update       = force pointe period update from RTE server
      - pointe_publish      = publish pointe period data now
   
@@ -213,10 +215,6 @@ You can then enable **Tempo**, **Pointe**  and/or **Ecowatt** data collection :
     tempo_enable 1
     pointe_enable 1
 
-By default, Ecowatt API is version 5. If you have enabled version 4, you can force it with :
-
-    eco_version 4
-
 After a restart you'll see that you ESP32 first gets a token and then gets the data. Every step is traced in the console logs.
 
     RTE: Token - abcdefghiL23OeISCK50tsGKzYD60hUt2TeESE1kBEe38x0MH0apF0y valid for 7200 seconds
@@ -225,9 +223,9 @@ After a restart you'll see that you ESP32 first gets a token and then gets the d
 
 Tempo, Pointe and Ecowatt data are published as SENSOR data :
 
-    your-device/tele/SENSOR = {"Time":"2023-12-20T07:23:39","TEMPO":{"Hier":"blanc","Aujour":"bleu","Demain":"rouge","Icon":"🟦"}}
+    your-device/tele/SENSOR = {"Time":"2023-12-20T07:23:39",TEMPO":{"lv":1,"hp":0,"label":"blue","icon":"🟦","yesterday":1,"today":1,"tomorrow":1}}
 
-    your-device/tele/SENSOR = {"Time":"2023-12-20T07:36:02","POINTE":{"Aujour":0,"Demain":0,"Icon":"🟩"}}
+    your-device/tele/SENSOR = {"Time":"2023-12-20T07:36:02","POINTE":{"lv":1,"label":"blue","icon":"🟦","today":1,"tomorrow":1}}
 
     your-device/tele/SENSOR = {"Time":"2022-10-10T23:51:09","ECOWATT":{"dval":2,"hour":14,"now":1,"next":2,
       "day0":{"jour":"2022-10-06","dval":1,"0":1,"1":1,"2":1,"3":1,"4":1,"5":1,"6":1,...,"23":1},
