@@ -10,7 +10,9 @@ Each binary has its own specificities :
   * **tasmota32s2-teleinfo-4m1200k.bin** : target is ESP32S2 with 4M memory. It handles a 1344k LittleFS partition to store history files.
   * **tasmota32s3-teleinfo-16m10m.bin** : target is ESP32S3 with 16M memory. It handles a 10M LittleFS partition to store history files.
 
-You can easily extract **.bin** files from **.bin.gz**
+For ESP8266, OTA should be done using **.bin.gz**
+
+For ESP32, OTA should be done using **.bin** (not .factory.bin !)
 
 If you want to flash these binaries, you'll need to use **esptool**.
 
