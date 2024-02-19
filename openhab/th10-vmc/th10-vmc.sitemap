@@ -1,9 +1,0 @@
-sitemap bathroom label="Bathroom" {
-    Frame label="VMC" {
-        Switch item=Bathroom_VMC_Mode mappings=[0="Off", 1="On", 2="Auto"] icon="vmc_auto_off" visibility=[Bathroom_VMC_Power==OFF]
-        Switch item=Bathroom_VMC_Mode mappings=[0="Off", 1="On", 2="Auto"] icon="vmc_auto_on" visibility=[Bathroom_VMC_Power==ON]
-        Setpoint item=Bathroom_VMC_HumidityMax minValue=10 maxValue=100 step=2
-        Default item=Bathroom_VMC_Humidity
-        Default item=Bathroom_VMC_Temperature
-    }
-}

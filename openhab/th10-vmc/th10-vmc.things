@@ -1,9 +1,0 @@
-Bridge mqtt:broker:mosquitto [ host="your.mqtt.host.ip", secure=false, username="your-mqtt-login", password="your-mqtt-password" ]
-{
-    Thing topic bathroomvmc "Bathroom VMC" {
-    Channels:
-        Type switch : power "Power"   [ stateTopic="your/topic/path/vmc/stat/POWER", commandTopic="your/topic/path/cmnd/POWER", on="ON", off="OFF" ]
-        Type string : state "State"   [ stateTopic="your/topic/path/vmc/tele/STATE"]
-        Type string : sensor "Sensor" [ stateTopic="your/topic/path/vmc/tele/SENSOR"]
-     }
-}
