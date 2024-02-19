@@ -31,48 +31,48 @@ Il a été compilé et testé sur les ESP suivants :
   * **ESP32S3** 16Mb (safeboot)
 
 Ce firmware fournit également :
-  * un serveur intégré TCP pour diffuser en temps réel les données **teleinfo**
-  * un serveur intégré FTP pour récupérer les fichiers historiques
+  * un serveur intégré **TCP** pour diffuser en temps réel les données reçues du compteur
+  * un serveur intégré **FTP** pour récupérer les fichiers historiques
 
 Des versions pré-compilées sont disponibles dans le répertoire [**binary**](./binary).
 
 ## Teleinfo
 
-Please note that it is a completly different implementation than the one published early 2020 by Charles Hallard and actually on the official Tasmota repository. 
+Ce firmware n'est pas le firmware officiel **Teleinfo** de **Tasmota**. C'est une implémentation complètement différente de celle publiée en 2020 par Charles Hallard. 
 
-This tasmota firmware handles consommation and production modes. Data are published thru some specific JSON sections :
-  * Consommation / production is published thru default **ENERGY** and specific **METER** sections
-  * Alerts (Tempo / EJP change, overload, over voltage, ...) are published under **ALERT** section
-  * Global consommation and production counters are published under **TOTAL** section
-  * Calendar data (Tempo, EJP, RTE) are published under **CAL** section
-  * Virtual relays state are published under **RELAY** section
-  * You can also publish a specific **TIC** section to have all **valid** Teleinfo keys of last received message
+Il gère les compteurs en mode consommation et production. Les données sont publiées via des sections JSON différentes :
+  * **ENERGY** : section officielle de Tasmota
+  * **METER** : données de consommation et prodcution en temps réel sous une forme compacte.
+  * **ALERT** : alertes publiées dans les messages STGE (changement Tempo / EJP, surpuissance & survoltage)
+  * **TOTAL** : compteurs de périodes en Wh
+  * **CAL** : calendrier consolidé entre le compteur et les données RTE (Tempo, Pointe & Ecowatt)
+  * **RELAY** : relais virtuels publiés par le compteur
+  * **TIC** : etiquettes et données brutes reçues depuis le compteur
 
-Some of these firmware versions are using a LittleFS partition to store graph data. Il allows to keep historical data over reboots.
-To take advantage of this feature, make sure to follow partitioning procedure given in the **readme** of the **binary** folder.
+Certaines variantes de ce firmware utilisent une partition **LittleFS** pour stocker les données historisées qui servent à générer les graphs de suivi. Lorsque vous souhaitez utiliser cette fonctionnalité, vérifier que vous flashez bien l'ESP en mode série la première fois.
 
-It manages :
-  * Voltage (**V**)
-  * Current (**A**)
-  * Instant Power (**VA** and **W**)
-  * Active Power total (**Wh**)
-  * Power Factor (**Cosφ**), calculated from Instant Power (VA) and meter Total (Wh)
+Ce firmware gère les données suivantes :
+  * Tension (**V**)
+  * Courant (**A**)
+  * Puissance instantanée et active (**VA** & **W**)
+  * Compteurs de période (**Wh**)
+  * Facteur de puissance (**Cosφ**), calculé sur la base du compteur de période et de la puissance instantanée.
 
-This firmware provides some extra Web page on the device :
-  * **/tic** : real time display of last received Teleinfo message
-  * **/graph** : live, daily and weekly graphs
-  * **/conso** : yearly consumption data
-  * **/prod** : yearly production
+Il fournit des pages web spécifiques :
+  * **/tic** : suivi en temps réel des données réçues
+  * **/graph** : graph en temps réel des données du compteur
+  * **/conso** : suivi des consommations
+  * **/prod** : suivi de la production
   
-If you are using a LittleFS version, you'll also get peak apparent power and peak voltage on the graphs.
+Si vous utilisez une version avec partition **LittleFS**, les graphs afficheront en complément les tensions et puissances crête.
 
-If your linky in in historic mode, it doesn't provide instant voltage. Voltage is then forced to 230V.
+Si votre compteur est en mode historique, la tension est forcée à 230V.
 
-If you want to remove default Tasmota Energy display on the main page, you just need to run this console command :
+Si vous souhaitez supprimer l'affichage des données Energy sur la page d'accueil, vous devez passer la commande suivante en console :
 
     websensor3 0
 
-Teleinfo protocol is described in [this document](https://www.enedis.fr/sites/default/files/Enedis-NOI-CPT_54E.pdf)
+Le protocole **Teleinfo** est décrit dans [ce document](https://www.enedis.fr/sites/default/files/Enedis-NOI-CPT_54E.pdf)
 
 #### MQTT data
 
