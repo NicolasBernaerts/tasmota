@@ -150,7 +150,7 @@ Chacun de ces fichiers inclue un entête.
 
 ## Calendriers RTE Tempo, Pointe and Ecowatt
 
-Ce firmware permet également de s'abonner aux calendriers publiés par [**RTE**](https://data.rte-france.com/) via leurs API :
+Ce firmware permet également de s'abonner aux calendriers publiés par [**RTE**](https://data.rte-france.com/) :
   * **Tempo**
   * **Pointe**
   * **Ecowatt**
@@ -233,18 +233,18 @@ Les données RTE sont publiées sous des sections spécifiques sous **tele/SENSO
       "day2":{"jour":"2022-10-08","dval":3,"0":1,"1":1,"2":1,"3":1,"4":1,"5":3,"6":1,...,"23":1},
       "day3":{"jour":"2022-10-09","dval":2,"0":1,"1":1,"2":1,"3":2,"4":1,"5":1,"6":1,...,"23":1}}}
 
-## TCP server
+## Serveur TCP
 
-This firmware brings a minimal embedded TCP server.
+Un serveur **TCP** est intégré à cette version de firmware.
 
-This server allows you to retrieve the complete teleinfo stream over your LAN.
+Il permet de récupérer très simplement le flux d'information publié par le compteur.
 
-Type **tcp_help** to list all available commands :
+La commande **tcp_help** explique toutes les possibilités :
   * **tcp_status** : status of TCP server (running port or 0 if not running)
   * **tcp_start** [port] : start TCP server on specified port
   * **tcp_stop** : stop TCP server
 
-When started, you can now receive your Linky teleinfo stream in real time on any Linux pc :
+Une fois le serveur activé, la réception du flux sur un PC sous Linux est un jeu d'enfant (ici sur le port 888) :
 
     # nc 192.168.1.10 8888
         SMAXSN-1	E220422144756	05210	W
@@ -254,36 +254,31 @@ When started, you can now receive your Linky teleinfo stream in real time on any
         STGE	003A0001	:
         MSG1	PAS DE          MESSAGE         	<
 
-Server allows only 1 concurrent connexion. Any new client will kill previous one.
+Le serveur étant minimaliste, il ne permet qu'une seule connexion simultanée. Toute nouvelle connexion tuera la connexion précédente.
 
-## FTP server
+## Serveur FTP
 
-If you are using a build with a LittleFS partition, you can access the partition thru a very basic FTP server embedded in this firmware.
+Si vous utilisez une version de firmware avec partition LittleFS, vous avez à disposition un serveur **FTP** embarqué afin de récupérer les fichiers de manière automatisée.
 
-This can allow you to retrieve automatically any CSV generated file.
-
-Type **ftp_help** to list all available commands :
+La commande **ftp_help** liste toutes les possibilités :
   * **ftp_status** : status of FTP server (running port or 0 if not running)
   * **ftp_start** : start FTP server on port 21
   * **ftp_stop** : stop FTP server
 
-On the client side, credentials are :
-  * login : **teleinfo**
-  * password : **teleinfo**
+Coté client FTP, vous devez utiliser les login / mot de passe suivants : **teleinfo** / **teleinfo**
 
-This embedded FTP server main limitation is that it can only one connexion at a time. \
-So you need to limit simultaneous connexions to **1** on your FTP client. Otherwise, connexion will fail.
+Ce serveur FTP ne peut accepter qu'une seule connexion simultanée. Vous devez donc configurer votre client FTP avec une limiote de type : **simultaneous connexions = 1**. Sinon, la connexion sera en erreur.
 
 ## Compilation
 
-If you want to compile this firmware version, you just need to :
-1. install official tasmota sources (please get exact version given at the beginning of this page)
-2. place or replace files from this repository
-3. place specific files from **tasmota/common** repository
-4. install **FTPClientServer** and **ArduinoJson** libraries
+Si vous voulez compiler ce firmware vous-même, vous devez :
+1. installer les sources **tasmota** officielles (utilisez la même version que celle déclarée en tête de cette page
+2. déposez ou remplacez les fichiers de ce **repository**
+3. déposez ou remplacez les fichiers du repository **tasmota/common**
+4. installez les librairies **FTPClientServer** et **ArduinoJson**
 
-Here is where you should place different files.
-Files should be taken from this repository and from **tasmota/common** :
+Voici la liste exhaustive des fichiers concernés :
+
 | File    |  Comment  |
 | --- | --- |
 | **platformio_override.ini** |    |
