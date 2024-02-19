@@ -113,7 +113,7 @@ La section **TOTAL** comprend autant de clés que de périodes dans votre contra
 
 #### Commands
 
-This Teleinfo firmware can be configured thru some **EnergyConfig** console commands :
+ce firmware propose un certain nombre de commandes **EnergyConfig** spécifiques disponibles en mode console :
 
     EnergyConfig Teleinfo parameters :
       historique      set historique mode at 1200 bauds (needs restart)
@@ -130,40 +130,58 @@ This Teleinfo firmware can be configured thru some **EnergyConfig** console comm
       maxday=110      graph max total per day (Wh)
       maxmonth=2000   graph max total per month (Wh)
 
-You can use few commands at once :
+Vous pouvez passer plusieurs commandes en même temps :
 
       EnergyConfig percent=110 nbday=8 nbweek=12
 
 #### LittleFS
 
-Certaines variantes de ce firmware utilisent une partition **LittleFS** pour stocker les données historisées qui servent à générer les graphs de suivi. Lorsque vous souhaitez utiliser cette fonctionnalité, vérifier que vous flashez bien l'ESP en mode série la première fois.
-Si vous utilisez une version avec partition **LittleFS**, les graphs afficheront en complément les tensions et puissances crête.
+Certaines variantes de ce firmware utilisent une partition **LittleFS** pour stocker les données historisées qui servent à générer les graphs de suivi. Lorsque vous souhaitez utiliser cette fonctionnalité, vérifier que vous flashez bien l'ESP en mode série la première fois afin de modifier le partitionnement.
 
-If you run this firmware on an ESP having a LittleFS partition, it will generate 3 types of energy logs :
-  * **teleinfo-day-nn.csv** : average values daily file with a record every ~5 mn (**00** is today's log, **01** yesterday's log, ...)
-  * **teleinfo-week-nn.csv** : average values weekly file with a record every ~30 mn (**00** is current week's log, **01** is previous week's log, ...)
-  * **teleinfo-year-yyyy.csv** : Consumption kWh total yearly file with a line per day and detail of hourly total for each day.
-  * **production-year-yyyy.csv** : Production kWh total yearly file with a line per day and detail of hourly total for each day.
+Pour les versions **LittleFS**, les graphs affichent en complément la tension et la puissances crête.
 
-Every CSV file includes a header.
+Avec une partition LittleFS, 4 familles de fichiers sont générées :
+  * **teleinfo-day-nn.csv** : valeurs quotidiennes enregistrées toutes les 5 mn (**00** aujourd'hui, **01** hier, ...)
+  * **teleinfo-week-nn.csv** : valeurs hebdomadaires enregistrées toutes les 30 mn (**00** semaine courante, **01** semaine précédente, ...)
+  * **teleinfo-year-yyyy.csv** : Compteurs de consommation annuels
+  * **production-year-yyyy.csv** : Compteur de production annuel
 
-These files are used to generate all graphs other than **Live** ones.
+Chacun de ces fichiers inclue un entête.
 
-## RTE Tempo, Pointe and Ecowatt
+## Calendriers RTE Tempo, Pointe and Ecowatt
 
-This evolution of Tasmota firmware allows to collect [**France RTE**](https://data.rte-france.com/) data thru their Web Services :
+Ce firmware permet également de s'abonner aux calendriers publiés par [**RTE**](https://data.rte-france.com/) via leurs API :
   * **Tempo**
   * **Pointe**
   * **Ecowatt**
-These data are then published thru MQTT.
+
+Cette fonctionnalité n'est disponible que sur les **ESP32**.
+  
+Vous devez tout d'abord créer un compte sur le site **RTE** [https://data.rte-france.com/]
+
+Ensuite vous devez activer l'un ou l'autre des API suivantes :
+  * **Tempo**
+  * **Demand Response Signal**
+  * **Ecowatt**
+
+![RTE applications](./screen/rte-application-list.png) 
+
+Ces calendriers sont utilisés pour générer le calendrier de la journée et du lendemain.
 
 ![RTE applications](./screen/tasmota-rte-display.png)
 
-It is only enabled on **ESP32** familiies, as SSL connexions are using too much memory for ESP8266.
+Ils sont utilisés suivant les règles suivantes :
+  * si calendrier **Tempo** activé, publication de ses données
+  * sinon, si calendrier **Pointe** activé, publication de ses données
+  * sinon, publication des données de calendrier fournies par le compteur (**PJOURN+1**)
 
-RTE configuration is saved under **rte.cfg** at the root of littlefs partition.
+En complément, si le calendrier **Ecowatt** est activé, les alertes sont publiées suivant les règles suivantes :
+  * alerte **orange**  = jour **blanc**
+  * alerte **rouge**  = jour **rouge**
 
-To get all available commands, just run **rte_help** in console :
+La configuration est stockée dans le fichier **rte.cfg**.
+
+Voici la liste de toutes les commandes RTE disponibles en mode console :
 
     HLP: RTE server commands
     RTE global commands :
@@ -186,30 +204,24 @@ To get all available commands, just run **rte_help** in console :
      - pointe_display <0/1 = display pointe calendra in main page
      - pointe_update       = force pointe period update from RTE server
      - pointe_publish      = publish pointe period data now
-  
-You first need to create **RTE account** from RTE site [https://data.rte-france.com/]
 
-Then enable **Tempo**, **Demand Response Signal** and/or **Ecowatt** application to be able to access its API.
-
-![RTE applications](./screen/rte-application-list.png) 
-
-Once your applications have been enabled, copy and declare your **private Base64 key** in console mode :
+Une fois votre compte créé chez RTE et les API activées, vous devez déclarer votre **private Base64 key** en mode console :
 
     rte_key your_rte_key_in_base64
 
-You can then enable **Tempo**, **Pointe**  and/or **Ecowatt** data collection : 
+Il ne vous reste plus qu'à activer les modules correspondant aux API RTE : 
 
-    eco_enable 1
     tempo_enable 1
     pointe_enable 1
+    eco_enable 1
 
-After a restart you'll see that you ESP32 first gets a token and then gets the data. Every step is traced in the console logs.
+Au prochain redémarrage, vous verez dans les logs que votre ESP32 récupère un token puis les données des API activées.
 
     RTE: Token - abcdefghiL23OeISCK50tsGKzYD60hUt2TeESE1kBEe38x0MH0apF0y valid for 7200 seconds
     RTE: Ecowatt - Success 200
     RTE: Tempo - Update done (2/1/1)
 
-Tempo, Pointe and Ecowatt data are published as SENSOR data :
+Les données RTE sont publiées sous des sections spécifiques sous **tele/SENSOR** :
 
     your-device/tele/SENSOR = {"Time":"2023-12-20T07:23:39",TEMPO":{"lv":1,"hp":0,"label":"blue","icon":"🟦","yesterday":1,"today":1,"tomorrow":1}}
 
