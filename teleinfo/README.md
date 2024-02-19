@@ -36,8 +36,6 @@ Ce firmware fournit également :
 
 Des versions pré-compilées sont disponibles dans le répertoire [**binary**](./binary).
 
-## Teleinfo
-
 Ce firmware n'est pas le firmware officiel **Teleinfo** de **Tasmota**. C'est une implémentation complètement différente de celle publiée en 2020 par Charles Hallard. 
 
 Il gère les compteurs en mode consommation et production. 
@@ -63,7 +61,7 @@ Si vous souhaitez supprimer l'affichage des données Energy sur la page d'accuei
 
 Le protocole **Teleinfo** est décrit dans [ce document](https://www.enedis.fr/sites/default/files/Enedis-NOI-CPT_54E.pdf)
 
-#### Publication MQTT
+## Publication MQTT
 
 En complément de la section officielle **ENERGY**, les sections suivantes peuvent être publiées :
   * **METER** : données de consommation et prodcution en temps réel sous une forme compacte.
@@ -111,7 +109,7 @@ Voici les données publiées dans la section **ALERT** :
 
 La section **TOTAL** comprend autant de clés que de périodes dans votre contrat. Seules les périodes avec un total de consommation différent de **0** sont publiées.
 
-#### Commands
+## Commands
 
 ce firmware propose un certain nombre de commandes **EnergyConfig** spécifiques disponibles en mode console :
 
@@ -134,7 +132,7 @@ Vous pouvez passer plusieurs commandes en même temps :
 
       EnergyConfig percent=110 nbday=8 nbweek=12
 
-#### LittleFS
+## LittleFS
 
 Certaines variantes de ce firmware utilisent une partition **LittleFS** pour stocker les données historisées qui servent à générer les graphs de suivi. Lorsque vous souhaitez utiliser cette fonctionnalité, vérifier que vous flashez bien l'ESP en mode série la première fois afin de modifier le partitionnement.
 
@@ -148,7 +146,7 @@ Avec une partition LittleFS, 4 familles de fichiers sont générées :
 
 Chacun de ces fichiers inclue un entête.
 
-## Calendriers RTE Tempo, Pointe and Ecowatt
+## Calendriers RTE : Tempo, Pointe & Ecowatt
 
 Ce firmware permet également de s'abonner aux calendriers publiés par [**RTE**](https://data.rte-france.com/) :
   * **Tempo**
@@ -282,29 +280,32 @@ Voici la liste exhaustive des fichiers concernés :
 | File    |  Comment  |
 | --- | --- |
 | **platformio_override.ini** |    |
-| tasmota/**user_config_override.h**  |    |
 | partition/**esp32_partition_4M_app1800k_fs1200k.csv** | Safeboot partitioning to get 1.3Mb FS on 4Mb ESP32   |
 | partition/**esp32_partition_8M_app3M_fs4M.csv** | Safeboot partitioning to get 4Mb FS on 8Mb ESP32   |
 | partition/**esp32_partition_16M_app3M_fs12M.csv** | Safeboot partitioning to get 12Mb FS on 16Mb ESP32   |
 | boards/**esp8266_16M14M.json** | ESP8266 16Mb boards  |
 | boards/**esp32_4M1200k.json** | ESP32 4Mb boards  |
-| boards/**esp32s2_4M1200k.json** | ESP32S2 4Mb boards  |
+| boards/**esp32c3_4M1200k.json** | ESP32 C3 4Mb boards  |
+| boards/**esp32s2_4M1200k.json** | ESP32 S2 4Mb boards  |
+| boards/**esp32s3_16M12M-safeboot.json** | ESP32 S3 16Mb boards  |
 | boards/**denkyd4_8M4M-safeboot.json** | ESP32 Denky D4 8Mb boards  |
-| boards/**esp32s3_16M12M-safeboot.json** | ESP32S3 16Mb boards  |
+| lib/default/**ArduinoJSON** | JSON handling library used by Ecowatt server, extract content of **ArduinoJson.zip** |
+| lib/default/**FTPClientServer** | FTP server library, extract content of **FTPClientServer.zip** |
+| tasmota/**user_config_override.h**  |    |
 | tasmota/include/**tasmota_type.h** | Redefinition of teleinfo structure |
-| tasmota/tasmota_nrg_energy/**xnrg_15_teleinfo.ino** | Teleinfo driver  |
+| tasmota/tasmota_nrg_energy/**xnrg_15_teleinfo.ino** | Teleinfo energy driver  |
 | tasmota/tasmota_drv_driver/**xdrv_01_9_webserver.ino** | Add compilation target in footer  |
+| tasmota/tasmota_nrg_energy/**xdrv_15_teleinfo.ino** | Teleinfo driver  |
+| tasmota/tasmota_nrg_energy/**xdrv_15_teleinfo_domoticz.ino** | Teleinfo domoticz integration  |
 | tasmota/tasmota_drv_driver/**xdrv_94_ip_address.ino** | Fixed IP address Web configuration |
 | tasmota/tasmota_drv_driver/**xdrv_96_ftp_server.ino** | Embedded FTP server |
 | tasmota/tasmota_drv_driver/**xdrv_97_tcp_server.ino** | Embedded TCP stream server |
 | tasmota/tasmota_drv_driver/**xdrv_98_esp32_board.ino** | Configuration of Ethernet ESP32 boards |
-| tasmota/tasmota_sns_sensor/**xsns_104_teleinfo_graph.ino** | Teleinfo Graphs |
+| tasmota/tasmota_sns_sensor/**xsns_99_timezone.ino** | Timezone Web configuration |
 | tasmota/tasmota_sns_sensor/**xsns_119_rte_server.ino** | RTE Tempo and Ecowatt data collection |
-| tasmota/tasmota_sns_sensor/**xsns_126_timezone.ino** | Timezone Web configuration |
-| lib/default/**ArduinoJSON** | JSON handling library used by Ecowatt server, extract content of **ArduinoJson.zip** |
-| lib/default/**FTPClientServer** | FTP server library, extract content of **FTPClientServer.zip** |
+| tasmota/tasmota_sns_sensor/**xsns_125_teleinfo_graph.ino** | Teleinfo sensor to handle graphs |
 
-If everything goes fine, you should be able to compile your own build.
+Si tout se passe bien, vous devriez pouvoir compiler votre propre build.
 
 ## Adapter
 
