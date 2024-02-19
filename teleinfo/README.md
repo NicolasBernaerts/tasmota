@@ -40,16 +40,7 @@ Des versions pré-compilées sont disponibles dans le répertoire [**binary**](.
 
 Ce firmware n'est pas le firmware officiel **Teleinfo** de **Tasmota**. C'est une implémentation complètement différente de celle publiée en 2020 par Charles Hallard. 
 
-Il gère les compteurs en mode consommation et production. Les données sont publiées via des sections JSON différentes :
-  * **ENERGY** : section officielle de Tasmota
-  * **METER** : données de consommation et prodcution en temps réel sous une forme compacte.
-  * **ALERT** : alertes publiées dans les messages STGE (changement Tempo / EJP, surpuissance & survoltage)
-  * **TOTAL** : compteurs de périodes en Wh
-  * **CAL** : calendrier consolidé entre le compteur et les données RTE (Tempo, Pointe & Ecowatt)
-  * **RELAY** : relais virtuels publiés par le compteur
-  * **TIC** : etiquettes et données brutes reçues depuis le compteur
-
-Certaines variantes de ce firmware utilisent une partition **LittleFS** pour stocker les données historisées qui servent à générer les graphs de suivi. Lorsque vous souhaitez utiliser cette fonctionnalité, vérifier que vous flashez bien l'ESP en mode série la première fois.
+Il gère les compteurs en mode consommation et production. 
 
 Ce firmware gère les données suivantes :
   * Tension (**V**)
@@ -64,8 +55,6 @@ Il fournit des pages web spécifiques :
   * **/conso** : suivi des consommations
   * **/prod** : suivi de la production
   
-Si vous utilisez une version avec partition **LittleFS**, les graphs afficheront en complément les tensions et puissances crête.
-
 Si votre compteur est en mode historique, la tension est forcée à 230V.
 
 Si vous souhaitez supprimer l'affichage des données Energy sur la page d'accueil, vous devez passer la commande suivante en console :
@@ -74,58 +63,53 @@ Si vous souhaitez supprimer l'affichage des données Energy sur la page d'accuei
 
 Le protocole **Teleinfo** est décrit dans [ce document](https://www.enedis.fr/sites/default/files/Enedis-NOI-CPT_54E.pdf)
 
-#### MQTT data
+#### Publication MQTT
 
-Standard **ENERGY** section is published during **Telemetry**.
+En complément de la section officielle **ENERGY**, les sections suivantes peuvent être publiées :
+  * **METER** : données de consommation et prodcution en temps réel sous une forme compacte.
+  * **ALERT** : alertes publiées dans les messages STGE (changement Tempo / EJP, surpuissance & survoltage)
+  * **TOTAL** : compteurs de périodes en Wh
+  * **CAL** : calendrier consolidé entre le compteur et les données RTE (Tempo, Pointe & Ecowatt)
+  * **RELAY** : relais virtuels publiés par le compteur
+  * **TIC** : etiquettes et données brutes reçues depuis le compteur
 
-You can also publish energy data under 2 different sections :
-  * **METER** : Consommation and prduction energy data are in a condensed form
-  * **ALERT** : Alert flags (Tempo, EJP, Overload, Over voltage, ...)
-  * **CAL** : Calendar data (tempo bleu, blanc, rouge - EJP bleu, rouge - heures pleines, heures creuses)
-  * **RELAY** : Virtual relay status
-  * **TIC** : Teleinfo valid data are publish as is. Data will vary according to your contract and to your meter.
+Toutes ces publications sont activables à travers la page **Configuration Teleinfo**.
 
-All these options can be enabled in the **Configure Teleinfo** page.
+Voici la liste des données publiées dans la section **METER** :
+  * **PH** = nombre de phases (1 ou 3)
+  * **PSUB** = puissance apparente (VA) maximale par phase dans le contrat
+  * **ISUB** = courant (A) maximal par phase dans le contrat 
+  * **PMAX** = puissance apparente (VA) maximale par phase intégrant le pourcentage acceptable
+  * **I** = courant instantané (A) global
+  * **P** = puissance instantanée (VA) globale
+  * **W** = puissance active (W) globale
+  * **Ix** = courant instantané (A) sur la phase **x** 
+  * **Ux** = tension (V) sur la phase **x** 
+  * **Px** = puissance instantanée (VA) sur la phase **x** 
+  * **Wx** = puissance active (W) sur la phase **x** 
+  * **Cx** = facteur de puissance (cos φ) sur la phase **x**
+  * **PP** = puissance instantanée (VA) produite
+  * **PW** = puissance active (W) produite
+  * **PC** = facteur de puissance (cos φ) de la production
 
-Here are the data you'll get in the **METER** section :
-  * **PH** = number of phases
-  * **PSUB** = power per phase in the contract (VA) 
-  * **ISUB** = current per phase in the contract 
-  * **PMAX** = maximum power per phase including an accetable % of overload (VA)
-  * **I** = total instant current (on all phases)
-  * **P** = total instant apparent power (on all phases)
-  * **W** = total instant active power (on all phases)
-  * **Ix** = instant current on phase **x** 
-  * **Ux** = instant voltage on phase **x** 
-  * **Px** = instant apparent power on phase **x** 
-  * **Wx** = instant active power on phase **x** 
-  * **Cx** = current calculated power factor (cos φ) on phase **x** 
-  * **PP** = production instant apparent power
-  * **PW** = production instant active power 
-  * **PC** = production calculated power factor (cos φ)
+Voici les données publiées dans la section **CAL** :
+  * **lv** = niveau de la période actuelle (0 inconnu, 1 bleu, 2 blanc, 3 rouge)
+  * **hp** = type de la période courante (0:heure creuse, 1 heure pleine)
+  * **today** = section avec le niveau et le type de chaque heure du jour
+  * **tomorrow** = section avec le niveau et le type de chaque heure du lendemain
 
-Here are the data you'll get in the **CAL** section :
-  * **lv** = current period level (0 unknown, 1 bleu, 2 blanc, 3 rouge)
-  * **hp** = current type (0:heure creuse, 1 heure pleine)
-  * **today** = section with period level and type for 24 today's hourly slots
-  * **tomorrow** = section with period level and type for 24 tomorrow's hourly slots
-
-Here are the data you'll get in the **RELAY** section :
-  * **R1** = virtual relay n°1 status (0:open, 1:closed)
-  * **R2** = virtual relay n°2 status (0:open, 1:closed)
+Voici les données publiées dans la section **RELAY** :
+  * **R1** = état du relai virtual n°1 (0:ouvert, 1:fermé)
+  * **R2** = état du relai virtual n°2 (0:ouvert, 1:fermé)
   * .. 
 
-Here are the data you'll get in the **ALERT** section :
-  * **Load** = overload status (0:all is right, 1:overload)
-  * **Volt** = overvoltage status (0:all is right, 1:one phase is currently having overvoltage)
-  * **Preavis** = next level announced as preavis (used in EJP)
-  * **Label** = preavis label
+Voici les données publiées dans la section **ALERT** :
+  * **Load** = indicateur de surconsommation (0:pas de pb, 1:surconsommation)
+  * **Volt** = indicateur de surtension (0:pas de pb, 1:au moins 1 phase est en surtension)
+  * **Preavis** = niveau du prochain préavis (utilisé en Tempo & EJP)
+  * **Label** = Libellé du prochain préavis
 
-MQTT result should look like that :
-
-    compteur/tele/SENSOR = {"Time":"2021-03-13T09:20:26","ENERGY":{"TotalStartTime":"2021-03-13T09:20:26","Total":7970.903,"Yesterday":3.198,"Today":6.024,"Period":63,"Power":860,"Current":4.000},"IP":"192.168.xx.xx","MAC":"50:02:91:xx:xx:xx"}
-    compteur/tele/SENSOR = {"Time":"2021-03-13T09:20:30","TIC":{"ADCO":"061964xxxxxx","OPTARIF":"BASE","ISOUSC":"30","BASE":"007970903","PTEC":"TH..","IINST":"003","IMAX":"090","PAPP":"00780","HHPHC":"A","MOTDETAT":"000000","PHASE":1,"SSOUSC":"6000","IINST1":"3","SINSTS1":"780"}}
-    compteur/tele/SENSOR = {"Time":"2023-03-10T13:53:42","METER":{"PH":1,"ISUB":45,"PSUB":9000,"PMAX":8910,"U1":235,"P1":1470,"W1":1470,"I1":6.0,"C1":1.00,"P":1470,"W":1470,"I":6.0,"PP":1470,"PW":1470,"PC":1.00}}
+La section **TOTAL** comprend autant de clés que de périodes dans votre contrat. Seules les périodes avec un total de consommation différent de **0** sont publiées.
 
 #### Commands
 
@@ -150,7 +134,10 @@ You can use few commands at once :
 
       EnergyConfig percent=110 nbday=8 nbweek=12
 
-#### Log files
+#### LittleFS
+
+Certaines variantes de ce firmware utilisent une partition **LittleFS** pour stocker les données historisées qui servent à générer les graphs de suivi. Lorsque vous souhaitez utiliser cette fonctionnalité, vérifier que vous flashez bien l'ESP en mode série la première fois.
+Si vous utilisez une version avec partition **LittleFS**, les graphs afficheront en complément les tensions et puissances crête.
 
 If you run this firmware on an ESP having a LittleFS partition, it will generate 3 types of energy logs :
   * **teleinfo-day-nn.csv** : average values daily file with a record every ~5 mn (**00** is today's log, **01** yesterday's log, ...)
