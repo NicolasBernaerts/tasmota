@@ -1,6 +1,6 @@
-# Teleinfo Tasmota firmware (with RTE Tempo, Pointe & Ecowatt)
+# Firmaware Tasmota Teleinfo alternatif (avec gestion RTE Tempo, Pointe & Ecowatt)
 
-⚠️ Depuis la **version 13**, le partitionnement a évolué dans la famille des **ESP32**. Il utilise maintenant le partitionnement standard **safeboot**.
+⚠️ Depuis la **version 13**, le partitionnement a évolué pour la famille des **ESP32**. Il utilise maintenant le partitionnement standard **safeboot**.
 
 Si vous faites une mise à jour ESP32 depuis une version plus ancienne, Vous devez faire un flash **serial**.
 
