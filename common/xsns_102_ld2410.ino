@@ -330,7 +330,6 @@ void CmndLD2410Bluetooth ()
 void LD2410LoadConfig ()
 {
   // read parameters
-//  ld2410_status.timeout = Settings->rf_code[2][2];
   ld2410_config.sample  = Settings->rf_code[2][3];
 
   // check parameters
@@ -340,7 +339,6 @@ void LD2410LoadConfig ()
 // Save configuration into flash memory
 void LD2410SaveConfig ()
 {
-//  Settings->rf_code[2][2] = ld2410_status.timeout;
   Settings->rf_code[2][3] = ld2410_config.sample;
 }
 

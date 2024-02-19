@@ -16,7 +16,7 @@
   Call LD2450InitDevice (timeout) to declare the device and make it operational
 
   Settings are stored using unused parameters :
-    - Settings->rf_code[2][3] : Presence detection timeout (sec.)
+    - Settings->rf_code[2][2] : Presence detection timeout (sec.)
     - Settings->rf_code[2][4] : x1 detection point (x10cm)
     - Settings->rf_code[2][5] : x2 detection point (x10cm)
     - Settings->rf_code[2][6] : y1 detection point (x10cm)
@@ -249,7 +249,7 @@ void CmndLD2450Zone ()
 void LD2450LoadConfig ()
 {
   // read parameters
-  ld2450_config.timeout      = Settings->rf_code[2][3];
+  ld2450_config.timeout      = Settings->rf_code[2][2];
   ld2450_config.x1 = ((int16_t)Settings->rf_code[2][4] - 128) * 100;
   ld2450_config.x2 = ((int16_t)Settings->rf_code[2][5] - 128) * 100;
   ld2450_config.y1 = ((int16_t)Settings->rf_code[2][6] - 128) * 100;
@@ -268,7 +268,7 @@ void LD2450LoadConfig ()
 // Save configuration into flash memory
 void LD2450SaveConfig ()
 {
-  Settings->rf_code[2][3] = ld2450_config.timeout;
+  Settings->rf_code[2][2] = ld2450_config.timeout;
   Settings->rf_code[2][4] = (uint8_t)((ld2450_config.x1 / 100) + 128);
   Settings->rf_code[2][5] = (uint8_t)((ld2450_config.x2 / 100) + 128);
   Settings->rf_code[2][6] = (uint8_t)((ld2450_config.y1 / 100) + 128);

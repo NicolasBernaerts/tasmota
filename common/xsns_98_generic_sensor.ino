@@ -329,16 +329,28 @@ void CmndSensorHelp ()
   AddLog (LOG_LEVEL_INFO, PSTR (" - temp_key <key>     = key of remote sensor"));
   AddLog (LOG_LEVEL_INFO, PSTR (" - temp_drift <value> = correction (in 1/10 of °C)"));
   AddLog (LOG_LEVEL_INFO, PSTR (" - temp_time <value>  = remote sensor timeout"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - temp_week <0/1>    = weekly histo. (%u bytes)"), SENSOR_SIZE_WEEK_TEMP);
-  AddLog (LOG_LEVEL_INFO, PSTR (" - temp_year <0/1>    = yearly histo. (%u bytes)"), SENSOR_SIZE_YEAR_TEMP);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - temp_week <0/1>    = weekly histo [%u], %u bytes"), sensor_config.weekly_temp, SENSOR_SIZE_WEEK_TEMP);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - temp_year <0/1>    = yearly histo [%u], %u bytes"), sensor_config.yearly_temp, SENSOR_SIZE_YEAR_TEMP);
 
   AddLog (LOG_LEVEL_INFO, PSTR (" Humidity :"));
   AddLog (LOG_LEVEL_INFO, PSTR (" - humi_topic <topic> = topic of remote sensor"));
   AddLog (LOG_LEVEL_INFO, PSTR (" - humi_key <key>     = key of remote sensor"));
   AddLog (LOG_LEVEL_INFO, PSTR (" - humi_time <value>  = remote sensor timeout"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - humi_week <0/1>    = weekly histo. (%u bytes)"), SENSOR_SIZE_WEEK_HUMI);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - humi_week <0/1>    = weekly histo [%u], %u bytes"), sensor_config.weekly_humi, SENSOR_SIZE_WEEK_HUMI);
+
+  AddLog (LOG_LEVEL_INFO, PSTR (" Activity :"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - acti_week <0/1>    = weekly histo [%u], %u bytes"), sensor_config.weekly_acti, SENSOR_SIZE_WEEK_ACTI);
+
+  AddLog (LOG_LEVEL_INFO, PSTR (" Inactivity :"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - inac_week <0/1>    = weekly histo [%u], %u bytes"), sensor_config.weekly_inac, SENSOR_SIZE_WEEK_INAC);
 
   AddLog (LOG_LEVEL_INFO, PSTR (" Presence :"));
+
+  AddLog (LOG_LEVEL_INFO, PSTR (" - pres_topic <topic> = topic of remote sensor"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - pres_key <key>     = key of remote sensor"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - pres_time <value>  = sensor timeout"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - pres_week <0/1>    = weekly histo [%u], %u bytes"), sensor_config.weekly_pres, SENSOR_SIZE_WEEK_PRES);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - pres_year <0/1>    = yearly histo [%u], %u bytes"), sensor_config.yearly_pres, SENSOR_SIZE_YEAR_PRES);
 
   AddLog (LOG_LEVEL_INFO, PSTR (" - pres_device <dev>  = presence sensor device"));
 
@@ -348,15 +360,6 @@ void CmndSensorHelp ()
   AddLog (LOG_LEVEL_INFO, PSTR ("                   %u : %s"), index, str_text);
   }
 
-  AddLog (LOG_LEVEL_INFO, PSTR (" - pres_topic <topic> = topic of remote sensor"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - pres_key <key>     = key of remote sensor"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - pres_time <value>  = sensor timeout"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - pres_week <0/1>    = weekly histo. (%u bytes)"), SENSOR_SIZE_WEEK_PRES);
-  AddLog (LOG_LEVEL_INFO, PSTR (" - pres_year <0/1>    = yearly histo. (%u bytes)"), SENSOR_SIZE_YEAR_PRES);
-
-  AddLog (LOG_LEVEL_INFO, PSTR (" Activity :"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - acti_week <0/1>    = weekly histo. of activity (%u bytes)"), SENSOR_SIZE_WEEK_ACTI);
-  AddLog (LOG_LEVEL_INFO, PSTR (" - inac_week <0/1>    = weekly histo. of inactivity (%u bytes)"), SENSOR_SIZE_WEEK_INAC);
 
   ResponseCmndDone();
 }
@@ -2997,10 +3000,11 @@ void SensorWebSensor ()
   if (sensor_status.temp.source != SENSOR_SOURCE_NONE)
   {
     if (sensor_status.temp.source == SENSOR_SOURCE_REMOTE) strcpy (str_type, "🌐"); else strcpy (str_type, "🌡️");
+    if (sensor_status.temp.value == INT16_MAX) strcpy (str_text, "---"); else sprintf (str_text, "%d.%d", sensor_status.temp.value / 10, sensor_status.temp.value % 10);
     WSContentSend_P (PSTR ("<div style='display:flex;margin:2px 0px;padding:1px;'>\n"));
     WSContentSend_P (PSTR ("<div style='width:15%%;padding:0px;'>%s</div>\n"), str_type);
     WSContentSend_P (PSTR ("<div style='width:47%%;padding:0px;text-align:left;'>Temperature</div>\n"));
-    WSContentSend_P (PSTR ("<div style='width:26%%;padding:0px;text-align:right;'>%d.%d</div><div style='width:2%%;padding:0px;'></div><div style='width:10%%;padding:0px;text-align:left;'>°C</div>\n"), sensor_status.temp.value / 10, sensor_status.temp.value % 10);
+    WSContentSend_P (PSTR ("<div style='width:26%%;padding:0px;text-align:right;'>%s</div><div style='width:2%%;padding:0px;'></div><div style='width:10%%;padding:0px;text-align:left;'>°C</div>\n"), str_text);
     WSContentSend_P (PSTR ("</div>\n"));
   }
 
@@ -3008,17 +3012,18 @@ void SensorWebSensor ()
   if (sensor_status.humi.source != SENSOR_SOURCE_NONE)
   {
     if (sensor_status.humi.source == SENSOR_SOURCE_REMOTE) strcpy (str_type, "🌐"); else strcpy (str_type, "💧");
+    if (sensor_status.humi.value == INT16_MAX) strcpy (str_text, "---"); else sprintf (str_text, "%d.%d", sensor_status.humi.value / 10, sensor_status.humi.value % 10);
     WSContentSend_P (PSTR ("<div style='display:flex;margin:2px 0px;padding:1px;'>\n"));
     WSContentSend_P (PSTR ("<div style='width:15%%;padding:0px;'>%s</div>\n"), str_type);
     WSContentSend_P (PSTR ("<div style='width:47%%;padding:0px;text-align:left;'>Humidity</div>\n"));
-    WSContentSend_P (PSTR ("<div style='width:26%%;padding:0px;text-align:right;'>%d.%d</div><div style='width:2%%;padding:0px;'></div><div style='width:10%%;padding:0px;text-align:left;'>%%</div>\n"), sensor_status.humi.value / 10, sensor_status.humi.value % 10);
+    WSContentSend_P (PSTR ("<div style='width:26%%;padding:0px;text-align:right;'>%s</div><div style='width:2%%;padding:0px;'></div><div style='width:10%%;padding:0px;text-align:left;'>%%</div>\n"), str_text);
     WSContentSend_P (PSTR ("</div>\n"));
   }
 
   // presence
   if (sensor_status.pres.source != SENSOR_SOURCE_NONE)
   {
-    if (sensor_status.humi.source == SENSOR_SOURCE_REMOTE) strcpy (str_type, "🌐"); else strcpy (str_type, "🧑");
+    if (sensor_status.humi.source == SENSOR_SOURCE_REMOTE) strcpy (str_type, "🌐"); else strcpy (str_type, "📡");
     WSContentSend_P (PSTR ("<div style='display:flex;margin:2px 0px;padding:1px;'>\n"));
     WSContentSend_P (PSTR ("<div style='width:15%%;padding:0px;'>%s</div>\n"), str_type);
     WSContentSend_P (PSTR ("<div style='width:47%%;padding:0px;text-align:left;'>Presence</div>\n"));
