@@ -1,10 +1,12 @@
 # Teleinfo Tasmota firmware (with RTE Tempo, Pointe & Ecowatt)
 
-⚠️ From **version 13** onward, partitionning has changed on **ESP32 family**, it uses new **safeboot** partitionning.
+⚠️ Depuis la **version 13**, le partitionnement a évolué dans la famille des **ESP32**. Il utilise maintenant le partitionnement standard **safeboot**.
 
-If you upgrade ESP32 from previous version, you need to do a serial flash in **erase** mode. If you do OTA, you may encounter serious instabilities. Of course you need to do it once. You'll be able to update futur versions using OTA.
+Si vous faites une mise à jour ESP32 depuis une version plus ancienne, Vous devez faire un flash **serial**.
 
-ESP8266 family partitionning hasn't changed.
+Si vous faites une mise à jour **OTA** vous pourrez rencontrer des dysfonctionnements. Mais à partir du moment où vous disposez d'une version **13++**, vous pouvez bien entendu réaliser les mises à jour en mode **OTA**.
+
+Le partitionnement des **ESP8266** n'a pas changé.
 
 ## Presentation
 
