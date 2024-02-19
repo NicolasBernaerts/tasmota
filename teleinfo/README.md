@@ -10,18 +10,18 @@ Le partitionnement des **ESP8266** n'a pas changé.
 
 ## Presentation
 
-This evolution of **Tasmota 13.2.0** firmware has been enhanced to :
-  * handle France energy meters known as **Linky** using **Teleinfo** protocol
-  * publish RTE **Tempo**, **Pointe** and **Ecowatt** data
+Cette évolution du firmware **Tasmota 13.2.0** permet de :
+  * gérer les compteurs français (**Linky**, **PME/PMI** et **Emeraude**) utilisant le protocole **Teleinfo**
+  * s'abonner aux API RTE **Tempo**, **Pointe** et **Ecowatt**
 
-This firmware has been developped and tested on  :
-  * **Sagem Classic Monophase** with TIC **Historique**
-  * **Linky Monophase** with TIC **Historique** & **Standard**
-  * **Linky Triphase** with TIC **Historique** & **Standard**
-  * **Ace6000 Triphase** with TIC **PME/PMI**
-  * **Emeraude 2 quadrants**
+ce firmware a été développé et testé sur les compteurs suivants :
+  * **Sagem Classic monophase** en TIC **Historique**
+  * **Linky monophase** en TIC **Historique** & **Standard**
+  * **Linky triphase** en TIC **Historique** & **Standard**
+  * **Ace6000 triphase** en TIC **PME/PMI**
+  * **Emeraude** en TIC **Emeraude 2 quadrands**
 
-It has been compiled and tested on the following devices :
+Il a été compilé et testé sur les ESP suivants :
   * **ESP8266** 1Mb
   * **ESP12F** 4Mb and 16Mb
   * **ESP32** 4Mb (safeboot)
@@ -30,11 +30,11 @@ It has been compiled and tested on the following devices :
   * **ESP32S2** 4Mb (safeboot)
   * **ESP32S3** 16Mb (safeboot)
 
-This firmware also provides :
-  * a TCP server to live stream **teleinfo** data
-  * a FTP server to easily retrieve graph data
+Ce firmware fournit également :
+  * un serveur intégré TCP pour diffuser en temps réel les données **teleinfo**
+  * un serveur intégré FTP pour récupérer les fichiers historiques
 
-Pre-compiled versions are available in the [**binary**](./binary) folder.
+Des versions pré-compilées sont disponibles dans le répertoire [**binary**](./binary).
 
 ## Teleinfo
 
