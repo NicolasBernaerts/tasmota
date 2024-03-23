@@ -10,7 +10,7 @@ Le partitionnement des **ESP8266** n'a pas changé.
 
 ## Presentation
 
-Cette évolution du firmware **Tasmota 13.2.0** permet de :
+Cette évolution du firmware **Tasmota 13.4.0** permet de :
   * gérer le flux **TIC** des compteurs français (**Linky**, **PME/PMI** et **Emeraude**)
   * s'abonner aux API RTE **Tempo**, **Pointe** et **Ecowatt**
   * publier les informations pour **Domoticz**
@@ -26,13 +26,13 @@ La réception **TIC** intègre une correction d'erreur basée sur le checksum af
 
 Il a été compilé et testé sur les ESP suivants :
   * **ESP8266** 1Mb
-  * **ESP12F** 4Mb and 16Mb
-  * **ESP32** 4Mb (safeboot)
-  * **Denky D4** 8Mb (safeboot)
-  * **Winky** 4Mb (safeboot)
-  * **ESP32C3** 4Mb (safeboot)
-  * **ESP32S2** 4Mb (safeboot)
-  * **ESP32S3** 16Mb (safeboot)
+  * **ESP12F** 4Mb et 16Mb
+  * **ESP32** 4Mb
+  * **Denky D4** 8Mb
+  * **Winky** 4Mb (auto-alimenté par le compteur)
+  * **ESP32C3** 4Mb
+  * **ESP32S2** 4Mb
+  * **ESP32S3** 4Mb et 16Mb
 
 Ce firmware fournit également :
   * un serveur intégré **TCP** pour diffuser en temps réel les données reçues du compteur
@@ -64,6 +64,14 @@ Si vous souhaitez supprimer l'affichage des données Energy sur la page d'accuei
     websensor3 0
 
 Le protocole **Teleinfo** est décrit dans [ce document](https://www.enedis.fr/sites/default/files/Enedis-NOI-CPT_54E.pdf)
+
+
+## Carte Winky
+
+La carte **Winky** fonctionne de manière un peu particulière car elle peut être auto-alimentée par le compteur Linky.
+
+Les grands principes sont les suivants :
+
 
 ## Publication MQTT
 
@@ -303,9 +311,8 @@ Voici la liste exhaustive des fichiers concernés :
 | tasmota/tasmota_drv_driver/**xdrv_94_ip_address.ino** | Fixed IP address Web configuration |
 | tasmota/tasmota_drv_driver/**xdrv_96_ftp_server.ino** | Embedded FTP server |
 | tasmota/tasmota_drv_driver/**xdrv_97_tcp_server.ino** | Embedded TCP stream server |
-| tasmota/tasmota_drv_driver/**xdrv_98_esp32_board.ino** | Configuration of Ethernet ESP32 boards |
 | tasmota/tasmota_sns_sensor/**xsns_99_timezone.ino** | Timezone Web configuration |
-| tasmota/tasmota_sns_sensor/**xsns_119_rte_server.ino** | RTE Tempo and Ecowatt data collection |
+| tasmota/tasmota_sns_sensor/**xsns_119_rte_server.ino** | RTE Tempo, Pointe and Ecowatt data collection |
 | tasmota/tasmota_sns_sensor/**xsns_124_teleinfo_histo.ino** | Teleinfo sensor to handle historisation |
 | tasmota/tasmota_sns_sensor/**xsns_125_teleinfo_curve.ino** | Teleinfo sensor to handle curves |
 | tasmota/tasmota_sns_sensor/**xsns_126_teleinfo_winky.ino** | Handling of Winky and deep sleep |
