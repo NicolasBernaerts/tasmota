@@ -1,31 +1,35 @@
-# Firmware Tasmota Teleinfo (avec gestion RTE Tempo, Pointe & Ecowatt)
+# Firmware Tasmota Teleinfo
 
 ⚠️ Depuis la **version 13**, le partitionnement a évolué pour la famille des **ESP32**. Il utilise maintenant le partitionnement standard **safeboot**.
 
-Si vous faites une mise à jour ESP32 depuis une version plus ancienne, Vous devez faire un flash **serial**.
+Si vous faites une mise à jour ESP32 depuis une version plus ancienne, Vous devez faire un flash **serial**. Si vous faites une mise à jour **OTA** vous pourrez rencontrer des dysfonctionnements.
 
-Si vous faites une mise à jour **OTA** vous pourrez rencontrer des dysfonctionnements. Mais à partir du moment où vous disposez d'une version **13++**, vous pouvez bien entendu réaliser les mises à jour en mode **OTA**.
+Mais à partir du moment où vous disposez d'une version **13++**, vous pouvez bien entendu réaliser les mises à jour en mode **OTA**.
 
 Le partitionnement des **ESP8266** n'a pas changé.
 
 ## Presentation
 
 Cette évolution du firmware **Tasmota 13.2.0** permet de :
-  * gérer les compteurs français (**Linky**, **PME/PMI** et **Emeraude**) utilisant le protocole **Teleinfo**
+  * gérer le flux **TIC** des compteurs français (**Linky**, **PME/PMI** et **Emeraude**)
   * s'abonner aux API RTE **Tempo**, **Pointe** et **Ecowatt**
+  * publier les informations pour **Domoticz**
 
-ce firmware a été développé et testé sur les compteurs suivants :
+Ce firmware a été développé et testé sur les compteurs suivants :
   * **Sagem Classic monophase** en TIC **Historique**
   * **Linky monophase** en TIC **Historique** & **Standard**
   * **Linky triphase** en TIC **Historique** & **Standard**
   * **Ace6000 triphase** en TIC **PME/PMI**
   * **Emeraude** en TIC **Emeraude 2 quadrands**
 
+La réception **TIC** intègre une correction d'erreur basée sur le checksum afin de ne traiter que des données fiables.
+
 Il a été compilé et testé sur les ESP suivants :
   * **ESP8266** 1Mb
   * **ESP12F** 4Mb and 16Mb
   * **ESP32** 4Mb (safeboot)
   * **Denky D4** 8Mb (safeboot)
+  * **Winky** 4Mb (safeboot)
   * **ESP32C3** 4Mb (safeboot)
   * **ESP32S2** 4Mb (safeboot)
   * **ESP32S3** 16Mb (safeboot)
@@ -111,7 +115,7 @@ La section **TOTAL** comprend autant de clés que de périodes dans votre contra
 
 ## Commands
 
-ce firmware propose un certain nombre de commandes **EnergyConfig** spécifiques disponibles en mode console :
+Ce firmware propose un certain nombre de commandes **EnergyConfig** spécifiques disponibles en mode console :
 
     EnergyConfig Teleinfo parameters :
       historique      set historique mode at 1200 bauds (needs restart)
@@ -134,7 +138,7 @@ Vous pouvez passer plusieurs commandes en même temps :
 
 ## LittleFS
 
-Certaines variantes de ce firmware utilisent une partition **LittleFS** pour stocker les données historisées qui servent à générer les graphs de suivi. Lorsque vous souhaitez utiliser cette fonctionnalité, vérifier que vous flashez bien l'ESP en mode série la première fois afin de modifier le partitionnement.
+Certaines variantes de ce firmware (ESP avec au moins 4Mo de ROM) utilisent une partition **LittleFS** pour stocker les données historisées qui servent à générer les graphs de suivi. Lorsque vous souhaitez utiliser cette fonctionnalité, vérifier que vous flashez bien l'ESP en mode série la première fois afin de modifier le partitionnement.
 
 Pour les versions **LittleFS**, les graphs affichent en complément la tension et la puissances crête.
 
@@ -153,11 +157,7 @@ Ce firmware permet également de s'abonner aux calendriers publiés par [**RTE**
   * **Pointe**
   * **Ecowatt**
 
-Cette fonctionnalité n'est disponible que sur les **ESP32**.
-  
-Vous devez tout d'abord créer un compte sur le site **RTE** [https://data.rte-france.com/]
-
-Ensuite vous devez activer l'un ou l'autre des API suivantes :
+Cette fonctionnalité n'est disponible que sur les **ESP32**. Vous devez tout d'abord créer un compte sur le site **RTE** [https://data.rte-france.com/] Ensuite vous devez activer l'un ou l'autre des API suivantes :
   * **Tempo**
   * **Demand Response Signal**
   * **Ecowatt**
@@ -235,7 +235,7 @@ Les données RTE sont publiées sous des sections spécifiques sous **tele/SENSO
 
 Un serveur **TCP** est intégré à cette version de firmware.
 
-Il permet de récupérer très simplement le flux d'information publié par le compteur.
+Il permet de récupérer très simplement le flux d'information publié par le compteur. Il est à noter que ce flux envoie toutes les données recues, sans aucune correction d'erreur.
 
 La commande **tcp_help** explique toutes les possibilités :
   * **tcp_status** : status of TCP server (running port or 0 if not running)
