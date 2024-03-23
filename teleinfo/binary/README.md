@@ -8,6 +8,7 @@ Each binary has its own specificities :
   * **tasmota32-teleinfo.bin** : target is ESP32 with 4M memory. It handles a 1344k LittleFS partition to store history files.
   * **tasmota32c3-teleinfo.bin** : target is ESP32C3 with 4M memory. It handles a 1344k LittleFS partition to store history files.
   * **tasmota32s2-teleinfo.bin** : target is ESP32S2 with 4M memory. It handles a 1344k LittleFS partition to store history files.
+  * **tasmota32s3-teleinfo** : target is ESP32S3 with 4M memory. It handles a 1344k LittleFS partition to store history files.
   * **tasmota32s3-teleinfo-16m12m.bin** : target is ESP32S3 with 16M memory. It handles a 10M LittleFS partition to store history files.
 
 For ESP8266, OTA should be done using **.bin.gz**
