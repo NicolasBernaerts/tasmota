@@ -283,10 +283,13 @@ Voici la liste exhaustive des fichiers concernés :
 | partition/**esp32_partition_4M_app1800k_fs1200k.csv** | Safeboot partitioning to get 1.3Mb FS on 4Mb ESP32   |
 | partition/**esp32_partition_8M_app3M_fs4M.csv** | Safeboot partitioning to get 4Mb FS on 8Mb ESP32   |
 | partition/**esp32_partition_16M_app3M_fs12M.csv** | Safeboot partitioning to get 12Mb FS on 16Mb ESP32   |
+| boards/**esp8266_4M2M.json** | ESP8266 4Mb boards  |
 | boards/**esp8266_16M14M.json** | ESP8266 16Mb boards  |
 | boards/**esp32_4M1200k.json** | ESP32 4Mb boards  |
 | boards/**esp32c3_4M1200k.json** | ESP32 C3 4Mb boards  |
+| boards/**esp32c6_4M1200k-safeboot.json** | ESP32 S3 16Mb boards  |
 | boards/**esp32s2_4M1200k.json** | ESP32 S2 4Mb boards  |
+| boards/**esp32s3_4M1200k-safeboot.json** | ESP32 S3 4Mb boards  |
 | boards/**esp32s3_16M12M-safeboot.json** | ESP32 S3 16Mb boards  |
 | boards/**denkyd4_8M4M-safeboot.json** | ESP32 Denky D4 8Mb boards  |
 | lib/default/**ArduinoJSON** | JSON handling library used by Ecowatt server, extract content of **ArduinoJson.zip** |
@@ -303,7 +306,9 @@ Voici la liste exhaustive des fichiers concernés :
 | tasmota/tasmota_drv_driver/**xdrv_98_esp32_board.ino** | Configuration of Ethernet ESP32 boards |
 | tasmota/tasmota_sns_sensor/**xsns_99_timezone.ino** | Timezone Web configuration |
 | tasmota/tasmota_sns_sensor/**xsns_119_rte_server.ino** | RTE Tempo and Ecowatt data collection |
-| tasmota/tasmota_sns_sensor/**xsns_125_teleinfo_graph.ino** | Teleinfo sensor to handle graphs |
+| tasmota/tasmota_sns_sensor/**xsns_124_teleinfo_histo.ino** | Teleinfo sensor to handle historisation |
+| tasmota/tasmota_sns_sensor/**xsns_125_teleinfo_curve.ino** | Teleinfo sensor to handle curves |
+| tasmota/tasmota_sns_sensor/**xsns_126_teleinfo_winky.ino** | Handling of Winky and deep sleep |
 
 Si tout se passe bien, vous devriez pouvoir compiler votre propre build.
 
