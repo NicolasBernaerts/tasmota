@@ -325,8 +325,8 @@ Voici la liste exhaustive des fichiers concernés :
 | tasmota/include/**tasmota_type.h** | Redefinition of teleinfo structure |
 | tasmota/tasmota_nrg_energy/**xnrg_15_teleinfo.ino** | Teleinfo energy driver  |
 | tasmota/tasmota_drv_driver/**xdrv_01_9_webserver.ino** | Add compilation target in footer  |
-| tasmota/tasmota_nrg_energy/**xdrv_15_teleinfo.ino** | Teleinfo driver  |
-| tasmota/tasmota_nrg_energy/**xdrv_15_teleinfo_domoticz.ino** | Teleinfo domoticz integration  |
+| tasmota/tasmota_drv_energy/**xdrv_15_teleinfo.ino** | Teleinfo driver  |
+| tasmota/tasmota_drv_energy/**xdrv_15_teleinfo_domoticz.ino** | Teleinfo domoticz integration  |
 | tasmota/tasmota_drv_driver/**xdrv_94_ip_address.ino** | Fixed IP address Web configuration |
 | tasmota/tasmota_drv_driver/**xdrv_96_ftp_server.ino** | Embedded FTP server |
 | tasmota/tasmota_drv_driver/**xdrv_97_tcp_server.ino** | Embedded TCP stream server |
@@ -334,7 +334,7 @@ Voici la liste exhaustive des fichiers concernés :
 | tasmota/tasmota_sns_sensor/**xsns_119_rte_server.ino** | RTE Tempo, Pointe and Ecowatt data collection |
 | tasmota/tasmota_sns_sensor/**xsns_124_teleinfo_histo.ino** | Teleinfo sensor to handle historisation |
 | tasmota/tasmota_sns_sensor/**xsns_125_teleinfo_curve.ino** | Teleinfo sensor to handle curves |
-| tasmota/tasmota_sns_sensor/**xsns_126_teleinfo_winky.ino** | Handling of Winky and deep sleep |
+| tasmota/tasmota_sns_sensor/**xsns_126_teleinfo_winky.ino** | Handling of Winky and deep sleep mode |
 
 Si tout se passe bien, vous devriez pouvoir compiler votre propre build.
 
