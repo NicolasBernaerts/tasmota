@@ -213,7 +213,7 @@ void (* const InacCommand[])(void) PROGMEM = { &CmndSensorInactivityWeekly };
 // form topic style
 const char SENSOR_FIELDSET_START[] PROGMEM = "<p><fieldset><legend><b>&nbsp;%s %s&nbsp;</b></legend>\n";
 const char SENSOR_FIELDSET_STOP[]  PROGMEM = "</fieldset></p>\n";
-const char SENSOR_FIELD_INPUT[]    PROGMEM = "<p>%s<span class='key'>%s</span><br><input name='%s' value='%s'></p>\n";
+const char SENSOR_FIELD_INPUT[]    PROGMEM = "<p>%s<span class='key'>%s</span><br><input name='%s' value='%s' placeholder='%s'></p>\n";
 const char SENSOR_FIELD_CONFIG[]   PROGMEM = "<p>%s (%s)<span class='key'>%s</span><br><input type='number' name='%s' min='%d' max='%d' step='%s' value='%s'></p>\n";
 
 // week days name for history
@@ -314,7 +314,8 @@ sensor_yearly sensor_year[12][31];            // sensor yearly range (1.86k)
 void CmndSensorHelp ()
 {
   uint8_t index;
-  char    str_text[16];
+  char    str_text[8];
+  char    str_name[16];
 
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Sensor commands :"));
 
@@ -329,37 +330,40 @@ void CmndSensorHelp ()
   AddLog (LOG_LEVEL_INFO, PSTR (" - temp_key <key>     = key of remote sensor"));
   AddLog (LOG_LEVEL_INFO, PSTR (" - temp_drift <value> = correction (in 1/10 of °C)"));
   AddLog (LOG_LEVEL_INFO, PSTR (" - temp_time <value>  = remote sensor timeout"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - temp_week <0/1>    = weekly histo [%u], %u bytes"), sensor_config.weekly_temp, SENSOR_SIZE_WEEK_TEMP);
-  AddLog (LOG_LEVEL_INFO, PSTR (" - temp_year <0/1>    = yearly histo [%u], %u bytes"), sensor_config.yearly_temp, SENSOR_SIZE_YEAR_TEMP);
+  if (sensor_config.weekly_temp) strcpy (str_text, "0/[1]"); else strcpy (str_text, "[0]/1");
+  AddLog (LOG_LEVEL_INFO, PSTR (" - temp_week <%s>    = weekly histo (%u bytes)"), str_text, SENSOR_SIZE_WEEK_TEMP);
+  if (sensor_config.yearly_temp) strcpy (str_text, "0/[1]"); else strcpy (str_text, "[0]/1");
+  AddLog (LOG_LEVEL_INFO, PSTR (" - temp_year <%s>    = yearly histo (%u bytes)"), str_text, SENSOR_SIZE_YEAR_TEMP);
 
   AddLog (LOG_LEVEL_INFO, PSTR (" Humidity :"));
   AddLog (LOG_LEVEL_INFO, PSTR (" - humi_topic <topic> = topic of remote sensor"));
   AddLog (LOG_LEVEL_INFO, PSTR (" - humi_key <key>     = key of remote sensor"));
   AddLog (LOG_LEVEL_INFO, PSTR (" - humi_time <value>  = remote sensor timeout"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - humi_week <0/1>    = weekly histo [%u], %u bytes"), sensor_config.weekly_humi, SENSOR_SIZE_WEEK_HUMI);
+  if (sensor_config.weekly_humi) strcpy (str_text, "0/[1]"); else strcpy (str_text, "[0]/1");
+  AddLog (LOG_LEVEL_INFO, PSTR (" - humi_week <%s>  = weekly histo (%u bytes)"), str_text, SENSOR_SIZE_WEEK_HUMI);
 
-  AddLog (LOG_LEVEL_INFO, PSTR (" Activity :"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - acti_week <0/1>    = weekly histo [%u], %u bytes"), sensor_config.weekly_acti, SENSOR_SIZE_WEEK_ACTI);
-
-  AddLog (LOG_LEVEL_INFO, PSTR (" Inactivity :"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - inac_week <0/1>    = weekly histo [%u], %u bytes"), sensor_config.weekly_inac, SENSOR_SIZE_WEEK_INAC);
+  AddLog (LOG_LEVEL_INFO, PSTR (" Activity & inactivity :"));
+  if (sensor_config.weekly_acti) strcpy (str_text, "0/[1]"); else strcpy (str_text, "[0]/1");
+  AddLog (LOG_LEVEL_INFO, PSTR (" - acti_week <%s>  = weekly histo (%u bytes)"), str_text, SENSOR_SIZE_WEEK_ACTI);
+  if (sensor_config.weekly_inac) strcpy (str_text, "0/[1]"); else strcpy (str_text, "[0]/1");
+  AddLog (LOG_LEVEL_INFO, PSTR (" - inac_week <%s>  = weekly histo (%u bytes)"), str_text, SENSOR_SIZE_WEEK_INAC);
 
   AddLog (LOG_LEVEL_INFO, PSTR (" Presence :"));
-
   AddLog (LOG_LEVEL_INFO, PSTR (" - pres_topic <topic> = topic of remote sensor"));
   AddLog (LOG_LEVEL_INFO, PSTR (" - pres_key <key>     = key of remote sensor"));
   AddLog (LOG_LEVEL_INFO, PSTR (" - pres_time <value>  = sensor timeout"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - pres_week <0/1>    = weekly histo [%u], %u bytes"), sensor_config.weekly_pres, SENSOR_SIZE_WEEK_PRES);
-  AddLog (LOG_LEVEL_INFO, PSTR (" - pres_year <0/1>    = yearly histo [%u], %u bytes"), sensor_config.yearly_pres, SENSOR_SIZE_YEAR_PRES);
+  if (sensor_config.weekly_pres) strcpy (str_text, "0/[1]"); else strcpy (str_text, "[0]/1");
+  AddLog (LOG_LEVEL_INFO, PSTR (" - pres_week <%s>  = weekly histo (%u bytes)"), str_text, SENSOR_SIZE_WEEK_PRES);
+  if (sensor_config.yearly_pres) strcpy (str_text, "0/[1]"); else strcpy (str_text, "[0]/1");
+  AddLog (LOG_LEVEL_INFO, PSTR (" - pres_year <%s>  = yearly histo (%u bytes)"), str_text, SENSOR_SIZE_YEAR_PRES);
 
-  AddLog (LOG_LEVEL_INFO, PSTR (" - pres_device <dev>  = presence sensor device"));
-
+  AddLog (LOG_LEVEL_INFO, PSTR (" - pres_device <%u>    = presence sensor device"), sensor_config.device_pres);
   for (index = 0; index < SENSOR_PRESENCE_MAX; index ++)
   {
-    GetTextIndexed (str_text, sizeof (str_text), index, kSensorPresenceModel);
-  AddLog (LOG_LEVEL_INFO, PSTR ("                   %u : %s"), index, str_text);
+    if (sensor_config.device_pres == index) sprintf (str_text, "[%u]", index); else sprintf (str_text, " %u ", index);
+    GetTextIndexed (str_name, sizeof (str_name), index, kSensorPresenceModel);
+    AddLog (LOG_LEVEL_INFO, PSTR ("   %s : %s"), str_text, str_name);
   }
-
 
   ResponseCmndDone();
 }
@@ -2568,7 +2572,8 @@ void SensorEverySecond ()
   if (sensor_status.counter == 0)
   {
     // SHT30 temperature and humidity sensor
-    if (sensor_status.temp.source == SENSOR_SOURCE_SHT) Sht3xRead ((uint32_t)sht3x_sensors[0].type, temperature, humidity, sht3x_sensors[0].address);
+    if (sensor_status.temp.source == SENSOR_SOURCE_SHT) Sht3xRead ((uint32_t)sht3x_sensors[0].type, temperature, humidity);
+//    if (sensor_status.temp.source == SENSOR_SOURCE_SHT) Sht3xRead ((uint32_t)sht3x_sensors[0].type, temperature, humidity, sht3x_sensors[0].address);
 
     // SHT30 temperature and humidity sensor
     else if (sensor_status.temp.source == SENSOR_SOURCE_DHT) { temperature = Dht[0].t; humidity = Dht[0].h; }
@@ -3134,8 +3139,8 @@ void SensorWebConfigure ()
   // topic and key
   WSContentSend_P (PSTR ("<p>\n"));
 
-  WSContentSend_P (SENSOR_FIELD_INPUT, D_SENSOR_TOPIC, D_CMND_SENSOR_TEMP D_CMND_SENSOR_TOPIC, D_CMND_SENSOR_TEMP D_CMND_SENSOR_TOPIC, sensor_config.temp.topic.c_str ());
-  WSContentSend_P (SENSOR_FIELD_INPUT, D_SENSOR_KEY, D_CMND_SENSOR_TEMP D_CMND_SENSOR_KEY, D_CMND_SENSOR_TEMP D_CMND_SENSOR_KEY, sensor_config.temp.key.c_str ());
+  WSContentSend_P (SENSOR_FIELD_INPUT, D_SENSOR_TOPIC, D_CMND_SENSOR_TEMP D_CMND_SENSOR_TOPIC, D_CMND_SENSOR_TEMP D_CMND_SENSOR_TOPIC, sensor_config.temp.topic.c_str (), "");
+  WSContentSend_P (SENSOR_FIELD_INPUT, D_SENSOR_KEY, D_CMND_SENSOR_TEMP D_CMND_SENSOR_KEY, D_CMND_SENSOR_TEMP D_CMND_SENSOR_KEY, sensor_config.temp.key.c_str (), D_SENSOR_TEMPERATURE);
 
   WSContentSend_P (PSTR ("</p>\n"));
   WSContentSend_P (SENSOR_FIELDSET_STOP);
@@ -3156,8 +3161,8 @@ void SensorWebConfigure ()
   // topic and key
   WSContentSend_P (PSTR ("<p>\n"));
 
-  WSContentSend_P (SENSOR_FIELD_INPUT, D_SENSOR_TOPIC, D_CMND_SENSOR_HUMI D_CMND_SENSOR_TOPIC, D_CMND_SENSOR_HUMI D_CMND_SENSOR_TOPIC, sensor_config.humi.topic.c_str ());
-  WSContentSend_P (SENSOR_FIELD_INPUT, D_SENSOR_KEY, D_CMND_SENSOR_HUMI D_CMND_SENSOR_KEY, D_CMND_SENSOR_HUMI D_CMND_SENSOR_KEY, sensor_config.humi.key.c_str ());
+  WSContentSend_P (SENSOR_FIELD_INPUT, D_SENSOR_TOPIC, D_CMND_SENSOR_HUMI D_CMND_SENSOR_TOPIC, D_CMND_SENSOR_HUMI D_CMND_SENSOR_TOPIC, sensor_config.humi.topic.c_str (), "");
+  WSContentSend_P (SENSOR_FIELD_INPUT, D_SENSOR_KEY, D_CMND_SENSOR_HUMI D_CMND_SENSOR_KEY, D_CMND_SENSOR_HUMI D_CMND_SENSOR_KEY, sensor_config.humi.key.c_str (), D_SENSOR_HUMIDITY);
 
   WSContentSend_P (PSTR ("</p>\n"));
   WSContentSend_P (SENSOR_FIELDSET_STOP);
@@ -3178,8 +3183,8 @@ void SensorWebConfigure ()
   // topic and key 
   WSContentSend_P (PSTR ("<p>\n"));
 
-  WSContentSend_P (SENSOR_FIELD_INPUT, D_SENSOR_TOPIC, D_CMND_SENSOR_PRES D_CMND_SENSOR_TOPIC, D_CMND_SENSOR_PRES D_CMND_SENSOR_TOPIC, sensor_config.pres.topic.c_str ());
-  WSContentSend_P (SENSOR_FIELD_INPUT, D_SENSOR_KEY, D_CMND_SENSOR_PRES D_CMND_SENSOR_KEY, D_CMND_SENSOR_PRES D_CMND_SENSOR_KEY, sensor_config.pres.key.c_str ());
+  WSContentSend_P (SENSOR_FIELD_INPUT, D_SENSOR_TOPIC, D_CMND_SENSOR_PRES D_CMND_SENSOR_TOPIC, D_CMND_SENSOR_PRES D_CMND_SENSOR_TOPIC, sensor_config.pres.topic.c_str (), "");
+  WSContentSend_P (SENSOR_FIELD_INPUT, D_SENSOR_KEY, D_CMND_SENSOR_PRES D_CMND_SENSOR_KEY, D_CMND_SENSOR_PRES D_CMND_SENSOR_KEY, sensor_config.pres.key.c_str (), D_SENSOR_PRESENCE);
 
   WSContentSend_P (PSTR ("</p>\n"));
   WSContentSend_P (SENSOR_FIELDSET_STOP);

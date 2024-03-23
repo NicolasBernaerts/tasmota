@@ -37,7 +37,7 @@
 
 #include <FTPServer.h>
 
-// commands : MQTT
+// default login/password (for teleinfo, use teleinfo/teleinfo)
 #ifndef FTP_SERVER_LOGIN
 #define FTP_SERVER_LOGIN          "ftp"
 #endif
@@ -51,7 +51,7 @@ const char kFTPServerCommands[] PROGMEM = "ftp_" "|" "help" "|" "start" "|" "sto
 void (* const FTPServerCommand[])(void) PROGMEM = { &CmndFTPServerHelp, &CmndFTPServerStart, &CmndFTPServerStop, &CmndFTPServerStatus };
 
 // FTP server instance
-FTPServer *ftp_server = nullptr;
+FTPServer *pftp_server = nullptr;
 
 /***********************************************************\
  *                      Commands
@@ -60,8 +60,13 @@ FTPServer *ftp_server = nullptr;
 // FTP server help
 void CmndFTPServerHelp ()
 {
+  uint16_t port;
+
+  if (pftp_server != nullptr) port = FTP_CTRL_PORT;
+    else port = 0;
+
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: FTP server commands :"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - ftp_status = status (running port or 0 if not running)"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - ftp_status = server listening port, 0 if stopped (%u)"), port);
   AddLog (LOG_LEVEL_INFO, PSTR (" - ftp_start  = start FTP server on port %u"), FTP_CTRL_PORT);
   AddLog (LOG_LEVEL_INFO, PSTR (" - ftp_stop   = stop FTP server"));
   AddLog (LOG_LEVEL_INFO, PSTR ("   Server allows only 1 concurrent connexion"));
@@ -75,17 +80,20 @@ void CmndFTPServerStart ()
   bool done = false;
 
   // if FTP server not created, create it
-  if (ftp_server == nullptr)
+  if (pftp_server == nullptr)
   {
     // create server
-    ftp_server = new FTPServer (LittleFS);
+    pftp_server = new FTPServer (LittleFS);
 
-    // if server created, start it with login/ pwd
-    if (ftp_server != nullptr) 
+    // if server created
+    if (pftp_server != nullptr) 
     {
-      ftp_server->begin (FTP_SERVER_LOGIN, FTP_SERVER_PASSWORD);
-      done = true;
+      // start it with login/ pwd
+      pftp_server->begin (FTP_SERVER_LOGIN, FTP_SERVER_PASSWORD);
+
+      // log
       AddLog (LOG_LEVEL_INFO, PSTR ("FTP: Server started on port %u"), FTP_CTRL_PORT);
+      done = true;
     }
   }
 
@@ -99,14 +107,17 @@ void CmndFTPServerStop ()
 {
   bool done = false;
 
-  // if server exists, stop it
-  if (ftp_server != nullptr) 
+  // if server exists
+  if (pftp_server != nullptr) 
   {
-    ftp_server->stop ();
-    delete (ftp_server);
-    ftp_server = nullptr;
-    done = true;
+    // stop it
+    pftp_server->stop ();
+    delete (pftp_server);
+    pftp_server = nullptr;
+
+    // log
     AddLog (LOG_LEVEL_INFO, PSTR ("FTP: Server stopped"));
+    done = true;
   }
 
   // answer
@@ -117,7 +128,7 @@ void CmndFTPServerStop ()
 // Status of FTP server
 void CmndFTPServerStatus ()
 {
-  if (ftp_server != nullptr) ResponseCmndNumber (FTP_CTRL_PORT);
+  if (pftp_server != nullptr) ResponseCmndNumber (FTP_CTRL_PORT);
     else ResponseCmndNumber (0);
 }
 
@@ -150,7 +161,7 @@ bool Xdrv96 (uint32_t function)
       result = DecodeCommand (kFTPServerCommands, FTPServerCommand);
       break;
     case FUNC_EVERY_50_MSECOND:
-      if (ftp_server != nullptr) ftp_server->handleFTP ();
+      if (pftp_server != nullptr) pftp_server->handleFTP ();
       break;
   }
   

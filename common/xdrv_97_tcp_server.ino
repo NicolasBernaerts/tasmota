@@ -16,6 +16,8 @@
   Version history :
     04/08/2021 - v1.0 - Creation
     15/09/2022 - v1.1 - Limit connexion to 1 client (latest kills previous one)
+    03/01/2024 - v2.0 - tcp_status bug correction
+                        Dynamic loading thru tcp_start
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -33,7 +35,7 @@
 
 #define XDRV_97                   97
 
-#define TCP_DATA_MAX              64             // buffer size
+#define TCP_DATA_MAX              512             // buffer size
 
 /****************************************\
  *           Class TCPServer
@@ -43,9 +45,9 @@ class TCPServer
 {
 public:
   TCPServer ();
-  bool start (int port);
+  bool start (const int port);
   bool stop ();
-  void send (char to_send);
+  void send (const char to_send);
   void check_for_client ();
   int  get_port ();
 
@@ -82,22 +84,19 @@ bool TCPServer::stop ()
   server = nullptr;
   server_port = 0;
 
-  // validate and log
-  AddLog (LOG_LEVEL_INFO, PSTR ("TCP: Stopping TCP server"));
-
   return true;
 }
 
-bool TCPServer::start (int port)
+bool TCPServer::start (const int port)
 {
   // if port undefined, cancel start
-  if (port <= 0) return false;
+  if (port == 0) return false;
 
   // if server already started, stop it
   if (server != nullptr) stop ();
 
   // create and start server
-  server = new WiFiServer (port);
+  server = new WiFiServer ((uint16_t)port);
 
   // if TCP server not created, cancel 
   if (server == nullptr) return false;
@@ -105,19 +104,16 @@ bool TCPServer::start (int port)
   // start server
   server_port = port;
   server->begin ();
-  server->setNoDelay (true);
+//  server->setNoDelay (true);
 
   // reset buffer index
   buffer_index = 0;
-
-  // log
-  AddLog (LOG_LEVEL_INFO, PSTR ("TCP: Starting TCP server on port %d"), port);
 
   return true;
 }
 
 // TCP server data send
-void TCPServer::send (char to_send)
+void TCPServer::send (const char to_send)
 {
   int index;
 
@@ -173,10 +169,10 @@ int TCPServer::get_port ()
 
 // TCP - MQTT commands
 const char kTCPServerCommands[] PROGMEM = "tcp_" "|" "help" "|" "start" "|" "stop" "|" "status";
-void (* const TCPServerCommand[])(void) PROGMEM = { &CmndTCPHelp, &CmndTCPStart, &CmndTCPStatus };
+void (* const TCPServerCommand[])(void) PROGMEM = { &CmndTCPHelp, &CmndTCPStart, &CmndTCPStop, &CmndTCPStatus };
 
 // TCP server instance
-TCPServer tcp_server;
+TCPServer *ptcp_server = nullptr;
 
 /***********************************************************\
  *                      Commands
@@ -185,10 +181,15 @@ TCPServer tcp_server;
 // TCP stream help
 void CmndTCPHelp ()
 {
+  int tcp_port = 0;
+
+  // if server active, get listening port
+  if (ptcp_server != nullptr) tcp_port = ptcp_server->get_port ();
+
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: TCP Server commands :"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - tcp_status     = status (running port or 0 if not running)"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - tcp_start xxxx = start stream on port xxxx"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - tcp_stop       = stop stream"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - tcp_status       = server listening port, 0 if stopped (%d)"), tcp_port);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - tcp_start <port> = start server on specified port"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - tcp_stop         = stop stream"));
   AddLog (LOG_LEVEL_INFO, PSTR ("   Server allows only 1 concurrent connexion"));
   AddLog (LOG_LEVEL_INFO, PSTR ("   Any new client will kill previous one"));
   ResponseCmndDone();
@@ -197,31 +198,69 @@ void CmndTCPHelp ()
 // Start TCP server
 void CmndTCPStart (void)
 {
-  bool result = false;
+  bool done = false;
+  int  tcp_port = 0;
 
-  if ((XdrvMailbox.data_len > 0) && (XdrvMailbox.payload > 0)) result = tcp_server.start (XdrvMailbox.payload);
- 
-  if (result) ResponseCmndDone ();
+  // if port is provided
+  if (XdrvMailbox.data_len > 0) tcp_port = XdrvMailbox.payload;
+  if (tcp_port > 0)
+  {
+    // if TCP server not created, create it
+    if (ptcp_server == nullptr)
+    {
+      // create server
+      ptcp_server = new TCPServer ();
+
+      // if server created
+      if (ptcp_server != nullptr) 
+      {
+        // start it on specified port
+        ptcp_server->start (tcp_port);
+
+        // log
+        AddLog (LOG_LEVEL_INFO, PSTR ("TCP: Server started on port %d"), tcp_port);
+        done = true;
+      }
+    }
+  }
+
+  // answer
+  if (done) ResponseCmndDone ();
     else ResponseCmndFailed ();
 }
 
 // Stop TCP server
 void CmndTCPStop (void)
 {
-  bool result = false;
+  bool done = false;
 
-  result = tcp_server.stop ();
+  // if server exists
+  if (ptcp_server != nullptr) 
+  {
+    // stop it
+    ptcp_server->stop ();
+    delete (ptcp_server);
+    ptcp_server = nullptr;
 
-  if (result) ResponseCmndDone (); 
+    // log
+    AddLog (LOG_LEVEL_INFO, PSTR ("TCP: Server stopped"));
+    done = true;
+  }
+
+  // answer
+  if (done) ResponseCmndDone (); 
     else ResponseCmndFailed ();
 }
 
 // Get TCP server status
 void CmndTCPStatus (void)
 {
-  int port = tcp_server.get_port ();
+  int tcp_port = 0;
 
-  ResponseCmndNumber (port); 
+  // if server active, get listening port
+  if (ptcp_server != nullptr) tcp_port = ptcp_server->get_port ();
+  
+  ResponseCmndNumber (tcp_port);
 }
 
 /***********************************************************\
@@ -233,6 +272,20 @@ void TCPInit ()
 {
   // log help command
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tcp_help to get help on TCP Server commands"));
+}
+
+// check for client connexion
+void TCPEvery100ms ()
+{
+  // if server is active, check client connexion
+  if (ptcp_server != nullptr) ptcp_server->check_for_client ();
+}
+
+// send caracter
+void TCPSend (const char to_send)
+{
+  // if server is active, send caracter
+  if (ptcp_server != nullptr) ptcp_server->send (to_send);
 }
 
 /***********************************************************\
@@ -249,11 +302,11 @@ bool Xdrv97 (uint32_t function)
     case FUNC_INIT:
       TCPInit ();
       break;
+    case FUNC_EVERY_100_MSECOND:
+      TCPEvery100ms ();
+      break;
     case FUNC_COMMAND:
       result = DecodeCommand (kTCPServerCommands, TCPServerCommand);
-      break;
-    case FUNC_EVERY_100_MSECOND:
-      tcp_server.check_for_client ();
       break;
   }
   

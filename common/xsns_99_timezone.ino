@@ -212,23 +212,33 @@ void TimezoneWebSensor ()
 {
   uint8_t index;
   TIME_T  current_dst;
-  char    str_text[8];
+  char    str_icon[8];
 
-  // get local time
-  BreakTime (LocalTime (), current_dst);
+  if (RtcTime.valid)
+  {
+    // get local time
+    BreakTime (LocalTime (), current_dst);
 
-  // get time icon
-  index = 2 * (current_dst.hour % 12);
-  if (current_dst.minute >= 45) index = index + 2;
-    else if (current_dst.minute >= 15) index = index + 1;
-  index = index % 24;
-  GetTextIndexed (str_text, sizeof (str_text), index, kTimezoneIcons);
+    // get time icon
+    index = 2 * (current_dst.hour % 12);
+    if (current_dst.minute >= 45) index = index + 2;
+      else if (current_dst.minute >= 15) index = index + 1;
+    index = index % 24;
+    GetTextIndexed (str_icon, sizeof (str_icon), index, kTimezoneIcons);
+  }
 
-  // time
+  else strcpy (str_icon, "❌");
+
+  // begin
   WSContentSend_P (PSTR ("<div style='text-align:center;padding:0px;margin:5px 0px;'>\n"));
   WSContentSend_P (PSTR ("<div style='display:flex;margin:2px 0px 6px 0px;padding:0px;'>\n"));
-  WSContentSend_P (PSTR ("<div style='width:15%%;padding:0px;font-size:20px;'>%s</div>\n"), str_text);
-  WSContentSend_P (PSTR ("<div style='width:70%%;padding:1px 0px;font-size:16px;font-weight:bold;'>%02d:%02d:%02d</div>\n"), current_dst.hour, current_dst.minute, current_dst.second);
+  WSContentSend_P (PSTR ("<div style='width:15%%;padding:0px;font-size:20px;'>%s</div>\n"), str_icon);
+
+  // time
+  if (RtcTime.valid) WSContentSend_P (PSTR ("<div style='width:70%%;padding:1px 0px;font-size:16px;font-weight:bold;'>%02d:%02d:%02d</div>\n"), current_dst.hour, current_dst.minute, current_dst.second);
+    else WSContentSend_P (PSTR ("<div style='width:70%%;padding:1px 0px;font-size:14px;font-weight:bold;'>Waiting fot NTP<br>(check DNS server)</div>\n"));
+
+  // end
   WSContentSend_P (PSTR ("<div style='width:15%%;padding:0px;'></div>\n"));
   WSContentSend_P (PSTR ("</div></div>\n"));
 }
