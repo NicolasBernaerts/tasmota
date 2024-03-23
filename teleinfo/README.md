@@ -63,19 +63,6 @@ Si vous souhaitez supprimer l'affichage des données Energy sur la page d'accuei
 
 Le protocole **Teleinfo** est décrit dans [ce document](https://www.enedis.fr/sites/default/files/Enedis-NOI-CPT_54E.pdf)
 
-
-## Carte Winky
-
-La carte [Winky](https://gricad-gitlab.univ-grenoble-alpes.fr/ferrarij/winky) développée par l'université de Grenoble avec Charles Hallard fonctionne de manière un peu particulière car elle peut être auto-alimentée par le compteur Linky à l'aide d'une super-capacité.
-
-Elle peut être alimentée en continu par le port USB ou directement par le compteur Linky. Dans ce cas, elle se réveille régulièrement pour lire les données du compteur, les envoyer via MQTT et se rendort ensuite en mode **deep sleep** le temps de recharger la super capacité qui sera utilisée lors du prochain réveil.
-
-Typiquement, après configuration en alimentation USB, le Winky doit être programmé en mode console afin d'activer le mode **deep sleep**. Ceci se fait à travers la console tasmota :
-
-    deepsleeptime xxx
-
-où **xxx** représente le nombre de secondes entre 2 réveils. Un minimum de 60 (secondes) est préconisé et il faut éviter 300 qui définit un mode de fonctionnement spécifique de Tasmota. Si la super capacité n'est pas assez rechargée lors du prochain réveil, l'ESP se rendort pour un cycle supplémentaire.
-
 ## Publication MQTT
 
 En complément de la section officielle **ENERGY**, les sections suivantes peuvent être publiées :
@@ -147,7 +134,7 @@ Vous pouvez passer plusieurs commandes en même temps :
 
       EnergyConfig percent=110 nbday=8 nbweek=12
 
-## LittleFS
+## Partition LittleFS
 
 Certaines variantes de ce firmware (ESP avec au moins 4Mo de ROM) utilisent une partition **LittleFS** pour stocker les données historisées qui servent à générer les graphs de suivi. Lorsque vous souhaitez utiliser cette fonctionnalité, vérifier que vous flashez bien l'ESP en mode série la première fois afin de modifier le partitionnement.
 
@@ -242,6 +229,23 @@ Les données RTE sont publiées sous des sections spécifiques sous **tele/SENSO
       "day2":{"jour":"2022-10-08","dval":3,"0":1,"1":1,"2":1,"3":1,"4":1,"5":3,"6":1,...,"23":1},
       "day3":{"jour":"2022-10-09","dval":2,"0":1,"1":1,"2":1,"3":2,"4":1,"5":1,"6":1,...,"23":1}}}
 
+## Intégration Domoticz
+
+Ce firmware intègre une émission de messages MQTT à destination de [**Domoticz**](https://www.domoticz.com/)
+
+La configuration des messages émis peut être réalisée en mode console :
+
+    domo_help
+    HLP: commands for Teleinfo Domoticz integration
+    domo_key <num,idx> = set key num to index idx
+             <0,-->  : total Wh (hc/hp) and power W for conso (base,hc/hp,ejp,bleu)
+             <1,-->  : total Wh (hc/hp) and power W for conso (blanc)
+             <2,-->  : total Wh (hc/hp) and power W for conso (rouge)
+             <8,-->  : total Wh and power W for production
+             <9,-->  : alert for current hc/hp
+             <10,--> : alert fot current period color (bleu, blanc, rouge)
+             <11,--> : alert for tomorrow's period color (bleu, blanc, rouge)
+
 ## Serveur TCP
 
 Un serveur **TCP** est intégré à cette version de firmware.
@@ -277,6 +281,18 @@ La commande **ftp_help** liste toutes les possibilités :
 Coté client FTP, vous devez utiliser les login / mot de passe suivants : **teleinfo** / **teleinfo**
 
 Ce serveur FTP ne peut accepter qu'une seule connexion simultanée. Vous devez donc configurer votre client FTP avec une limiote de type : **simultaneous connexions = 1**. Sinon, la connexion sera en erreur.
+
+## Carte Winky
+
+La carte [Winky](https://gricad-gitlab.univ-grenoble-alpes.fr/ferrarij/winky) développée par l'université de Grenoble avec Charles Hallard fonctionne de manière un peu particulière car elle peut être auto-alimentée par le compteur Linky à l'aide d'une super-capacité.
+
+Elle peut être alimentée en continu par le port USB ou directement par le compteur Linky. Dans ce cas, elle se réveille régulièrement pour lire les données du compteur, les envoyer via MQTT et se rendort ensuite en mode **deep sleep** le temps de recharger la super capacité qui sera utilisée lors du prochain réveil.
+
+Typiquement, après configuration en alimentation USB, le Winky doit être programmé en mode console afin d'activer le mode **deep sleep**. Ceci se fait à travers la console tasmota :
+
+    deepsleeptime xxx
+
+où **xxx** représente le nombre de secondes entre 2 réveils. Un minimum de 60 (secondes) est préconisé et il faut éviter 300 qui définit un mode de fonctionnement spécifique de Tasmota. Si la super capacité n'est pas assez rechargée lors du prochain réveil, l'ESP se rendort pour un cycle supplémentaire.
 
 ## Compilation
 
