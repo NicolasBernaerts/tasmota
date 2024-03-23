@@ -25,12 +25,10 @@ Ce firmware a été développé et testé sur les compteurs suivants :
 La réception **TIC** intègre une correction d'erreur basée sur le checksum afin de ne traiter que des données fiables.
 
 Il a été compilé et testé sur les ESP suivants :
-  * **ESP8266** 1Mb
-  * **ESP12F** 4Mb et 16Mb
-  * **ESP32** 4Mb
-  * **Denky D4** 8Mb
-  * **Winky** 4Mb (auto-alimenté par le compteur)
+  * **ESP8266** 1Mb, 4Mb et 16Mb
+  * **ESP32** 4Mb et **ESP32 Denky D4** 8Mb
   * **ESP32C3** 4Mb
+  * **ESP32C6 Winky** 4Mb (auto-alimenté par le compteur)
   * **ESP32S2** 4Mb
   * **ESP32S3** 4Mb et 16Mb
 
@@ -68,10 +66,15 @@ Le protocole **Teleinfo** est décrit dans [ce document](https://www.enedis.fr/s
 
 ## Carte Winky
 
-La carte **Winky** fonctionne de manière un peu particulière car elle peut être auto-alimentée par le compteur Linky.
+La carte [Winky](https://gricad-gitlab.univ-grenoble-alpes.fr/ferrarij/winky) développée par l'université de Grenoble avec Charles Hallard fonctionne de manière un peu particulière car elle peut être auto-alimentée par le compteur Linky à l'aide d'une super-capacité.
 
-Les grands principes sont les suivants :
+Elle peut être alimentée en continu par le port USB ou directement par le compteur Linky. Dans ce cas, elle se réveille régulièrement pour lire les données du compteur, les envoyer via MQTT et se rendort ensuite en mode **deep sleep** le temps de recharger la super capacité qui sera utilisée lors du prochain réveil.
 
+Typiquement, après configuration en alimentation USB, le Winky doit être programmé en mode console afin d'activer le mode **deep sleep**. Ceci se fait à travers la console tasmota :
+
+    deepsleeptime xxx
+
+où **xxx** représente le nombre de secondes entre 2 réveils. Un minimum de 60 (secondes) est préconisé et il faut éviter 300 qui définit un mode de fonctionnement spécifique de Tasmota. Si la super capacité n'est pas assez rechargée lors du prochain réveil, l'ESP se rendort pour un cycle supplémentaire.
 
 ## Publication MQTT
 
