@@ -1,7 +1,7 @@
 /*
   user_config_override.h - user configuration overrides my_user_config.h for Tasmota
 
-  Copyright (C) 2019-2023  Theo Arends, Nicolas Bernaerts
+  Copyright (C) 2019-2024  Theo Arends, Nicolas Bernaerts
 
     05/05/2019 - v1.0  - Creation
     16/05/2019 - v1.1  - Add Tempo and EJP contracts
@@ -92,9 +92,20 @@
                          Calculate active power for production
     05/12/2023 - v13.1 - Add RTE Tempo calendar
     07/12/2023 - v13.2 - Handle both Ecowatt v4 and v5 (command eco_version)
-    09/12/2023 - v13.3 - Add RTE pointe API
-                         Start STGE management
-    
+    03/01/2024 - v13.3 - Add alert management thru STGE
+    15/01/2024 - v13.6 - Add support for Denky (thanks to C. Hallard prototype)
+                         Add RTE pointe API
+                         Add Emeraude 2 meter management
+                         Add calendar and virtual relay management
+    25/02/2024 - v14.0 - Complete rewrite of Contrat and Period management
+                         Activate serial reception when NTP time is ready
+                         Change MQTT publication and data reception handling to minimize errors
+                         Support various temperature sensors
+                         Add Domoticz topics publication (idea from Sebastien)
+                         Add support for Wenky with deep sleep (thanks to C. Hallard prototype)
+                         Lots of bug fixes (thanks to B. Monot and Sebastien)
+    05/03/2024 - v14.1 - Separation of curve and historisation sources
+                         Removal of all float calculations
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License aStart STGE managements published by
@@ -110,8 +121,11 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef FIRMWARE_SAFEBOOT
+
 #ifndef _USER_CONFIG_OVERRIDE_H_
 #define _USER_CONFIG_OVERRIDE_H_
+#endif      // _USER_CONFIG_OVERRIDE_H_
 
 // force the compiler to show a warning to confirm that this file is included
 //#warning **** user_config_override.h: Using Settings from this File ****
@@ -135,16 +149,12 @@
 \********************************************/
 
 // complementary modules
-#define USE_ENERGY_SENSOR                     // Enable energy sensors
-
 #define USE_IPADDRESS                         // Add fixed IP configuration page
 #define USE_TIMEZONE                          // Enable Timezone management
-#define USE_TCPSERVER                         // Enable TCP server (for TIC to TCP)
-#define USE_TELEINFO                          // Enable Teleinfo energy module
-
-// web modules
 #define USE_TIMEZONE_WEB_CONFIG               // Enable timezone web configuration page
-#define USE_TELEINFO_GRAPH                    // Enable Teleinfo sensor module for graph display
+
+#define USE_ENERGY_SENSOR                     // Enable energy sensors
+#define USE_TCPSERVER                         // Enable TCP server (for TIC to TCP)
 
 #ifdef USE_FTPSERVER
 #define FTP_SERVER_LOGIN      "teleinfo"      // FTP server login
@@ -152,29 +162,46 @@
 #endif
 
 // build
-#if defined BUILD_ESP32S3_16M
+#ifdef BUILD_ESP32S3_16M
 #define EXTENSION_BUILD "esp32s3_16m-10m"
-#elif defined BUILD_ESP32S2
-#define EXTENSION_BUILD "esp32s2-4m-1200k"
-#elif defined BUILD_ESP32_DENKYD4
+
+#elif BUILD_ESP32S3_4M
+#define EXTENSION_BUILD "esp32s3-4m-1.3m"
+
+#elif BUILD_ESP32S2
+#define EXTENSION_BUILD "esp32s2-4m-1.3m"
+
+#elif BUILD_ESP32_DENKYD4
 #define EXTENSION_BUILD "denkyd4-8m-4m"
 #define USER_TEMPLATE "{\"NAME\":\"Denky D4\",\"GPIO\":[32,0,0,0,1,0,0,0,0,1,1376,1,0,0,0,0,0,640,608,0,0,0,0,0,0,0,5632,0,0,0,0,0,0,0,0,0],\"FLAG\":0,\"BASE\":1}" 
-#elif defined BUILD_ESP32_4M
-#define EXTENSION_BUILD "esp32-4m-1200k"
-#elif defined BUILD_16M14M
+
+#elif BUILD_ESP32_WINKY
+#define EXTENSION_BUILD "winky-4m-1.3m"
+#define USER_TEMPLATE "{\"NAME\":\"Winky\",\"GPIO\":[1,4704,1376,4705,5632,4706,640,608,1,32,1,0,0,0,0,0,0,0,1,1,1,1,1,4096,0,0,0,0,0,0,0],\"FLAG\":0,\"BASE\":1}" 
+
+#elif BUILD_ESP32_4M
+#define EXTENSION_BUILD "esp32-4m-1.3m"
+
+#elif BUILD_16M14M
 #define EXTENSION_BUILD "esp8266-16m-14m"
-#elif defined BUILD_4M2M
+
+#elif BUILD_4M2M
 #define EXTENSION_BUILD "esp8266-4m-2m"
-#elif defined BUILD_2M1M
+
+#elif BUILD_2M1M
 #define EXTENSION_BUILD "esp8266-2m-1m"
-#else
+
+#elif BUILD_1M
 #define EXTENSION_BUILD "esp8266-1m"
+
+#else
+#define EXTENSION_BUILD "other"
 #endif
 
 // extension data
 #define EXTENSION_NAME    "Teleinfo"          // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
-#define EXTENSION_VERSION "13.3"              // version
+#define EXTENSION_VERSION "14.0"              // version
 
 // teleinfo display is in French
 #define MY_LANGUAGE        fr_FR
@@ -199,17 +226,21 @@
 #undef SERIAL_LOG_LEVEL 
 #define SERIAL_LOG_LEVEL   LOG_LEVEL_NONE
 
+#define MDNS_ENABLE false                     // disable multicast DNS
+
 // ----------------------
 // Common ESP8266 & ESP32
 // ----------------------
 
 #define MQTT_DATA_STRING                      // Enable use heap instead of fixed memory for TasmotaGlobal.mqtt_data
 
+#define RULE_MAX_EVENTSZ        256           // increase rules buffer
+
 #undef USE_ARDUINO_OTA                        // support for Arduino OTA
 #undef USE_WPS                                // support for WPS as initial wifi configuration tool
 #undef USE_SMARTCONFIG                        // support for Wifi SmartConfig as initial wifi configuration tool
-//#undef USE_DOMOTICZ                           // Domoticz
-//#undef USE_HOME_ASSISTANT                     // Home Assistant
+#undef USE_DOMOTICZ                           // Domoticz
+#define USE_HOME_ASSISTANT                     // Home Assistant
 #undef USE_MQTT_TLS                           // TLS support won't work as the MQTTHost is not set
 
 #undef USE_KNX                                // KNX IP Protocol Support
@@ -221,7 +252,7 @@
 #undef USE_CUSTOM                             // Custom features
 
 #undef USE_DISCOVERY                          // Discovery services for both MQTT and web server
-#undef WEBSERVER_ADVERTISE                    // Provide access to webserver by name <Hostname>.local/
+#define WEBSERVER_ADVERTISE                    // Provide access to webserver by name <Hostname>.local/
 #undef MQTT_HOST_DISCOVERY                    // Find MQTT host server (overrides MQTT_HOST if found)
 
 #undef USE_TIMERS                             // support for up to 16 timers
@@ -247,7 +278,7 @@
 #undef USE_BUZZER                             // Add support for a buzzer (+0k6 code)
 #undef USE_ARILUX_RF                          // Add support for Arilux RF remote controller (+0k8 code, 252 iram (non 2.3.0))
 #undef USE_SHUTTER                            // Add Shutter support for up to 4 shutter with different motortypes (+11k code)
-#undef USE_DEEPSLEEP                          // Add support for deepsleep (+1k code)
+//#undef USE_DEEPSLEEP                          // Add support for deepsleep (+1k code)
 #undef USE_EXS_DIMMER                         // Add support for ES-Store WiFi Dimmer (+1k5 code)
 #undef USE_DEVICE_GROUPS                      // Add support for device groups (+5k5 code)
 #undef USE_DEVICE_GROUPS_SEND                 // Add support for the DevGroupSend command (+0k6 code)
@@ -267,11 +298,18 @@
 #undef USE_LIGHT_VIRTUAL_CT                   // Add support for Virtual White Color Temperature (+1.1k code)
 #undef USE_DGR_LIGHT_SEQUENCE                 // Add support for device group light sequencing (requires USE_DEVICE_GROUPS) (+0k2 code)
 
-#undef USE_COUNTER                            // Enable inputs as counter (+0k8 code)
+//#undef USE_COUNTER                            // Enable inputs as counter (+0k8 code)
 
-#undef USE_DS18x20                            // Add support for DS18x20 sensors with id sort, single scan and read retry (+2k6 code)
+#define USE_DS18x20                            // Add support for DS18x20 sensors with id sort, single scan and read retry (+2k6 code)
+#define USE_DHT                                // Disable internal DHT sensor
 
-#undef USE_DHT                                // Disable internal DHT sensor
+#define USE_I2C                               // Enable all I2C sensors and devices
+#define USE_SHT3X                             // Enable SHT30 and SHT40
+#define USE_SHT                                // [I2cDriver8] Enable SHT1X sensor (+1k4 code)
+#define USE_HTU                                // [I2cDriver9] Enable HTU21/SI7013/SI7020/SI7021 sensor (I2C address 0x40) (+1k5 code)
+#define USE_BMP                                // [I2cDriver10] Enable BMP085/BMP180/BMP280/BME280 sensors (I2C addresses 0x76 and 0x77) (+4k4 code)
+
+//#define USE_ADC_VCC                            // display analog input as VCC
 
 #undef USE_SPI                                // Disable all SPI devices
 
@@ -298,6 +336,9 @@
 //#undef USE_TELEINFO                           // Add support for Teleinfo via serial RX interface (+5k2 code, +168 RAM + SmartMeter LinkedList Values RAM)
 #undef USE_IEM3000                            // Add support for Schneider Electric iEM3000-Modbus series energy monitor (+0k8 code)
 #undef USE_ADE7953                            // support for ADE7953 energy sensor 
+#undef USE_SONOFF_SPM
+
+#undef USE_AC_ZERO_CROSS_DIMMER
 
 #undef USE_IR_REMOTE                          // Send IR remote commands using library IRremoteESP8266 and ArduinoJson (+4k3 code, 0k3 mem, 48 iram)
 #undef USE_IR_REMOTE_FULL                     // complete integration of IRremoteESP8266 for Tasmota
@@ -336,6 +377,8 @@
 #undef USE_TIMEPROP                           // Add support for the timeprop feature (+9k1 code)
 #undef USE_PID                                // Add suport for the PID  feature (+11k2 code)
 
+#undef USE_DRV_FILE_JSON_DEMO
+
 //#define USE_TLS                               // for safeboot and BearSSL
 
 // ----------------------
@@ -344,6 +387,15 @@
 
 
 #ifdef ESP32
+
+// berry and autoconf
+//#undef USE_AUTOCONF                           // Enable Esp32 autoconf feature
+//#undef USE_BERRY                              // Enable Berry scripting langage
+
+// display
+#define USE_I2C                                // All I2C sensors and devices
+#define USE_DISPLAY                             // Add Display support
+#undef  USE_DISPLAY_TM1621_SONOFF
 
 //#undef USE_ESP32_SENSORS
 
@@ -354,22 +406,13 @@
 #define USE_LIGHT                              // Add support for light control
 #define USE_WS2812                             // WS2812 Led string using library NeoPixelBus (+5k code, +1k mem, 232 iram) - Disable by //
 
-// display
-#define USE_I2C                                // Disable all I2C sensors and devices
-#define USE_DISPLAY                            // Add Display support
-
 #undef USE_BLE_ESP32
 #undef USE_MI_ESP32
 #undef USE_IBEACON
 
-#define USE_AUTOCONF                           // Enable Esp32 autoconf feature
-#define USE_BERRY                              // Enable Berry scripting langage
-
-#undef USE_DISPLAY
 #undef USE_SR04
-#undef USE_LVGL
 
-#undef USE_ADC                                // Add support for ADC on GPIO32 to GPIO39
+#define USE_ADC                                // Add support for ADC on GPIO32 to GPIO39
 
 #undef USE_WEBCAM
 
@@ -387,4 +430,4 @@
 
 #endif  // ESP32
 
-#endif  // _USER_CONFIG_OVERRIDE_H_
+#endif  // FIRMWARE_SAFEBOOT
