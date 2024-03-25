@@ -104,7 +104,7 @@
                          Add Domoticz topics publication (idea from Sebastien)
                          Add support for Wenky with deep sleep (thanks to C. Hallard prototype)
                          Lots of bug fixes (thanks to B. Monot and Sebastien)
-    05/03/2024 - v14.1 - Separation of curve and historisation sources
+                         Separation of curve and historisation sources
                          Removal of all float calculations
 
   This program is free software: you can redistribute it and/or modify
