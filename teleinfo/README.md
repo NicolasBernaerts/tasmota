@@ -212,7 +212,7 @@ Il ne vous reste plus qu'à activer les modules correspondant aux API RTE :
     pointe_enable 1
     eco_enable 1
 
-Au prochain redémarrage, vous verez dans les logs que votre ESP32 récupère un token puis les données des API activées.
+Au prochain redémarrage, vous verrez dans les logs que votre ESP32 récupère un token puis les données des API activées.
 
     RTE: Token - abcdefghiL23OeISCK50tsGKzYD60hUt2TeESE1kBEe38x0MH0apF0y valid for 7200 seconds
     RTE: Ecowatt - Success 200
