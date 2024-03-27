@@ -1,5 +1,5 @@
 /*
-  xdrv_15_teleinfo_domoticz.ino - Domoticz integration for France Teleinfo energy sensor
+  xdrv_15_teleinfo_domoticz.ino - Domoticz integration for Teleinfo
 
   Copyright (C) 2024  Nicolas Bernaerts
 

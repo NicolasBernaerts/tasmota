@@ -106,6 +106,7 @@
                          Lots of bug fixes (thanks to B. Monot and Sebastien)
                          Separation of curve and historisation sources
                          Removal of all float calculations
+    27/03/2024 - v14.1 - Integration of Home Assistant auto discovery (thanks to Matthieu Matelau)
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License aStart STGE managements published by
@@ -163,7 +164,7 @@
 
 // build
 #ifdef BUILD_ESP32S3_16M
-#define EXTENSION_BUILD "esp32s3_16m-10m"
+#define EXTENSION_BUILD "esp32s3_16m-12m"
 
 #elif BUILD_ESP32S3_4M
 #define EXTENSION_BUILD "esp32s3-4m-1.3m"
@@ -201,7 +202,7 @@
 // extension data
 #define EXTENSION_NAME    "Teleinfo"          // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
-#define EXTENSION_VERSION "14.0"              // version
+#define EXTENSION_VERSION "14.1"              // version
 
 // teleinfo display is in French
 #define MY_LANGUAGE        fr_FR
@@ -239,9 +240,12 @@
 #undef USE_ARDUINO_OTA                        // support for Arduino OTA
 #undef USE_WPS                                // support for WPS as initial wifi configuration tool
 #undef USE_SMARTCONFIG                        // support for Wifi SmartConfig as initial wifi configuration tool
-#undef USE_DOMOTICZ                           // Domoticz
-#define USE_HOME_ASSISTANT                     // Home Assistant
 #undef USE_MQTT_TLS                           // TLS support won't work as the MQTTHost is not set
+
+#undef USE_DOMOTICZ                           // Disable official Domoticz
+#undef USE_TASMOTA_DISCOVERY                  // Disable Tasmota discovery to enable Home Assistant
+#define USE_HOME_ASSISTANT                    // Enable Home Assistant
+
 
 #undef USE_KNX                                // KNX IP Protocol Support
 #undef USE_KNX_WEB_MENU                       // Enable KNX WEB MENU (+8.3k code, +144 mem)
@@ -251,8 +255,8 @@
 #undef USE_EMULATION_WEMO                     // Belkin WeMo emulation for Alexa (+6k code, +2k mem common)
 #undef USE_CUSTOM                             // Custom features
 
-#undef USE_DISCOVERY                          // Discovery services for both MQTT and web server
-#define WEBSERVER_ADVERTISE                    // Provide access to webserver by name <Hostname>.local/
+//#define USE_DISCOVERY                          // Discovery services for both MQTT and web server
+//#define WEBSERVER_ADVERTISE                    // Provide access to webserver by name <Hostname>.local/
 #undef MQTT_HOST_DISCOVERY                    // Find MQTT host server (overrides MQTT_HOST if found)
 
 #undef USE_TIMERS                             // support for up to 16 timers

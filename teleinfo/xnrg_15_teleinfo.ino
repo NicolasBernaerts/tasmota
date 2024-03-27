@@ -175,7 +175,7 @@ bool TeleinfoHandleCommand ()
       AddLog (LOG_LEVEL_INFO, PSTR ("  tic=%u        publish TIC data"), teleinfo_config.tic);
       AddLog (LOG_LEVEL_INFO, PSTR ("  calendar=%u   publish CALENDAR data"), teleinfo_config.calendar);
       AddLog (LOG_LEVEL_INFO, PSTR ("  relay=%u      publish RELAY data"), teleinfo_config.relay);
-      AddLog (LOG_LEVEL_INFO, PSTR ("  counter=%u    publish COUNTER data"), teleinfo_config.counter);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  counter=%u    publish COUNTER data"), teleinfo_config.contract);
 
 #ifdef USE_TELEINFO_GRAPH
       AddLog (LOG_LEVEL_INFO, PSTR ("  maxv=%u     graph max voltage (V)"), teleinfo_config.max_volt);
@@ -302,9 +302,9 @@ bool TeleinfoExecuteCommand (const char* pstr_command, const char* pstr_param)
       if (serviced) teleinfo_config.relay = (uint8_t)value;
       break;
 
-    case TIC_CMND_COUNTER:
+    case TIC_CMND_CONTRACT:
       serviced = (value < 2);
-      if (serviced) teleinfo_config.counter = (uint8_t)value;
+      if (serviced) teleinfo_config.contract = (uint8_t)value;
       break;
 
 #ifdef USE_TELEINFO_GRAPH
@@ -493,7 +493,7 @@ void TeleinfoLoadConfig ()
   teleinfo_config.tic       = Settings->teleinfo.tic;
   teleinfo_config.calendar  = Settings->teleinfo.calendar;
   teleinfo_config.relay     = Settings->teleinfo.relay;
-  teleinfo_config.counter   = Settings->teleinfo.counter;
+  teleinfo_config.contract  = Settings->teleinfo.contract;
   teleinfo_config.max_volt  = TELEINFO_GRAPH_MIN_VOLTAGE + Settings->teleinfo.adjust_v * 5;
   teleinfo_config.max_power = TELEINFO_GRAPH_MIN_POWER + Settings->teleinfo.adjust_va * 3000;
 
@@ -503,7 +503,7 @@ void TeleinfoLoadConfig ()
   if (teleinfo_config.tic > 1) teleinfo_config.tic = 1;
   if (teleinfo_config.calendar > 1) teleinfo_config.calendar = 1;
   if (teleinfo_config.relay > 1) teleinfo_config.relay = 1;
-  if (teleinfo_config.counter > 1) teleinfo_config.counter = 1;
+  if (teleinfo_config.contract > 1) teleinfo_config.contract = 1;
   if ((teleinfo_config.percent < TELEINFO_PERCENT_MIN) || (teleinfo_config.percent > TELEINFO_PERCENT_MAX)) teleinfo_config.percent = 100;
 
   // load hourly status slots
@@ -562,7 +562,7 @@ void TeleinfoSaveConfig ()
   Settings->teleinfo.tic       = teleinfo_config.tic;
   Settings->teleinfo.calendar  = teleinfo_config.calendar;
   Settings->teleinfo.relay     = teleinfo_config.relay;
-  Settings->teleinfo.counter   = teleinfo_config.counter;
+  Settings->teleinfo.contract  = teleinfo_config.contract;
   Settings->teleinfo.adjust_v  = (teleinfo_config.max_volt - TELEINFO_GRAPH_MIN_VOLTAGE) / 5;
   Settings->teleinfo.adjust_va = (teleinfo_config.max_power - TELEINFO_GRAPH_MIN_POWER) / 3000;
 
@@ -1645,7 +1645,7 @@ void TeleinfoInit ()
   // init JSON flags
   teleinfo_meter.json.alert    = 0;
   teleinfo_meter.json.meter    = 0;
-  teleinfo_meter.json.counter  = 0;
+  teleinfo_meter.json.contract = 0;
   teleinfo_meter.json.tic      = 0;
   teleinfo_meter.json.calendar = 0;
   teleinfo_meter.json.relay    = 0;

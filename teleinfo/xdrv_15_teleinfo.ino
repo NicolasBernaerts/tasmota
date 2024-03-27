@@ -129,7 +129,7 @@
 #define D_CMND_TELEINFO_TIC             "tic"
 #define D_CMND_TELEINFO_CALENDAR        "calendar"
 #define D_CMND_TELEINFO_RELAY           "relay"
-#define D_CMND_TELEINFO_COUNTER         "counter"
+#define D_CMND_TELEINFO_CONTRACT        "contract"
 
 #define D_CMND_TELEINFO_LOG_DAY         "nbday"
 #define D_CMND_TELEINFO_LOG_WEEK        "nbweek"
@@ -190,8 +190,8 @@ const char D_TELEINFO_PAGE_TIC_UPD[]    PROGMEM = "/tic.upd";
 #define TELEINFO_HISTO_WEEK_MAX         52        // max number of weekly historisation files
 
 // MQTT EnergyConfig commands
-const char kTeleinfoCommands[] PROGMEM = D_CMND_TELEINFO_HISTORIQUE "|" D_CMND_TELEINFO_STANDARD "|" D_CMND_TELEINFO_STATS "|" D_CMND_TELEINFO_DISPLAY "|" D_CMND_TELEINFO_PERCENT "|" D_CMND_TELEINFO_POLICY "|" D_CMND_TELEINFO_METER "|" D_CMND_TELEINFO_TIC "|" D_CMND_TELEINFO_CALENDAR "|" D_CMND_TELEINFO_RELAY "|" D_CMND_TELEINFO_COUNTER "|" D_CMND_TELEINFO_LOG_DAY "|" D_CMND_TELEINFO_LOG_WEEK "|" D_CMND_TELEINFO_MAX_V "|" D_CMND_TELEINFO_MAX_VA "|" D_CMND_TELEINFO_MAX_KWH_HOUR "|" D_CMND_TELEINFO_MAX_KWH_DAY "|" D_CMND_TELEINFO_MAX_KWH_MONTH;
-enum TeleinfoCommand                   { TIC_CMND_HISTORIQUE,           TIC_CMND_STANDARD,           TIC_CMND_STATS,           TIC_CMND_DISPLAY,           TIC_CMND_PERCENT,           TIC_CMND_POLICY,           TIC_CMND_METER,           TIC_CMND_TIC,           TIC_CMND_CALENDAR,           TIC_CMND_RELAY,           TIC_CMND_COUNTER,           TIC_CMND_LOG_DAY,           TIC_CMND_LOG_WEEK,           TIC_CMND_MAX_V,           TIC_CMND_MAX_VA,           TIC_CMND_MAX_KWH_HOUR,           TIC_CMND_MAX_KWH_DAY,           TIC_CMND_MAX_KWH_MONTH };
+const char kTeleinfoCommands[] PROGMEM = D_CMND_TELEINFO_HISTORIQUE "|" D_CMND_TELEINFO_STANDARD "|" D_CMND_TELEINFO_STATS "|" D_CMND_TELEINFO_DISPLAY "|" D_CMND_TELEINFO_PERCENT "|" D_CMND_TELEINFO_POLICY "|" D_CMND_TELEINFO_METER "|" D_CMND_TELEINFO_TIC "|" D_CMND_TELEINFO_CALENDAR "|" D_CMND_TELEINFO_RELAY "|" D_CMND_TELEINFO_CONTRACT "|" D_CMND_TELEINFO_LOG_DAY "|" D_CMND_TELEINFO_LOG_WEEK "|" D_CMND_TELEINFO_MAX_V "|" D_CMND_TELEINFO_MAX_VA "|" D_CMND_TELEINFO_MAX_KWH_HOUR "|" D_CMND_TELEINFO_MAX_KWH_DAY "|" D_CMND_TELEINFO_MAX_KWH_MONTH;
+enum TeleinfoCommand                   { TIC_CMND_HISTORIQUE,           TIC_CMND_STANDARD,           TIC_CMND_STATS,           TIC_CMND_DISPLAY,           TIC_CMND_PERCENT,           TIC_CMND_POLICY,           TIC_CMND_METER,           TIC_CMND_TIC,           TIC_CMND_CALENDAR,           TIC_CMND_RELAY,           TIC_CMND_CONTRACT,           TIC_CMND_LOG_DAY,           TIC_CMND_LOG_WEEK,           TIC_CMND_MAX_V,           TIC_CMND_MAX_VA,           TIC_CMND_MAX_KWH_HOUR,           TIC_CMND_MAX_KWH_DAY,           TIC_CMND_MAX_KWH_MONTH };
 
 // Data diffusion policy
 enum TeleinfoMessagePolicy { TELEINFO_POLICY_TELEMETRY, TELEINFO_POLICY_PERCENT, TELEINFO_POLICY_MESSAGE, TELEINFO_POLICY_MAX };
@@ -207,6 +207,9 @@ enum TeleinfoContractUnit { TIC_UNIT_NONE, TIC_UNIT_KVA, TIC_UNIT_KW, TIC_UNIT_M
 // contract periods
 enum TeleinfoPeriodDay    {TIC_DAY_YESTERDAY, TIC_DAY_TODAY, TIC_DAY_TOMORROW, TIC_DAY_MAX};
 const char kTeleinfoPeriodDay[] PROGMEM = "Hier|Aujourd'hui|Demain";
+
+// contract hours
+const char kTeleinfoPeriodHour[] PROGMEM = "Heure creuse|Heure pleine";
 
 // contract periods
 enum TeleinfoPeriodLevel  { TIC_LEVEL_NONE, TIC_LEVEL_BLUE, TIC_LEVEL_WHITE, TIC_LEVEL_RED, TIC_LEVEL_MAX };
@@ -362,7 +365,7 @@ static struct {
   uint8_t  tic       = 0;                               // publish TIC section
   uint8_t  calendar  = 1;                               // publish CALENDAR section
   uint8_t  relay     = 1;                               // publish RELAY section
-  uint8_t  counter   = 1;                               // publish COUNTER section
+  uint8_t  contract  = 1;                               // publish CONTRACT section
   long     max_volt  = TELEINFO_GRAPH_DEF_VOLTAGE;      // maximum voltage on graph
   long     max_power = TELEINFO_GRAPH_DEF_POWER;        // maximum power on graph
   long     param[TELEINFO_CONFIG_MAX] = { TELEINFO_HISTO_DAY_DEFAULT, TELEINFO_HISTO_WEEK_DEFAULT, TELEINFO_GRAPH_DEF_WH_HOUR, TELEINFO_GRAPH_DEF_WH_DAY, TELEINFO_GRAPH_DEF_WH_MONTH, 0, 0 };      // graph configuration
@@ -424,7 +427,7 @@ struct tic_json {
   uint8_t   published;                            // flag to first publication
   uint8_t   meter;                                // flag to publish METER
   uint8_t   alert;                                // flag to publish ALERT
-  uint8_t   counter;                              // flag to publish COUNTER
+  uint8_t   contract;                             // flag to publish CONTRACT
   uint8_t   relay;                                // flag to publish RELAY
   uint8_t   tic;                                  // flag to publish TIC
   uint8_t   calendar;                             // flag to publish CAL
@@ -615,7 +618,7 @@ void TeleinfoDriverPublishTrigger ()
   // set data publication flags
   if (teleinfo_config.relay) teleinfo_meter.json.relay = 1;
   if (teleinfo_config.meter) teleinfo_meter.json.meter = 1;
-  if (teleinfo_config.counter) teleinfo_meter.json.counter = 1;
+  if (teleinfo_config.contract) teleinfo_meter.json.contract = 1;
   if (teleinfo_config.calendar) teleinfo_meter.json.calendar = 1;
   if (teleinfo_config.tic) teleinfo_meter.json.tic = 1;
 
@@ -693,33 +696,38 @@ void TeleinfoDriverPublishMeter ()
   // METER adjusted maximum power
   ResponseAppend_P (PSTR (",\"PMAX\":%d"), (long)teleinfo_config.percent * teleinfo_contract.ssousc / 100);
 
-  // loop to calculate apparent and active power
-  current = power_app = power_act = 0;
-  for (phase = 0; phase < teleinfo_contract.phase; phase++)
+  // conso 
+  if (teleinfo_conso.global_wh > 0)
   {
-    // calculate parameters
-    value  = phase + 1;
-    current   += teleinfo_conso.phase[phase].current;
-    power_app += teleinfo_conso.phase[phase].papp;
-    power_act += teleinfo_conso.phase[phase].pact;
+    // conso : loop thru phases
+    current = power_app = power_act = 0;
+    for (phase = 0; phase < teleinfo_contract.phase; phase++)
+    {
+      // calculate parameters
+      value  = phase + 1;
+      current   += teleinfo_conso.phase[phase].current;
+      power_app += teleinfo_conso.phase[phase].papp;
+      power_act += teleinfo_conso.phase[phase].pact;
 
-    // voltage
-    ResponseAppend_P (PSTR (",\"U%u\":%d"), value, teleinfo_conso.phase[phase].voltage);
+      // voltage
+      ResponseAppend_P (PSTR (",\"U%u\":%d"), value, teleinfo_conso.phase[phase].voltage);
 
-    // apparent and active power
-    ResponseAppend_P (PSTR (",\"P%u\":%d,\"W%u\":%d"), value, teleinfo_conso.phase[phase].papp, value, teleinfo_conso.phase[phase].pact);
+      // apparent and active power
+      ResponseAppend_P (PSTR (",\"P%u\":%d,\"W%u\":%d"), value, teleinfo_conso.phase[phase].papp, value, teleinfo_conso.phase[phase].pact);
 
-    // current
-    ResponseAppend_P (PSTR (",\"I%u\":%d.%02d"), value, teleinfo_conso.phase[phase].current / 1000, teleinfo_conso.phase[phase].current % 1000 / 10);
+      // current
+      ResponseAppend_P (PSTR (",\"I%u\":%d.%02d"), value, teleinfo_conso.phase[phase].current / 1000, teleinfo_conso.phase[phase].current % 1000 / 10);
 
-    // cos phi
-    if (teleinfo_conso.cosphi.nb_measure > 1) ResponseAppend_P (PSTR (",\"C%u\":%d.%02d"), value, teleinfo_conso.phase[phase].cosphi / 1000, teleinfo_conso.phase[phase].cosphi % 1000 / 10);
-  } 
+      // cos phi
+      if (teleinfo_conso.cosphi.nb_measure > 1) ResponseAppend_P (PSTR (",\"C%u\":%d.%02d"), value, teleinfo_conso.phase[phase].cosphi / 1000, teleinfo_conso.phase[phase].cosphi % 1000 / 10);
+    } 
 
-  // Total Papp, Pact and Current
-  ResponseAppend_P (PSTR (",\"P\":%d,\"W\":%d,\"I\":%d.%02d"), power_app, power_act, current / 1000, current % 1000 / 10);
-
-  // if production mode, apparent and active 
+    // conso : totals
+    ResponseAppend_P (PSTR (",\"P\":%d,\"W\":%d,\"I\":%d.%02d"), power_app, power_act, current / 1000, current % 1000 / 10);
+    if (teleinfo_conso.cosphi.nb_measure > 1) ResponseAppend_P (PSTR (",\"C\":%d.%02d"), teleinfo_conso.cosphi.value / 1000, teleinfo_conso.cosphi.value % 1000 / 10);
+  }
+  
+  // production 
   if (teleinfo_prod.total_wh != 0)
   {
     ResponseAppend_P (PSTR (",\"PP\":%d,\"PW\":%d"), teleinfo_prod.papp, teleinfo_prod.pact);
@@ -765,18 +773,45 @@ void TeleinfoDriverPublishRelay ()
   TeleinfoProcessRealTime ();
 }
 
-// Generate JSON with COUNTER (global counters in wh)
-void TeleinfoDriverPublishCounter ()
+// Generate JSON with Contract and Totals (global counters in wh)
+void TeleinfoDriverPublishContract ()
 {
-  bool    is_first = true;
   uint8_t index;
-  char    str_value[16];
-  char    str_period[16];
+  char    str_value[32];
+  char    str_period[32];
 
   // start of message
   ResponseClear ();
   ResponseAppendTime ();
-  ResponseAppend_P (PSTR (",\"TOTAL\":{"));
+  ResponseAppend_P (PSTR (",\"CONTRACT\":{"));
+
+  // contract name
+  TeleinfoContractGetName (str_value, sizeof (str_value));
+  ResponseAppend_P (PSTR ("\"name\":\"%s\""), str_value);
+
+  // contract period
+  TeleinfoPeriodGetName (str_value, sizeof (str_value));
+  ResponseAppend_P (PSTR (",\"period\":\"%s\""), str_value);
+
+  // contract color
+  index = TeleinfoPeriodGetLevel ();
+  GetTextIndexed (str_value, sizeof (str_value), index, kTeleinfoPeriodLevel);
+  ResponseAppend_P (PSTR (",\"color\":\"%s\""), str_value);
+
+  // contract hour type
+  index = TeleinfoPeriodGetHP ();
+  GetTextIndexed (str_value, sizeof (str_value), index, kTeleinfoPeriodHour);
+  ResponseAppend_P (PSTR (",\"hour\":\"%s\""), str_value);
+
+  // contract today
+  index = TeleinfoDriverCalendarGetLevel (TIC_DAY_TODAY, 12, true);
+  GetTextIndexed (str_value, sizeof (str_value), index, kTeleinfoPeriodLevel);
+  ResponseAppend_P (PSTR (",\"today\":\"%s\""), str_value);
+
+  // contract tomorrow
+  index = TeleinfoDriverCalendarGetLevel (TIC_DAY_TOMORROW, 12, true);
+  GetTextIndexed (str_value, sizeof (str_value), index, kTeleinfoPeriodLevel);
+  ResponseAppend_P (PSTR (",\"tomorrow\":\"%s\""), str_value);
 
   // loop to publish conso counters
   for (index = 0; index < teleinfo_contract.period_qty; index ++)
@@ -785,8 +820,7 @@ void TeleinfoDriverPublishCounter ()
     {
       TeleinfoPeriodGetCode (index, str_period, sizeof (str_period));
       lltoa (teleinfo_conso.index_wh[index], str_value, 10);
-      if (!is_first) ResponseAppend_P (PSTR (",")); else is_first = false;
-      ResponseAppend_P (PSTR ("\"%s\":%s"), str_period, str_value);
+      ResponseAppend_P (PSTR (",\"%s\":%s"), str_period, str_value);
     }
   }
 
@@ -795,8 +829,7 @@ void TeleinfoDriverPublishCounter ()
   if (teleinfo_prod.total_wh != 0)
   {
     lltoa (teleinfo_prod.total_wh, str_value, 10) ;
-    if (!is_first) ResponseAppend_P (PSTR (",")); else is_first = false;
-    ResponseAppend_P (PSTR ("\"PROD\":%s"), str_value);
+    ResponseAppend_P (PSTR (",\"PROD\":%s"), str_value);
   }
 
   // end of message
@@ -804,7 +837,7 @@ void TeleinfoDriverPublishCounter ()
   MqttPublishTeleSensor ();
 
   // reset JSON flag
-  teleinfo_meter.json.counter = 0;
+  teleinfo_meter.json.contract = 0;
 
   // update data reception
   TeleinfoProcessRealTime ();
@@ -948,7 +981,7 @@ void TeleinfoDriverEvery100ms ()
   else if (teleinfo_meter.json.tic) TeleinfoDriverPublishTic ();
   else if (teleinfo_meter.json.relay) TeleinfoDriverPublishRelay ();
   else if (teleinfo_meter.json.calendar) TeleinfoDriverPublishCalendar ();
-  else if (teleinfo_meter.json.counter) TeleinfoDriverPublishCounter ();
+  else if (teleinfo_meter.json.contract) TeleinfoDriverPublishContract ();
   else if (teleinfo_meter.json.meter) TeleinfoDriverPublishMeter ();
 }
 
@@ -1036,10 +1069,10 @@ void TeleinfoDriverWebPageConfigure ()
     if (strlen (str_text) > 0) teleinfo_config.relay = 1;
       else teleinfo_config.relay = 0;
 
-    // parameter 'counter' : set COUNTER section diffusion flag
-    WebGetArg (D_CMND_TELEINFO_COUNTER, str_text, sizeof (str_text));
-    if (strlen (str_text) > 0) teleinfo_config.counter = 1;
-      else teleinfo_config.counter = 0;
+    // parameter 'contract' : set CONTRACT section diffusion flag
+    WebGetArg (D_CMND_TELEINFO_CONTRACT, str_text, sizeof (str_text));
+    if (strlen (str_text) > 0) teleinfo_config.contract = 1;
+      else teleinfo_config.contract = 0;
 
     // save configuration
     TeleinfoSaveConfig ();
@@ -1075,8 +1108,8 @@ void TeleinfoDriverWebPageConfigure ()
   WSContentSend_P (PSTR ("<p><fieldset><legend><b>&nbsp;%s %s&nbsp;</b></legend>\n"), "📊", PSTR ("Données publiées"));
   if (teleinfo_config.meter) strcpy_P (str_select, PSTR ("checked")); else strcpy (str_select, "");
   WSContentSend_P (PSTR ("<p><input type='checkbox' id='%s' name='%s' %s><label for='%s'>Consommation & Production</label></p>\n"), D_CMND_TELEINFO_METER, D_CMND_TELEINFO_METER, str_select, D_CMND_TELEINFO_METER);
-  if (teleinfo_config.counter) strcpy_P (str_select, PSTR ("checked")); else strcpy (str_select, "");
-  WSContentSend_P (PSTR ("<p><input type='checkbox' id='%s' name='%s' %s><label for='%s'>Compteurs</label></p>\n"), D_CMND_TELEINFO_COUNTER, D_CMND_TELEINFO_COUNTER, str_select, D_CMND_TELEINFO_COUNTER);
+  if (teleinfo_config.contract) strcpy_P (str_select, PSTR ("checked")); else strcpy (str_select, "");
+  WSContentSend_P (PSTR ("<p><input type='checkbox' id='%s' name='%s' %s><label for='%s'>Contrat & Compteurs</label></p>\n"), D_CMND_TELEINFO_CONTRACT, D_CMND_TELEINFO_CONTRACT, str_select, D_CMND_TELEINFO_CONTRACT);
   if (teleinfo_config.calendar) strcpy_P (str_select, PSTR ("checked")); else strcpy (str_select, "");
   WSContentSend_P (PSTR ("<p><input type='checkbox' id='%s' name='%s' %s><label for='%s'>Calendrier</label></p>\n"), D_CMND_TELEINFO_CALENDAR, D_CMND_TELEINFO_CALENDAR, str_select, D_CMND_TELEINFO_CALENDAR);
   if (teleinfo_config.relay) strcpy_P (str_select, PSTR ("checked")); else strcpy (str_select, "");
@@ -1632,7 +1665,12 @@ bool Xdrv15 (uint32_t function)
     case FUNC_SAVE_BEFORE_RESTART:
       TeleinfoDriverSaveBeforeRestart ();
       break;
-    case FUNC_EVERY_100_MSECOND:
+    case FUNC_EVERY_SECOND:
+#ifdef USE_HOME_ASSISTANT
+      TeleinfoHomeAssistantEverySecond ();
+#endif
+      break;
+   case FUNC_EVERY_100_MSECOND:
       TeleinfoDriverEvery100ms ();
       break;
     case FUNC_JSON_APPEND:
