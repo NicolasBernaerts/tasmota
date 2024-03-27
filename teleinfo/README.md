@@ -109,7 +109,7 @@ Voici les données publiées dans la section **ALERT** :
   * **Preavis** = niveau du prochain préavis (utilisé en Tempo & EJP)
   * **Label** = Libellé du prochain préavis
 
-La section **TOTAL** comprend autant de clés que de périodes dans votre contrat. Seules les périodes avec un total de consommation différent de **0** sont publiées.
+En complément des données de base du contrat, la section **CONTRAT** liste l'ensemble des périodes dans votre contrat. Seules les périodes avec un total de consommation différent de **0** sont publiées.
 
 ## Commands
 
