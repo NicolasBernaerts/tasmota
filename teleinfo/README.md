@@ -252,8 +252,9 @@ Ce firmware intègre la gestion du mode **auto-discovery** de [**Home Assistant*
 
 Toutes les données candidates à intégration dans **Home Assistant** sont émises via MQTT en mode **retain** au boot après de réception de 5 messages complets (50 pour le Winky). Cela permet d'émettre des données correspondant exactement au contrat lié au compteur raccordé.
 
-Vous devriz avoir une découverte ressemblant à ceci :
+Vous devriez avoir une découverte ressemblant à ceci :
 
+![Home Assistant integration](./screen/tasmota-ha-integration.png)
 
 ## Serveur TCP
 
@@ -336,6 +337,7 @@ Voici la liste exhaustive des fichiers concernés :
 | tasmota/tasmota_drv_driver/**xdrv_01_9_webserver.ino** | Add compilation target in footer  |
 | tasmota/tasmota_drv_energy/**xdrv_15_teleinfo.ino** | Teleinfo driver  |
 | tasmota/tasmota_drv_energy/**xdrv_15_teleinfo_domoticz.ino** | Teleinfo domoticz integration  |
+| tasmota/tasmota_drv_energy/**xdrv_15_teleinfo_homeassistant.ino** | Teleinfo home assistant integration  |
 | tasmota/tasmota_drv_driver/**xdrv_94_ip_address.ino** | Fixed IP address Web configuration |
 | tasmota/tasmota_drv_driver/**xdrv_96_ftp_server.ino** | Embedded FTP server |
 | tasmota/tasmota_drv_driver/**xdrv_97_tcp_server.ino** | Embedded TCP stream server |
