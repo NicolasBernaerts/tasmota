@@ -291,7 +291,7 @@ La commande **ftp_help** liste toutes les possibilités :
 
 Coté client FTP, vous devez utiliser les login / mot de passe suivants : **teleinfo** / **teleinfo**
 
-Ce serveur FTP ne peut accepter qu'une seule connexion simultanée. Vous devez donc configurer votre client FTP avec une limiote de type : **simultaneous connexions = 1**. Sinon, la connexion sera en erreur.
+Ce serveur FTP ne peut accepter qu'une seule connexion simultanée. Vous devez donc configurer votre client FTP avec une limite de type : **simultaneous connexions = 1**. Sinon, la connexion sera en erreur.
 
 ## Carte Winky
 
