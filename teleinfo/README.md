@@ -246,6 +246,15 @@ La configuration des messages émis peut être réalisée en mode console :
              <10,--> : alert fot current period color (bleu, blanc, rouge)
              <11,--> : alert for tomorrow's period color (bleu, blanc, rouge)
 
+## Intégration Home Assistant
+
+Ce firmware intègre la gestion du mode **auto-discovery** de [**Home Assistant**](https://www.home-assistant.io/)
+
+Toutes les données candidates à intégration dans **Home Assistant** sont émises via MQTT en mode **retain** au boot après de réception de 5 messages complets (50 pour le Winky). Cela permet d'émettre des données correspondant exactement au contrat lié au compteur raccordé.
+
+Vous devriz avoir une découverte ressemblant à ceci :
+
+
 ## Serveur TCP
 
 Un serveur **TCP** est intégré à cette version de firmware.
