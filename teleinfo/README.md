@@ -68,7 +68,7 @@ Le protocole **Teleinfo** est décrit dans [ce document](https://www.enedis.fr/s
 En complément de la section officielle **ENERGY**, les sections suivantes peuvent être publiées :
   * **METER** : données de consommation et prodcution en temps réel sous une forme compacte.
   * **ALERT** : alertes publiées dans les messages STGE (changement Tempo / EJP, surpuissance & survoltage)
-  * **TOTAL** : compteurs de périodes en Wh
+  * **CONTRACT** : données du contrat intégrant les compteurs de périodes en Wh
   * **CAL** : calendrier consolidé entre le compteur et les données RTE (Tempo, Pointe & Ecowatt)
   * **RELAY** : relais virtuels publiés par le compteur
   * **TIC** : etiquettes et données brutes reçues depuis le compteur
@@ -83,11 +83,11 @@ Voici la liste des données publiées dans la section **METER** :
   * **I** = courant instantané (A) global
   * **P** = puissance instantanée (VA) globale
   * **W** = puissance active (W) globale
+  * **C** = facteur de puissance (cos φ)
   * **Ix** = courant instantané (A) sur la phase **x** 
   * **Ux** = tension (V) sur la phase **x** 
   * **Px** = puissance instantanée (VA) sur la phase **x** 
   * **Wx** = puissance active (W) sur la phase **x** 
-  * **Cx** = facteur de puissance (cos φ) sur la phase **x**
   * **PP** = puissance instantanée (VA) produite
   * **PW** = puissance active (W) produite
   * **PC** = facteur de puissance (cos φ) de la production
