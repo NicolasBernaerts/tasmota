@@ -383,7 +383,7 @@ If you want to remove default Tasmota energy display, you just need to run this 
 
     websensor3 0
 
-## Configuration##
+## Configuration
 
 ![Config page](./screen/tasmota-teleinfo-config.png)
 
