@@ -106,7 +106,8 @@
                          Lots of bug fixes (thanks to B. Monot and Sebastien)
                          Separation of curve and historisation sources
                          Removal of all float calculations
-    27/03/2024 - v14.1 - Integration of Home Assistant auto discovery (thanks to Matthieu Matelau)
+    27/03/2024 - v14.1 - Integration of Home Assistant auto discovery (with help of msevestre31)
+                         Section COUNTER renamed as CONTRACT, addition of contract data
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License aStart STGE managements published by

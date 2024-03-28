@@ -26,6 +26,7 @@
                         Add support for Wenky with deep sleep (thanks to C. Hallard prototype)
                         Lots of bug fixes (thanks to B. Monot and Sebastien)
     05/03/2024 - v3.1 - Removal of all float and double calculations
+    27/03/2024 - v3.2 - Section COUNTER renamed as CONTRACT, addition of contract data
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
