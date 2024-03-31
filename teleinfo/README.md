@@ -1,12 +1,8 @@
 # Firmware Tasmota Teleinfo
 
-⚠️ Depuis la **version 13**, le partitionnement a évolué pour la famille des **ESP32**. Il utilise maintenant le partitionnement standard **safeboot**.
+⚠️ Depuis la **version 13**, le partitionnement a évolué pour la famille des **ESP32**. Il utilise maintenant le partitionnement standard **safeboot**. Si vous faites une mise à jour ESP32 depuis une version plus ancienne, Vous devez faire un flash **serial**. Si vous faites une mise à jour **OTA** vous pourrez rencontrer des dysfonctionnements.
 
-Si vous faites une mise à jour ESP32 depuis une version plus ancienne, Vous devez faire un flash **serial**. Si vous faites une mise à jour **OTA** vous pourrez rencontrer des dysfonctionnements.
-
-Mais à partir du moment où vous disposez d'une version **13++**, vous pouvez bien entendu réaliser les mises à jour en mode **OTA**.
-
-Le partitionnement des **ESP8266** n'a pas changé.
+A partir du moment où vous disposez d'une version **13++**, vous pouvez bien entendu réaliser les mises à jour en mode **OTA**. Le partitionnement des **ESP8266** n'a pas changé.
 
 ## Presentation
 
@@ -85,13 +81,17 @@ Voici la liste des données publiées dans la section **METER** :
   * **P** = puissance instantanée (VA) globale
   * **W** = puissance active (W) globale
   * **C** = facteur de puissance (cos φ)
+  * **2DAY** = Total consommé aujourd'hui (Wh)
+  * **YDAY** = Total consommé hier (Wh)
   * **Ix** = courant instantané (A) sur la phase **x** 
   * **Ux** = tension (V) sur la phase **x** 
   * **Px** = puissance instantanée (VA) sur la phase **x** 
-  * **Wx** = puissance active (W) sur la phase **x** 
+  * **Wx** = puissance active (W) sur la phase **x**
   * **PP** = puissance instantanée (VA) produite
   * **PW** = puissance active (W) produite
   * **PC** = facteur de puissance (cos φ) de la production
+  * **P2DAY** = Total produit aujourd'hui (Wh)
+  * **PYDAY** = Total produit hier (Wh)
 
 Voici les données publiées dans la section **CAL** :
   * **lv** = niveau de la période actuelle (0 inconnu, 1 bleu, 2 blanc, 3 rouge)
@@ -251,7 +251,7 @@ La configuration des messages émis peut être réalisée en mode console :
 
 Ce firmware intègre la gestion du mode **auto-discovery** de [**Home Assistant**](https://www.home-assistant.io/)
 
-Toutes les données candidates à intégration dans **Home Assistant** sont émises via MQTT en mode **retain** au boot après de réception de 5 messages complets (50 pour le Winky). Cela permet d'émettre des données correspondant exactement au contrat lié au compteur raccordé.
+Toutes les données candidates à intégration dans **Home Assistant** sont émises via MQTT en mode **retain** au boot après de réception de 5 messages complets. Cela permet d'émettre des données correspondant exactement au contrat lié au compteur raccordé.
 
 Vous devriez avoir une découverte ressemblant à ceci :
 
