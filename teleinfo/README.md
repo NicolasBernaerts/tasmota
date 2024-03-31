@@ -251,9 +251,11 @@ La configuration des messages émis peut être réalisée en mode console :
 
 Ce firmware intègre la gestion du mode **auto-discovery** de [**Home Assistant**](https://www.home-assistant.io/)
 
-Toutes les données candidates à intégration dans **Home Assistant** sont émises via MQTT en mode **retain** au boot après de réception de 5 messages complets. Cela permet d'émettre des données correspondant exactement au contrat lié au compteur raccordé.
+A chaque boot, toutes les données candidates à intégration dans **Home Assistant** sont émises via MQTT en mode **retain** après de réception de 5 messages complets. Cela permet d'émettre des données correspondant exactement au contrat lié au compteur raccordé.
 
-Vous devriez avoir une découverte ressemblant à ceci :
+Dans le cas particulier du Wenky, ces messages ne sont pas émis au réveil s'il ne dispose pas d'une alimentation fixe via USB.
+
+Suite à l'émission des messages d'auto-découverten, dans Home Assistant vous devriez avoir un device ressemblant à ceci :
 
 ![Home Assistant integration](./screen/tasmota-ha-integration.png)
 
