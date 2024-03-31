@@ -247,13 +247,13 @@ La configuration des messages émis peut être réalisée en mode console :
     domo_help
     HLP: commands for Teleinfo Domoticz integration
     domo_key <num,idx> = set key num to index idx
-             <0,-->  : total Wh (hc/hp) and power W for conso (base,hc/hp,ejp,bleu)
-             <1,-->  : total Wh (hc/hp) and power W for conso (blanc)
-             <2,-->  : total Wh (hc/hp) and power W for conso (rouge)
-             <8,-->  : total Wh and power W for production
-             <9,-->  : alert for current hc/hp
-             <10,--> : alert fot current period color (bleu, blanc, rouge)
-             <11,--> : alert for tomorrow's period color (bleu, blanc, rouge)
+             <0,index>  : index Domoticz du total Wh (hc/hp) et puissance active W pour la 1ère période du contrat (base,hc/hp,ejp,bleu)
+             <1,index>  : index Domoticz du total Wh (hc/hp) et puissance active W pour la 1ère période du contrat (blanc)
+             <2,index>  : index Domoticz du total Wh (hc/hp) et puissance active W pour la 1ère période du contrat (rouge)
+             <8,index>  : index Domoticz du total Wh (hc/hp) et puissance active W pour la production
+             <9,index>  : index Domoticz de l'alerte de publication hc/hp
+             <10,index> : index Domoticz de l'alerte de publication de la couleur actuelle (bleu, blanc, rouge)
+             <11,index> : index Domoticz de l'alerte de publication de la couleur du lendemain (bleu, blanc, rouge)
 
 ## Intégration Home Assistant
 
