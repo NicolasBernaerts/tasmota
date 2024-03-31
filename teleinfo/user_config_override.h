@@ -107,7 +107,9 @@
                          Separation of curve and historisation sources
                          Removal of all float calculations
     27/03/2024 - v14.1 - Integration of Home Assistant auto discovery (with help of msevestre31)
-                         Section COUNTER renamed as CONTRACT, addition of contract data
+                         Section COUNTER renamed as CONTRACT with addition of contract data
+    28/03/2024 - v14.2 - Add Today and Yesterday conso and Prod
+                         Disable Tasmota auto-discovery
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License aStart STGE managements published by
@@ -150,48 +152,56 @@
  *    Teleinfo firmware configuration
 \********************************************/
 
-// complementary modules
-#define USE_IPADDRESS                         // Add fixed IP configuration page
-#define USE_TIMEZONE                          // Enable Timezone management
-#define USE_TIMEZONE_WEB_CONFIG               // Enable timezone web configuration page
+// extension description
+#define EXTENSION_NAME    "Teleinfo"          // name
+#define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
+#define EXTENSION_VERSION "14.2"              // version
 
-#define USE_ENERGY_SENSOR                     // Enable energy sensors
-#define USE_TCPSERVER                         // Enable TCP server (for TIC to TCP)
-
+// FTP server credentials
 #ifdef USE_FTPSERVER
 #define FTP_SERVER_LOGIN      "teleinfo"      // FTP server login
 #define FTP_SERVER_PASSWORD   "teleinfo"      // FTP server password
 #endif
 
+// complementary modules
+#define USE_IPADDRESS                         // Add fixed IP configuration page
+#define USE_TIMEZONE                          // Enable Timezone management
+#define USE_TIMEZONE_WEB_CONFIG               // Enable timezone web configuration page
+#define USE_TCPSERVER                         // Enable TCP server (for TIC to TCP)
+
+// home management integration
+#define USE_TELEINFO_DOMOTICZ                 // Domoticz intégration
+#define USE_TELEINFO_HOMEASSISTANT            // Home Assistant intégration
+
 // build
 #ifdef BUILD_ESP32S3_16M
-#define EXTENSION_BUILD "esp32s3_16m-12m"
+#define EXTENSION_BUILD "esp32s3_16m"
 
 #elif BUILD_ESP32S3_4M
-#define EXTENSION_BUILD "esp32s3-4m-1.3m"
+#define EXTENSION_BUILD "esp32s3-4m"
 
 #elif BUILD_ESP32S2
-#define EXTENSION_BUILD "esp32s2-4m-1.3m"
+#define EXTENSION_BUILD "esp32s2-4m"
 
 #elif BUILD_ESP32_DENKYD4
-#define EXTENSION_BUILD "denkyd4-8m-4m"
+#define EXTENSION_BUILD "denkyd4-8m"
 #define USER_TEMPLATE "{\"NAME\":\"Denky D4\",\"GPIO\":[32,0,0,0,1,0,0,0,0,1,1376,1,0,0,0,0,0,640,608,0,0,0,0,0,0,0,5632,0,0,0,0,0,0,0,0,0],\"FLAG\":0,\"BASE\":1}" 
 
 #elif BUILD_ESP32_WINKY
-#define EXTENSION_BUILD "winky-4m-1.3m"
+#define EXTENSION_BUILD "winky-4m"
 #define USER_TEMPLATE "{\"NAME\":\"Winky\",\"GPIO\":[1,4704,1376,4705,5632,4706,640,608,1,32,1,0,0,0,0,0,0,0,1,1,1,1,1,4096,0,0,0,0,0,0,0],\"FLAG\":0,\"BASE\":1}" 
 
 #elif BUILD_ESP32_4M
-#define EXTENSION_BUILD "esp32-4m-1.3m"
+#define EXTENSION_BUILD "esp32-4m"
 
 #elif BUILD_16M14M
-#define EXTENSION_BUILD "esp8266-16m-14m"
+#define EXTENSION_BUILD "esp8266-16m"
 
 #elif BUILD_4M2M
-#define EXTENSION_BUILD "esp8266-4m-2m"
+#define EXTENSION_BUILD "esp8266-4m"
 
 #elif BUILD_2M1M
-#define EXTENSION_BUILD "esp8266-2m-1m"
+#define EXTENSION_BUILD "esp8266-2m"
 
 #elif BUILD_1M
 #define EXTENSION_BUILD "esp8266-1m"
@@ -199,11 +209,6 @@
 #else
 #define EXTENSION_BUILD "other"
 #endif
-
-// extension data
-#define EXTENSION_NAME    "Teleinfo"          // name
-#define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
-#define EXTENSION_VERSION "14.1"              // version
 
 // teleinfo display is in French
 #define MY_LANGUAGE        fr_FR
@@ -244,9 +249,9 @@
 #undef USE_MQTT_TLS                           // TLS support won't work as the MQTTHost is not set
 
 #undef USE_DOMOTICZ                           // Disable official Domoticz
-#undef USE_TASMOTA_DISCOVERY                  // Disable Tasmota discovery to enable Home Assistant
-#define USE_HOME_ASSISTANT                    // Enable Home Assistant
 
+#undef USE_TASMOTA_DISCOVERY                 // Enable Tasmota discovery
+#undef USE_HOME_ASSISTANT                     // Disable historic Home Assistant
 
 #undef USE_KNX                                // KNX IP Protocol Support
 #undef USE_KNX_WEB_MENU                       // Enable KNX WEB MENU (+8.3k code, +144 mem)
@@ -320,7 +325,7 @@
 
 #undef USE_SERIAL_BRIDGE                      // Disable support for software Serial Bridge (+0k8 code)
 
-//#undef USE_ENERGY_SENSOR                      // Disable energy sensors
+#define USE_ENERGY_SENSOR                      // Disable energy sensors
 #undef USE_ENERGY_MARGIN_DETECTION            // Add support for Energy Margin detection (+1k6 code)
 #undef USE_ENERGY_POWER_LIMIT                 // Add additional support for Energy Power Limit detection (+1k2 code)
 #undef USE_PZEM004T                           // Add support for PZEM004T Energy monitor (+2k code)

@@ -493,7 +493,7 @@ void TeleinfoLoadConfig ()
   teleinfo_config.tic       = Settings->teleinfo.tic;
   teleinfo_config.calendar  = Settings->teleinfo.calendar;
   teleinfo_config.relay     = Settings->teleinfo.relay;
-  teleinfo_config.contract  = Settings->teleinfo.contract;
+  teleinfo_config.contract   = Settings->teleinfo.contract;
   teleinfo_config.max_volt  = TELEINFO_GRAPH_MIN_VOLTAGE + Settings->teleinfo.adjust_v * 5;
   teleinfo_config.max_power = TELEINFO_GRAPH_MIN_POWER + Settings->teleinfo.adjust_va * 3000;
 
@@ -541,6 +541,10 @@ void TeleinfoLoadConfig ()
         if ((index >= 0) && (index < TELEINFO_CONFIG_MAX)) teleinfo_config.param[index] = atol (pstr_value);
       }
     }
+
+    // update yesterday totals
+    teleinfo_conso.yesterday_wh = teleinfo_config.param[TELEINFO_CONFIG_YESTERDAY_CONSO];
+    teleinfo_prod.yesterday_wh  = teleinfo_config.param[TELEINFO_CONFIG_YESTERDAY_PROD];
   }
 
 # endif     // USE_UFILESYS
@@ -580,15 +584,17 @@ void TeleinfoSaveConfig ()
   char    str_text[32];
   File    file;
 
-  // update today conso
-  if ((teleinfo_conso.global_wh != 0) && (teleinfo_conso.midnight_wh != 0)) today_wh = teleinfo_conso.global_wh - teleinfo_conso.midnight_wh;
-    else today_wh = 0;
+  // update today and yesterday conso
+  today_wh = 0;
+  if ((teleinfo_conso.total_wh > 0) && (teleinfo_conso.midnight_wh > 0)) today_wh = teleinfo_conso.total_wh - teleinfo_conso.midnight_wh;
   teleinfo_config.param[TELEINFO_CONFIG_TODAY_CONSO] = (long)today_wh;
+  teleinfo_config.param[TELEINFO_CONFIG_YESTERDAY_CONSO] = teleinfo_conso.yesterday_wh;
 
-  // update today production
-  if ((teleinfo_prod.total_wh != 0) && (teleinfo_prod.midnight_wh != 0)) today_wh = teleinfo_prod.total_wh - teleinfo_prod.midnight_wh;
-    else today_wh = 0;
+  // update today and yesterday production
+  today_wh = 0;
+  if ((teleinfo_prod.total_wh > 0) && (teleinfo_prod.midnight_wh > 0)) today_wh = teleinfo_prod.total_wh - teleinfo_prod.midnight_wh;
   teleinfo_config.param[TELEINFO_CONFIG_TODAY_PROD] = (long)today_wh;
+  teleinfo_config.param[TELEINFO_CONFIG_YESTERDAY_PROD] = teleinfo_prod.yesterday_wh;
 
   // open file and write content
   file = ffsp->open (D_TELEINFO_CFG, "w");
@@ -718,24 +724,24 @@ void TeleinfoUpdateConsoGlobalCounter ()
   for (index = 0; index < teleinfo_contract.period_qty; index ++) total += teleinfo_conso.index_wh[index];
 
   // if total not defined, update total
-  if (teleinfo_conso.global_wh == 0) teleinfo_conso.global_wh = total;
+  if (teleinfo_conso.total_wh == 0) teleinfo_conso.total_wh = total;
 
   // if needed, update midnight value
-  if ((teleinfo_conso.midnight_wh == 0) && (teleinfo_conso.global_wh > 0)) teleinfo_conso.midnight_wh = teleinfo_conso.global_wh - (long long)teleinfo_config.param[TELEINFO_CONFIG_TODAY_CONSO];
+  if ((teleinfo_conso.midnight_wh == 0) && (teleinfo_conso.total_wh > 0)) teleinfo_conso.midnight_wh = teleinfo_conso.total_wh - (long long)teleinfo_config.param[TELEINFO_CONFIG_TODAY_CONSO];
 
   // if no increment, return
-  if (total == teleinfo_conso.global_wh) return;
+  if (total == teleinfo_conso.total_wh) return;
 
   // if total has decreased, total is abnormal
-  if (total < teleinfo_conso.global_wh) abnormal = true;
+  if (total < teleinfo_conso.total_wh) abnormal = true;
 
   // else if total is high enougth and has increased more than 1%, total is abnormal
-  else if ((total > 1000) && (total > teleinfo_conso.global_wh + (teleinfo_conso.global_wh / 100))) abnormal = true;
+  else if ((total > 1000) && (total > teleinfo_conso.total_wh + (teleinfo_conso.total_wh / 100))) abnormal = true;
 
   // if value is abnormal
   if (abnormal)
   {
-    teleinfo_conso.global_wh  = 0;
+    teleinfo_conso.total_wh   = 0;
     teleinfo_conso.delta_mwh  = 0;
     teleinfo_conso.delta_mvah = 0;
   }
@@ -743,8 +749,8 @@ void TeleinfoUpdateConsoGlobalCounter ()
   // else update counters
   else
   {
-    teleinfo_conso.delta_mwh += 1000 * (long)(total - teleinfo_conso.global_wh);
-    teleinfo_conso.global_wh  = total;
+    teleinfo_conso.delta_mwh += 1000 * (long)(total - teleinfo_conso.total_wh);
+    teleinfo_conso.total_wh   = total;
   }
 }
 
@@ -1086,6 +1092,9 @@ void TeleinfoContractUpdate (const char* pstr_contract)
   // handle specificity of Historique Tempo where last char is dynamic (BBRx)
   strlcpy (str_contract, pstr_contract, 4);
   if (strcmp (str_contract, "BBR") != 0) strlcpy (str_contract, pstr_contract, sizeof (str_contract));
+
+  // handle specificity of historic BASE contract
+  if ((strcmp (str_contract, "BASE") == 0) && (teleinfo_contract.mode == TIC_MODE_HISTORIC)) strcpy (str_contract, "TH..");
 
   // look for contract
   index = GetCommandCode (str_text, sizeof (str_text), str_contract, kTicContractCode);
@@ -2719,9 +2728,9 @@ void TeleinfoEnergyEverySecond ()
   // -----------------------
 
   // force meter grand total on conso total
-  Energy->total[0] = (float)(teleinfo_conso.global_wh / 1000);
+  Energy->total[0] = (float)(teleinfo_conso.total_wh / 1000);
   for (phase = 1; phase < teleinfo_contract.phase; phase++) Energy->total[phase] = 0;
-  RtcSettings.energy_kWhtotal_ph[0] = (int32_t)(teleinfo_conso.global_wh / 100000);
+  RtcSettings.energy_kWhtotal_ph[0] = (int32_t)(teleinfo_conso.total_wh / 100000);
   for (phase = 1; phase < teleinfo_contract.phase; phase++) RtcSettings.energy_kWhtotal_ph[phase] = 0;
 
   // update today delta
@@ -2738,8 +2747,12 @@ void TeleinfoEnergyEverySecond ()
   if (teleinfo_meter.days == 0) teleinfo_meter.days = RtcTime.days;
   if (teleinfo_meter.days != RtcTime.days)
   {
-    // update daily counters 
-    teleinfo_conso.midnight_wh = teleinfo_conso.global_wh;
+    // update conso counters
+    teleinfo_conso.yesterday_wh = (long)(teleinfo_conso.total_wh - teleinfo_conso.midnight_wh);
+    teleinfo_conso.midnight_wh  = teleinfo_conso.total_wh;
+
+    // update prod counters
+    teleinfo_prod.yesterday_wh = (long)(teleinfo_prod.total_wh - teleinfo_prod.midnight_wh);
     teleinfo_prod.midnight_wh  = teleinfo_prod.total_wh;
 
     // rotate profile of yesterday and today

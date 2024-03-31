@@ -7,13 +7,13 @@
     24/01/2024 - v1.0 - Creation (split from xnrg_15_teleinfo.ino)
     05/02/2024 - v1.1 - Use FUNC_SHOW_SENSOR & FUNC_JSON_APPEND for JSON publication
     13/01/2024 - v2.0 - Complete rewrite of Contrat and Period management
-                         Add Emeraude 2 meter management
-                         Add calendar and virtual relay management
-                         Activate serial reception when NTP time is ready
-                         Change MQTT publication and data reception handling to minimize errors
-                         Handle Linky supplied Winky with deep sleep 
-                         Support various temperature sensors
-                         Add Domoticz topics publication
+                        Add Emeraude 2 meter management
+                        Add calendar and virtual relay management
+                        Activate serial reception when NTP time is ready
+                        Change MQTT publication and data reception handling to minimize errors
+                        Handle Linky supplied Winky with deep sleep 
+                        Support various temperature sensors
+                        Add Domoticz topics publication
     03/01/2024 - v2.1 - Add alert management thru STGE
     15/01/2024 - v2.2 - Add support for Denky (thanks to C. Hallard prototype)
                         Add Emeraude 2 meter management
@@ -26,7 +26,7 @@
                         Add support for Wenky with deep sleep (thanks to C. Hallard prototype)
                         Lots of bug fixes (thanks to B. Monot and Sebastien)
     05/03/2024 - v3.1 - Removal of all float and double calculations
-    27/03/2024 - v3.2 - Section COUNTER renamed as CONTRACT, addition of contract data
+    27/03/2024 - v3.2 - Section COUNTER renamed as CONTRACT with addition of contract data
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -156,6 +156,8 @@
 #define D_CMND_TELEINFO_PLUS            "plus"
 #define D_CMND_TELEINFO_TODAY_CONSO     "today-conso"
 #define D_CMND_TELEINFO_TODAY_PROD      "today-prod"
+#define D_CMND_TELEINFO_YESTERDAY_CONSO "yesterday-conso"
+#define D_CMND_TELEINFO_YESTERDAY_PROD  "yesterday-prod"
 
 // JSON TIC extensions
 #define TELEINFO_JSON_TIC               "TIC"
@@ -199,8 +201,8 @@ enum TeleinfoMessagePolicy { TELEINFO_POLICY_TELEMETRY, TELEINFO_POLICY_PERCENT,
 const char kTeleinfoMessagePolicy[] PROGMEM = "Telemetrie seulement|± 5% Evolution puissance|Tous les messages TIC";
 
 // config
-enum TeleinfoConfigKey { TELEINFO_CONFIG_NBDAY, TELEINFO_CONFIG_NBWEEK, TELEINFO_CONFIG_MAX_HOUR, TELEINFO_CONFIG_MAX_DAY, TELEINFO_CONFIG_MAX_MONTH, TELEINFO_CONFIG_TODAY_CONSO, TELEINFO_CONFIG_TODAY_PROD, TELEINFO_CONFIG_MAX };     // configuration parameters
-const char kTeleinfoConfigKey[] PROGMEM = D_CMND_TELEINFO_LOG_DAY "|" D_CMND_TELEINFO_LOG_WEEK "|" D_CMND_TELEINFO_MAX_KWH_HOUR "|" D_CMND_TELEINFO_MAX_KWH_DAY "|" D_CMND_TELEINFO_MAX_KWH_MONTH "|" D_CMND_TELEINFO_TODAY_CONSO "|" D_CMND_TELEINFO_TODAY_PROD;      // configuration keys
+enum TeleinfoConfigKey { TELEINFO_CONFIG_NBDAY, TELEINFO_CONFIG_NBWEEK, TELEINFO_CONFIG_MAX_HOUR, TELEINFO_CONFIG_MAX_DAY, TELEINFO_CONFIG_MAX_MONTH, TELEINFO_CONFIG_TODAY_CONSO, TELEINFO_CONFIG_TODAY_PROD, TELEINFO_CONFIG_YESTERDAY_CONSO, TELEINFO_CONFIG_YESTERDAY_PROD, TELEINFO_CONFIG_MAX };     // configuration parameters
+const char kTeleinfoConfigKey[] PROGMEM = D_CMND_TELEINFO_LOG_DAY "|" D_CMND_TELEINFO_LOG_WEEK "|" D_CMND_TELEINFO_MAX_KWH_HOUR "|" D_CMND_TELEINFO_MAX_KWH_DAY "|" D_CMND_TELEINFO_MAX_KWH_MONTH "|" D_CMND_TELEINFO_TODAY_CONSO "|" D_CMND_TELEINFO_TODAY_PROD "|" D_CMND_TELEINFO_YESTERDAY_CONSO "|" D_CMND_TELEINFO_YESTERDAY_PROD;      // configuration keys
 
 // power calculation modes
 enum TeleinfoContractUnit { TIC_UNIT_NONE, TIC_UNIT_KVA, TIC_UNIT_KW, TIC_UNIT_MAX };
@@ -240,6 +242,9 @@ enum TeleinfoGraphPeriod { TELEINFO_CURVE_LIVE, TELEINFO_PERIOD_MAX };          
 
 #endif    // USE_UFILESYS
 
+// teleinfo relays
+const char kTeleinfoRelayName[] PROGMEM  = "Eau Chaude Sanitaire|Chauffage Principal|Chauffage Secondaire|Clim / Pompe à Chaleur|Véhicule Electrique|Stockage & Injection|Relai Virtuel|Relai Virtuel";
+
 // graph - display
 enum TeleinfoGraphDisplay { TELEINFO_UNIT_VA, TELEINFO_UNIT_W, TELEINFO_UNIT_V, TELEINFO_UNIT_COSPHI, TELEINFO_UNIT_PEAK_VA, TELEINFO_UNIT_PEAK_V, TELEINFO_UNIT_WH, TELEINFO_UNIT_MAX };       // available graph units
 const char kTeleinfoGraphDisplay[] PROGMEM = "VA|W|V|cosφ|VA|V|Wh";                                                                                                                             // units labels
@@ -271,7 +276,7 @@ const char kTeleinfoModeIcon[] PROGMEM = "|🇭|🇸|🇵|🇪";
 // Type of contracts
 enum TicContract  { TIC_C_UNDEFINED, TIC_C_HISTO_BASE, TIC_C_HISTO_HCHP, TIC_C_HISTO_EJP, TIC_C_HISTO_TEMPO, TIC_C_STD_BASE, TIC_C_STD_HCHP, TIC_C_STD_EJP, TIC_C_STD_TEMPO, TIC_C_BT4SUP36, TIC_C_BT5SUP36, TIC_C_TJEJP, TIC_C_HTA5, TIC_C_HTA8, TIC_C_A5_BASE, TIC_C_A8_BASE, TIC_C_A5_EJP, TIC_C_A8_EJP, TIC_C_A8_MOD, TIC_C_JAUNE_BASE, TIC_C_JAUNE_EJP, TIC_C_MAX };
 const char kTicContractCode[] PROGMEM = "UNDEF|TH..|HC..|EJP.|BBR|BASE|H PLEINE/CREUSE|EJP|TEMPO|BT 4 SUP36|BT 5 SUP36|TJ EJP|HTA 5|HTA 8|BASE_A5|BASE_A8|EJP_A5|EJP_A8|MOD|JBASE|JEJP";
-const char kTicContractName[] PROGMEM = "Indéterminé|Base|HP / HC|EJP|Tempo|Base|HC / HP|EJP|Tempo|BT>36kVA 4p.|BT>36kVA 5p.|Jaune EJP|HTA 5p|HTA 8p|A5 Base|A8 Base|A5 EJP|A8 EJP|A8 Mod.|Jaune Base|Jaune EJP";
+const char kTicContractName[] PROGMEM = "Indéterminé|Base|HC/HP|EJP|Tempo|Base|HC/HP|EJP|Tempo|BT>36kVA 4p.|BT>36kVA 5p.|Jaune EJP|HTA 5p|HTA 8p|A5 Base|A8 Base|A5 EJP|A8 EJP|A8 Mod.|Jaune Base|Jaune EJP";
 
 // contrat de type inconnu
 const char    kTicPeriodUndefCode[] PROGMEM = "PERIOD1|PERIOD2|PERIOD3|PERIOD4|PERIOD5|PERIOD6|PERIOD7|PERIOD8|PERIOD9|PERIOD10";
@@ -287,13 +292,13 @@ const uint8_t arrPeriodHistoBaseHP[]            = {      1      };
 
 // contrat Historique Heure Pleine / Heure creuse : 2 periods
 const char    kTicPeriodHistoHcHpCode[] PROGMEM = "HC..|HP..";
-const char    kTicPeriodHistoHcHpName[] PROGMEM = "Creuses|Pleines";
+const char    kTicPeriodHistoHcHpName[] PROGMEM = "Heures Creuses|Heures Pleines";
 const uint8_t arrPeriodHistoHcHpLevel[]         = {   1,      1    };
 const uint8_t arrPeriodHistoHcHpHP[]            = {   0,      1    };
 
 // contrat Historique EJP : 2 periods
 const char    kTicPeriodHistoEjpCode[] PROGMEM = "HN..|PM..";
-const char    kTicPeriodHistoEjpName[] PROGMEM = "Normales|Pointe Mobile";
+const char    kTicPeriodHistoEjpName[] PROGMEM = "Normale|Pointe Mobile";
 const uint8_t arrPeriodHistoEjpLevel[]         = {   1,          3,     };
 const uint8_t arrPeriodHistoEjpHP[]            = {   1,          1,     };
 
@@ -311,13 +316,13 @@ const uint8_t arrPeriodStandardBaseHP[]            = {      1      };
 
 // contrat Standard Heure Pleine / Heure creuse : 2 periods
 const char    kTicPeriodStandardHcHpCode[] PROGMEM = "HEURE CREUSE|HEURE PLEINE";
-const char    kTicPeriodStandardHcHpName[] PROGMEM = "Creuses|Pleines";
+const char    kTicPeriodStandardHcHpName[] PROGMEM = "Heures Creuses|Heures Pleines";
 const uint8_t arrPeriodStandardHcHpLevel[]         = {      1,             1        };
 const uint8_t arrPeriodStandardHcHpHP[]            = {      0,             1        };
 
 // contrat Standard EJP : 2 periods
 const char    kTicPeriodStandardEjpCode[] PROGMEM = "HEURE NORMALE|HEURE POINTE";
-const char    kTicPeriodStandardEjpName[] PROGMEM = "Normales|Pointe Mobile";
+const char    kTicPeriodStandardEjpName[] PROGMEM = "Normale|Pointe Mobile";
 const uint8_t arrPeriodStandardEjpLevel[]         = {   1,          3      };
 const uint8_t arrPeriodStandardEjpHP[]            = {   1,          1      };
 
@@ -329,7 +334,7 @@ const uint8_t arrPeriodStandardTempoHP[]            = {      0,           1,    
 
 // contrat PME/PMI : 16 periods
 const char    kTicPeriodPmePmiCode[] PROGMEM = "P|PM|HH|HM|HP|HC|HPH|HCH|HPE|HCE|HPD|HCD|HD|JA|DSM|SCM";
-const char    kTicPeriodPmePmiName[] PROGMEM = "Pointe|Pointe Mobile|Hiver|Hiver Mobile|Pleines|Creuses|Pleines Hiver|Creuses Hiver|Pleines Eté|Creuses Eté|Pleines 1/2 saison|Creuses 1/2 saison|1/2 saison|Juillet-Août|1/2 saison Mobile|Saison Creuse Mobile";
+const char    kTicPeriodPmePmiName[] PROGMEM = "Pointe|Pointe Mobile|Hiver|Hiver Mobile|Heures Pleines|Heures Creuses|Pleines Hiver|Creuses Hiver|Pleines Eté|Creuses Eté|Pleines 1/2 saison|Creuses 1/2 saison|1/2 saison|Juillet-Août|1/2 saison Mobile|Saison Creuse Mobile";
 const uint8_t arrPeriodPmePmiLevel[]         = {  3,         3,        1,       2,         1,      1,         1,            1,            1,          1,            1,                 1,              1,           1,           2,                  2          };
 const uint8_t arrPeriodPmePmiHP[]            = {  1,         1,        0,       1,         1,      0,         1,            0,            1,          0,            1,                 0,              0,           0,           1,                  0          };
 
@@ -360,6 +365,7 @@ const char    kTicPeriodEmeraude4Name[] PROGMEM = "Pointe|Pleines Hiver|Creuses 
 // teleinfo : configuration
 static struct {
   bool     restart   = false;                           // flag to ask for restart
+  uint8_t  battery   = 0;                               // tasmota is running on battery
   uint8_t  percent   = 100;                             // maximum acceptable power in percentage of contract power
   uint8_t  policy    = TELEINFO_POLICY_TELEMETRY;       // data publishing policy
   uint8_t  meter     = 1;                               // publish METER & PROD section
@@ -369,7 +375,7 @@ static struct {
   uint8_t  contract  = 1;                               // publish CONTRACT section
   long     max_volt  = TELEINFO_GRAPH_DEF_VOLTAGE;      // maximum voltage on graph
   long     max_power = TELEINFO_GRAPH_DEF_POWER;        // maximum power on graph
-  long     param[TELEINFO_CONFIG_MAX] = { TELEINFO_HISTO_DAY_DEFAULT, TELEINFO_HISTO_WEEK_DEFAULT, TELEINFO_GRAPH_DEF_WH_HOUR, TELEINFO_GRAPH_DEF_WH_DAY, TELEINFO_GRAPH_DEF_WH_MONTH, 0, 0 };      // graph configuration
+  long     param[TELEINFO_CONFIG_MAX] = { TELEINFO_HISTO_DAY_DEFAULT, TELEINFO_HISTO_WEEK_DEFAULT, TELEINFO_GRAPH_DEF_WH_HOUR, TELEINFO_GRAPH_DEF_WH_DAY, TELEINFO_GRAPH_DEF_WH_MONTH, 0, 0, 0, 0 };      // graph configuration
 } teleinfo_config;
 
 // teleinfo : current message
@@ -434,7 +440,6 @@ struct tic_json {
   uint8_t   calendar;                             // flag to publish CAL
 };
 static struct {
-  uint8_t     use_deepsleep = 0;                  // tasmota is using deep sleep mode
   uint8_t     serial     = TIC_SERIAL_INIT;       // serial port status
   uint8_t     reception  = TIC_RECEPTION_NONE;    // reception phase 
   uint8_t     display    = 0;                     // display errors on home page 
@@ -475,13 +480,14 @@ struct tic_phase {
   long  cosphi;                                   // current cos phi (x1000)
 }; 
 static struct {
-  long      papp        = 0;                      // current conso apparent power (VA)
-  long      pact        = 0;                      // current conso active power (W)
-  long      delta_mwh   = 0;                      // active conso delta since last total (milli Wh)
-  long      delta_mvah  = 0;                      // apparent power counter increment (milli VAh)
+  long      papp         = 0;                     // current conso apparent power (VA)
+  long      pact         = 0;                     // current conso active power (W)
+  long      delta_mwh    = 0;                     // active conso delta since last total (milli Wh)
+  long      delta_mvah   = 0;                     // apparent power counter increment (milli VAh)
+  long      yesterday_wh = 0;                     // global active conso total at previous midnight (Wh)
+  long long midnight_wh  = 0;                     // global active conso total at previous midnight (Wh)
+  long long total_wh     = 0;                     // global active conso total (Wh)
   long long index_wh[TELEINFO_INDEX_MAX];         // array of conso total of different tarif periods (Wh)
-  long long midnight_wh = 0;                      // global active conso total at previous midnight (Wh)
-  long long global_wh   = 0;                      // global active conso total (Wh)
   tic_cosphi cosphi;
   tic_phase  phase[ENERGY_MAX_PHASES];
   
@@ -501,13 +507,14 @@ static struct {
 
 // teleinfo : production mode
 static struct {
-  long      papp        = 0;                      // production instant apparent power 
-  long      pact        = 0;                      // production instant active power
-  long      papp_last   = 0;                      // last published apparent power
-  long      delta_mwh   = 0;                      // active conso delta since last total (milli Wh)
-  long      delta_mvah  = 0;                      // apparent power counter increment (milli VAh)
-  long long total_wh    = 0;                      // active production total
-  long long midnight_wh = 0;                      // active production total last midnight
+  long      papp         = 0;                     // production instant apparent power 
+  long      pact         = 0;                     // production instant active power
+  long      papp_last    = 0;                     // last published apparent power
+  long      delta_mwh    = 0;                     // active conso delta since last total (milli Wh)
+  long      delta_mvah   = 0;                     // apparent power counter increment (milli VAh)
+  long      yesterday_wh = 0;                     // active production total last midnight
+  long long midnight_wh  = 0;                     // active production total last midnight
+  long long total_wh     = 0;                     // active production total
   tic_cosphi cosphi;
 } teleinfo_prod;
 
@@ -698,7 +705,7 @@ void TeleinfoDriverPublishMeter ()
   ResponseAppend_P (PSTR (",\"PMAX\":%d"), (long)teleinfo_config.percent * teleinfo_contract.ssousc / 100);
 
   // conso 
-  if (teleinfo_conso.global_wh > 0)
+  if (teleinfo_conso.total_wh > 0)
   {
     // conso : loop thru phases
     current = power_app = power_act = 0;
@@ -723,16 +730,33 @@ void TeleinfoDriverPublishMeter ()
       if (teleinfo_conso.cosphi.nb_measure > 1) ResponseAppend_P (PSTR (",\"C%u\":%d.%02d"), value, teleinfo_conso.phase[phase].cosphi / 1000, teleinfo_conso.phase[phase].cosphi % 1000 / 10);
     } 
 
-    // conso : totals
+    // conso : global values
     ResponseAppend_P (PSTR (",\"P\":%d,\"W\":%d,\"I\":%d.%02d"), power_app, power_act, current / 1000, current % 1000 / 10);
+
+    // conso : cosphi
     if (teleinfo_conso.cosphi.nb_measure > 1) ResponseAppend_P (PSTR (",\"C\":%d.%02d"), teleinfo_conso.cosphi.value / 1000, teleinfo_conso.cosphi.value % 1000 / 10);
+
+    // conso : yesterday
+    ResponseAppend_P (PSTR (",\"YDAY\":%d"), teleinfo_conso.yesterday_wh);
+
+    // conso : today
+    if (teleinfo_conso.midnight_wh > 0) ResponseAppend_P (PSTR (",\"2DAY\":%d"), (long)(teleinfo_conso.total_wh - teleinfo_conso.midnight_wh));
   }
   
   // production 
   if (teleinfo_prod.total_wh != 0)
   {
+    // prod : global values
     ResponseAppend_P (PSTR (",\"PP\":%d,\"PW\":%d"), teleinfo_prod.papp, teleinfo_prod.pact);
+
+    // prod : cosphi
     if (teleinfo_prod.cosphi.nb_measure > 1) ResponseAppend_P (PSTR (",\"PC\":%d.%02d"), teleinfo_prod.cosphi.value / 1000, teleinfo_prod.cosphi.value % 1000 / 10);
+
+    // prod : yesterday
+    ResponseAppend_P (PSTR (",\"PYDAY\":%d"), teleinfo_prod.yesterday_wh);
+
+    // prod : today
+    if (teleinfo_prod.midnight_wh > 0) ResponseAppend_P (PSTR (",\"P2DAY\":%d"), (long)(teleinfo_prod.total_wh - teleinfo_prod.midnight_wh));
   } 
 
   // end of message
@@ -1228,7 +1252,7 @@ void TeleinfoDriverWebSensor ()
     //   consommation
     // ----------------
 
-    if (teleinfo_conso.global_wh > 0)
+    if (teleinfo_conso.total_wh > 0)
     {
       // consumption : separator and header
       WSContentSend_P (PSTR ("<hr>\n"));
@@ -1299,10 +1323,21 @@ void TeleinfoDriverWebSensor ()
       WSContentSend_P (PSTR ("<div style='width:2%%;padding:0px;'></div><div style='width:10%%;padding:0px;text-align:left;'>W</div>\n"));
       WSContentSend_P (PSTR ("</div>\n"));
 
-      // consumption : today's total
-      if (teleinfo_conso.midnight_wh != 0)
+     // consumption : yesterday's total
+      if (teleinfo_conso.yesterday_wh > 0)
       {
-        total = teleinfo_conso.global_wh - teleinfo_conso.midnight_wh;
+        WSContentSend_P (PSTR ("<div style='display:flex;padding:2px 0px;'>\n"));
+        WSContentSend_P (PSTR ("<div style='width:16%%;padding:0px;'></div>\n"));
+        WSContentSend_P (PSTR ("<div style='width:37%%;padding:0px;text-align:left;'>Hier</div>\n"));
+        WSContentSend_P (PSTR ("<div style='width:35%%;padding:0px;text-align:right;font-weight:bold;'>%d</div>\n"), teleinfo_conso.yesterday_wh);
+        WSContentSend_P (PSTR ("<div style='width:2%%;padding:0px;'></div><div style='width:10%%;padding:0px;text-align:left;'>Wh</div>\n"));
+        WSContentSend_P (PSTR ("</div>\n"));
+      }
+
+      // consumption : today's total
+      if (teleinfo_conso.midnight_wh > 0)
+      {
+        total = teleinfo_conso.total_wh - teleinfo_conso.midnight_wh;
         WSContentSend_P (PSTR ("<div style='display:flex;padding:2px 0px;'>\n"));
         WSContentSend_P (PSTR ("<div style='width:16%%;padding:0px;'></div>\n"));
         WSContentSend_P (PSTR ("<div style='width:37%%;padding:0px;text-align:left;'>Aujourd'hui</div>\n"));
@@ -1357,8 +1392,18 @@ void TeleinfoDriverWebSensor ()
       WSContentSend_P (PSTR ("<div style='width:2%%;padding:0px;'></div><div style='width:10%%;padding:0px;text-align:left;'>W</div>\n"));
       WSContentSend_P (PSTR ("</div>\n"));
 
+      // production : yesterday's total
+      if (teleinfo_prod.yesterday_wh > 0)
+      {
+        WSContentSend_P (PSTR ("<div style='display:flex;padding:2px 0px;'>\n"));
+        WSContentSend_P (PSTR ("<div style='width:16%%;padding:0px;'></div>\n"));
+        WSContentSend_P (PSTR ("<div style='width:37%%;padding:0px;text-align:left;'>Hier</div>\n"));
+        WSContentSend_P (PSTR ("<div style='width:35%%;padding:0px;text-align:right;font-weight:bold;'>%d</div>\n"), teleinfo_prod.yesterday_wh);
+        WSContentSend_P (PSTR ("<div style='width:2%%;padding:0px;'></div><div style='width:10%%;padding:0px;text-align:left;'>Wh</div>\n"));
+        WSContentSend_P (PSTR ("</div>\n"));
+      }
       // production : today's total
-      if (teleinfo_prod.midnight_wh != 0)
+      if (teleinfo_prod.midnight_wh > 0)
       {
         total = teleinfo_prod.total_wh - teleinfo_prod.midnight_wh;
         WSContentSend_P (PSTR ("<div style='display:flex;padding:2px 0px;'>\n"));
@@ -1667,7 +1712,7 @@ bool Xdrv15 (uint32_t function)
       TeleinfoDriverSaveBeforeRestart ();
       break;
     case FUNC_EVERY_SECOND:
-#ifdef USE_HOME_ASSISTANT
+#ifdef USE_TELEINFO_HOMEASSISTANT
       TeleinfoHomeAssistantEverySecond ();
 #endif
       break;

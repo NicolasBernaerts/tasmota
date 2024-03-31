@@ -168,7 +168,7 @@ long TeleinfoHistoConsoGetHour (const uint8_t index)
   long long value;
 
   // not available
-  if (teleinfo_conso.global_wh == 0) value = 0;
+  if (teleinfo_conso.total_wh == 0) value = 0;
 
   // out of range
   else if (index > 23) value = 0;
@@ -177,14 +177,14 @@ long TeleinfoHistoConsoGetHour (const uint8_t index)
   else if (index == 23)
   {
     if (teleinfo_histo.conso.hour_wh[index] == 0) value = 0;
-    else value = teleinfo_conso.global_wh - teleinfo_histo.conso.hour_wh[index];
+    else value = teleinfo_conso.total_wh - teleinfo_histo.conso.hour_wh[index];
   }
 
   // other slots
   else
   {
     if (teleinfo_histo.conso.hour_wh[index] == 0) value = 0;
-    else if (teleinfo_histo.conso.hour_wh[index + 1] == 0) value = teleinfo_conso.global_wh - teleinfo_histo.conso.hour_wh[index];
+    else if (teleinfo_histo.conso.hour_wh[index + 1] == 0) value = teleinfo_conso.total_wh - teleinfo_histo.conso.hour_wh[index];
     else value = teleinfo_histo.conso.hour_wh[index + 1] - teleinfo_histo.conso.hour_wh[index];
   }
 
@@ -275,12 +275,12 @@ void TeleinfoHistoSaveData ()
     str_line = str_text;
 
     // line : global counter
-    lltoa (teleinfo_conso.global_wh, str_text, 10);
+    lltoa (teleinfo_conso.total_wh, str_text, 10);
     str_line += ";";
     str_line += str_text;
 
     // line : daily counter
-    value = teleinfo_conso.global_wh - teleinfo_histo.conso.start_wh;
+    value = teleinfo_conso.total_wh - teleinfo_histo.conso.start_wh;
     lltoa (value, str_text, 10);
     str_line += ";";
     str_line += str_text;
@@ -310,9 +310,9 @@ void TeleinfoHistoSaveData ()
     file.close ();
 
     // reset historisation data
-    teleinfo_histo.conso.start_wh = teleinfo_conso.global_wh;
+    teleinfo_histo.conso.start_wh = teleinfo_conso.total_wh;
     for (index = 0; index < 24; index ++) teleinfo_histo.conso.hour_wh[index] = 0;
-    teleinfo_histo.conso.hour_wh[RtcTime.hour] = teleinfo_conso.global_wh;
+    teleinfo_histo.conso.hour_wh[RtcTime.hour] = teleinfo_conso.total_wh;
     for (index = 0; index < TELEINFO_INDEX_MAX; index ++) teleinfo_histo.conso.period_wh[index] = 0;
     teleinfo_histo.conso.period_wh[teleinfo_contract.period] = teleinfo_conso.index_wh[teleinfo_contract.period];
   }
@@ -426,13 +426,13 @@ void TeleinfoHistoEverySecond ()
   if (!TeleinfoDriverMeterReady ()) return;
 
   // if conso is defined
-  if (teleinfo_conso.global_wh > 0)
+  if (teleinfo_conso.total_wh > 0)
   {
     // if needed, init start counter
-    if (teleinfo_histo.conso.start_wh == 0) teleinfo_histo.conso.start_wh = teleinfo_conso.global_wh;
+    if (teleinfo_histo.conso.start_wh == 0) teleinfo_histo.conso.start_wh = teleinfo_conso.total_wh;
 
     // if needed, init hourly counter
-    if (teleinfo_histo.conso.hour_wh[hour] == 0) teleinfo_histo.conso.hour_wh[hour] = teleinfo_conso.global_wh;
+    if (teleinfo_histo.conso.hour_wh[hour] == 0) teleinfo_histo.conso.hour_wh[hour] = teleinfo_conso.total_wh;
 
     // if needed, init current period counter
     if (period < TELEINFO_INDEX_MAX)
@@ -496,7 +496,7 @@ void TeleinfoHistoDisplayFrame (const uint8_t month, const uint8_t day)
 // Append Teleinfo histo button to main page
 void TeleinfoHistoWebMainButton ()
 {
-  if (teleinfo_conso.global_wh > 0) WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>Consommation</button></form></p>\n"), D_TELEINFO_PAGE_GRAPH_CONSO);
+  if (teleinfo_conso.total_wh > 0) WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>Consommation</button></form></p>\n"), D_TELEINFO_PAGE_GRAPH_CONSO);
   if (teleinfo_prod.total_wh > 0)   WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>Production</button></form></p>\n"), D_TELEINFO_PAGE_GRAPH_PROD);
 }
 

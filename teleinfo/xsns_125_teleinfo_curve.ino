@@ -691,7 +691,7 @@ void TeleinfoCurveDisplayFrame (const uint8_t data_type, const uint8_t month, co
 // Append Teleinfo curve button to main page
 void TeleinfoCurveWebMainButton ()
 {
-  if (teleinfo_conso.global_wh > 0) WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>Courbes</button></form></p>\n"), D_TELEINFO_PAGE_GRAPH);
+  if (teleinfo_conso.total_wh > 0) WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>Courbes</button></form></p>\n"), D_TELEINFO_PAGE_GRAPH);
 }
 
 // Display graph frame and time marks

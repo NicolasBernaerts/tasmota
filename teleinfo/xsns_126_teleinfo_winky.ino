@@ -172,6 +172,9 @@ void TeleinfoWinkyInit ()
   // if USB not connected and capa not charged enough, entering deep sleep
   if (!usb_ok && !capa_ok) TeleinfoWinkyEnterSleepMode ();
 
+  // if no usb, declare tasmota on battery
+  if (!usb_ok) teleinfo_config.battery = 1;
+
   // get start datatime_t TeleinfoHistoGetLastWrite (const uint8_t period)
   teleinfo_winky.time_boot = millis ();
   teleinfo_winky.vcap_boot = TeleinfoWinkySensorGetVoltage (WINKY_SOURCE_CAPA);
@@ -183,7 +186,8 @@ void TeleinfoWinkyInit ()
 // called 10 times per second
 void TeleinfoWinkyEvery100ms ()
 {
-  bool publish;
+  bool    publish;
+  uint8_t level_usb, level_capa;
 
   // check for network connectivity
   if (teleinfo_winky.time_ip == UINT32_MAX)
@@ -204,12 +208,16 @@ void TeleinfoWinkyEvery100ms ()
     if (RtcTime.valid) teleinfo_winky.time_ntp = millis ();
   }
 
-  // if USB not connected
-  if (TeleinfoWinkySourceGetLevel (WINKY_SOURCE_USB) < WINKY_LEVEL_CORRECT)
+  // check for USB connexion
+  level_usb = TeleinfoWinkySourceGetLevel (WINKY_SOURCE_USB);
+  if (level_usb >= WINKY_LEVEL_CORRECT) teleinfo_config.battery = 0;
+
+  // else, USB is not connected, check capa level
+  else
   {
-    // if capa is too low
-    publish = (TeleinfoWinkySourceGetLevel (WINKY_SOURCE_CAPA) <= WINKY_LEVEL_DISCHARGED);
-    if (publish)
+    // check if capa is too low
+    level_capa = TeleinfoWinkySourceGetLevel (WINKY_SOURCE_CAPA);
+    if (level_capa <= WINKY_LEVEL_DISCHARGED)
     {
       // stop serial reception
       TeleinfoSerialStop ();
@@ -219,19 +227,20 @@ void TeleinfoWinkyEvery100ms ()
 
 #ifdef USE_TELEINFO_DOMOTICZ
       // publish remaining domoticz messages
-      publish  = (TeleinfoWinkySourceGetLevel (WINKY_SOURCE_CAPA) > WINKY_LEVEL_CRITICAL);
-      publish &= TeleinfoDomoticzPublishNeeded ();
+      publish = TeleinfoDomoticzPublishNeeded ();
       while (publish)
       {
+        // publish next topic
         TeleinfoDomoticzPublish ();
-        publish  = (TeleinfoWinkySourceGetLevel (WINKY_SOURCE_CAPA) > WINKY_LEVEL_CRITICAL);
-        publish &= TeleinfoDomoticzPublishNeeded ();
+
+        // publish next if capa is still charged enough
+        level_capa = TeleinfoWinkySourceGetLevel (WINKY_SOURCE_CAPA);
+        publish = ((level_capa > WINKY_LEVEL_CRITICAL) && TeleinfoDomoticzPublishNeeded ());
       }
 #endif    // USE_TELEINFO_DOMOTICZ
 
-      // if enought power, publish last messages
-      publish = (TeleinfoWinkySourceGetLevel (WINKY_SOURCE_CAPA) > WINKY_LEVEL_CRITICAL);
-      if (publish)
+      // if capa is still charged enough, publish last messages
+      if (level_capa > WINKY_LEVEL_CRITICAL)
       {
         // publish last meter and last alert
         if (teleinfo_config.meter) TeleinfoDriverPublishMeter ();
