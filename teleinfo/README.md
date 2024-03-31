@@ -42,9 +42,10 @@ Il gère les compteurs en mode consommation et production.
 Ce firmware gère les données suivantes :
   * Tension (**V**)
   * Courant (**A**)
-  * Puissance instantanée et active (**VA** & **W**)
-  * Compteurs de période (**Wh**)
-  * Facteur de puissance (**Cosφ**), calculé sur la base du compteur de période et de la puissance instantanée.
+  * Puissance instantanée (**VA**)
+  * Puissance active (**W**)
+  * Facteur de puissance (**Cosφ**)
+  * Compteurs quotidiens et de période (**Wh**)
 
 Il fournit des pages web spécifiques :
   * **/tic** : suivi en temps réel des données réçues
@@ -54,7 +55,7 @@ Il fournit des pages web spécifiques :
   
 Si votre compteur est en mode historique, la tension est forcée à 230V.
 
-Si vous souhaitez supprimer l'affichage des données Energy sur la page d'accueil, vous devez passer la commande suivante en console :
+Si vous souhaitez supprimer l'affichage des données **Energy** sur la page d'accueil, vous devez passer la commande suivante en console :
 
     websensor3 0
 
@@ -63,16 +64,17 @@ Le protocole **Teleinfo** est décrit dans [ce document](https://www.enedis.fr/s
 ## Publication MQTT
 
 En complément de la section officielle **ENERGY**, les sections suivantes peuvent être publiées :
-  * **METER** : données de consommation et prodcution en temps réel sous une forme compacte.
+  * **METER** : données normalisées de consommation et production en temps réel
   * **ALERT** : alertes publiées dans les messages STGE (changement Tempo / EJP, surpuissance & survoltage)
   * **CONTRACT** : données du contrat intégrant les compteurs de périodes en Wh
-  * **CAL** : calendrier consolidé entre le compteur et les données RTE (Tempo, Pointe & Ecowatt)
+  * **CAL** : calendrier consolidé entre la publication compteur et les données RTE reçues (Tempo, Pointe et/ou Ecowatt)
   * **RELAY** : relais virtuels publiés par le compteur
   * **TIC** : etiquettes et données brutes reçues depuis le compteur
 
 Toutes ces publications sont activables à travers la page **Configuration Teleinfo**.
 
-Voici la liste des données publiées dans la section **METER** :
+Données de **consommation** publiées dans la section **METER** :
+
   * **PH** = nombre de phases (1 ou 3)
   * **PSUB** = puissance apparente (VA) maximale par phase dans le contrat
   * **ISUB** = courant (A) maximal par phase dans le contrat 
@@ -83,10 +85,16 @@ Voici la liste des données publiées dans la section **METER** :
   * **C** = facteur de puissance (cos φ)
   * **2DAY** = Total consommé aujourd'hui (Wh)
   * **YDAY** = Total consommé hier (Wh)
+
+Données de **consommation** par **phase** publiées dans la section **METER** :
+
   * **Ix** = courant instantané (A) sur la phase **x** 
   * **Ux** = tension (V) sur la phase **x** 
   * **Px** = puissance instantanée (VA) sur la phase **x** 
   * **Wx** = puissance active (W) sur la phase **x**
+
+Données de **production** publiées dans la section **METER** :
+
   * **PP** = puissance instantanée (VA) produite
   * **PW** = puissance active (W) produite
   * **PC** = facteur de puissance (cos φ) de la production
@@ -99,12 +107,12 @@ Voici les données publiées dans la section **CAL** :
   * **today** = section avec le niveau et le type de chaque heure du jour
   * **tomorrow** = section avec le niveau et le type de chaque heure du lendemain
 
-Voici les données publiées dans la section **RELAY** :
+Données publiées dans la section **RELAY** :
   * **R1** = état du relai virtual n°1 (0:ouvert, 1:fermé)
   * **R2** = état du relai virtual n°2 (0:ouvert, 1:fermé)
   * .. 
 
-Voici les données publiées dans la section **ALERT** :
+Données publiées dans la section **ALERT** :
   * **Load** = indicateur de surconsommation (0:pas de pb, 1:surconsommation)
   * **Volt** = indicateur de surtension (0:pas de pb, 1:au moins 1 phase est en surtension)
   * **Preavis** = niveau du prochain préavis (utilisé en Tempo & EJP)
