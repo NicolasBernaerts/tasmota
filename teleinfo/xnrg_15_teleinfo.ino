@@ -98,6 +98,7 @@
     13/01/2024 - v13.4 - Activate serial reception when NTP time is ready
     25/02/2024 - v13.5 - Lots of bug fixes (thanks to B. Monot and Sebastien)
     05/03/2024 - v13.6 - Removal of all float and double calculations
+    13/04/2024 - v13.7 - Adjust cosphi calculation for auto-prod router usage
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -110,8 +111,6 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-
-#ifndef FIRMWARE_SAFEBOOT
 
 #ifdef USE_ENERGY_SENSOR
 #ifdef USE_TELEINFO
@@ -156,7 +155,7 @@ bool TeleinfoHandleCommand ()
       AddLog (LOG_LEVEL_INFO, PSTR ("  historique   set historique mode at 1200 bauds (needs restart)"));
       AddLog (LOG_LEVEL_INFO, PSTR ("  standard     set Standard mode at 9600 bauds (needs restart)"));
       AddLog (LOG_LEVEL_INFO, PSTR ("  stats        display reception statistics"));
-      AddLog (LOG_LEVEL_INFO, PSTR ("  display=%u   display error counters on home page"), teleinfo_meter.display);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  error=%u    display error counters on home page"), teleinfo_config.display);
       AddLog (LOG_LEVEL_INFO, PSTR ("  percent=%u  maximum acceptable contract (%%)"), teleinfo_config.percent);
 
       // publishing policy
@@ -267,14 +266,14 @@ bool TeleinfoExecuteCommand (const char* pstr_command, const char* pstr_param)
       serviced = true;
       break;
 
-    case TIC_CMND_DISPLAY:
-      serviced = true;
-      if (serviced) teleinfo_meter.display = (uint8_t)value;
-      break;
-
     case TIC_CMND_PERCENT:
       serviced = (value < TELEINFO_PERCENT_MAX);
       if (serviced) teleinfo_config.percent = (uint8_t)value;
+      break;
+
+    case TIC_CMND_ERROR:
+      serviced = true;
+      teleinfo_config.display = (uint8_t)value;
       break;
 
     case TIC_CMND_POLICY:
@@ -493,7 +492,7 @@ void TeleinfoLoadConfig ()
   teleinfo_config.tic       = Settings->teleinfo.tic;
   teleinfo_config.calendar  = Settings->teleinfo.calendar;
   teleinfo_config.relay     = Settings->teleinfo.relay;
-  teleinfo_config.contract   = Settings->teleinfo.contract;
+  teleinfo_config.contract  = Settings->teleinfo.contract;
   teleinfo_config.max_volt  = TELEINFO_GRAPH_MIN_VOLTAGE + Settings->teleinfo.adjust_v * 5;
   teleinfo_config.max_power = TELEINFO_GRAPH_MIN_POWER + Settings->teleinfo.adjust_va * 3000;
 
@@ -585,15 +584,11 @@ void TeleinfoSaveConfig ()
   File    file;
 
   // update today and yesterday conso
-  today_wh = 0;
-  if ((teleinfo_conso.total_wh > 0) && (teleinfo_conso.midnight_wh > 0)) today_wh = teleinfo_conso.total_wh - teleinfo_conso.midnight_wh;
-  teleinfo_config.param[TELEINFO_CONFIG_TODAY_CONSO] = (long)today_wh;
+  teleinfo_config.param[TELEINFO_CONFIG_TODAY_CONSO] = teleinfo_conso.today_wh;
   teleinfo_config.param[TELEINFO_CONFIG_YESTERDAY_CONSO] = teleinfo_conso.yesterday_wh;
 
   // update today and yesterday production
-  today_wh = 0;
-  if ((teleinfo_prod.total_wh > 0) && (teleinfo_prod.midnight_wh > 0)) today_wh = teleinfo_prod.total_wh - teleinfo_prod.midnight_wh;
-  teleinfo_config.param[TELEINFO_CONFIG_TODAY_PROD] = (long)today_wh;
+  teleinfo_config.param[TELEINFO_CONFIG_TODAY_PROD] = teleinfo_prod.today_wh;;
   teleinfo_config.param[TELEINFO_CONFIG_YESTERDAY_PROD] = teleinfo_prod.yesterday_wh;
 
   // open file and write content
@@ -655,15 +650,18 @@ char TeleinfoCalculateChecksum (const char* pstr_line, char* pstr_etiquette, con
   for (index = 0; index < size_checksum; index ++) line_checksum += (uint8_t)pstr_line[index];
   line_checksum = (line_checksum & 0x3F) + 0x20;
 
-  // if different than given checksum,
+  // if checksum difference
   if (line_checksum != given_checksum)
   {
-    // if network is up, account error
-    teleinfo_meter.nb_error++;
-    AddLog (LOG_LEVEL_DEBUG, PSTR ("TIC: Error [%s]"), pstr_line);
-
-    // return error
+    // declare error
     line_checksum = 0;
+
+    // if network is fully up, account error
+    if (MqttIsConnected ())
+    {
+      teleinfo_meter.nb_error++;
+      AddLog (LOG_LEVEL_DEBUG, PSTR ("TIC: Error [%s]"), pstr_line);
+    }
   }
 
   // replace all TABS and SPACE by single SPACE
@@ -751,6 +749,7 @@ void TeleinfoUpdateConsoGlobalCounter ()
   {
     teleinfo_conso.delta_mwh += 1000 * (long)(total - teleinfo_conso.total_wh);
     teleinfo_conso.total_wh   = total;
+    if (teleinfo_conso.midnight_wh > 0) teleinfo_conso.today_wh = (long)(teleinfo_conso.total_wh - teleinfo_conso.midnight_wh);
   }
 }
 
@@ -793,6 +792,7 @@ void TeleinfoProdGlobalCounterUpdate (const char* pstr_value)
   {
     teleinfo_prod.delta_mwh += 1000 * (long)(total - teleinfo_prod.total_wh);
     teleinfo_prod.total_wh   = total;
+    if (teleinfo_prod.midnight_wh > 0) teleinfo_prod.today_wh = (long)(teleinfo_prod.total_wh - teleinfo_prod.midnight_wh);
   }
 }
 
@@ -1577,25 +1577,25 @@ void TeleinfoUpdateCosphi (long cosphi, struct tic_cosphi &struct_cosphi, const 
   delta = papp - struct_cosphi.last_papp;
   struct_cosphi.last_papp = papp;
 
-  // if apparent power increased more than 500 VA, average on 2 samples to update cosphi very fast
+  // if apparent power increased more than 5% of the contract power, average on 2 samples to update cosphi very fast
   if (delta >= contract5percent) for (index = 1; index < TELEINFO_COSPHI_SAMPLE; index++) struct_cosphi.arr_value[index] = LONG_MAX;
 
-  // else if apparent power increased more than 200 VA, average on 4 samples to update cosphi quite fast
+  // else if apparent power increased more than 2% of the contract power, average on 4 samples to update cosphi quite fast
   else if (delta >= contract2percent) for (index = 3; index < TELEINFO_COSPHI_SAMPLE; index++) struct_cosphi.arr_value[index] = LONG_MAX;
 
-  // else if apparent power decreased more than 200 VA, average on 2 samples to update cosphi very fast
+  // else if apparent power decreased more than 5% of the contract power, average on 2 samples to update cosphi very fast
   else if (delta <= -contract5percent) for (index = 1; index < TELEINFO_COSPHI_SAMPLE; index++) struct_cosphi.arr_value[index] = LONG_MAX;
 
-  // if apparent power increased, cancel cosphi calculation to avoid spikes
+  // if apparent power increased more than 5% of the contract power, cancel current cosphi average calculation to avoid spikes
   if (delta >= contract5percent) return;
-//  if (delta >= 200) cosphi = struct_cosphi.arr_value[0];
 
   // shift values and update first one
   for (index = TELEINFO_COSPHI_SAMPLE - 1; index > 0; index--) struct_cosphi.arr_value[index] = struct_cosphi.arr_value[index - 1];
   struct_cosphi.arr_value[0] = cosphi;
 
   // calculate cosphi average
-  result = sample = 0;
+  result = 0;
+  sample = 0;
   for (index = 0; index < TELEINFO_COSPHI_SAMPLE; index++)
     if (struct_cosphi.arr_value[index] != LONG_MAX) { result += struct_cosphi.arr_value[index]; sample++; }
 
@@ -1696,14 +1696,16 @@ void TeleinfoInit ()
     teleinfo_message.arr_last[index].checksum      = 0;
   }
 
-  // init cosphi data
-  teleinfo_conso.cosphi.value      = 1000;
-  teleinfo_prod.cosphi.value       = 1000;
-  teleinfo_conso.cosphi.nb_measure = 0;
-  teleinfo_prod.cosphi.nb_measure  = 0;
-  teleinfo_conso.cosphi.last_papp  = 0;
-  teleinfo_prod.cosphi.last_papp   = 0;
-  for (index = 0; index < TELEINFO_COSPHI_SAMPLE; index++)
+  // init cosphi calculation data
+  teleinfo_conso.cosphi.nb_measure   = 0;
+  teleinfo_prod.cosphi.nb_measure    = 0;
+  teleinfo_conso.cosphi.last_papp    = 0;
+  teleinfo_prod.cosphi.last_papp     = 0;
+  teleinfo_conso.cosphi.value        = TELEINFO_COSPHI_DEFAULT;     
+  teleinfo_prod.cosphi.value         = TELEINFO_COSPHI_DEFAULT;
+  teleinfo_conso.cosphi.arr_value[0] = TELEINFO_COSPHI_DEFAULT;
+  teleinfo_prod.cosphi.arr_value[0]  = TELEINFO_COSPHI_DEFAULT;
+  for (index = 1; index < TELEINFO_COSPHI_SAMPLE; index++)
   {
     teleinfo_conso.cosphi.arr_value[index] = LONG_MAX;
     teleinfo_prod.cosphi.arr_value[index]  = LONG_MAX;
@@ -1874,6 +1876,14 @@ void TeleinfoReceptionMessageStop ()
         {
           cosphi = 1000 * 100 * teleinfo_conso.delta_mwh / teleinfo_conso.delta_mvah;
           TeleinfoUpdateCosphi (cosphi, teleinfo_conso.cosphi, teleinfo_conso.papp);
+        }
+
+        // else try to forecast cosphi evolution in case of very low power
+        else
+        {
+          cosphi = 1000 * 100 * 1000 / teleinfo_conso.delta_mvah;
+          if (cosphi < 50) cosphi = 0;
+          if (cosphi < teleinfo_conso.cosphi.value) TeleinfoUpdateCosphi (cosphi, teleinfo_conso.cosphi, teleinfo_conso.papp);
         }
       }
 
@@ -2103,6 +2113,14 @@ void TeleinfoReceptionMessageStop ()
       {
         cosphi = 1000 * 100 * teleinfo_prod.delta_mwh / teleinfo_prod.delta_mvah;
         TeleinfoUpdateCosphi (cosphi, teleinfo_prod.cosphi, teleinfo_prod.papp);
+      }
+
+      // else try to forecast cosphi drop in case of very low active power production (photovoltaic router ...)
+      else
+      {
+        cosphi = 1000 * 100 * 1000 / teleinfo_prod.delta_mvah;
+        if (cosphi < 50) cosphi = 0;
+        if (cosphi < teleinfo_prod.cosphi.value) TeleinfoUpdateCosphi (cosphi, teleinfo_prod.cosphi, teleinfo_prod.papp);
       }
     }
 
@@ -2748,10 +2766,12 @@ void TeleinfoEnergyEverySecond ()
   if (teleinfo_meter.days != RtcTime.days)
   {
     // update conso counters
+    teleinfo_conso.today_wh = 0;
     teleinfo_conso.yesterday_wh = (long)(teleinfo_conso.total_wh - teleinfo_conso.midnight_wh);
     teleinfo_conso.midnight_wh  = teleinfo_conso.total_wh;
 
     // update prod counters
+    teleinfo_prod.today_wh = 0;
     teleinfo_prod.yesterday_wh = (long)(teleinfo_prod.total_wh - teleinfo_prod.midnight_wh);
     teleinfo_prod.midnight_wh  = teleinfo_prod.total_wh;
 
@@ -2830,4 +2850,3 @@ bool Xnrg15 (uint32_t function)
 #endif      // USE_TELEINFO
 #endif      // USE_ENERGY_SENSOR
 
-#endif      // FIRMWARE_SAFEBOOT

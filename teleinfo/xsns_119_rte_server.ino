@@ -714,7 +714,7 @@ bool RteStreamTokenBegin ()
 
   // check private key
   is_ok = (strlen (rte_config.str_private_key) > 0);
-  if (!is_ok) AddLog (LOG_LEVEL_ERROR, PSTR ("RTE: Token - Private key missing"));
+  if (!is_ok) AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Token - Private key missing"));
 
   // prepare connexion
   if (is_ok)
@@ -726,7 +726,7 @@ bool RteStreamTokenBegin ()
     if (is_ok) AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Token - Connexion done [%s]"), RTE_URL_OAUTH2);
     else
     {
-      AddLog (LOG_LEVEL_ERROR, PSTR ("RTE: Token - Connexion refused [%s]"), RTE_URL_OAUTH2);
+      AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Token - Connexion refused [%s]"), RTE_URL_OAUTH2);
       rte_http.end ();
       rte_wifi.stop ();
     }
@@ -767,7 +767,7 @@ bool RteStreamTokenGet ()
   if (is_ok) AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Token - Success [%d]"), http_code);
   else
   {
-    AddLog (LOG_LEVEL_ERROR, PSTR ("RTE: Token - Error %s [%d]"), rte_http.errorToString (http_code).c_str(), http_code);
+    AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Token - Error %s [%d]"), rte_http.errorToString (http_code).c_str(), http_code);
     rte_http.end ();
     rte_wifi.stop ();
   }
@@ -869,7 +869,7 @@ bool RteEcowattStreamBegin ()
     if (is_ok) AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Ecowatt - Connexion done [%s]"), str_text);
     else
     {
-      AddLog (LOG_LEVEL_ERROR, PSTR ("RTE: Ecowatt - Connexion refused [%s]"), str_text);
+      AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Ecowatt - Connexion refused [%s]"), str_text);
       rte_http.end ();
       rte_wifi.stop ();
     }
@@ -910,7 +910,7 @@ bool RteEcowattStreamGet ()
   if (is_ok) AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Ecowatt - Success [%d]"), http_code);
   else
   {
-    AddLog (LOG_LEVEL_ERROR, PSTR ("RTE: Ecowatt - Error %s [%d]"), rte_http.errorToString (http_code).c_str(), http_code);
+    AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Ecowatt - Error %s [%d]"), rte_http.errorToString (http_code).c_str(), http_code);
     rte_http.end ();
     rte_wifi.stop ();
   }
@@ -1065,13 +1065,15 @@ void RteTempoStreamRetry ()
 bool RteTempoStreamBegin ()
 {
   bool     is_ok;
+  int32_t  tz_offset;
   uint32_t current_time;
   TIME_T   start_dst, stop_dst;
+//  char     str_offset[8];
   char     str_text[256];
 
   // check token
   is_ok = (strlen (rte_update.str_token) > 0);
-  if (!is_ok) AddLog (LOG_LEVEL_ERROR, PSTR ("RTE: Tempo - Token missing"));
+  if (!is_ok) AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Tempo - Token missing"));
 
   // prepare connexion
   if (is_ok) 
@@ -1081,8 +1083,12 @@ bool RteTempoStreamBegin ()
     BreakTime (current_time - 86400, start_dst);
     BreakTime (current_time + 172800, stop_dst);
 
+    // calculate timezone offset
+    tz_offset = Rtc.time_timezone / 60;
+
     // generate URL
-    sprintf (str_text, "%s?start_date=%04u-%02u-%02uT00:00:00%%2B01:00&end_date=%04u-%02u-%02uT00:00:00%%2B01:00", RTE_URL_TEMPO_DATA, 1970 + start_dst.year, start_dst.month, start_dst.day_of_month, 1970 + stop_dst.year, stop_dst.month, stop_dst.day_of_month);
+    sprintf_P (str_text, PSTR ("%s?start_date=%04u-%02u-%02uT00:00:00+%02d:00&end_date=%04u-%02u-%02uT00:00:00+%02d:00"), RTE_URL_TEMPO_DATA, 1970 + start_dst.year, start_dst.month, start_dst.day_of_month, tz_offset, 1970 + stop_dst.year, stop_dst.month, stop_dst.day_of_month, tz_offset);
+    AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Tempo - URL %s"), str_text);
 
     // connexion
     is_ok = rte_http.begin (rte_wifi, str_text);
@@ -1091,7 +1097,7 @@ bool RteTempoStreamBegin ()
     if (is_ok) AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Tempo - Connexion done [%s]"), str_text);
     else
     {
-      AddLog (LOG_LEVEL_ERROR, PSTR ("RTE: Tempo - Connexion refused [%s]"), str_text);
+      AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Tempo - Connexion refused [%s]"), str_text);
       rte_http.end ();
       rte_wifi.stop ();
     }
@@ -1132,7 +1138,7 @@ bool RteTempoStreamGet ()
   if (is_ok) AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Tempo - Success [%d]"), http_code);
   else
   {
-    AddLog (LOG_LEVEL_ERROR, PSTR ("RTE: Tempo - Error %s [%d]"), rte_http.errorToString (http_code).c_str(), http_code);
+    AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Tempo - Error %s [%d]"), rte_http.errorToString (http_code).c_str(), http_code);
     rte_http.end ();
     rte_wifi.stop ();
   }
@@ -1204,8 +1210,8 @@ uint8_t RtePointeGetGlobalLevel (const uint8_t day, const uint8_t slot)
   // convert level
   switch (level)
   {
-    case RTE_POINTE_LEVEL_BLUE: result = RTE_LEVEL_BLUE; break;
-    case RTE_POINTE_LEVEL_RED:  result = RTE_LEVEL_RED; break;
+    case RTE_POINTE_LEVEL_BLUE: result = RTE_LEVEL_BLUE;    break;
+    case RTE_POINTE_LEVEL_RED:  result = RTE_LEVEL_RED;     break;
     default:                    result = RTE_LEVEL_UNKNOWN; break;
   }
 
@@ -1257,7 +1263,7 @@ bool RtePointeStreamBegin ()
     if (is_ok) AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Pointe - Connexion done [%s]"), str_text);
     else
     {
-      AddLog (LOG_LEVEL_ERROR, PSTR ("RTE: Pointe - Connexion refused [%s]"), str_text);
+      AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Pointe - Connexion refused [%s]"), str_text);
       rte_http.end ();
       rte_wifi.stop ();
     }
@@ -1298,7 +1304,7 @@ bool RtePointeStreamGet ()
   if (is_ok) AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Pointe - Success [%d]"), http_code);
   else
   {
-    AddLog (LOG_LEVEL_ERROR, PSTR ("RTE: Pointe - Error %s [%d]"), rte_http.errorToString (http_code).c_str(), http_code);
+    AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Pointe - Error %s [%d]"), rte_http.errorToString (http_code).c_str(), http_code);
     rte_http.end ();
     rte_wifi.stop ();
   }

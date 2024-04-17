@@ -18,8 +18,6 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef FIRMWARE_SAFEBOOT
-
 #ifdef USE_TELEINFO
 #ifdef USE_TELEINFO_HISTO
 
@@ -1271,5 +1269,3 @@ bool Xsns124 (uint32_t function)
 
 #endif    // USE_TELEINFO_HISTO
 #endif    // USE_TELEINFO
-
-#endif    // FIRMWARE_SAFEBOOT

@@ -18,10 +18,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef FIRMWARE_SAFEBOOT
-
 #ifdef USE_TELEINFO
-
 #ifdef USE_WINKY
 
 // declare teleinfo winky sensor
@@ -186,8 +183,7 @@ void TeleinfoWinkyInit ()
 // called 10 times per second
 void TeleinfoWinkyEvery100ms ()
 {
-  bool    publish;
-  uint8_t level_usb, level_capa;
+  uint8_t result, level_usb, level_capa;
 
   // check for network connectivity
   if (teleinfo_winky.time_ip == UINT32_MAX)
@@ -225,30 +221,32 @@ void TeleinfoWinkyEvery100ms ()
       // log end
       AddLog (LOG_LEVEL_INFO, PSTR ("TIC: CAPA voltage low, switching off ..."));
 
-#ifdef USE_TELEINFO_DOMOTICZ
-      // publish remaining domoticz messages
-      publish = TeleinfoDomoticzPublishNeeded ();
-      while (publish)
-      {
-        // publish next topic
-        TeleinfoDomoticzPublish ();
-
-        // publish next if capa is still charged enough
-        level_capa = TeleinfoWinkySourceGetLevel (WINKY_SOURCE_CAPA);
-        publish = ((level_capa > WINKY_LEVEL_CRITICAL) && TeleinfoDomoticzPublishNeeded ());
-      }
-#endif    // USE_TELEINFO_DOMOTICZ
-
       // if capa is still charged enough, publish last messages
       if (level_capa > WINKY_LEVEL_CRITICAL)
       {
         // publish last meter and last alert
         if (teleinfo_config.meter) TeleinfoDriverPublishMeter ();
         TeleinfoDriverPublishAlert ();
-
-        // publish WINKY section
-        TeleinfoWinkyPublish ();
       }
+
+#ifdef USE_TELEINFO_DOMOTICZ
+      // publish remaining domoticz messages
+      result = 0;
+      while (result < MAX_DOMOTICZ_SNS_IDX)
+      {
+        // publish next if capa is still charged enough
+        level_capa = TeleinfoWinkySourceGetLevel (WINKY_SOURCE_CAPA);
+        if (level_capa < WINKY_LEVEL_CRITICAL) result = MAX_DOMOTICZ_SNS_IDX;
+          else result = DomoticzIntegrationPublish ();
+      }
+#endif    // USE_TELEINFO_DOMOTICZ
+
+#ifdef USE_TELEINFO_HOMIE
+      HomieIntegrationPublishAllData ();
+#endif    // USE_TELEINFO_HOMIE
+
+      // if capa is still charged enough, publish publish WINKY message
+      if (level_capa > WINKY_LEVEL_CRITICAL) TeleinfoWinkyPublish ();
 
       // enter deep sleep
       TeleinfoWinkyEnterSleepMode ();
@@ -332,7 +330,4 @@ bool Xsns126 (uint32_t function)
 }
 
 #endif    // USE_WINKY
-
 #endif    // USE_TELEINFO
-
-#endif    // FIRMWARE_SAFEBOOT

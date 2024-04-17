@@ -110,6 +110,10 @@
                          Section COUNTER renamed as CONTRACT with addition of contract data
     28/03/2024 - v14.2 - Add Today and Yesterday conso and Prod
                          Disable Tasmota auto-discovery
+    04/04/2024 - v14.3 - Correct RTE Tempo summer bug (different URL for Heure Ete / Heure Hiver)
+                         All ESP32 are using Arduino 3.0 libraries
+                         Add integration of Homie auto-discovery
+                         Update Home assistant auto-discovery with state_class
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License aStart STGE managements published by
@@ -124,8 +128,6 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-
-#ifndef FIRMWARE_SAFEBOOT
 
 #ifndef _USER_CONFIG_OVERRIDE_H_
 #define _USER_CONFIG_OVERRIDE_H_
@@ -155,7 +157,7 @@
 // extension description
 #define EXTENSION_NAME    "Teleinfo"          // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
-#define EXTENSION_VERSION "14.2"              // version
+#define EXTENSION_VERSION "14.3"              // version
 
 // FTP server credentials
 #ifdef USE_FTPSERVER
@@ -171,7 +173,8 @@
 
 // home management integration
 #define USE_TELEINFO_DOMOTICZ                 // Domoticz intégration
-#define USE_TELEINFO_HOMEASSISTANT            // Home Assistant intégration
+#define USE_TELEINFO_HASS                     // Home Assistant auto-discovery intégration
+#define USE_TELEINFO_HOMIE                    // Homie protocol auto-discovery intégration
 
 // build
 #ifdef BUILD_ESP32S3_16M
@@ -440,4 +443,3 @@
 
 #endif  // ESP32
 
-#endif  // FIRMWARE_SAFEBOOT
