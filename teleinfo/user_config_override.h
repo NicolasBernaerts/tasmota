@@ -166,10 +166,12 @@
 #endif
 
 // complementary modules
+#ifdef USE_TELEINFO
 #define USE_IPADDRESS                         // Add fixed IP configuration page
 #define USE_TIMEZONE                          // Enable Timezone management
 #define USE_TIMEZONE_WEB_CONFIG               // Enable timezone web configuration page
 #define USE_TCPSERVER                         // Enable TCP server (for TIC to TCP)
+# endif     // USE_TELEINFO
 
 // home management integration
 #define USE_TELEINFO_DOMOTICZ                 // Domoticz intégration
@@ -253,7 +255,7 @@
 
 #undef USE_DOMOTICZ                           // Disable official Domoticz
 
-#undef USE_TASMOTA_DISCOVERY                 // Enable Tasmota discovery
+#undef USE_TASMOTA_DISCOVERY                  // Enable Tasmota discovery
 #undef USE_HOME_ASSISTANT                     // Disable historic Home Assistant
 
 #undef USE_KNX                                // KNX IP Protocol Support
@@ -313,6 +315,13 @@
 
 //#undef USE_COUNTER                            // Enable inputs as counter (+0k8 code)
 
+//#define USE_ADC_VCC                            // display analog input as VCC
+
+#undef USE_SPI                                // Disable all SPI devices
+
+#undef USE_SERIAL_BRIDGE                      // Disable support for software Serial Bridge (+0k8 code)
+
+#ifdef USE_TELEINFO
 #define USE_DS18x20                            // Add support for DS18x20 sensors with id sort, single scan and read retry (+2k6 code)
 #define USE_DHT                                // Disable internal DHT sensor
 
@@ -322,13 +331,9 @@
 #define USE_HTU                                // [I2cDriver9] Enable HTU21/SI7013/SI7020/SI7021 sensor (I2C address 0x40) (+1k5 code)
 #define USE_BMP                                // [I2cDriver10] Enable BMP085/BMP180/BMP280/BME280 sensors (I2C addresses 0x76 and 0x77) (+4k4 code)
 
-//#define USE_ADC_VCC                            // display analog input as VCC
-
-#undef USE_SPI                                // Disable all SPI devices
-
-#undef USE_SERIAL_BRIDGE                      // Disable support for software Serial Bridge (+0k8 code)
-
 #define USE_ENERGY_SENSOR                      // Disable energy sensors
+#endif    // USE_TELEINFO
+
 #undef USE_ENERGY_MARGIN_DETECTION            // Add support for Energy Margin detection (+1k6 code)
 #undef USE_ENERGY_POWER_LIMIT                 // Add additional support for Energy Power Limit detection (+1k2 code)
 #undef USE_PZEM004T                           // Add support for PZEM004T Energy monitor (+2k code)
@@ -418,14 +423,13 @@
 // conso LED status
 #define USE_LIGHT                              // Add support for light control
 #define USE_WS2812                             // WS2812 Led string using library NeoPixelBus (+5k code, +1k mem, 232 iram) - Disable by //
+#define USE_ADC                                // Add support for ADC on GPIO32 to GPIO39
 
 #undef USE_BLE_ESP32
 #undef USE_MI_ESP32
 #undef USE_IBEACON
 
 #undef USE_SR04
-
-#define USE_ADC                                // Add support for ADC on GPIO32 to GPIO39
 
 #undef USE_WEBCAM
 

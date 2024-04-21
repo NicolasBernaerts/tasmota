@@ -40,6 +40,8 @@
  *               Variables
 \*******************************************/
 
+#define TELEINFO_DOMOTICZ_NB_MESSAGE    5
+
 // Commands
 const char kDomoticzIntegrationCommands[] PROGMEM = "domo_" "|" "help" "|" "enable" "|" "key";
 void (* const DomoticzIntegrationCommand[])(void) PROGMEM = { &CmndDomoticzIntegrationHelp, &CmndDomoticzIntegrationEnable, &CmndDomoticzIntegrationSetKey };
@@ -69,6 +71,29 @@ void DomoticzIntegrationSaveConfig ()
   Settings->rf_code[16][2] = domoticz_integration.enabled;
 }
 
+/***************************************\
+ *               Function
+\***************************************/
+
+// set integration
+void DomoticzIntegrationSet (const bool enabled) 
+{
+  // update status
+  domoticz_integration.enabled = enabled;
+
+  // reset publication flags
+  domoticz_integration.index = 0; 
+
+  // save configuration
+  DomoticzIntegrationSaveConfig ();
+}
+
+// get integration
+bool DomoticzIntegrationGet () 
+{
+  return (domoticz_integration.enabled == 1);
+}
+
 /****************************\
  *        Commands
 \****************************/
@@ -92,18 +117,7 @@ void CmndDomoticzIntegrationHelp ()
 // Enable Domoticz integration
 void CmndDomoticzIntegrationEnable ()
 {
-  if (XdrvMailbox.data_len > 0)
-  {
-    // update status
-    domoticz_integration.enabled = (XdrvMailbox.payload != 0);
-
-    // reset publication flags
-    domoticz_integration.index = 0; 
-
-    // save configuration
-    DomoticzIntegrationSaveConfig ();
-  }
-
+  if (XdrvMailbox.data_len > 0) DomoticzIntegrationSet (XdrvMailbox.payload != 0); 
   ResponseCmndNumber (domoticz_integration.enabled);
 }
 
@@ -146,6 +160,10 @@ void CmndDomoticzIntegrationSetKey ()
 // Domoticz init message
 void DomoticzIntegrationInit ()
 {
+  // load config
+  DomoticzIntegrationLoadConfig ();
+  
+  // log help command
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: domo_help to get help on Domoticz integration"));
 }
 
@@ -154,6 +172,9 @@ void DomoticzIntegrationEvery100ms ()
 {
   // check if enabled
   if (!domoticz_integration.enabled) return;
+  if (teleinfo_meter.nb_message <= TELEINFO_DOMOTICZ_NB_MESSAGE) return;
+  if (!RtcTime.valid) return;
+  if (!MqttIsConnected ()) return;
 
   // publish if needed
   if (domoticz_integration.index < MAX_DOMOTICZ_SNS_IDX) DomoticzIntegrationPublish ();
@@ -264,6 +285,14 @@ uint8_t DomoticzIntegrationPublish ()
   domoticz_integration.index++;
 
   return domoticz_integration.index;
+}
+
+// publish next pending data
+void DomoticzIntegrationPublishAll ()
+{
+  uint8_t result = 0;
+
+  while (result < MAX_DOMOTICZ_SNS_IDX) result = DomoticzIntegrationPublish ();
 }
 
 /***************************************\

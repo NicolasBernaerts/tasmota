@@ -27,6 +27,7 @@
                         Lots of bug fixes (thanks to B. Monot and Sebastien)
     05/03/2024 - v3.1 - Removal of all float and double calculations
     27/03/2024 - v3.2 - Section COUNTER renamed as CONTRACT with addition of contract data
+    21/04/2024 - v3.3 - Add Homie integration
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -124,6 +125,10 @@
 #define D_CMND_TELEINFO_CALENDAR        "calendar"
 #define D_CMND_TELEINFO_RELAY           "relay"
 #define D_CMND_TELEINFO_CONTRACT        "contract"
+
+#define D_CMND_TELEINFO_DOMO            "domo"
+#define D_CMND_TELEINFO_HASS            "hass"
+#define D_CMND_TELEINFO_HOMIE           "homie"
 
 #define D_CMND_TELEINFO_LOG_DAY         "nbday"
 #define D_CMND_TELEINFO_LOG_WEEK        "nbweek"
@@ -632,16 +637,17 @@ void TeleinfoDriverGetDataDisplay (const int unit_type, const long value, char* 
 // Trigger publication flags
 void TeleinfoDriverPublishTrigger ()
 {
+#ifdef USE_TELEINFO_DOMOTICZ
+  DomoticzIntegrationPublishTrigger ();
+#endif    // USE_TELEINFO_DOMOTICZ
+
   // set data publication flags
+  teleinfo_meter.json.alert = 1;
   if (teleinfo_config.relay) teleinfo_meter.json.relay = 1;
   if (teleinfo_config.meter) teleinfo_meter.json.meter = 1;
   if (teleinfo_config.contract) teleinfo_meter.json.contract = 1;
   if (teleinfo_config.calendar) teleinfo_meter.json.calendar = 1;
   if (teleinfo_config.tic) teleinfo_meter.json.tic = 1;
-
-#ifdef USE_TELEINFO_DOMOTICZ
-  DomoticzIntegrationPublishTrigger ();
-#endif    // USE_TELEINFO_DOMOTICZ
 }
 
 // Generate JSON alert data
@@ -701,6 +707,10 @@ void TeleinfoDriverPublishMeter ()
   uint8_t phase, value;
   long    voltage, current, power_app, power_act;
 
+#ifdef USE_TELEINFO_HOMIE
+  HomieIntegrationTriggerMeter ();
+#endif    // USE_TELEINFO_HOMIE
+
   // start of message
   ResponseClear ();
   ResponseAppendTime ();
@@ -745,11 +755,12 @@ void TeleinfoDriverPublishMeter ()
     // conso : cosphi
     if (teleinfo_conso.cosphi.nb_measure > 1) ResponseAppend_P (PSTR (",\"C\":%d.%02d"), teleinfo_conso.cosphi.value / 1000, teleinfo_conso.cosphi.value % 1000 / 10);
 
-    // conso : yesterday
-    ResponseAppend_P (PSTR (",\"YDAY\":%d"), teleinfo_conso.yesterday_wh);
-
-    // conso : today
-    if (teleinfo_conso.today_wh > 0) ResponseAppend_P (PSTR (",\"2DAY\":%d"), teleinfo_conso.today_wh);
+    // conso : if not on battery, publish total of yesterday and today
+    if (!teleinfo_config.battery)
+    {
+      ResponseAppend_P (PSTR (",\"YDAY\":%d"), teleinfo_conso.yesterday_wh);
+      ResponseAppend_P (PSTR (",\"TDAY\":%d"), teleinfo_conso.today_wh);
+    }
   }
   
   // production 
@@ -761,11 +772,12 @@ void TeleinfoDriverPublishMeter ()
     // prod : cosphi
     if (teleinfo_prod.cosphi.nb_measure > 1) ResponseAppend_P (PSTR (",\"PC\":%d.%02d"), teleinfo_prod.cosphi.value / 1000, teleinfo_prod.cosphi.value % 1000 / 10);
 
-    // prod : yesterday
-    ResponseAppend_P (PSTR (",\"PYDAY\":%d"), teleinfo_prod.yesterday_wh);
-
-    // prod : today
-    if (teleinfo_prod.today_wh > 0) ResponseAppend_P (PSTR (",\"P2DAY\":%d"), teleinfo_prod.today_wh);
+    // prod : if not on battery, publish total of yesterday and today
+    if (!teleinfo_config.battery)
+    {
+      ResponseAppend_P (PSTR (",\"PYDAY\":%d"), teleinfo_prod.yesterday_wh);
+      ResponseAppend_P (PSTR (",\"PTDAY\":%d"), teleinfo_prod.today_wh);
+    }
   } 
 
   // end of message
@@ -775,10 +787,6 @@ void TeleinfoDriverPublishMeter ()
   // reset JSON flag
   teleinfo_meter.json.meter = 0;
 
-#ifdef USE_TELEINFO_HOMIE
-  HomieIntegrationPublishMeter ();
-#endif    // USE_TELEINFO_HOMIE
-
   // update data reception
   TeleinfoProcessRealTime ();
 }
@@ -787,6 +795,11 @@ void TeleinfoDriverPublishMeter ()
 void TeleinfoDriverPublishRelay ()
 {
   uint8_t index;
+
+#ifdef USE_TELEINFO_HOMIE
+  // ask to publish relay data with Homie protocol
+  HomieIntegrationTriggerRelay ();
+#endif    // USE_TELEINFO_HOMIE
 
   // start of message
   ResponseClear ();
@@ -807,11 +820,6 @@ void TeleinfoDriverPublishRelay ()
   // reset JSON flag
   teleinfo_meter.json.relay = 0;
 
-#ifdef USE_TELEINFO_HOMIE
-  // ask to publish relay data with Homie protocol
-  HomieIntegrationPublishRelay ();
-#endif    // USE_TELEINFO_HOMIE
-
   // update data reception
   TeleinfoProcessRealTime ();
 }
@@ -822,6 +830,11 @@ void TeleinfoDriverPublishContract ()
   uint8_t index;
   char    str_value[32];
   char    str_period[32];
+
+#ifdef USE_TELEINFO_HOMIE
+  HomieIntegrationTriggerCalendar ();
+  HomieIntegrationTriggerTotal ();
+#endif    // USE_TELEINFO_HOMIE
 
   // start of message
   ResponseClear ();
@@ -881,10 +894,6 @@ void TeleinfoDriverPublishContract ()
 
   // reset JSON flag
   teleinfo_meter.json.contract = 0;
-
-#ifdef USE_TELEINFO_HOMIE
-  HomieIntegrationPublishTotal ();
-#endif    // USE_TELEINFO_HOMIE
 
   // update data reception
   TeleinfoProcessRealTime ();
@@ -946,6 +955,9 @@ void TeleinfoDriverPublishCalendar ()
 {
   uint8_t day, slot, level, peak;
 
+  // if on battery, ignore publication
+  if (teleinfo_config.battery) return;
+
   // start of message
   ResponseClear ();
   ResponseAppendTime ();
@@ -983,10 +995,6 @@ void TeleinfoDriverPublishCalendar ()
 
   // reset JSON flag
   teleinfo_meter.json.calendar = 0;
-
-#ifdef USE_TELEINFO_HOMIE
-  HomieIntegrationPublishCalendar ();
-#endif    // USE_TELEINFO_HOMIE
 
   // update data reception
   TeleinfoProcessRealTime ();
@@ -1038,7 +1046,6 @@ void TeleinfoDriverTeleperiod ()
   if (TasmotaGlobal.tele_period > 0) return;
 
   // trigger flags for full topic publication
-  teleinfo_meter.json.alert = 1;
   TeleinfoDriverPublishTrigger ();
 }
 
@@ -1077,6 +1084,9 @@ void TeleinfoDriverWebConfigButton ()
 // Teleinfo web page
 void TeleinfoDriverWebPageConfigure ()
 {
+  bool domo_available,  domo_enabled;
+  bool hass_available,  hass_enabled;
+  bool homie_available, homie_enabled;
   int  index;
   char str_text[32];
   char str_select[16];
@@ -1120,9 +1130,45 @@ void TeleinfoDriverWebPageConfigure ()
     if (strlen (str_text) > 0) teleinfo_config.contract = 1;
       else teleinfo_config.contract = 0;
 
+    // parameter 'domo' : set domoticz integration
+#ifdef USE_TELEINFO_DOMOTICZ
+      WebGetArg (D_CMND_TELEINFO_DOMO, str_text, sizeof (str_text));
+      DomoticzIntegrationSet (strlen (str_text) > 0);
+#endif    // USE_TELEINFO_DOMOTICZ
+
+    // parameter 'hass' : set home assistant integration
+#ifdef USE_TELEINFO_HASS
+      WebGetArg (D_CMND_TELEINFO_HASS, str_text, sizeof (str_text));
+      HassIntegrationSet (strlen (str_text) > 0);
+#endif    // USE_TELEINFO_HASS
+
+    // parameter 'homie' : set homie integration
+#ifdef USE_TELEINFO_HOMIE
+      WebGetArg (D_CMND_TELEINFO_HOMIE, str_text, sizeof (str_text));
+      HomieIntegrationSet (strlen (str_text) > 0);
+#endif    // USE_TELEINFO_HOMIE
+
     // save configuration
     TeleinfoSaveConfig ();
   }
+
+  domo_available = false;
+#ifdef USE_TELEINFO_DOMOTICZ
+  domo_available = true;
+  domo_enabled   = DomoticzIntegrationGet ();
+#endif    // USE_TELEINFO_DOMOTICZ
+
+  hass_available = false;
+#ifdef USE_TELEINFO_HASS
+  hass_available = true;
+  hass_enabled   = HassIntegrationGet ();
+#endif    // USE_TELEINFO_HASS
+
+  homie_available = false;
+#ifdef USE_TELEINFO_HOMIE
+  homie_available = true;
+  homie_enabled   = HomieIntegrationGet ();
+#endif    // USE_TELEINFO_HOMIE
 
   // beginning of form
   WSContentStart_P (PSTR ("Configure Teleinfo"));
@@ -1130,7 +1176,7 @@ void TeleinfoDriverWebPageConfigure ()
   WSContentSend_P (PSTR ("<form method='get' action='%s'>\n"), D_TELEINFO_PAGE_CONFIG);
 
   // speed selection form
-  WSContentSend_P (PSTR ("<p><fieldset><legend><b>&nbsp;%s %s&nbsp;</b></legend>\n"), "📨", PSTR ("Teleinfo"));
+  WSContentSend_P (PSTR ("<p><fieldset><legend><b>&nbsp;📨&nbsp;&nbsp;Teleinfo&nbsp;</b></legend>\n"));
   if ((TasmotaGlobal.baudrate != 1200) && (TasmotaGlobal.baudrate != 9600)) strcpy_P (str_select, PSTR ("checked")); else strcpy (str_select, "");
   WSContentSend_P (PSTR ("<p><input type='radio' name='%s' value='%d' %s>%s</p>\n"), D_CMND_TELEINFO_RATE, 115200, str_select, "Désactivé");
   if (TasmotaGlobal.baudrate == 1200) strcpy_P (str_select, PSTR ("checked")); else strcpy (str_select, "");
@@ -1141,7 +1187,7 @@ void TeleinfoDriverWebPageConfigure ()
   WSContentSend_P (PSTR ("</fieldset></p>\n"));
 
   // teleinfo message diffusion policy
-  WSContentSend_P (PSTR ("<p><fieldset><legend><b>&nbsp;%s %s&nbsp;</b></legend>\n"), "〽️", PSTR ("Fréquence de publication"));
+  WSContentSend_P (PSTR ("<p><fieldset><legend><b>&nbsp;〽️&nbsp;&nbsp;Fréquence de publication&nbsp;</b></legend>\n"));
   for (index = 0; index < TELEINFO_POLICY_MAX; index++)
   {
     if (index == teleinfo_config.policy) strcpy_P (str_select, PSTR ("checked")); else strcpy (str_select, "");
@@ -1151,7 +1197,7 @@ void TeleinfoDriverWebPageConfigure ()
   WSContentSend_P (PSTR ("</fieldset></p>\n"));
 
   // teleinfo message diffusion type
-  WSContentSend_P (PSTR ("<p><fieldset><legend><b>&nbsp;%s %s&nbsp;</b></legend>\n"), "📊", PSTR ("Données publiées"));
+  WSContentSend_P (PSTR ("<p><fieldset><legend><b>&nbsp;📊&nbsp;&nbsp;Données publiées&nbsp;</b></legend>\n"));
   if (teleinfo_config.meter) strcpy_P (str_select, PSTR ("checked")); else strcpy (str_select, "");
   WSContentSend_P (PSTR ("<p><input type='checkbox' id='%s' name='%s' %s><label for='%s'>Consommation & Production</label></p>\n"), D_CMND_TELEINFO_METER, D_CMND_TELEINFO_METER, str_select, D_CMND_TELEINFO_METER);
   if (teleinfo_config.contract) strcpy_P (str_select, PSTR ("checked")); else strcpy (str_select, "");
@@ -1163,6 +1209,28 @@ void TeleinfoDriverWebPageConfigure ()
   if (teleinfo_config.tic) strcpy_P (str_select, PSTR ("checked")); else strcpy (str_select, "");
   WSContentSend_P (PSTR ("<p><input type='checkbox' id='%s' name='%s' %s><label for='%s'>Données Teleinfo brutes</label></p>\n"), D_CMND_TELEINFO_TIC, D_CMND_TELEINFO_TIC, str_select, D_CMND_TELEINFO_TIC);
   WSContentSend_P (PSTR ("</fieldset></p>\n"));
+
+  // domotic integration
+  if (domo_available || hass_available || homie_available)
+  {
+    WSContentSend_P (PSTR ("<p><fieldset><legend><b>&nbsp;🏠&nbsp;&nbsp;Intégration&nbsp;</b></legend>\n"));
+    if (domo_available)
+    {
+      if (domo_enabled) strcpy_P (str_select, PSTR ("checked")); else strcpy (str_select, "");
+      WSContentSend_P (PSTR ("<p><input type='checkbox' id='%s' name='%s' %s><label for='%s'>Domoticz</label></p>\n"), D_CMND_TELEINFO_DOMO, D_CMND_TELEINFO_DOMO, str_select, D_CMND_TELEINFO_DOMO);
+    }
+    if (hass_available)
+    {
+      if (hass_enabled) strcpy_P (str_select, PSTR ("checked")); else strcpy (str_select, "");
+      WSContentSend_P (PSTR ("<p><input type='checkbox' id='%s' name='%s' %s><label for='%s'>Home Assistant</label></p>\n"), D_CMND_TELEINFO_HASS, D_CMND_TELEINFO_HASS, str_select, D_CMND_TELEINFO_HASS);
+    }
+    if (homie_available)
+    {
+      if (homie_enabled) strcpy_P (str_select, PSTR ("checked")); else strcpy (str_select, "");
+      WSContentSend_P (PSTR ("<p><input type='checkbox' id='%s' name='%s' %s><label for='%s'>Homie</label></p>\n"), D_CMND_TELEINFO_HOMIE, D_CMND_TELEINFO_HOMIE, str_select, D_CMND_TELEINFO_HOMIE);
+    }
+    WSContentSend_P (PSTR ("</fieldset></p>\n"));
+  }
 
   // save button
   WSContentSend_P (PSTR ("<br><button name='save' type='submit' class='button bgrn'>%s</button>"), D_SAVE);

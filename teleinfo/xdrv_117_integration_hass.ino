@@ -7,7 +7,8 @@
     23/03/2024 - v1.0 - Creation (with help of msevestre31)
     28/03/2024 - v1.1 - Home Assistant auto-discovery only with SetOption19 1
     31/03/2024 - v1.2 - Remove SetOption19 dependancy
-    14/04/2024 - v1.3 - switch to rf_code configuration
+    14/04/2024 - v1.3 - Switch to rf_code configuration
+                        Change key 2DAY to TDAY
 
   Configuration values are stored in :
     - Settings->rf_code[16][0]  : Flag en enable/disable integration
@@ -68,6 +69,30 @@ void HassIntegrationSaveConfig ()
   Settings->rf_code[16][0] = hass_integration.enabled;
 }
 
+/***************************************\
+ *               Function
+\***************************************/
+
+// set integration
+void HassIntegrationSet (const bool enabled) 
+{
+  // update status
+  hass_integration.enabled = enabled;
+
+  // reset publication flags
+  hass_integration.stage = TIC_PUB_CONNECT; 
+  hass_integration.index = 0; 
+
+  // save configuration
+  HassIntegrationSaveConfig ();
+}
+
+// get integration
+bool HassIntegrationGet () 
+{
+  return (hass_integration.enabled == 1);
+}
+
 /*******************************\
  *          Command
 \*******************************/
@@ -75,18 +100,7 @@ void HassIntegrationSaveConfig ()
 // Enable home assistant auto-discovery
 void CmndHassIntegrationEnable ()
 {
-  if (XdrvMailbox.data_len > 0)
-  {
-    // update status
-    hass_integration.enabled = (XdrvMailbox.payload != 0);
-
-    // reset publication flags
-    hass_integration.stage = TIC_PUB_CONNECT; 
-    hass_integration.index = 0; 
-
-    HassIntegrationSaveConfig ();
-  }
-
+  if (XdrvMailbox.data_len > 0) HassIntegrationSet (XdrvMailbox.payload != 0);
   ResponseCmndNumber (hass_integration.enabled);
 }
 
@@ -99,9 +113,6 @@ void CmndHassIntegrationInit ()
   // load config
   HassIntegrationLoadConfig ();
 
-  // if on battery, no initial publication
-  if (teleinfo_config.battery) hass_integration.stage = UINT8_MAX;
-
   // log help command
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: hass_enable to enable Home Assistant auto-discovery [%u]"), hass_integration.enabled);
 }
@@ -109,13 +120,15 @@ void CmndHassIntegrationInit ()
 // trigger publication
 void HassIntegrationEvery250ms ()
 {
+  // if on battery, no publication of persistent data
+  if (teleinfo_config.battery) hass_integration.stage = UINT8_MAX;
+
   // if already published or running on battery, ignore 
   if (!hass_integration.enabled) return;
-  if (teleinfo_config.battery) return;
-  if (!MqttIsConnected ()) return;
-  if (!RtcTime.valid) return;
   if (hass_integration.stage == UINT8_MAX) return;
   if (teleinfo_meter.nb_message <= TELEINFO_HASS_NB_MESSAGE) return;
+  if (!RtcTime.valid) return;
+  if (!MqttIsConnected ()) return;
 
   // publication
   HassIntegrationPublish (hass_integration.stage, hass_integration.index);
@@ -168,67 +181,32 @@ void HassIntegrationPublish (const uint8_t stage, const uint8_t index)
   switch (stage)
   {
     // contract
-//    case TIC_PUB_CONTRACT_NAME:   strcpy_P (str_param, PSTR ("Contrat"              "|CONTRACT_NAME"   "|['CONTRACT']['name']"     "|calendar"     "|" "|" "|")); break;
-    case TIC_PUB_CONTRACT_NAME:   strcpy_P (str_param, PSTR ("Contrat"              "|CONTRACT_NAME"   "|.CONTRACT.name"     "|calendar"   "|" "|" "|")); break;
+    case TIC_PUB_CONTRACT_NAME:   strcpy_P (str_param, PSTR ("Contrat"             "|CONTRACT_NAME"   "|.CONTRACT.name"     "|calendar"   "|" "|" "|")); break;
 
     // calendar
-//    case TIC_PUB_CALENDAR_PERIOD: strcpy_P (str_param, PSTR ("Contrat Période"      "|CONTRACT_PERIOD" "|['CONTRACT']['period']"   "|calendar"     "|" "|" "|")); break;
-//    case TIC_PUB_CALENDAR_COLOR:  strcpy_P (str_param, PSTR ("Contrat Couleur"      "|CONTRACT_COLOR"  "|['CONTRACT']['color']"    "|calendar"     "|" "|" "|")); break;
-//    case TIC_PUB_CALENDAR_HOUR:   strcpy_P (str_param, PSTR ("Contrat Heure"        "|CONTRACT_HOUR"   "|['CONTRACT']['hour']"     "|calendar"     "|" "|" "|")); break;
-//    case TIC_PUB_CALENDAR_TODAY:  strcpy_P (str_param, PSTR ("Couleur Aujourd'hui"  "|CONTRACT_2DAY"   "|['CONTRACT']['today']"    "|calendar"     "|" "|" "|")); break;
-//    case TIC_PUB_CALENDAR_TOMRW:  strcpy_P (str_param, PSTR ("Couleur Demain"       "|CONTRACT_TMRW"   "|['CONTRACT']['tomorrow']" "|calendar"     "|" "|" "|")); break;
-    case TIC_PUB_CALENDAR_PERIOD: strcpy_P (str_param, PSTR ("Contrat Période"      "|CONTRACT_PERIOD" "|.CONTRACT.period"   "|calendar"   "|" "|" "|")); break;
-    case TIC_PUB_CALENDAR_COLOR:  strcpy_P (str_param, PSTR ("Contrat Couleur"      "|CONTRACT_COLOR"  "|.CONTRACT.color"    "|calendar"   "|" "|" "|")); break;
-    case TIC_PUB_CALENDAR_HOUR:   strcpy_P (str_param, PSTR ("Contrat Heure"        "|CONTRACT_HOUR"   "|.CONTRACT.hour"     "|calendar"   "|" "|" "|")); break;
-    case TIC_PUB_CALENDAR_TODAY:  strcpy_P (str_param, PSTR ("Couleur Aujourd'hui"  "|CONTRACT_2DAY"   "|.CONTRACT.today"    "|calendar"   "|" "|" "|")); break;
-    case TIC_PUB_CALENDAR_TOMRW:  strcpy_P (str_param, PSTR ("Couleur Demain"       "|CONTRACT_TMRW"   "|.CONTRACT.tomorrow" "|calendar"   "|" "|" "|")); break;
+    case TIC_PUB_CALENDAR_PERIOD: strcpy_P (str_param, PSTR ("Contrat Période"     "|CONTRACT_PERIOD" "|.CONTRACT.period"   "|calendar"   "|" "|" "|")); break;
+    case TIC_PUB_CALENDAR_COLOR:  strcpy_P (str_param, PSTR ("Contrat Couleur"     "|CONTRACT_COLOR"  "|.CONTRACT.color"    "|calendar"   "|" "|" "|")); break;
+    case TIC_PUB_CALENDAR_HOUR:   strcpy_P (str_param, PSTR ("Contrat Heure"       "|CONTRACT_HOUR"   "|.CONTRACT.hour"     "|calendar"   "|" "|" "|")); break;
+    case TIC_PUB_CALENDAR_TODAY:  strcpy_P (str_param, PSTR ("Couleur Aujourdhui"  "|CONTRACT_TDAY"   "|.CONTRACT.today"    "|calendar"   "|" "|" "|")); break;
+    case TIC_PUB_CALENDAR_TOMRW:  strcpy_P (str_param, PSTR ("Couleur Demain"      "|CONTRACT_TMRW"   "|.CONTRACT.tomorrow" "|calendar"   "|" "|" "|")); break;
 
     // production
-/*    case TIC_PUB_PROD_P:    strcpy_P (str_param, PSTR ("Prod Puiss. apparente" "|METER_PP"      "|['METER']['PP']"      "|alpha-p-circle"    "|apparent_power" "|measurement"  "|VA")); break;
-    case TIC_PUB_PROD_W:    strcpy_P (str_param, PSTR ("Prod Puiss. active"    "|METER_PW"      "|['METER']['PW']"      "|alpha-p-circle"    "|power"          "|measurement"  "|W" )); break;
-    case TIC_PUB_PROD_C:    strcpy_P (str_param, PSTR ("Prod Cos φ"            "|METER_PC"      "|['METER']['PC']"      "|alpha-p-circle"    "|power_factor"   "|measurement"  "|"  )); break;
-    case TIC_PUB_PROD_YDAY: strcpy_P (str_param, PSTR ("Prod Hier"             "|METER_PYDAY"   "|['METER']['PYDAY']"   "|alpha-p-circle"    "|energy"         "|total"        "|Wh")); break;
-    case TIC_PUB_PROD_2DAY: strcpy_P (str_param, PSTR ("Prod Aujourd'hui"      "|METER_P2DAY"   "|['METER']['P2DAY']"   "|alpha-p-circle"    "|energy"         "|total"        "|Wh")); break;
-*/
     case TIC_PUB_PROD_P:    strcpy_P (str_param, PSTR ("Prod Puiss. apparente" "|METER_PP"      "|.METER.PP"     "|alpha-p-circle"  "|apparent_power"  "|measurement"  "|VA")); break;
     case TIC_PUB_PROD_W:    strcpy_P (str_param, PSTR ("Prod Puiss. active"    "|METER_PW"      "|.METER.PW"     "|alpha-p-circle"  "|power"           "|measurement"  "|W" )); break;
     case TIC_PUB_PROD_C:    strcpy_P (str_param, PSTR ("Prod Cos φ"            "|METER_PC"      "|.METER.PC"     "|alpha-p-circle"  "|power_factor"    "|measurement"  "|"  )); break;
     case TIC_PUB_PROD_YDAY: strcpy_P (str_param, PSTR ("Prod Hier"             "|METER_PYDAY"   "|.METER.PYDAY"  "|alpha-p-circle"  "|energy"          "|total"        "|Wh")); break;
-    case TIC_PUB_PROD_2DAY: strcpy_P (str_param, PSTR ("Prod Aujourd'hui"      "|METER_P2DAY"   "|.METER.P2DAY"  "|alpha-p-circle"  "|energy"          "|total"        "|Wh")); break;
+    case TIC_PUB_PROD_2DAY: strcpy_P (str_param, PSTR ("Prod Aujourdhui"       "|METER_PTDAY"   "|.METER.PTDAY"  "|alpha-p-circle"  "|energy"          "|total"        "|Wh")); break;
 
     // conso
-/*    case TIC_PUB_CONSO_U:    strcpy_P (str_param, PSTR ("Conso Tension"          "|METER_U"     "|['METER']['U']"       "|alpha-c-circle"    "|voltage"        "|measurement"  "|V" )); break;
-    case TIC_PUB_CONSO_I:    strcpy_P (str_param, PSTR ("Conso Courant"          "|METER_I"     "|['METER']['I']"       "|alpha-c-circle"    "|current"        "|measurement"  "|A" )); break;
-    case TIC_PUB_CONSO_P:    strcpy_P (str_param, PSTR ("Conso Puiss. apparente" "|METER_P"     "|['METER']['P']"       "|alpha-c-circle"    "|apparent_power" "|measurement"  "|VA")); break;
-    case TIC_PUB_CONSO_W:    strcpy_P (str_param, PSTR ("Conso Puiss. active"    "|METER_W"     "|['METER']['W']"       "|alpha-c-circle"    "|power"          "|measurement"  "|W" )); break;
-    case TIC_PUB_CONSO_C:    strcpy_P (str_param, PSTR ("Conso Cos φ"            "|METER_C"     "|['METER']['C']"       "|alpha-c-circle"    "|power_factor"   "|measurement"  "|"  )); break;
-    case TIC_PUB_CONSO_YDAY: strcpy_P (str_param, PSTR ("Conso Hier"             "|METER_YDAY"  "|['METER']['YDAY']"    "|alpha-c-circle"    "|energy"         "|total"        "|Wh")); break;
-    case TIC_PUB_CONSO_2DAY: strcpy_P (str_param, PSTR ("Conso Aujourd'hui"      "|METER_2DAY"  "|['METER']['2DAY']"    "|alpha-c-circle"    "|energy"         "|total"        "|Wh")); break;
-*/
     case TIC_PUB_CONSO_U:    strcpy_P (str_param, PSTR ("Conso Tension"          "|METER_U"     "|.METER.U"      "|alpha-c-circle"  "|voltage"         "|measurement"  "|V" )); break;
     case TIC_PUB_CONSO_I:    strcpy_P (str_param, PSTR ("Conso Courant"          "|METER_I"     "|.METER.I"      "|alpha-c-circle"  "|current"         "|measurement"  "|A" )); break;
     case TIC_PUB_CONSO_P:    strcpy_P (str_param, PSTR ("Conso Puiss. apparente" "|METER_P"     "|.METER.P"      "|alpha-c-circle"  "|apparent_power"  "|measurement"  "|VA")); break;
     case TIC_PUB_CONSO_W:    strcpy_P (str_param, PSTR ("Conso Puiss. active"    "|METER_W"     "|.METER.W"      "|alpha-c-circle"  "|power"           "|measurement"  "|W" )); break;
     case TIC_PUB_CONSO_C:    strcpy_P (str_param, PSTR ("Conso Cos φ"            "|METER_C"     "|.METER.C"      "|alpha-c-circle"  "|power_factor"    "|measurement"  "|"  )); break;
     case TIC_PUB_CONSO_YDAY: strcpy_P (str_param, PSTR ("Conso Hier"             "|METER_YDAY"  "|.METER.YDAY"   "|alpha-c-circle"  "|energy"          "|total"        "|Wh")); break;
-    case TIC_PUB_CONSO_2DAY: strcpy_P (str_param, PSTR ("Conso Aujourd'hui"      "|METER_2DAY"  "|.METER.2DAY"   "|alpha-c-circle"  "|energy"          "|total"        "|Wh")); break;
+    case TIC_PUB_CONSO_2DAY: strcpy_P (str_param, PSTR ("Conso Aujourdhui"       "|METER_TDAY"  "|.METER.TDAY"   "|alpha-c-circle"  "|energy"          "|total"        "|Wh")); break;
 
     // 3 phases
-/*    case TIC_PUB_PH1_U: strcpy_P (str_param, PSTR ("Ph1 Tension"           "|METER_U1"    "|['METER']['U1']"    "|numeric-1-box-multiple"    "|voltage"        "|measurement"  "|V" )); break;
-    case TIC_PUB_PH1_I: strcpy_P (str_param, PSTR ("Ph1 Courant"           "|METER_I1"    "|['METER']['I1']"    "|numeric-1-box-multiple"    "|current"        "|measurement"  "|A" )); break;
-    case TIC_PUB_PH1_P: strcpy_P (str_param, PSTR ("Ph1 Puiss. apparente"  "|METER_P1"    "|['METER']['P1']"    "|numeric-1-box-multiple"    "|apparent_power" "|measurement"  "|VA")); break;
-    case TIC_PUB_PH1_W: strcpy_P (str_param, PSTR ("Ph1 Puiss. active"     "|METER_W1"    "|['METER']['W1']"    "|numeric-1-box-multiple"    "|power"          "|measurement"  "|W" )); break;
-
-    case TIC_PUB_PH2_U: strcpy_P (str_param, PSTR ("Ph2 Tension"           "|METER_U2"    "|['METER']['U2']"    "|numeric-2-box-multiple"    "|voltage"        "|measurement"  "|V" )); break;
-    case TIC_PUB_PH2_I: strcpy_P (str_param, PSTR ("Ph2 Courant"           "|METER_I2"    "|['METER']['I2']"    "|numeric-2-box-multiple"    "|current"        "|measurement"  "|A" )); break;
-    case TIC_PUB_PH2_P: strcpy_P (str_param, PSTR ("Ph2 Puiss. apparente"  "|METER_P2"    "|['METER']['P2']"    "|numeric-2-box-multiple"    "|apparent_power" "|measurement"  "|VA")); break;
-    case TIC_PUB_PH2_W: strcpy_P (str_param, PSTR ("Ph2 Puiss. active"     "|METER_W2"    "|['METER']['W2']"    "|numeric-2-box-multiple"    "|power"          "|measurement"  "|W" )); break;
-
-    case TIC_PUB_PH3_U: strcpy_P (str_param, PSTR ("Ph3 Tension"           "|METER_U3"    "|['METER']['U3']"    "|numeric-3-box-multiple"    "|voltage"        "|measurement"  "|V" )); break;
-    case TIC_PUB_PH3_I: strcpy_P (str_param, PSTR ("Ph3 Courant"           "|METER_I3"    "|['METER']['I3']"    "|numeric-3-box-multiple"    "|current"        "|measurement"  "|A" )); break;
-    case TIC_PUB_PH3_P: strcpy_P (str_param, PSTR ("Ph3 Puiss. apparente"  "|METER_P3"    "|['METER']['P3']"    "|numeric-3-box-multiple"    "|apparent_power" "|measurement"  "|VA")); break;
-    case TIC_PUB_PH3_W: strcpy_P (str_param, PSTR ("Ph3 Puiss. active"     "|METER_W3"    "|['METER']['W3']"    "|numeric-3-box-multiple"    "|power"          "|measurement"  "|W" )); break;
-*/
     case TIC_PUB_PH1_U: strcpy_P (str_param, PSTR ("Ph1 Tension"           "|METER_U1"  "|.METER.U1"  "|numeric-1-box-multiple"  "|voltage"         "|measurement"  "|V" )); break;
     case TIC_PUB_PH1_I: strcpy_P (str_param, PSTR ("Ph1 Courant"           "|METER_I1"  "|.METER.I1"  "|numeric-1-box-multiple"  "|current"         "|measurement"  "|A" )); break;
     case TIC_PUB_PH1_P: strcpy_P (str_param, PSTR ("Ph1 Puiss. apparente"  "|METER_P1"  "|.METER.P1"  "|numeric-1-box-multiple"  "|apparent_power"  "|measurement"  "|VA")); break;
@@ -247,13 +225,11 @@ void HassIntegrationPublish (const uint8_t stage, const uint8_t index)
     // relay
     case TIC_PUB_RELAY_DATA:
       GetTextIndexed (str_text, sizeof (str_text), index, kTeleinfoRelayName);
-//      snprintf_P (str_param, sizeof (str_param), PSTR ("Relai %u (%s)"     "|RELAY_%u"       "|['RELAY']['R%u']"      "|toggle-switch-off"    "|" "|" "|"), index + 1, str_text, index + 1,  index + 1);
       snprintf_P (str_param, sizeof (str_param), PSTR ("Relai %u (%s)"     "|RELAY_%u"  "|.RELAY.R%u"  "|toggle-switch-off"  "|" "|" "|"), index + 1, str_text, index + 1,  index + 1);
       break;
 
     // production counter
     case TIC_PUB_TOTAL_PROD: 
-//      strcpy_P (str_param, PSTR ("Total Production"                        "|CONTRACT_PROD"  "|['CONTRACT']['PROD']"  "|counter"    "|energy"    "|total"  "|Wh"));
       strcpy_P (str_param, PSTR ("Total Production"                        "|CONTRACT_PROD"  "|.CONTRACT.PROD"  "|counter"  "|energy"  "|total"  "|Wh"));
       break;
 

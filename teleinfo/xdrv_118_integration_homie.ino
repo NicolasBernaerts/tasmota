@@ -6,7 +6,8 @@
   Version history :
     01/04/2024 - v1.0 - Creation
     14/04/2024 - v1.1 - switch to rf_code configuration
-
+                        Change key 2DAY to TDAY
+                        
   Configuration values are stored in :
     - Settings->rf_code[16][1]  : Flag en enable/disable integration
 
@@ -50,9 +51,9 @@ static struct {
   uint8_t data[TIC_PUB_MAX];              // data to be published
 } homie_integration;
 
-/**********************************************\
- *                Configuration
-\**********************************************/
+/******************************************\
+ *             Configuration
+\******************************************/
 
 // load configuration
 void HomieIntegrationLoadConfig () 
@@ -69,6 +70,33 @@ void HomieIntegrationSaveConfig ()
   Settings->rf_code[16][1] = homie_integration.enabled;
 }
 
+/***************************************\
+ *               Function
+\***************************************/
+
+// set integration
+void HomieIntegrationSet (const bool enabled) 
+{
+  // update status
+  homie_integration.enabled = enabled;
+
+  // if disabled, set offline
+  if (!enabled) HomieIntegrationPublishData (TIC_PUB_DISCONNECT);
+
+  // reset publication flags
+  homie_integration.stage = TIC_PUB_CONNECT; 
+  homie_integration.index = 0; 
+  homie_integration.step  = 1; 
+
+  // save configuration
+  HomieIntegrationSaveConfig ();
+}
+
+// get integration
+bool HomieIntegrationGet () 
+{
+  return (homie_integration.enabled == 1);
+}
 
 /*******************************\
  *          Command
@@ -77,23 +105,7 @@ void HomieIntegrationSaveConfig ()
 // Enable homie auto-discovery
 void CmndHomieIntegrationEnable ()
 {
-  if (XdrvMailbox.data_len > 0)
-  {
-    // update status
-    homie_integration.enabled = (XdrvMailbox.payload != 0);
-
-    // if disabled, set offline
-    if (!homie_integration.enabled) HomieIntegrationPublishData (TIC_PUB_DISCONNECT);
-
-    // reset publication flags
-    homie_integration.stage = TIC_PUB_CONNECT; 
-    homie_integration.index = 0; 
-    homie_integration.step  = 1; 
-
-    // save configuration
-    HomieIntegrationSaveConfig ();
-  }
-
+  if (XdrvMailbox.data_len > 0) HomieIntegrationSet ((XdrvMailbox.payload != 0));
   ResponseCmndNumber (homie_integration.enabled);
 }
 
@@ -105,10 +117,7 @@ void CmndHomieIntegrationEnable ()
 void HomieIntegrationInit ()
 {
   // load config
-  HassIntegrationLoadConfig ();
-
-  // if on battery, no initial publication
-  if (teleinfo_config.battery) homie_integration.stage = UINT8_MAX;
+  HomieIntegrationLoadConfig ();
 
   // log help command
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: homie_enable to enable Homie auto-discovery [%u]"), homie_integration.enabled);
@@ -119,13 +128,15 @@ void HomieIntegrationEvery250ms ()
 {
   bool result;
 
+  // if on battery, no publication of persistent data
+  if (teleinfo_config.battery) homie_integration.stage = UINT8_MAX;
+
   // check publication validity 
   if (!homie_integration.enabled) return;
-  if (teleinfo_config.battery) return;
-  if (!MqttIsConnected ()) return;
-  if (!RtcTime.valid) return;
   if (homie_integration.stage == UINT8_MAX) return;
   if (teleinfo_meter.nb_message <= TELEINFO_HOMIE_NB_MESSAGE) return;
+  if (!RtcTime.valid) return;
+  if (!MqttIsConnected ()) return;
 
   // publish current data
   result = HomieIntegrationPublish (homie_integration.stage, homie_integration.index, homie_integration.step);
@@ -198,6 +209,7 @@ void HomieIntegrationPublishAllData ()
   if (!homie_integration.enabled) return;
 
   // loop to publish next available value
+  homie_integration.stage = UINT8_MAX;
   for (index = 0; index < TIC_PUB_MAX; index ++)
   {
     result = HomieIntegrationPublishData (index);
@@ -230,18 +242,15 @@ void HomieIntegrationEvery100ms ()
 
 void HomieIntegrationBeforeRestart ()
 {
-  // check publication validity
-  if (!homie_integration.enabled) return;
-
-  // disconnect
-  HomieIntegrationPublishData (TIC_PUB_DISCONNECT);
+  // if enabled, publish disconnexion
+  if (homie_integration.enabled) HomieIntegrationPublishData (TIC_PUB_DISCONNECT);
 }
 
 /***************************************\
  *           JSON publication
 \***************************************/
 
-void HomieIntegrationPublishMeter ()
+void HomieIntegrationTriggerMeter ()
 {
   uint8_t index;
 
@@ -262,18 +271,18 @@ void HomieIntegrationPublishMeter ()
     for (index = TIC_PUB_PROD_P; index <= TIC_PUB_PROD_2DAY; index++) homie_integration.data[index] = 1;
 }
 
-void HomieIntegrationPublishTotal ()
+void HomieIntegrationTriggerTotal ()
 {
   if (teleinfo_conso.total_wh > 0) homie_integration.data[TIC_PUB_TOTAL_CONSO] = 1;
   if (teleinfo_prod.total_wh > 0)  homie_integration.data[TIC_PUB_TOTAL_PROD] = 1;
 }
 
-void HomieIntegrationPublishRelay ()
+void HomieIntegrationTriggerRelay ()
 {
   homie_integration.data[TIC_PUB_RELAY_DATA] = 1;
 }
 
-void HomieIntegrationPublishCalendar ()
+void HomieIntegrationTriggerCalendar ()
 {
   uint8_t index;
 
@@ -329,6 +338,7 @@ bool HomieIntegrationPublish (const uint8_t stage, const uint8_t index, const ui
   if (strcmp (str_text, "END") == 0) return false;
 
   // load parameters according to stage/data
+  strcpy (str_param, "");
   switch (stage)
   {
     // declaration
@@ -345,7 +355,7 @@ bool HomieIntegrationPublish (const uint8_t stage, const uint8_t index, const ui
     case TIC_PUB_CALENDAR_PERIOD: strcpy_P (str_param, PSTR ("/cal/period" "|Période"     "|string"  "|")); break;
     case TIC_PUB_CALENDAR_COLOR:  strcpy_P (str_param, PSTR ("/cal/color"  "|Couleur"     "|string"  "|")); break;
     case TIC_PUB_CALENDAR_HOUR:   strcpy_P (str_param, PSTR ("/cal/hour"   "|Heure"       "|string"  "|")); break;
-    case TIC_PUB_CALENDAR_TODAY:  strcpy_P (str_param, PSTR ("/cal/2day"   "|Aujourd'hui" "|string"  "|")); break;
+    case TIC_PUB_CALENDAR_TODAY:  strcpy_P (str_param, PSTR ("/cal/tday"   "|Aujourdhui" "|string"  "|")); break;
     case TIC_PUB_CALENDAR_TOMRW:  strcpy_P (str_param, PSTR ("/cal/tmrw"   "|Demain"      "|string"  "|")); break;
 
     // production
@@ -353,8 +363,8 @@ bool HomieIntegrationPublish (const uint8_t stage, const uint8_t index, const ui
     case TIC_PUB_PROD_P:    strcpy_P (str_param, PSTR ("/prod/p"    "|Prod Puissance apparente" "|integer" "|VA")); break;
     case TIC_PUB_PROD_W:    strcpy_P (str_param, PSTR ("/prod/w"    "|Prod Puissance active"    "|integer" "|W" )); break;
     case TIC_PUB_PROD_C:    strcpy_P (str_param, PSTR ("/prod/c"    "|Prod Cos φ"               "|float"   "|"  )); break;
-    case TIC_PUB_PROD_YDAY: strcpy_P (str_param, PSTR ("/prod/yday" "|Prod hier"                "|integer" "|Wh")); break;
-    case TIC_PUB_PROD_2DAY: strcpy_P (str_param, PSTR ("/prod/2day" "|Prod aujourd'hui"         "|integer" "|Wh")); break;
+    case TIC_PUB_PROD_YDAY: if (!teleinfo_config.battery) strcpy_P (str_param, PSTR ("/prod/yday" "|Prod Hier"         "|integer" "|Wh")); break;
+    case TIC_PUB_PROD_2DAY: if (!teleinfo_config.battery) strcpy_P (str_param, PSTR ("/prod/tday" "|Prod Aujourdhui"  "|integer" "|Wh")); break;
 
     // conso
     case TIC_PUB_CONSO:      strcpy_P (str_param, PSTR ("/conso"      "|Conso|yday,2day,p,w,c,i,u|")); break;
@@ -363,8 +373,8 @@ bool HomieIntegrationPublish (const uint8_t stage, const uint8_t index, const ui
     case TIC_PUB_CONSO_C:    strcpy_P (str_param, PSTR ("/conso/c"    "|Conso Cos φ"               "|float"   "|"  )); break;
     case TIC_PUB_CONSO_I:    strcpy_P (str_param, PSTR ("/conso/i"    "|Conso Courant"             "|float"   "|A" )); break;
     case TIC_PUB_CONSO_U:    strcpy_P (str_param, PSTR ("/conso/u"    "|Conso Tension"             "|integer" "|V" )); break;
-    case TIC_PUB_CONSO_YDAY: strcpy_P (str_param, PSTR ("/conso/yday" "|Conso hier"                "|integer" "|Wh")); break;
-    case TIC_PUB_CONSO_2DAY: strcpy_P (str_param, PSTR ("/conso/2day" "|Conso aujourd'hui"         "|integer" "|Wh")); break;
+    case TIC_PUB_CONSO_YDAY: if (!teleinfo_config.battery) strcpy_P (str_param, PSTR ("/conso/yday" "|Conso hier"         "|integer" "|Wh")); break;
+    case TIC_PUB_CONSO_2DAY: if (!teleinfo_config.battery) strcpy_P (str_param, PSTR ("/conso/2day" "|Conso aujourd'hui"  "|integer" "|Wh")); break;
 
     // 3 phases
     case TIC_PUB_PH1:   strcpy_P (str_param, PSTR ("/ph1"   "|Phase 1|u,i,p,w|")); break;
@@ -409,14 +419,13 @@ bool HomieIntegrationPublish (const uint8_t stage, const uint8_t index, const ui
       break;
     case TIC_PUB_TOTAL_CONSO: 
       TeleinfoPeriodGetName (index, str_text, sizeof (str_text));
-      snprintf_P (str_param, sizeof (str_param), PSTR ("/total/c%u" "|Total %s" "|integer" "|Wh"), index, str_text);
+      snprintf_P (str_param, sizeof (str_param), PSTR ("/total/conso%u" "|Total %s" "|integer" "|Wh"), index, str_text);
       break;
 
     // disconnexion
     case TIC_PUB_DISCONNECT:
       snprintf_P (str_param, sizeof (str_param), PSTR ("|disconnected"));
       break;
-
   }
 
   // if no valid data, ignore
