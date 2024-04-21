@@ -238,11 +238,17 @@ Les données RTE sont publiées sous des sections spécifiques sous **tele/SENSO
       "day2":{"jour":"2022-10-08","dval":3,"0":1,"1":1,"2":1,"3":1,"4":1,"5":3,"6":1,...,"23":1},
       "day3":{"jour":"2022-10-09","dval":2,"0":1,"1":1,"2":1,"3":2,"4":1,"5":1,"6":1,...,"23":1}}}
 
-## Intégration Domoticz
+## Intégration Domotique
 
-Ce firmware intègre une émission de messages MQTT à destination de [**Domoticz**](https://www.domoticz.com/)
+Il est possible de génerer des messages d'**auto-découverte** à destination de plusieurs solutions d'assistants domotiques.
 
-La configuration des messages émis peut être réalisée en mode console :
+Ces messages sont émis après la réception de quelques messages complets. Cela permet d'émettre des données correspondant exactement au contrat lié au compteur raccordé.
+
+### Intégration Domoticz
+
+Ce firmware intègre l'auto-découverte à destination de [**Domoticz**](https://www.domoticz.com/)
+
+La configuration des messages émis doit être réalisée en mode console :
 
     domo_help
     HLP: commands for Teleinfo Domoticz integration
@@ -255,17 +261,25 @@ La configuration des messages émis peut être réalisée en mode console :
              <10,index> : index Domoticz de l'alerte de publication de la couleur actuelle (bleu, blanc, rouge)
              <11,index> : index Domoticz de l'alerte de publication de la couleur du lendemain (bleu, blanc, rouge)
 
-## Intégration Home Assistant
+### Intégration Home Assistant
 
-Ce firmware intègre la gestion du mode **auto-discovery** de [**Home Assistant**](https://www.home-assistant.io/)
+Ce firmware intègre l'auto-découverte à destination de [**Home Assistant**](https://www.home-assistant.io/)
 
-A chaque boot, toutes les données candidates à intégration dans **Home Assistant** sont émises via MQTT en mode **retain** après de réception de 5 messages complets. Cela permet d'émettre des données correspondant exactement au contrat lié au compteur raccordé.
+A chaque boot, toutes les données candidates à intégration dans **Home Assistant** sont émises via MQTT en mode **retain** .
 
-Dans le cas particulier du Wenky, ces messages ne sont pas émis au réveil s'il ne dispose pas d'une alimentation fixe via USB.
+Dans le cas particulier du Wenky, les messages d'auto-découverte ne sont pas émis au réveil s'il ne dispose pas d'une alimentation fixe via USB.
 
-Suite à l'émission des messages d'auto-découverten, dans Home Assistant vous devriez avoir un device ressemblant à ceci :
+Suite à l'émission des messages d'auto-découverte, dans Home Assistant vous devriez avoir un device ressemblant à ceci :
 
 ![Home Assistant integration](./screen/tasmota-ha-integration.png)
+
+### Intégration Homie
+
+Ce firmware intègre l'auto-découverte à destination des solutions utilisant le protocole [**Homie**](https://homieiot.github.io/)
+
+A chaque boot, toutes les données candidates à intégration dans un client **Homie** sont émises via MQTT en mode **retain**.
+
+Dans le cas particulier du Wenky, les messages d'auto-découverte ne sont pas émis au réveil s'il ne dispose pas d'une alimentation fixe via USB. Seuls les messages de publication des données sont émis.
 
 ## Serveur TCP
 
@@ -335,7 +349,7 @@ Voici la liste exhaustive des fichiers concernés :
 | boards/**esp8266_16M14M.json** | ESP8266 16Mb boards  |
 | boards/**esp32_4M1200k.json** | ESP32 4Mb boards  |
 | boards/**esp32c3_4M1200k.json** | ESP32 C3 4Mb boards  |
-| boards/**esp32c6_4M1200k-safeboot.json** | ESP32 S3 16Mb boards  |
+| boards/**esp32c6_winky.json** | ESP32 S3 16Mb boards  |
 | boards/**esp32s2_4M1200k.json** | ESP32 S2 4Mb boards  |
 | boards/**esp32s3_4M1200k-safeboot.json** | ESP32 S3 4Mb boards  |
 | boards/**esp32s3_16M12M-safeboot.json** | ESP32 S3 16Mb boards  |
@@ -346,12 +360,13 @@ Voici la liste exhaustive des fichiers concernés :
 | tasmota/include/**tasmota_type.h** | Redefinition of teleinfo structure |
 | tasmota/tasmota_nrg_energy/**xnrg_15_teleinfo.ino** | Teleinfo energy driver  |
 | tasmota/tasmota_drv_driver/**xdrv_01_9_webserver.ino** | Add compilation target in footer  |
-| tasmota/tasmota_drv_energy/**xdrv_15_teleinfo.ino** | Teleinfo driver  |
-| tasmota/tasmota_drv_energy/**xdrv_15_teleinfo_domoticz.ino** | Teleinfo domoticz integration  |
-| tasmota/tasmota_drv_energy/**xdrv_15_teleinfo_homeassistant.ino** | Teleinfo home assistant integration  |
 | tasmota/tasmota_drv_driver/**xdrv_94_ip_address.ino** | Fixed IP address Web configuration |
 | tasmota/tasmota_drv_driver/**xdrv_96_ftp_server.ino** | Embedded FTP server |
 | tasmota/tasmota_drv_driver/**xdrv_97_tcp_server.ino** | Embedded TCP stream server |
+| tasmota/tasmota_drv_energy/**xdrv_115_teleinfo.ino** | Teleinfo driver  |
+| tasmota/tasmota_drv_energy/**xdrv_116_integration_domoticz.ino** | Teleinfo domoticz integration  |
+| tasmota/tasmota_drv_energy/**xdrv_117_integration_hass.ino** | Teleinfo home assistant integration  |
+| tasmota/tasmota_drv_energy/**xdrv_118_integration_homie.ino** | Teleinfo homie protocol integration  |
 | tasmota/tasmota_sns_sensor/**xsns_99_timezone.ino** | Timezone Web configuration |
 | tasmota/tasmota_sns_sensor/**xsns_119_rte_server.ino** | RTE Tempo, Pointe and Ecowatt data collection |
 | tasmota/tasmota_sns_sensor/**xsns_124_teleinfo_histo.ino** | Teleinfo sensor to handle historisation |
