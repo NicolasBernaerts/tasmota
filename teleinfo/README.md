@@ -83,7 +83,7 @@ Données de **consommation** publiées dans la section **METER** :
   * **P** = puissance instantanée (VA) globale
   * **W** = puissance active (W) globale
   * **C** = facteur de puissance (cos φ)
-  * **2DAY** = Total consommé aujourd'hui (Wh)
+  * **TDAY** = Total consommé aujourd'hui (Wh)
   * **YDAY** = Total consommé hier (Wh)
 
 Données de **consommation** par **phase** publiées dans la section **METER** :
@@ -98,7 +98,7 @@ Données de **production** publiées dans la section **METER** :
   * **PP** = puissance instantanée (VA) produite
   * **PW** = puissance active (W) produite
   * **PC** = facteur de puissance (cos φ) de la production
-  * **P2DAY** = Total produit aujourd'hui (Wh)
+  * **PTDAY** = Total produit aujourd'hui (Wh)
   * **PYDAY** = Total produit hier (Wh)
 
 Voici les données publiées dans la section **CAL** :
@@ -265,6 +265,10 @@ La configuration des messages émis doit être réalisée en mode console :
 
 Ce firmware intègre l'auto-découverte à destination de [**Home Assistant**](https://www.home-assistant.io/)
 
+Cette intégration peut être activée via le menu **Configuration / Teleinfo** ou en mode console : 
+
+    hass_enable 1
+
 A chaque boot, toutes les données candidates à intégration dans **Home Assistant** sont émises via MQTT en mode **retain** .
 
 Dans le cas particulier du Wenky, les messages d'auto-découverte ne sont pas émis au réveil s'il ne dispose pas d'une alimentation fixe via USB.
@@ -277,6 +281,10 @@ Suite à l'émission des messages d'auto-découverte, dans Home Assistant vous d
 
 Ce firmware intègre l'auto-découverte à destination des solutions utilisant le protocole [**Homie**](https://homieiot.github.io/)
 
+Cette intégration peut être activée via le menu **Configuration / Teleinfo** ou en mode console : 
+
+    homie_enable 1
+ 
 A chaque boot, toutes les données candidates à intégration dans un client **Homie** sont émises via MQTT en mode **retain**.
 
 Dans le cas particulier du Wenky, les messages d'auto-découverte ne sont pas émis au réveil s'il ne dispose pas d'une alimentation fixe via USB. Seuls les messages de publication des données sont émis.
