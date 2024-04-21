@@ -252,6 +252,7 @@ La configuration des messages émis doit être réalisée en mode console :
 
     domo_help
     HLP: commands for Teleinfo Domoticz integration
+    domo_enable <0> = enable/disable Domoticz integration (0/1)
     domo_key <num,idx> = set key num to index idx
              <0,index>  : index Domoticz du total Wh (hc/hp) et puissance active W pour la 1ère période du contrat (base,hc/hp,ejp,bleu)
              <1,index>  : index Domoticz du total Wh (hc/hp) et puissance active W pour la 1ère période du contrat (blanc)
@@ -260,6 +261,7 @@ La configuration des messages émis doit être réalisée en mode console :
              <9,index>  : index Domoticz de l'alerte de publication hc/hp
              <10,index> : index Domoticz de l'alerte de publication de la couleur actuelle (bleu, blanc, rouge)
              <11,index> : index Domoticz de l'alerte de publication de la couleur du lendemain (bleu, blanc, rouge)
+
 
 ### Intégration Home Assistant
 
