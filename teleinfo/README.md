@@ -4,13 +4,14 @@
 
 A partir du moment où vous disposez d'une version **13+**, vous pouvez bien entendu réaliser les mises à jour en mode **OTA**. Le partitionnement des **ESP8266** n'a pas changé.
 
+Le **changelog** général est disponible dans le fichier **user_config_override.h**
+
 ## Presentation
 
 Cette évolution du firmware **Tasmota 13.4.0** permet de :
-  * gérer le flux **TIC** des compteurs français (**Linky**, **PME/PMI** et **Emeraude**)
+  * gérer le flux **Teleinfo** des compteurs français (**Linky**, **PME/PMI** et **Emeraude**)
+  * publier les données sous **Domoticz**, **Home Assistant** et **Homie**
   * s'abonner aux API RTE **Tempo**, **Pointe** et **Ecowatt**
-  * publier les données sous **Domoticz**
-  * publier les données sous **Home Assistant**
 
 Ce firmware a été développé et testé sur les compteurs suivants :
   * **Sagem Classic monophase** en TIC **Historique**
