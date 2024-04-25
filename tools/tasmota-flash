@@ -13,6 +13,7 @@
 #   31/01/2022, V1.5 - Use esptool.py to fully handle 16 Mb chips
 #   08/07/2022, V1.6 - Use .factory.bin for ESP32, drop partition management
 #   22/08/2022, V1.7 - Change ESP32 flash to -fm dio
+#   25/04/2024, v1.8 - Change mktemp options for MacOS compatibility
 # ----------------------------------------------------------
 
 # default files and images
@@ -62,7 +63,7 @@ ARR_PARAM=( )
 [ "${NORESET}" = "ok" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "--before" "no_reset" )
 
 # generate temporary files and directory
-TMP_DIR=$(mktemp -t -d "flash-XXXXXXXX")
+TMP_DIR=$(mktemp -d -t "flash-XXXXXXXX")
 TMP_CHIP="${TMP_DIR}/chip.txt"
 
 # get device specs
