@@ -62,7 +62,7 @@ ARR_PARAM=( )
 [ "${NORESET}" = "ok" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "--before" "no_reset" )
 
 # generate temporary files and directory
-TMP_DIR=$(mktemp -t -d "flash-XXXXXXXX")
+TMP_DIR=$(mktemp -d -t "flash-XXXXXXXX")
 TMP_CHIP="${TMP_DIR}/chip.txt"
 
 # get device specs
