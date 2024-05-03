@@ -319,10 +319,9 @@ Le serveur étant minimaliste, il ne permet qu'une seule connexion simultanée. 
 
 Si vous utilisez une version de firmware avec partition LittleFS, vous avez à disposition un serveur **FTP** embarqué afin de récupérer les fichiers de manière automatisée.
 
-La commande **ftp_help** liste toutes les possibilités :
-  * **ftp_status** : status of FTP server (running port or 0 if not running)
-  * **ftp_start** : start FTP server on port 21
-  * **ftp_stop** : stop FTP server
+Les commandes sont les suivantes :
+  * **ufsftp 2** : démarrage du serveur FTP sur le port 21
+  * **ufsftp 0** : arrêt du serveur FTP
 
 Coté client FTP, vous devez utiliser les login / mot de passe suivants : **teleinfo** / **teleinfo**
 
