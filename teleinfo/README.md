@@ -243,7 +243,11 @@ Les données RTE sont publiées sous des sections spécifiques sous **tele/SENSO
 
 Il est possible de génerer des messages d'**auto-découverte** à destination de plusieurs solutions d'assistants domotiques.
 
-Ces messages sont émis après la réception de quelques messages complets. Cela permet d'émettre des données correspondant exactement au contrat lié au compteur raccordé.
+Ces messages sont émis au boot après la réception de quelques messages complets depuis le compteur. Cela permet d'émettre des données correspondant exactement au contrat lié au compteur raccordé.
+
+Avant d'activer l'intégration, il est important de sélectionner et sauvegarder les données que vous souhaitez publier :
+
+![Donnees publiées](./screen/tasmota-teleinfo-data.png)
 
 ### Intégration Domoticz
 
