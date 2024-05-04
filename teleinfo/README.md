@@ -247,7 +247,7 @@ Ces messages sont émis au boot après la réception de quelques messages comple
 
 Avant d'activer l'intégration, il est important de sélectionner et sauvegarder les données que vous souhaitez publier :
 
-![Donnees publiées](./screen/tasmota-teleinfo-data.png)
+![Donnees publiées](./screen/tasmota-teleinfo-config-data.png)
 
 ### Intégration Domoticz
 
