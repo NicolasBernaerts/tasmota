@@ -7,7 +7,10 @@
     28/04/2022 - v1.0 - Creation
     06/11/2022 - v1.1 - Rename to XSNS_119
     04/12/2022 - v1.2 - Add graphs
-    
+    15/05/2023 - v1.3 - Rewrite CSV file access
+    05/05/2024 - v2.0 - Use Tasmota native FTP
+                        Home Asisstant and Homie auto-discovery
+        
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
@@ -51,27 +54,35 @@
 #define USE_TIMEZONE                        // Enable Timezone management
 #define USE_GAZPAR                          // Enable Teleinfo
 
+// home management integration
+#define USE_GAZPAR_HASS                     // Home Assistant auto-discovery intégration
+#define USE_GAZPAR_HOMIE                    // Homie protocol auto-discovery intégration
+
+// FTP server credentials
+#ifdef USE_FTP
+#define USER_FTP          "gazpar"          // FTP server login
+#define PW_FTP            "gazpar"          // FTP server password
+#endif
+
 // build
 #if defined BUILD_ESP32
-#define EXTENSION_BUILD   "esp32-4m1.3m"
+#define EXTENSION_BUILD   "esp32-4m"
 #elif defined BUILD_16M14M
-#define EXTENSION_BUILD   "esp-16m14m"
+#define EXTENSION_BUILD   "esp-16m"
 #elif defined BUILD_4M2M
-#define EXTENSION_BUILD   "esp-4m2m"
+#define EXTENSION_BUILD   "esp8266-4m"
 #elif defined BUILD_2M1M
-#define EXTENSION_BUILD   "esp-2m1m"
-#elif defined BUILD_1M128K
-#define EXTENSION_BUILD   "esp-1m128k"
-#elif defined BUILD_1M64K
-#define EXTENSION_BUILD   "esp-1m64k"
+#define EXTENSION_BUILD   "esp8266-2m"
+#elif defined BUILD_1M
+#define EXTENSION_BUILD   "esp8266-1m"
 #else
-#define EXTENSION_BUILD   "esp-nofs"
+#define EXTENSION_BUILD   "other"
 #endif
 
 // extension data
 #define EXTENSION_NAME    "Gazpar"            // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
-#define EXTENSION_VERSION "1.2"               // version
+#define EXTENSION_VERSION "2.0"               // version
 
 // MQTT default
 #undef MQTT_HOST
@@ -100,8 +111,11 @@
 #undef USE_ARDUINO_OTA                        // support for Arduino OTA
 #undef USE_WPS                                // support for WPS as initial wifi configuration tool
 #undef USE_SMARTCONFIG                        // support for Wifi SmartConfig as initial wifi configuration tool
-//#undef USE_DOMOTICZ                           // Domoticz
-//#undef USE_HOME_ASSISTANT                     // Home Assistant
+
+#undef USE_TASMOTA_DISCOVERY                  // Enable Tasmota discovery
+#undef USE_DOMOTICZ                           // Domoticz
+#undef USE_HOME_ASSISTANT                     // Home Assistant
+
 #undef USE_MQTT_TLS                           // TLS support won't work as the MQTTHost is not set
 
 #undef USE_KNX                                // KNX IP Protocol Support
@@ -171,7 +185,7 @@
 
 #undef USE_SERIAL_BRIDGE                      // Disable support for software Serial Bridge (+0k8 code)
 
-//#undef USE_ENERGY_SENSOR                      // Disable energy sensors
+#undef USE_ENERGY_SENSOR                      // Disable energy sensors
 #undef USE_ENERGY_MARGIN_DETECTION            // Add support for Energy Margin detection (+1k6 code)
 #undef USE_ENERGY_POWER_LIMIT                 // Add additional support for Energy Power Limit detection (+1k2 code)
 #undef USE_PZEM004T                           // Add support for PZEM004T Energy monitor (+2k code)
@@ -235,19 +249,22 @@
 
 #ifdef ESP32
 
-#define USE_TLS                               // for safeboot
+//#undef USE_ESP32_SENSORS
+
+//#define USE_TLS                               // for safeboot and BearSSL
 
 #undef USE_BLE_ESP32
 #undef USE_MI_ESP32
 #undef USE_IBEACON
 
-//#undef USE_BERRY
+#undef USE_AUTOCONF                           // Disable Esp32 autoconf feature
+#undef USE_BERRY
 
 #undef USE_DISPLAY
 #undef USE_SR04
 #undef USE_LVGL
 
-#undef USE_ADC                                  // Add support for ADC on GPIO32 to GPIO39
+#undef USE_ADC                                // Add support for ADC on GPIO32 to GPIO39
 
 #undef USE_WEBCAM
 
