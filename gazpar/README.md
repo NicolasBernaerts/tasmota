@@ -4,9 +4,9 @@ Gazpar Tasmota firmware
 Presentation
 ------------
 
-This evolution of **Tasmota 12.3.1** firmware has been enhanced to handle France gaz meters known as **Gazpar** using a dry contact counter.
+This evolution of **Tasmota 13.4** firmware has been enhanced to handle France gaz meters known as **Gazpar** using a dry contact counter.
 
-It is compatible with **ESP8266** chipsets.
+It is compatible with **ESP8266** and **ESP32** chipsets.
  
 This firmware uses LittleFS partition to store graph data. Il allows to keep historical data over reboots.
 To take advantage of this feature, make sure to follow partitioning procedure given in the **readme** of the **binary** folder.
@@ -19,13 +19,7 @@ Pre-compiled versions are available in the [**binary**](https://github.com/Nicol
 Configuration
 -------------
 
-Gazpar impulse connector should be declared as **Counter 1**
-
-To be on the safe side and to avoid false triggering, it's better to configure debounce :
-
-    # CounterDebounce 150
-    # CounterDebounceHigh 50
-    # CounterDebounceLow 50
+Gazpar impulse should be declared as **Counter 1**
 
 In LittleFS partition, config is stored in /gazpar.cfg
 
