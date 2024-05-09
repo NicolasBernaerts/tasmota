@@ -50,6 +50,8 @@ Voici la liste exhaustive des fichiers concernés :
 
 If everything goes fine, you should be able to compile your own build.
 
+Screen shots
+------------
 
  ![Grah yearly](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/gazpar/screen/gazpar-graph-year.png)
  
