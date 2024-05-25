@@ -1,6 +1,6 @@
 # Tasmota Firmware Extensions
 
-Some Tasmota firmware extensions :
+You'll find here some ESP8266 and ESP32 Tasmota firmware extensions :
   * **teleinfo** : manage **Teleinfo** protocol (Linky) & RTE API for **Tempo** and **Ecowatt** protocol
   * **gazpar** : manage french gaz smart meters (Gazpar)
   * **intercom** : manage building gate opening upon flat intercom rings
