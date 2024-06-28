@@ -81,21 +81,25 @@ En complément de la section officielle **ENERGY**, les sections suivantes peuve
 Toutes ces publications sont activables à travers la page **Configuration Teleinfo**.
 
 |    Section   |     Clé     |  Valeur   |
-| ------------ | --------_-- | ----------- |
-| **METER**    |     PH      |  nombre de phases (1 ou 3)  | 
-|              |     PSUB      | puissance apparente (VA) maximale par phase dans le contrat    | 
-|              |    ISUB       |  courant (A) maximal par phase dans le contrat    | 
-|              |   PMAX        |  puissance apparente (VA) maximale par phase intégrant le pourcentage acceptable   | 
-|              |    I       |  courant instantané (A) global   | 
-|              |    P       |  puissance apparente instantanée (VA) globale   | 
-|              |    W       |  puissance active instantanée (W) globale   | 
-|              |    C       |  facteur de puissance (cos φ)   | 
-|              |    TDAY       |  Total consommé aujourd'hui (Wh)   | 
-|              |    YDAY       |  Total consommé hier (Wh)   | 
-| **CAL**      |     x      |      x      | 
-| **RELAY**    |     x      |      x      | 
-| **ALERT**    |     x      |      x      | 
-| **CONTRACT** |  *PERIODE*  |   Compteur total (Wh) de la période     | 
+| ------------ | ----------- | ----------- |
+| **METER**    |     PH      | Nombre de phases (1 ou 3)  | 
+|              |     PSUB    | Puissance apparente (VA) maximale par phase dans le contrat    | 
+|              |    ISUB     | Courant (A) maximal par phase dans le contrat    | 
+|              |   PMAX      | Puissance apparente (VA) maximale par phase intégrant le pourcentage acceptable   | 
+|              |    I        | Courant global (A)    | 
+|              |    P        | Puissance apparente globale (VA)   | 
+|              |    W        | Puissance active globale (W)    | 
+|              |    C        | Facteur de puissance (cos φ)   | 
+|              |    I*x*     | Courant (A) sur la phase **x**   | 
+|              |    U*x*     | Tension (V) sur la phase **x**    | 
+|              |    P*x*     | Puissance apparente (VA) sur la phase **x**    | 
+|              |    W*x*     | Puissance active (W) sur la phase **x**   | 
+|              |    TDAY     | Total consommé aujourd'hui (Wh)   | 
+|              |    YDAY     | Total consommé hier (Wh)   | 
+| **CAL**      |     x       |      x      | 
+| **RELAY**    |     x       |      x      | 
+| **ALERT**    |     x       |      x      | 
+| **CONTRACT** |  *PERIODE*  | Compteur total (Wh) de la période     | 
 
 
 
@@ -104,10 +108,10 @@ Toutes ces publications sont activables à travers la page **Configuration Telei
 
 Données de **consommation** par **phase** publiées dans la section **METER** :
 
-  * **Ix** = courant instantané (A) sur la phase **x** 
-  * **Ux** = tension (V) sur la phase **x** 
-  * **Px** = puissance instantanée (VA) sur la phase **x** 
-  * **Wx** = puissance active (W) sur la phase **x**
+  * **** =  
+  * **Ux** = 
+  * **Px** = 
+  * **Wx** = 
 
 Données de **production** publiées dans la section **METER** :
 
