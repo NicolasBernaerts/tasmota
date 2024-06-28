@@ -1,16 +1,17 @@
 # Firmware Tasmota Teleinfo
 
-⚠️ Depuis la **version 13**, le partitionnement a évolué pour la famille des **ESP32**. Il utilise maintenant le partitionnement standard **safeboot**. Si vous faites une mise à jour ESP32 depuis une version plus ancienne, Vous devez faire un flash **serial**. Si vous faites une mise à jour **OTA** vous pourrez rencontrer des dysfonctionnements.
-
-A partir du moment où vous disposez d'une version **13+**, vous pouvez bien entendu réaliser les mises à jour en mode **OTA**. Le partitionnement des **ESP8266** n'a pas changé.
+⚠️ Pour la famille des **ESP32**, merci de faire systématiquement un premier flash **serial** afin de synchroniser le partitionnement et d'éviter tout dysfonctionnement. Vous pourrez alors faire toutes les mises à jour en mode **OTA**.
 
 Le **changelog** général est disponible dans le fichier **user_config_override.h**
 
 ## Presentation
 
-Cette évolution du firmware **Tasmota 13.4.0** permet de :
+Cette évolution du firmware **Tasmota 14** permet de :
   * gérer le flux **Teleinfo** des compteurs français (**Linky**, **PME/PMI** et **Emeraude**)
-  * publier les données sous **Domoticz**, **Home Assistant** et **Homie**
+  * gérer les compteurs en mode **Historique** et en mode **Standard**
+  * gérer les compteurs en mode **Consommation** et/ou **Production**
+  * calculer le **Cosφ** en quasi temps réel
+  * publier les données pour **Domoticz**, **Home Assistant** et **Homie**
   * s'abonner aux API RTE **Tempo**, **Pointe** et **Ecowatt**
 
 Ce firmware a été développé et testé sur les compteurs suivants :
@@ -19,8 +20,6 @@ Ce firmware a été développé et testé sur les compteurs suivants :
   * **Linky triphase** en TIC **Historique** & **Standard**
   * **Ace6000 triphase** en TIC **PME/PMI**
   * **Emeraude** en TIC **Emeraude 2 quadrands**
-
-La réception **TIC** intègre une correction d'erreur basée sur le checksum afin de ne traiter que des données fiables.
 
 Il a été compilé et testé sur les ESP suivants :
   * **ESP8266** 1Mb, 4Mb et 16Mb
@@ -33,34 +32,41 @@ Il a été compilé et testé sur les ESP suivants :
 Ce firmware fournit également :
   * un serveur intégré **TCP** pour diffuser en temps réel les données reçues du compteur
   * un serveur intégré **FTP** pour récupérer les fichiers historiques
+  * le suivi en temps réel des trames réçues
+  * un graph en temps réel des données principales (tension, puissance et Cosφ)
+  * suivi historisé de la consommation
+  * suivi historisé de la production
 
-Des versions pré-compilées sont disponibles dans le répertoire [**binary**](./binary).
+Si votre compteur est en mode historique, la tension est forcée à 230V.
 
 Ce firmware n'est pas le firmware officiel **Teleinfo** de **Tasmota**. C'est une implémentation complètement différente de celle publiée en 2020 par Charles Hallard. 
 
-Il gère les compteurs en mode consommation et production. 
-
-Ce firmware gère les données suivantes :
-  * Tension (**V**)
-  * Courant (**A**)
-  * Puissance instantanée (**VA**)
-  * Puissance active (**W**)
-  * Facteur de puissance (**Cosφ**)
-  * Compteurs quotidiens et de période (**Wh**)
-
-Il fournit des pages web spécifiques :
-  * **/tic** : suivi en temps réel des données réçues
-  * **/graph** : graph en temps réel des données du compteur
-  * **/conso** : suivi des consommations
-  * **/prod** : suivi de la production
-  
-Si votre compteur est en mode historique, la tension est forcée à 230V.
-
-Si vous souhaitez supprimer l'affichage des données **Energy** sur la page d'accueil, vous devez passer la commande suivante en console :
-
-    websensor3 0
+Des versions pré-compilées sont disponibles dans le répertoire [**binary**](./binary).
 
 Le protocole **Teleinfo** est décrit dans [ce document](https://www.enedis.fr/sites/default/files/Enedis-NOI-CPT_54E.pdf)
+
+## Fonctionnalités
+
+Suivant le type d'ESP utilisé, toutes les fonctionnalités ne sont pas disponibles. Voici un tableau récapitulatif :
+
+|       Fonctionnalité        | ESP8266 1M | ESP8266 4M+ | ESP32  |
+| --------------------------- | ---------- | ----------- | -----  |
+| IP fixe                     |     x      |      x      |   x    |
+| Calcul Cosφ                 |     x      |      x      |   x    |
+| LED couleur contrat         |     x      |      x      |   x    |
+| Trames temps réel           |     x      |      x      |   x    |
+| Graph temps réel            |     x      |      x      |   x    |
+| Graph historisé             |            |      x      |   x    |
+| Consommation historisée     |            |      x      |   x    |
+| Production historisée       |            |      x      |   x    |
+| Serveur TCP                 |     x      |      x      |   x    |
+| Serveur FTP                 |            |             |   x    |
+| Intégration Home Assistant  |            |             |   x    |
+| Intégration Domoticz        |            |             |   x    |
+| Intégration Homie           |            |             |   x    |
+| Intégration API RTE         |            |             |   x    |
+| Nombre max étiquettes       |    48      |    48       |   74   |
+| Longueur max étiquette      |    32      |    32       |  112   |
 
 ## Publication MQTT
 
@@ -125,20 +131,26 @@ En complément des données de base du contrat, la section **CONTRAT** liste l'e
 
 Ce firmware propose un certain nombre de commandes **EnergyConfig** spécifiques disponibles en mode console :
 
-    EnergyConfig Teleinfo parameters :
-      historique      set historique mode at 1200 bauds (needs restart)
-      standard        set standard mode at 9600 bauds (needs restart)
-      stats           display reception statistics
-      percent=100     maximum acceptable % of total contract
-      msgpol=1        message policy : 0=Every TIC, 1=± 5% Power Change, 2=Telemetry only
-      msgtype=1       message type : 0=None, 1=METER only, 2=TIC only, 3=METER and TIC
-      maxv=240        graph max voltage (V)
-      maxva=9000      graph max power (VA or W)
-      nbday=8         number of daily logs
-      nbweek=4        number of weekly logs
-      maxhour=8       graph max total per hour (Wh)
-      maxday=110      graph max total per day (Wh)
-      maxmonth=2000   graph max total per month (Wh)
+      historique   set historique mode at 1200 bauds (needs restart)
+      standard     set Standard mode at 9600 bauds (needs restart)
+      stats        display reception statistics
+      reset        reset contract data
+      error=0      display error counters on home page
+      percent=100  maximum acceptable contract (%)
+      
+      policy=1     message policy : 0=Telemetrie seulement, 1=± 5% Evolution puissance, 2=Tous les messages TIC
+      meter=1      publish METER & PROD data
+      contract=1   publish CONTRACT data
+      calendar=1   publish CAL data
+      relay=1      publish RELAY data
+      
+      maxv=235     graph max voltage (V)
+      maxva=3000  graph max power (VA or W)
+      nbday=8      number of daily logs
+      nbweek=4     number of weekly logs
+      maxhour=2    graph max total per hour (Wh)
+      maxday=10    graph max total per day (Wh)
+      maxmonth=100 graph max total per month (Wh)
 
 Vous pouvez passer plusieurs commandes en même temps :
 
