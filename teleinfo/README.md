@@ -1,6 +1,8 @@
 # Firmware Tasmota Teleinfo
 
-⚠️ Pour la famille des **ESP32**, merci de faire systématiquement un premier flash **serial** afin de synchroniser le partitionnement et d'éviter tout dysfonctionnement. Vous pourrez alors faire toutes les mises à jour en mode **OTA**.
+⚠️ Ce firmware n'est pas le firmware officiel **Teleinfo** de **Tasmota** publié en 2020 par Charles Hallard. 
+
+Pour la famille des **ESP32**, merci de faire systématiquement un premier flash en mode **Série** afin de regénérer le partitionnement et d'éviter tout dysfonctionnement. Vous pourrez alors faire toutes les mises à jour suivantes en mode **OTA**.
 
 Le **changelog** général est disponible dans le fichier **user_config_override.h**
 
@@ -38,8 +40,6 @@ Ce firmware fournit également :
   * suivi historisé de la production
 
 Si votre compteur est en mode historique, la tension est forcée à 230V.
-
-Ce firmware n'est pas le firmware officiel **Teleinfo** de **Tasmota**. C'est une implémentation complètement différente de celle publiée en 2020 par Charles Hallard. 
 
 Des versions pré-compilées sont disponibles dans le répertoire [**binary**](./binary).
 
