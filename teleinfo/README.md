@@ -111,8 +111,8 @@ Données de **production** publiées dans la section **METER** :
 Voici les données publiées dans la section **CAL** :
   * **lv** = niveau de la période actuelle (0 inconnu, 1 bleu, 2 blanc, 3 rouge)
   * **hp** = type de la période courante (0:heure creuse, 1 heure pleine)
-  * **today** = section avec le niveau et le type de chaque heure du jour
-  * **tomorrow** = section avec le niveau et le type de chaque heure du lendemain
+  * **tday** = section avec le niveau et le type de chaque heure du jour
+  * **tmrw** = section avec le niveau et le type de chaque heure du lendemain
 
 Données publiées dans la section **RELAY** :
   * **R1** = état du relai virtual n°1 (0:ouvert, 1:fermé)
@@ -125,7 +125,7 @@ Données publiées dans la section **ALERT** :
   * **Preavis** = niveau du prochain préavis (utilisé en Tempo & EJP)
   * **Label** = Libellé du prochain préavis
 
-En complément des données de base du contrat, la section **CONTRAT** liste l'ensemble des périodes dans votre contrat. Seules les périodes avec un total de consommation différent de **0** sont publiées.
+En complément des données de base du contrat, la section **CONTRAT** liste l'ensemble des périodes dans votre contrat.
 
 ## Commands
 
