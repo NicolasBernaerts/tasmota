@@ -47,26 +47,28 @@ Le protocole **Teleinfo** est décrit dans [ce document](https://www.enedis.fr/s
 
 ## Fonctionnalités
 
-Suivant le type d'ESP utilisé, toutes les fonctionnalités ne sont pas disponibles. Voici un tableau récapitulatif :
+Suivant le type d'ESP utilisé, toutes les fonctionnalités ne sont pas disponibles.
 
-|       Fonctionnalité        | ESP8266 1M | ESP8266 4M+ | ESP32  |
-| --------------------------- | ---------- | ----------- | -----  |
-| IP fixe                     |     x      |      x      |   x    |
-| Calcul Cosφ                 |     x      |      x      |   x    |
-| LED couleur contrat         |     x      |      x      |   x    |
-| Trames temps réel           |     x      |      x      |   x    |
-| Graph temps réel            |     x      |      x      |   x    |
-| Graph historisé             |            |      x      |   x    |
-| Consommation historisée     |            |      x      |   x    |
-| Production historisée       |            |      x      |   x    |
-| Serveur TCP                 |     x      |      x      |   x    |
-| Serveur FTP                 |            |             |   x    |
-| Intégration Home Assistant  |            |             |   x    |
-| Intégration Domoticz        |            |             |   x    |
-| Intégration Homie           |            |             |   x    |
-| Intégration API RTE         |            |             |   x    |
-| Nombre max étiquettes       |    48      |    48       |   74   |
-| Longueur max étiquette      |    32      |    32       |  112   |
+Voici un tableau récapitulatif des fonctionnalités par famille d'ESP :
+
+|       Fonctionnalité        | ESP8266 1M | ESP8266 4M+ | ESP32 4M+ |
+| --------------------------- | ---------- | ----------- | --------  |
+| IP fixe                     |     x      |      x      |     x     |
+| Calcul Cosφ                 |     x      |      x      |     x     |
+| LED couleur contrat         |     x      |      x      |     x     |
+| Trames temps réel           |     x      |      x      |     x     |
+| Graph temps réel            |     x      |      x      |     x     |
+| Graph historisé             |            |      x      |     x     |
+| Consommation historisée     |            |      x      |     x     |
+| Production historisée       |            |      x      |     x     |
+| Serveur TCP                 |     x      |      x      |     x     |
+| Serveur FTP                 |            |             |     x     |
+| Intégration Home Assistant  |            |             |     x     |
+| Intégration Domoticz        |            |             |     x     |
+| Intégration Homie           |            |             |     x     |
+| Intégration API RTE         |            |             |     x     |
+| Taille max d'une étiquette  |    32      |    32       |    112    |
+| Nombre max d'étiquettes     |    48      |    48       |    74     |
 
 ## Publication MQTT
 
