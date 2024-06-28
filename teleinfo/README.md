@@ -94,32 +94,17 @@ Toutes ces publications sont activables à travers la page **Configuration Telei
 |              |    U*x*     | Tension (V) sur la phase **x**    | 
 |              |    P*x*     | Puissance apparente (VA) sur la phase **x**    | 
 |              |    W*x*     | Puissance active (W) sur la phase **x**   | 
-|              |    TDAY     | Total consommé aujourd'hui (Wh)   | 
-|              |    YDAY     | Total consommé hier (Wh)   | 
+|              |    TDAY     | Puissance totale consommée aujourd'hui (Wh)   | 
+|              |    YDAY     | Puissance totale consommée hier (Wh)   | 
+|              |    PP       |  puissance apparente **produite** (VA) | 
+|              |    PW       |  puissance active **produite** (VA) | 
+|              |    PC       |  facteur de puissance (cos φ) de la **production**  | 
+|              |    PTDAY    | Puissance totale **produite** aujourd'hui (Wh) | 
 | **CAL**      |     x       |      x      | 
 | **RELAY**    |     x       |      x      | 
 | **ALERT**    |     x       |      x      | 
 | **CONTRACT** |  *PERIODE*  | Compteur total (Wh) de la période     | 
 
-
-
-
-
-
-Données de **consommation** par **phase** publiées dans la section **METER** :
-
-  * **** =  
-  * **Ux** = 
-  * **Px** = 
-  * **Wx** = 
-
-Données de **production** publiées dans la section **METER** :
-
-  * **PP** = puissance instantanée (VA) produite
-  * **PW** = puissance active (W) produite
-  * **PC** = facteur de puissance (cos φ) de la production
-  * **PTDAY** = Total produit aujourd'hui (Wh)
-  * **PYDAY** = Total produit hier (Wh)
 
 Voici les données publiées dans la section **CAL** :
   * **lv** = niveau de la période actuelle (0 inconnu, 1 bleu, 2 blanc, 3 rouge)
