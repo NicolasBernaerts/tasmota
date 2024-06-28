@@ -80,18 +80,27 @@ En complément de la section officielle **ENERGY**, les sections suivantes peuve
 
 Toutes ces publications sont activables à travers la page **Configuration Teleinfo**.
 
-Données de **consommation** publiées dans la section **METER** :
+|    Section   |     Clé     |  Valeur   |
+| ------------ | --------_-- | ----------- |
+| **METER**    |     PH      |  nombre de phases (1 ou 3)  | 
+|              |     PSUB      | puissance apparente (VA) maximale par phase dans le contrat    | 
+|              |    ISUB       |  courant (A) maximal par phase dans le contrat    | 
+|              |   PMAX        |  puissance apparente (VA) maximale par phase intégrant le pourcentage acceptable   | 
+|              |    I       |  courant instantané (A) global   | 
+|              |    P       |  puissance apparente instantanée (VA) globale   | 
+|              |    W       |  puissance active instantanée (W) globale   | 
+|              |    C       |  facteur de puissance (cos φ)   | 
+|              |    TDAY       |  Total consommé aujourd'hui (Wh)   | 
+|              |    YDAY       |  Total consommé hier (Wh)   | 
+| **CAL**      |     x      |      x      | 
+| **RELAY**    |     x      |      x      | 
+| **ALERT**    |     x      |      x      | 
+| **CONTRACT** |  *PERIODE*  |   Compteur total (Wh) de la période     | 
 
-  * **PH** = nombre de phases (1 ou 3)
-  * **PSUB** = puissance apparente (VA) maximale par phase dans le contrat
-  * **ISUB** = courant (A) maximal par phase dans le contrat 
-  * **PMAX** = puissance apparente (VA) maximale par phase intégrant le pourcentage acceptable
-  * **I** = courant instantané (A) global
-  * **P** = puissance instantanée (VA) globale
-  * **W** = puissance active (W) globale
-  * **C** = facteur de puissance (cos φ)
-  * **TDAY** = Total consommé aujourd'hui (Wh)
-  * **YDAY** = Total consommé hier (Wh)
+
+
+
+
 
 Données de **consommation** par **phase** publiées dans la section **METER** :
 
