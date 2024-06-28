@@ -74,10 +74,10 @@ Voici un tableau récapitulatif des fonctionnalités par famille d'ESP :
 
 En complément de la section officielle **ENERGY**, les sections suivantes peuvent être publiées :
   * **METER** : données normalisées de consommation et production en temps réel
-  * **ALERT** : alertes publiées dans les messages STGE (changement Tempo / EJP, surpuissance & survoltage)
-  * **CONTRACT** : données du contrat intégrant les compteurs de périodes en Wh
   * **CAL** : calendrier consolidé entre la publication compteur et les données RTE reçues (Tempo, Pointe et/ou Ecowatt)
   * **RELAY** : relais virtuels publiés par le compteur
+  * **CONTRACT** : données du contrat intégrant les compteurs de périodes en Wh
+  * **ALERT** : alertes publiées dans les messages STGE (changement Tempo / EJP, surpuissance & survoltage)
   * **TIC** : etiquettes et données brutes reçues depuis le compteur
 
 Toutes ces publications sont activables à travers la page **Configuration Teleinfo**.
@@ -110,10 +110,6 @@ Toutes ces publications sont activables à travers la page **Configuration Telei
 | **RELAY**    |    R1       | Etat du relai virtual n°1 (0:ouvert, 1:fermé)   | 
 |              |    ...      |                                                 | 
 |              |    R8       | Etat du relai virtual n°8 (0:ouvert, 1:fermé)   | 
-| **ALERT**    |    Load     | Indicateur de surconsommation (0:pas de pb, 1:surconsommation)     | 
-|              |    Volt     | Indicateur de surtension (0:pas de pb, 1:au moins 1 phase est en surtension)    | 
-|              |   Preavis   | Niveau du prochain préavis (utilisé en Tempo & EJP)     | 
-|              |    Label    | Libellé du prochain préavis    | 
 | **CONTRACT** |   serial    | Numéro de série du compteur    | 
 |              |    name     | Nom du contrat en cours        | 
 |              |   period    | Nom de la periode en cours     | 
@@ -121,6 +117,10 @@ Toutes ces publications sont activables à travers la page **Configuration Telei
 |              |    hour     | Type de la periode en cours     | 
 |              |    CONSO    | Compteur global (Wh) de l'ensemble des périodes    | 
 |              |  *PERIODE*  | Compteur total (Wh) de la période *PERIODE*      | 
+| **ALERT**    |    Load     | Indicateur de surconsommation (0:pas de pb, 1:surconsommation)     | 
+|              |    Volt     | Indicateur de surtension (0:pas de pb, 1:au moins 1 phase est en surtension)    | 
+|              |   Preavis   | Niveau du prochain préavis (utilisé en Tempo & EJP)     | 
+|              |    Label    | Libellé du prochain préavis    | 
 
 ## Commands
 
