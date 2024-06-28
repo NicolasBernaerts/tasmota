@@ -100,23 +100,25 @@ Toutes ces publications sont activables à travers la page **Configuration Telei
 |              |    PW       | Puissance active **produite** (VA) | 
 |              |    PC       | Facteur de puissance (cos φ) de la **production**  | 
 |              |    PTDAY    | Puissance totale **produite** aujourd'hui (Wh) | 
+|              |    PYDAY    | Puissance totale **produite** hier (Wh) | 
 | **CAL**      |    lv       | Niveau de la période actuelle (0 inconnu, 1 bleu, 2 blanc, 3 rouge)     | 
 |              |    hp       | Type de la période courante (0:heure creuse, 1 heure pleine) | 
 |              |  **tday**   | Section avec le niveau et le type de chaque heure du jour | 
 |              |  **tmrw**   | Section avec le niveau et le type de chaque heure du lendemain | 
-| **RELAY**    |    R1       |  état du relai virtual n°1 (0:ouvert, 1:fermé)   | 
-|              |    ...      |  | 
-|              |    R8       |  état du relai virtual n°8 (0:ouvert, 1:fermé) | 
-| **ALERT**    |     x       |      x      | 
-| **CONTRACT** |  *PERIODE*  | Compteur total (Wh) de la période     | 
-
-Données publiées dans la section **ALERT** :
-  * **Load** = indicateur de surconsommation (0:pas de pb, 1:surconsommation)
-  * **Volt** = indicateur de surtension (0:pas de pb, 1:au moins 1 phase est en surtension)
-  * **Preavis** = niveau du prochain préavis (utilisé en Tempo & EJP)
-  * **Label** = Libellé du prochain préavis
-
-En complément des données de base du contrat, la section **CONTRAT** liste l'ensemble des périodes dans votre contrat.
+| **RELAY**    |    R1       | Etat du relai virtual n°1 (0:ouvert, 1:fermé)   | 
+|              |    ...      |                                                 | 
+|              |    R8       | Etat du relai virtual n°8 (0:ouvert, 1:fermé)   | 
+| **ALERT**    |    Load     | Indicateur de surconsommation (0:pas de pb, 1:surconsommation)     | 
+|              |    Volt     | Indicateur de surtension (0:pas de pb, 1:au moins 1 phase est en surtension)    | 
+|              |    Preavis  | Niveau du prochain préavis (utilisé en Tempo & EJP)     | 
+|              |    Label    | Libellé du prochain préavis    | 
+| **CONTRACT** |    serial   | Numéro de série du compteur    | 
+|              |    name     | Nom du contrat en cours        | 
+|              |    period   | Nom de la periode en cours     | 
+|              |    color    | Couleur de la periode en cours     | 
+|              |    hour     | Type de la periode en cours     | 
+|              |    CONSO    | Compteur global (Wh) de l'ensemble des périodes    | 
+|              |  *PERIODE*  | Compteur total (Wh) de la période *PERIODE*      | 
 
 ## Commands
 
