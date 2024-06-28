@@ -90,32 +90,25 @@ Toutes ces publications sont activables à travers la page **Configuration Telei
 |              |    P        | Puissance apparente globale (VA)   | 
 |              |    W        | Puissance active globale (W)    | 
 |              |    C        | Facteur de puissance (cos φ)   | 
-|              |    I*x*     | Courant (A) sur la phase **x**   | 
-|              |    U*x*     | Tension (V) sur la phase **x**    | 
-|              |    P*x*     | Puissance apparente (VA) sur la phase **x**    | 
-|              |    W*x*     | Puissance active (W) sur la phase **x**   | 
+|              |    I*x*     | Courant (A) sur la phase **_x_**   | 
+|              |    U*x*     | Tension (V) sur la phase **_x_**    | 
+|              |    P*x*     | Puissance apparente (VA) sur la phase **_x_**    | 
+|              |    W*x*     | Puissance active (W) sur la phase **_x_**   | 
 |              |    TDAY     | Puissance totale consommée aujourd'hui (Wh)   | 
 |              |    YDAY     | Puissance totale consommée hier (Wh)   | 
-|              |    PP       |  puissance apparente **produite** (VA) | 
-|              |    PW       |  puissance active **produite** (VA) | 
-|              |    PC       |  facteur de puissance (cos φ) de la **production**  | 
+|              |    PP       | Puissance apparente **produite** (VA) | 
+|              |    PW       | Puissance active **produite** (VA) | 
+|              |    PC       | Facteur de puissance (cos φ) de la **production**  | 
 |              |    PTDAY    | Puissance totale **produite** aujourd'hui (Wh) | 
-| **CAL**      |     x       |      x      | 
-| **RELAY**    |     x       |      x      | 
+| **CAL**      |    lv       | Niveau de la période actuelle (0 inconnu, 1 bleu, 2 blanc, 3 rouge)     | 
+|              |    hp       | Type de la période courante (0:heure creuse, 1 heure pleine) | 
+|              |  **tday**   | Section avec le niveau et le type de chaque heure du jour | 
+|              |  **tmrw**   | Section avec le niveau et le type de chaque heure du lendemain | 
+| **RELAY**    |    R1       |  état du relai virtual n°1 (0:ouvert, 1:fermé)   | 
+|              |    ...      |  | 
+|              |    R8       |  état du relai virtual n°8 (0:ouvert, 1:fermé) | 
 | **ALERT**    |     x       |      x      | 
 | **CONTRACT** |  *PERIODE*  | Compteur total (Wh) de la période     | 
-
-
-Voici les données publiées dans la section **CAL** :
-  * **lv** = niveau de la période actuelle (0 inconnu, 1 bleu, 2 blanc, 3 rouge)
-  * **hp** = type de la période courante (0:heure creuse, 1 heure pleine)
-  * **tday** = section avec le niveau et le type de chaque heure du jour
-  * **tmrw** = section avec le niveau et le type de chaque heure du lendemain
-
-Données publiées dans la section **RELAY** :
-  * **R1** = état du relai virtual n°1 (0:ouvert, 1:fermé)
-  * **R2** = état du relai virtual n°2 (0:ouvert, 1:fermé)
-  * .. 
 
 Données publiées dans la section **ALERT** :
   * **Load** = indicateur de surconsommation (0:pas de pb, 1:surconsommation)
