@@ -82,14 +82,14 @@ Toutes ces publications sont activables à travers la page **Configuration Telei
 
 |    Section   |     Clé     |  Valeur   |
 | ------------ | ----------- | ----------- |
-| **METER**    |     PH      | Nombre de phases (1 ou 3)  | 
-|              |     PSUB    | Puissance apparente (VA) maximale par phase dans le contrat    | 
-|              |    ISUB     | Courant (A) maximal par phase dans le contrat    | 
+| **METER**    |    PH       | Nombre de phases (1 ou 3)  | 
+|              |   PSUB      | Puissance apparente (VA) maximale par phase dans le contrat    | 
+|              |   ISUB      | Courant (A) maximal par phase dans le contrat    | 
 |              |   PMAX      | Puissance apparente (VA) maximale par phase intégrant le pourcentage acceptable   | 
-|              |    I        | Courant global (A)    | 
-|              |    P        | Puissance apparente globale (VA)   | 
-|              |    W        | Puissance active globale (W)    | 
-|              |    C        | Facteur de puissance (cos φ)   | 
+|              |     I       | Courant global (A)    | 
+|              |     P       | Puissance apparente globale (VA)   | 
+|              |     W       | Puissance active globale (W)    | 
+|              |     C       | Facteur de puissance (cos φ)   | 
 |              |    I*x*     | Courant (A) sur la phase **_x_**   | 
 |              |    U*x*     | Tension (V) sur la phase **_x_**    | 
 |              |    P*x*     | Puissance apparente (VA) sur la phase **_x_**    | 
@@ -99,8 +99,8 @@ Toutes ces publications sont activables à travers la page **Configuration Telei
 |              |    PP       | Puissance apparente **produite** (VA) | 
 |              |    PW       | Puissance active **produite** (VA) | 
 |              |    PC       | Facteur de puissance (cos φ) de la **production**  | 
-|              |    PTDAY    | Puissance totale **produite** aujourd'hui (Wh) | 
-|              |    PYDAY    | Puissance totale **produite** hier (Wh) | 
+|              |   PTDAY     | Puissance totale **produite** aujourd'hui (Wh) | 
+|              |   PYDAY     | Puissance totale **produite** hier (Wh) | 
 | **CAL**      |    lv       | Niveau de la période actuelle (0 inconnu, 1 bleu, 2 blanc, 3 rouge)     | 
 |              |    hp       | Type de la période courante (0:heure creuse, 1 heure pleine) | 
 |              |  **tday**   | Section avec le niveau et le type de chaque heure du jour | 
@@ -110,11 +110,11 @@ Toutes ces publications sont activables à travers la page **Configuration Telei
 |              |    R8       | Etat du relai virtual n°8 (0:ouvert, 1:fermé)   | 
 | **ALERT**    |    Load     | Indicateur de surconsommation (0:pas de pb, 1:surconsommation)     | 
 |              |    Volt     | Indicateur de surtension (0:pas de pb, 1:au moins 1 phase est en surtension)    | 
-|              |    Preavis  | Niveau du prochain préavis (utilisé en Tempo & EJP)     | 
+|              |   Preavis   | Niveau du prochain préavis (utilisé en Tempo & EJP)     | 
 |              |    Label    | Libellé du prochain préavis    | 
-| **CONTRACT** |    serial   | Numéro de série du compteur    | 
+| **CONTRACT** |   serial    | Numéro de série du compteur    | 
 |              |    name     | Nom du contrat en cours        | 
-|              |    period   | Nom de la periode en cours     | 
+|              |   period    | Nom de la periode en cours     | 
 |              |    color    | Couleur de la periode en cours     | 
 |              |    hour     | Type de la periode en cours     | 
 |              |    CONSO    | Compteur global (Wh) de l'ensemble des périodes    | 
