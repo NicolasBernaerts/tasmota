@@ -63,9 +63,9 @@ Voici un tableau récapitulatif des fonctionnalités par famille d'ESP :
 | Production historisée       |            |      x      |     x     |
 | Serveur TCP                 |     x      |      x      |     x     |
 | Serveur FTP                 |            |             |     x     |
-| Intégration Home Assistant  |            |             |     x     |
-| Intégration Domoticz        |            |             |     x     |
-| Intégration Homie           |            |             |     x     |
+| Intégration Home Assistant  |     x      |      x      |     x     |
+| Intégration Domoticz        |     x      |      x      |     x     |
+| Intégration Homie           |     x      |      x      |     x     |
 | Intégration API RTE         |            |             |     x     |
 | Taille max d'une étiquette  |    32      |    32       |    112    |
 | Nombre max d'étiquettes     |    48      |    48       |    74     |
