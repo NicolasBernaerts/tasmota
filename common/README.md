@@ -1,9 +1,5 @@
 You'll find here all the common libraries and files used by the Tasmota projects of this repository.
 
-## xdrv_94_ip_address.ino ##
-
-This simple driver allows graphical configuration of fixed IP.
-
 ## Timezone management ##
 
 File : **xsns_120_timezone.ino**
@@ -17,7 +13,7 @@ File : **xsns_99_generic_sensor.ino**
 ![RCWL0516](./screen/tasmota-sensor-main-pres.png)
 
 This generic sensor drivers allows to :
-  - standardize local sensors access (temprature, humidity and presence)
+  - standardize access to local and remote sensors (temperature, humidity and presence)
   - historisation of weekly and yearly measures
   - use of MQTT remote sensors
 
@@ -115,6 +111,7 @@ This is an extension of **xdrv_40_telegram.ino** to allow :
 ## Others ##
 
 Some other drivers are available from this repository :
+  **xdrv_94_ip_address.ino** : Simple driver to allow graphical configuration of IP and misc options
   * **xdrv_96_ftp_server.ino** : Embedded FTP Server
   * **xdrv_97_tcp_server.ino** : Embedded TCP server for Teleinfo stream
   * **xdrv_98_esp32_board.ino** : Handler for ESP32 Ethernet board configuration
