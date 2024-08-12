@@ -318,11 +318,9 @@ Cette intégration peut être activée via le menu **Configuration / Teleinfo** 
 
     tboard_enable 1
  
-Voici le paramétrage à appliquer coté Tasmota et coté Thingsboard pour que les données soient publiées et consommées :
+Voici le paramétrage à appliquer coté **Tasmota** et coté **Thingsboard** pour que les données soient publiées et consommées :
 
-![Tasmota config](./screen/tasmota-thingsboard-config.jpg)
-
-![Thingsboard device](./screen/thingsboard-device.jpg)  ![Thingsboard credentials](./screen/thingsboard-credentials.jpg)
+![Tasmota config](./screen/tasmota-thingsboard-config.jpg)  ![Thingsboard device](./screen/thingsboard-device.jpg)  ![Thingsboard credentials](./screen/thingsboard-credentials.jpg)
 
 ## Serveur TCP
 
