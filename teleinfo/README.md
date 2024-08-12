@@ -295,7 +295,8 @@ Dans le cas particulier du Wenky, les messages d'auto-découverte ne sont pas é
 
 Suite à l'émission des messages d'auto-découverte, dans Home Assistant vous devriez avoir un device ressemblant à ceci :
 
-![Home Assistant integration](./screen/tasmota-ha-integration.png)
+![Home Assistant integration](./screen/tasmota-ha-integration-1.png)  ![Home Assistant integration](./screen/tasmota-ha-integration-2.png)
+
 
 ### Intégration Homie
 
