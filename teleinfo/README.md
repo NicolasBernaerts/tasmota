@@ -110,13 +110,19 @@ Toutes ces publications sont activables à travers la page **Configuration Telei
 | **RELAY**    |    R1       | Etat du relai virtual n°1 (0:ouvert, 1:fermé)   | 
 |              |    ...      |                                                 | 
 |              |    R8       | Etat du relai virtual n°8 (0:ouvert, 1:fermé)   | 
+|              |    P1       | Etat de la période n°1 (0:inactive, 1:active)   | 
+|              |    L1       | Libellé de la période n°1   | 
+|              |    ...      |                                                 | 
+|              |    P9       | Etat de la période n°9 (0:inactive, 1:active)   | 
+|              |    L9       | Libellé de la période n°9   | 
 | **CONTRACT** |   serial    | Numéro de série du compteur    | 
 |              |    name     | Nom du contrat en cours        | 
 |              |   period    | Nom de la periode en cours     | 
 |              |    color    | Couleur de la periode en cours     | 
 |              |    hour     | Type de la periode en cours     | 
-|              |    CONSO    | Compteur global (Wh) de l'ensemble des périodes    | 
-|              |  *PERIODE*  | Compteur total (Wh) de la période *PERIODE*      | 
+|              |    CONSO    | Compteur global (Wh) de l'ensemble des périodes de consommation    | 
+|              |  *PERIODE*  | Compteur total (Wh) de la période de consommation *PERIODE*      | 
+|              |    PROD     | Compteur global (Wh) de la production    | 
 | **ALERT**    |    Load     | Indicateur de surconsommation (0:pas de pb, 1:sur-consommation)     | 
 |              |    Volt     | Indicateur de surtension (0:pas de pb, 1:au moins 1 phase est en surtension)    | 
 |              |   Preavis   | Niveau du prochain préavis (utilisé en Tempo & EJP)     | 
