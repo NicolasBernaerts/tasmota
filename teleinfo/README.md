@@ -117,7 +117,7 @@ Toutes ces publications sont activables à travers la page **Configuration Telei
 |              |    hour     | Type de la periode en cours     | 
 |              |    CONSO    | Compteur global (Wh) de l'ensemble des périodes    | 
 |              |  *PERIODE*  | Compteur total (Wh) de la période *PERIODE*      | 
-| **ALERT**    |    Load     | Indicateur de surconsommation (0:pas de pb, 1:surconsommation)     | 
+| **ALERT**    |    Load     | Indicateur de surconsommation (0:pas de pb, 1:sur-consommation)     | 
 |              |    Volt     | Indicateur de surtension (0:pas de pb, 1:au moins 1 phase est en surtension)    | 
 |              |   Preavis   | Niveau du prochain préavis (utilisé en Tempo & EJP)     | 
 |              |    Label    | Libellé du prochain préavis    | 
