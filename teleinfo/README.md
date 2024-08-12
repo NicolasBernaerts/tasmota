@@ -309,6 +309,19 @@ A chaque boot, toutes les données candidates à intégration dans un client **H
 
 Dans le cas particulier du Wenky, les messages d'auto-découverte ne sont pas émis au réveil s'il ne dispose pas d'une alimentation fixe via USB. Seuls les messages de publication des données sont émis.
 
+
+### Intégration Homie
+
+Ce firmware gère la publication des données à destination de la plateforme IoT  [**Thingsboard**](https://thingsboard.io/)
+
+Cette intégration peut être activée via le menu **Configuration / Teleinfo** ou en mode console : 
+
+    tboard_enable 1
+ 
+Voici le paramétrage à appliquer coté Tasmota et coté Thingsboard pour que les données soient publiées et consommées :
+
+
+
 ## Serveur TCP
 
 Un serveur **TCP** est intégré à cette version de firmware.
