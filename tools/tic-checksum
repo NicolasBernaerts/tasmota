@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# ----------------------------------------------------
+# Utility to correct and modify TIC streams
+# All checksum are calculated and replaced
+# Any value can be replaced using --param and --value
+#
+# Revision history :
+#  29/08/2024, v1.0 - Creation by N. Bernaerts
+# ----------------------------------------------------
+
+# iterate thru parameters
+while test ${#} -gt 0
+do
+  case $1 in
+    --param) shift; PARAM="$1"; shift; ;;
+    --value) shift; VALUE="$1"; shift; ;;
+    *) ORIGINAL="$1"; shift; ;;
+  esac
+done
+
+# check parameters
+[ -f "${ORIGINAL}" ] || { echo "${ORIGINAL} not present"; exit 1; }
+
+# generate temporary files and directory
+TMP_DIR=$(mktemp -t -d "tic-XXXXXXXX")
+TMP_TIC="${TMP_DIR}/tic.log"
+
+# init
+SPACE=""
+ARR_CONTENT=( )
+
+# replace param with value
+if [ "${PARAM}" != "" -a "${VALUE}" != "" ]
+then
+  cat "${ORIGINAL}" | sed "s|${PARAM}\([ \t]\)[^ \t]*|${PARAM}\1${VALUE}|g" > "${TMP_TIC}"
+else
+  cp "${ORIGINAL}" "${TMP_TIC}"
+fi
+
+# loop thru bytes
+for CARAC in $(cat "${TMP_TIC}" | od -An -td1 | xargs)
+do
+  # init
+  SEND=""
+  
+  # handle specific caracters
+  case "${CARAC}" in
+  
+  2|3|4)
+    # display caracter
+    printf "\\$(printf "%o" ${CARAC})"
+    ;;
+
+  10)
+    # empty line content and display caracter
+    ARR_CONTENT=( )
+    printf "\\$(printf "%o" ${CARAC})"
+    ;;
+    
+  13)
+    # update current line
+    if [ ${#ARR_CONTENT[@]} -gt 1 ]
+    then
+      # remove last or last 2 caracters
+      unset 'ARR_CONTENT[${#ARR_CONTENT[@]}-1]'
+      [ "${SPACE}" = "ok" ] && unset 'ARR_CONTENT[${#ARR_CONTENT[@]}-1]'
+
+      # calculate checksum
+      SUM=$(echo "${ARR_CONTENT[@]}" | tr ' ' '+' | bc)
+      CHECKSUM=$(echo "32+(${SUM}%64)" | bc)
+
+      # add checksum to content
+      [ "${SPACE}" = "ok" ] && ARR_CONTENT=( "${ARR_CONTENT[@]}" "32" )
+      ARR_CONTENT=( "${ARR_CONTENT[@]}" "${CHECKSUM}" )
+    
+      # display content
+      for CONTENT in "${ARR_CONTENT[@]}"
+      do
+        printf "\\$(printf "%o" ${CONTENT})"
+      done
+    fi
+    
+    # display caracter
+    printf "\\$(printf "%o" ${CARAC})"
+    ;;
+
+  *)
+    [ "${CARAC}" = "32" ] && SPACE="ok"
+    ARR_CONTENT=( "${ARR_CONTENT[@]}" "${CARAC}" )
+    ;;
+  esac
+done
+
+# remove temporary directory
+rm -r "${TMP_DIR}"
