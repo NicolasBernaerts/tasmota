@@ -3,6 +3,8 @@
 # Utility to correct and modify TIC streams
 # All checksum are calculated and replaced
 # Any value can be replaced using --param and --value
+# It should work with all type of TIC streams
+#   (Historique, Standard, PME, Emeraude)
 #
 # Revision history :
 #  29/08/2024, v1.0 - Creation by N. Bernaerts
