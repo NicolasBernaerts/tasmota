@@ -40,7 +40,7 @@
     25/02/2021 - v7.0  - Prepare compatibility with TIC standard
                          Add power status bar
     05/03/2021 - v7.1  - Correct bug on hardware energy counter
-    08/03/2021 - v7.2  - Handle voltage and checksum for horodatage
+    08/03/2021 - v7.2  - Handle voltage and checksum for srodatage
     12/03/2021 - v7.3  - Use average / overload for graph
     15/03/2021 - v7.4  - Change graph period parameter
     21/03/2021 - v7.5  - Support for TIC Standard
@@ -99,7 +99,13 @@
     25/02/2024 - v13.5 - Lots of bug fixes (thanks to B. Monot and Sebastien)
     05/03/2024 - v13.6 - Removal of all float and double calculations
     13/04/2024 - v13.7 - Adjust cosphi calculation for auto-prod router usage
-
+    21/05/2024 - v14.4 - Based on Tasmota 14
+                         Add serial reception buffer to minimize reception errors
+    01/06/2024 - v14.5 - Add contract auto-discovery for unknown Standard contracts
+    28/06/2024 - v14.6 - Remove all String for ESP8266 stability
+    28/06/2024 - v14.7 - Add commands full and noraw (compatibility with official version)
+    28/08/2024 - v14.8 - Correct bug in Tempo Historique contract management
+  
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
@@ -139,12 +145,12 @@ TasmotaSerial *teleinfo_serial = nullptr;
 
 bool TeleinfoHandleCommand ()
 {
-  bool   serviced = true;
-  int    index;
-  char   *pstr_next, *pstr_key, *pstr_value;
-  char   str_label[32];
-  char   str_item[64];
-  String str_line;
+  bool  serviced = true;
+  int   index;
+  char *pstr_next, *pstr_key, *pstr_value;
+  char  str_label[32];
+  char  str_item[64];
+  char  str_line[96];
 
   if (Energy->command_code == CMND_ENERGYCONFIG) 
   {
@@ -152,41 +158,42 @@ bool TeleinfoHandleCommand ()
     if (XdrvMailbox.data_len == 0) 
     {
       AddLog (LOG_LEVEL_INFO, PSTR ("EnergyConfig Teleinfo parameters :"));
-      AddLog (LOG_LEVEL_INFO, PSTR ("  historique   set historique mode at 1200 bauds (needs restart)"));
-      AddLog (LOG_LEVEL_INFO, PSTR ("  standard     set Standard mode at 9600 bauds (needs restart)"));
-      AddLog (LOG_LEVEL_INFO, PSTR ("  stats        display reception statistics"));
-      AddLog (LOG_LEVEL_INFO, PSTR ("  error=%u    display error counters on home page"), teleinfo_config.display);
-      AddLog (LOG_LEVEL_INFO, PSTR ("  percent=%u  maximum acceptable contract (%%)"), teleinfo_config.percent);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  historique     mode historique (1200 bauds)"));
+      AddLog (LOG_LEVEL_INFO, PSTR ("  standard       mode standard (9600 bauds)"));
+      AddLog (LOG_LEVEL_INFO, PSTR ("  noraw          pas d'emission trame TIC"));
+      AddLog (LOG_LEVEL_INFO, PSTR ("  full           emission trame TIC"));
+      AddLog (LOG_LEVEL_INFO, PSTR ("  stats          statistiques de reception"));
+      AddLog (LOG_LEVEL_INFO, PSTR ("  reset          changement de contrat"));
+      AddLog (LOG_LEVEL_INFO, PSTR ("  error=%u        affiche les compteurs d'erreurs"), teleinfo_config.error);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  percent=%u    puissance maximale acceptable (%% du contrat)"), teleinfo_config.percent);
 
       // publishing policy
-      str_line = "";
-      for (index = 0; index < TELEINFO_POLICY_MAX; index++)
+      str_line[0] = 0;
+      for (index = 0; index < TIC_POLICY_MAX; index++)
       {
         GetTextIndexed (str_label, sizeof (str_label), index, kTeleinfoMessagePolicy);
-        sprintf (str_item, "%u=%s", index, str_label);
-        if (str_line.length () > 0) str_line += ", ";
-        str_line += str_item;
+        sprintf_P (str_item, PSTR ("%u=%s"), index, str_label);
+        if (strlen (str_line) > 0) strcat_P (str_line, PSTR (", "));
+        strlcat (str_line, str_item, sizeof (str_line));
       }
-      AddLog (LOG_LEVEL_INFO, PSTR ("  policy=%u     message policy : %s"), teleinfo_config.policy, str_line.c_str ());
+      AddLog (LOG_LEVEL_INFO, PSTR ("  policy=%u       politique de publication : %s"), teleinfo_config.policy, str_line);
 
       // publishing type
-      AddLog (LOG_LEVEL_INFO, PSTR ("  meter=%u      publish METER & PROD data"), teleinfo_config.meter);
-      AddLog (LOG_LEVEL_INFO, PSTR ("  tic=%u        publish TIC data"), teleinfo_config.tic);
-      AddLog (LOG_LEVEL_INFO, PSTR ("  calendar=%u   publish CALENDAR data"), teleinfo_config.calendar);
-      AddLog (LOG_LEVEL_INFO, PSTR ("  relay=%u      publish RELAY data"), teleinfo_config.relay);
-      AddLog (LOG_LEVEL_INFO, PSTR ("  counter=%u    publish COUNTER data"), teleinfo_config.contract);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  meter=%u        publication sections METER, PROD & CONTRACT"), teleinfo_config.meter);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  calendar=%u     publication section CAL"), teleinfo_config.calendar);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  relay=%u        publication section RELAY"), teleinfo_config.relay);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  led=%u          signal compteur couleur période en cours"), teleinfo_config.led_level);
 
-#ifdef USE_TELEINFO_GRAPH
-      AddLog (LOG_LEVEL_INFO, PSTR ("  maxv=%u     graph max voltage (V)"), teleinfo_config.max_volt);
-      AddLog (LOG_LEVEL_INFO, PSTR ("  maxva=%u  graph max power (VA or W)"), teleinfo_config.max_power);
+#ifdef USE_TELEINFO_CURVE
+      AddLog (LOG_LEVEL_INFO, PSTR ("  nbday=%d        nbre log quotidiens"), teleinfo_config.param[TIC_CONFIG_NBDAY]);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  nbweek=%d       nbre log hebdomadaires"), teleinfo_config.param[TIC_CONFIG_NBWEEK]);
 
-      AddLog (LOG_LEVEL_INFO, PSTR ("  nbday=%d      number of daily logs"), teleinfo_config.param[TELEINFO_CONFIG_NBDAY]);
-      AddLog (LOG_LEVEL_INFO, PSTR ("  nbweek=%d     number of weekly logs"), teleinfo_config.param[TELEINFO_CONFIG_NBWEEK]);
-
-      AddLog (LOG_LEVEL_INFO, PSTR ("  maxhour=%d    graph max total per hour (Wh)"), teleinfo_config.param[TELEINFO_CONFIG_MAX_HOUR]);
-      AddLog (LOG_LEVEL_INFO, PSTR ("  maxday=%d    graph max total per day (Wh)"), teleinfo_config.param[TELEINFO_CONFIG_MAX_DAY]);
-      AddLog (LOG_LEVEL_INFO, PSTR ("  maxmonth=%d graph max total per month (Wh)"), teleinfo_config.param[TELEINFO_CONFIG_MAX_MONTH]);
-#endif    // USE_TELEINFO_GRAPH
+      AddLog (LOG_LEVEL_INFO, PSTR ("  maxv=%u       graph : tension max (V)"), teleinfo_config.max_volt);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  maxva=%u     graph : puissance max (VA or W)"), teleinfo_config.max_power);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  maxhour=%d      graph : total horaire max (Wh)"), teleinfo_config.param[TIC_CONFIG_MAX_HOUR]);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  maxday=%d      graph : total quotidien max (Wh)"), teleinfo_config.param[TIC_CONFIG_MAX_DAY]);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  maxmonth=%d   graph : total mensuel max (Wh)"), teleinfo_config.param[TIC_CONFIG_MAX_MONTH]);
+#endif    // USE_TELEINFO_CURVE
 
       serviced = true;
     }
@@ -212,11 +219,8 @@ bool TeleinfoHandleCommand ()
       } 
       while (pstr_next != nullptr);
 
-      // if needed, save confoguration
-      if (serviced) TeleinfoSaveConfig ();
-
-      // if restart will take place, log
-      if (teleinfo_config.restart) AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Please restart for new config to take effect"));
+      // if needed, trigger to save configuration
+      if (serviced) TeleinfoConfigSave ();
     }
   }
 
@@ -226,6 +230,7 @@ bool TeleinfoHandleCommand ()
 bool TeleinfoExecuteCommand (const char* pstr_command, const char* pstr_param)
 {
   bool serviced = false;
+  bool restart  = false;
   int  index;
   long value;
   char str_buffer[32];
@@ -240,20 +245,6 @@ bool TeleinfoExecuteCommand (const char* pstr_command, const char* pstr_param)
   // handle command
   switch (index)
   {
-    case TIC_CMND_HISTORIQUE:
-      SetSerialBaudrate (1200);                         // 1200 bauds
-      serviced = true;
-      teleinfo_config.restart = true;
-      AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Set mode Historique (%d bauds)"), TasmotaGlobal.baudrate);
-      break;
-
-    case TIC_CMND_STANDARD:
-      SetSerialBaudrate (9600);                         // 9600 bauds
-      serviced = true;
-      teleinfo_config.restart = true;
-      AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Set mode Standard (%d bauds)"), TasmotaGlobal.baudrate);
-      break;
-
     case TIC_CMND_STATS:
       if (teleinfo_meter.nb_line > 0) value = (long)(teleinfo_meter.nb_error * 10000 / teleinfo_meter.nb_line);
         else value = 0;
@@ -266,29 +257,63 @@ bool TeleinfoExecuteCommand (const char* pstr_command, const char* pstr_param)
       serviced = true;
       break;
 
+    case TIC_CMND_HISTORIQUE:
+      SetSerialBaudrate (1200);                         // 1200 bauds
+      serviced = true;
+      TasmotaGlobal.restart_flag = 2;
+      AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Mode Historique (%d bauds)"), TasmotaGlobal.baudrate);
+      break;
+
+    case TIC_CMND_STANDARD:
+      SetSerialBaudrate (9600);                         // 9600 bauds
+      serviced = true;
+      TasmotaGlobal.restart_flag = 2;
+      AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Mode Standard (%d bauds)"), TasmotaGlobal.baudrate);
+      break;
+
+    case TIC_CMND_NORAW:
+      teleinfo_config.tic = 0;
+      serviced = true;
+      AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Non emission section TIC"));
+      break;
+
+    case TIC_CMND_FULL:
+      teleinfo_config.tic = 1;
+      serviced = true;
+      AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Emission section TIC"));
+      break;
+
     case TIC_CMND_PERCENT:
-      serviced = (value < TELEINFO_PERCENT_MAX);
+      serviced = (value < TIC_PERCENT_MAX);
       if (serviced) teleinfo_config.percent = (uint8_t)value;
       break;
 
     case TIC_CMND_ERROR:
       serviced = true;
-      teleinfo_config.display = (uint8_t)value;
+      teleinfo_config.error = (uint8_t)value;
+      break;
+
+    case TIC_CMND_RESET:
+      serviced = true;
+      AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Contrat remis a zéro"));
+      AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Redémarrage en cours"));
+      TeleinfoContractReset ();
+      restart = true;
+      break;
+
+    case TIC_CMND_LED:
+      serviced = (value < 2);
+      if (serviced) teleinfo_config.led_level = (uint8_t)value;
       break;
 
     case TIC_CMND_POLICY:
-      serviced = (value < TELEINFO_POLICY_MAX);
+      serviced = (value < TIC_POLICY_MAX);
       if (serviced) teleinfo_config.policy = (uint8_t)value;
       break;
 
     case TIC_CMND_METER:
       serviced = (value < 2);
       if (serviced) teleinfo_config.meter = (uint8_t)value;
-      break;
-
-    case TIC_CMND_TIC:
-      serviced = (value < 2);
-      if (serviced) teleinfo_config.tic = (uint8_t)value;
       break;
 
     case TIC_CMND_CALENDAR:
@@ -301,48 +326,49 @@ bool TeleinfoExecuteCommand (const char* pstr_command, const char* pstr_param)
       if (serviced) teleinfo_config.relay = (uint8_t)value;
       break;
 
-    case TIC_CMND_CONTRACT:
-      serviced = (value < 2);
-      if (serviced) teleinfo_config.contract = (uint8_t)value;
-      break;
-
-#ifdef USE_TELEINFO_GRAPH
+#ifdef USE_TELEINFO_CURVE
     case TIC_CMND_MAX_V:
-      serviced = ((value >= TELEINFO_GRAPH_MIN_VOLTAGE) && (value <= TELEINFO_GRAPH_MAX_VOLTAGE));
+      serviced = ((value >= TIC_GRAPH_MIN_VOLTAGE) && (value <= TIC_GRAPH_MAX_VOLTAGE));
       if (serviced) teleinfo_config.max_volt = value;
       break;
 
     case TIC_CMND_MAX_VA:
-      serviced = ((value >= TELEINFO_GRAPH_MIN_POWER) && (value <= TELEINFO_GRAPH_MAX_POWER));
+      serviced = ((value >= TIC_GRAPH_MIN_POWER) && (value <= TIC_GRAPH_MAX_POWER));
       if (serviced) teleinfo_config.max_power = value;
       break;
 
     case TIC_CMND_LOG_DAY:
       serviced = ((value > 0) && (value <= 31));
-      if (serviced) teleinfo_config.param[TELEINFO_CONFIG_NBDAY] = value;
+      if (serviced) teleinfo_config.param[TIC_CONFIG_NBDAY] = value;
       break;
 
     case TIC_CMND_LOG_WEEK:
       serviced = ((value > 0) && (value <= 52));
-      if (serviced) teleinfo_config.param[TELEINFO_CONFIG_NBWEEK] = value;
+      if (serviced) teleinfo_config.param[TIC_CONFIG_NBWEEK] = value;
       break;
 
     case TIC_CMND_MAX_KWH_HOUR:
-      serviced = ((value >= TELEINFO_GRAPH_MIN_WH_HOUR) && (value <= TELEINFO_GRAPH_MAX_WH_HOUR));
-      if (serviced) teleinfo_config.param[TELEINFO_CONFIG_MAX_HOUR] = value;
+      serviced = ((value >= TIC_GRAPH_MIN_WH_HOUR) && (value <= TIC_GRAPH_MAX_WH_HOUR));
+      if (serviced) teleinfo_config.param[TIC_CONFIG_MAX_HOUR] = value;
       break;
 
     case TIC_CMND_MAX_KWH_DAY:
-      serviced = ((value >= TELEINFO_GRAPH_MIN_WH_DAY) && (value <= TELEINFO_GRAPH_MAX_WH_DAY));
-      if (serviced) teleinfo_config.param[TELEINFO_CONFIG_MAX_DAY] = value;
+      serviced = ((value >= TIC_GRAPH_MIN_WH_DAY) && (value <= TIC_GRAPH_MAX_WH_DAY));
+      if (serviced) teleinfo_config.param[TIC_CONFIG_MAX_DAY] = value;
       break;
 
     case TIC_CMND_MAX_KWH_MONTH:
-      serviced = ((value >= TELEINFO_GRAPH_MIN_WH_MONTH) && (value <= TELEINFO_GRAPH_MAX_WH_MONTH));
-      if (serviced) teleinfo_config.param[TELEINFO_CONFIG_MAX_MONTH] = value;
+      serviced = ((value >= TIC_GRAPH_MIN_WH_MONTH) && (value <= TIC_GRAPH_MAX_WH_MONTH));
+      if (serviced) teleinfo_config.param[TIC_CONFIG_MAX_MONTH] = value;
       break;
-#endif    // USE_TELEINFO_GRAPH
+#endif    // USE_TELEINFO_CURVE
   }
+
+  // if needed, trigger to save config
+  if (serviced && (index != TIC_CMND_STATS)) TeleinfoConfigSave ();
+
+  // if needed, restart
+  if (restart) WebRestart (1);
 
   return serviced;
 }
@@ -366,7 +392,7 @@ char* lltoa (const long long value, char *pstr_result, const int base)
   // if needed convert upper digits
   result = lldiv (value, 10000000000000000LL);
   if (result.quot != 0) ltoa ((long)result.quot, pstr_result, 10);
-    else strcpy (pstr_result, "");
+    else pstr_result[0] = 0;
 
   // convert middle digits
   result = lldiv (result.rem, 100000000LL);
@@ -409,59 +435,64 @@ long long llsqrt (const long long value)
 	return result;
 }
 
-// General update (wifi & serial)
-void TeleinfoProcessRealTime ()
-{
-  // check if serial reception is active
-  if (teleinfo_meter.serial != TIC_SERIAL_ACTIVE) return;
-
-  // read serial data
-  TeleinfoReceiveData (TELEINFO_RECV_TIMEOUT_DATA);
-
-  // give control back to system to avoid watchdog
-  yield ();
-}
-
 // Start serial reception
 bool TeleinfoSerialStart ()
 {
-  bool is_ready;
+  bool   is_ready;
+  size_t buffer_size;
 
   // if serial port is not already created
   is_ready = (teleinfo_serial != nullptr);
   if (!is_ready)
   { 
-    // check if environment is ok
-    is_ready = (PinUsed (GPIO_TELEINFO_RX) && (TasmotaGlobal.baudrate > 0));
-    if (is_ready)
+    // GPIO selection step
+    teleinfo_meter.serial = TIC_SERIAL_GPIO;
+    if (PinUsed (GPIO_TELEINFO_RX))
     {
-#ifdef ESP32
-      // create and initialise serial port
-      teleinfo_serial = new TasmotaSerial (Pin (GPIO_TELEINFO_RX), -1, 1, 0);
-      is_ready = teleinfo_serial->begin (TasmotaGlobal.baudrate, SERIAL_7E1);
+      // speed selection step
+      teleinfo_meter.serial = TIC_SERIAL_SPEED;
+      if (TasmotaGlobal.baudrate <= 9600)
+      {
+        // create and initialise serial port
+        teleinfo_serial = new TasmotaSerial (Pin (GPIO_TELEINFO_RX), -1, 1, 0);
 
-      // display UART used
-      AddLog (LOG_LEVEL_DEBUG, PSTR("TIC: Serial UART %d"), teleinfo_serial->getUart ());
+        // start reception
+        is_ready = teleinfo_serial->begin (TasmotaGlobal.baudrate, SERIAL_7E1);
+        if (is_ready)
+        {
+          // set serial reception buffer
+          teleinfo_serial->setRxBufferSize (TIC_BUFFER_MAX);
+          buffer_size = teleinfo_serial->getRxBufferSize ();
+
+#ifdef ESP32
+
+          // display UART used and speed
+          AddLog (LOG_LEVEL_INFO, PSTR("TIC: Serial UART %d started at %ubps (buffer %u)"), teleinfo_serial->getUart (), TasmotaGlobal.baudrate, buffer_size);
 
 #else       // ESP8266
-      // create and initialise serial port
-      teleinfo_serial = new TasmotaSerial (Pin (GPIO_TELEINFO_RX), -1, 1, 0);
-      is_ready = teleinfo_serial->begin (TasmotaGlobal.baudrate, SERIAL_7E1);
 
-      // force configuration on ESP8266
-      if (teleinfo_serial->hardwareSerial ()) ClaimSerial ();
+          // force configuration on ESP8266
+          if (teleinfo_serial->hardwareSerial ()) ClaimSerial ();
+
+          // display serial speed
+          AddLog (LOG_LEVEL_INFO, PSTR("TIC: Serial started at %ubps (buffer %d)"), TasmotaGlobal.baudrate, buffer_size);
+
 #endif      // ESP32 & ESP8266
 
-      // flush transmit and receive buffer
-//      teleinfo_serial->flush ();
+          // flush serail data
+          teleinfo_serial->flush ();
 
-      // log error
-      if (!is_ready) AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Serial port init failed"));
+          // serial init succeeded
+          teleinfo_meter.serial = TIC_SERIAL_ACTIVE;
+        }
+
+        // serial init failed
+        else teleinfo_meter.serial = TIC_SERIAL_FAILED;
+      }
     }
 
-    // set serial port status
-    if (is_ready) teleinfo_meter.serial = TIC_SERIAL_ACTIVE;
-      else teleinfo_meter.serial = TIC_SERIAL_FAILED;
+    // log serial port init failure
+    if (!is_ready) AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Serial port init failed"));
   }
 
   return is_ready;
@@ -474,36 +505,48 @@ void TeleinfoSerialStop ()
   teleinfo_meter.serial = TIC_SERIAL_STOPPED;
 }
 
-// Check if serial reception is active
-bool TeleinfoSerialIsActive ()
-{
-  return (teleinfo_meter.serial == TIC_SERIAL_ACTIVE);
-}
-
 // Load configuration from Settings or from LittleFS
-void TeleinfoLoadConfig () 
+void TeleinfoConfigLoad () 
 {
   uint8_t index, day, slot, part;
 
   // load standard settings
-  teleinfo_config.percent   = Settings->teleinfo.percent;
-  teleinfo_config.policy    = Settings->teleinfo.policy;
-  teleinfo_config.meter     = Settings->teleinfo.meter;
-  teleinfo_config.tic       = Settings->teleinfo.tic;
-  teleinfo_config.calendar  = Settings->teleinfo.calendar;
-  teleinfo_config.relay     = Settings->teleinfo.relay;
-  teleinfo_config.contract  = Settings->teleinfo.contract;
-  teleinfo_config.max_volt  = TELEINFO_GRAPH_MIN_VOLTAGE + Settings->teleinfo.adjust_v * 5;
-  teleinfo_config.max_power = TELEINFO_GRAPH_MIN_POWER + Settings->teleinfo.adjust_va * 3000;
+  teleinfo_config.percent    = Settings->teleinfo.percent;
+  teleinfo_config.policy     = Settings->teleinfo.policy;
+  teleinfo_config.meter      = Settings->teleinfo.meter;
+  teleinfo_config.energy     = Settings->teleinfo.energy;
+  teleinfo_config.calendar   = Settings->teleinfo.calendar;
+  teleinfo_config.relay      = Settings->teleinfo.relay;
+  teleinfo_config.tic        = Settings->teleinfo.tic;
+  teleinfo_config.led_level  = Settings->teleinfo.led_level;
+  teleinfo_config.sensor     = Settings->teleinfo.sensor;
+  teleinfo_config.max_volt   = TIC_GRAPH_MIN_VOLTAGE + (long)Settings->teleinfo.adjust_v * 5;
+  teleinfo_config.max_power  = TIC_GRAPH_MIN_POWER + (long)Settings->teleinfo.adjust_va * 3000;
 
   // validate boundaries
-  if ((teleinfo_config.policy < 0) || (teleinfo_config.policy >= TELEINFO_POLICY_MAX)) teleinfo_config.policy = TELEINFO_POLICY_TELEMETRY;
+  if ((teleinfo_config.policy < 0) || (teleinfo_config.policy >= TIC_POLICY_MAX)) teleinfo_config.policy = TIC_POLICY_TELEMETRY;
   if (teleinfo_config.meter > 1) teleinfo_config.meter = 1;
-  if (teleinfo_config.tic > 1) teleinfo_config.tic = 1;
   if (teleinfo_config.calendar > 1) teleinfo_config.calendar = 1;
   if (teleinfo_config.relay > 1) teleinfo_config.relay = 1;
-  if (teleinfo_config.contract > 1) teleinfo_config.contract = 1;
-  if ((teleinfo_config.percent < TELEINFO_PERCENT_MIN) || (teleinfo_config.percent > TELEINFO_PERCENT_MAX)) teleinfo_config.percent = 100;
+  if (teleinfo_config.tic > 1) teleinfo_config.tic = 1;
+  if ((teleinfo_config.percent < TIC_PERCENT_MIN) || (teleinfo_config.percent > TIC_PERCENT_MAX)) teleinfo_config.percent = 100;
+
+  // init parameters
+  for (index = 0; index < TIC_CONFIG_MAX; index ++) teleinfo_config.param[index] = arrTeleinfoConfigDefault[index];
+
+  // init contract data
+  teleinfo_contract.period_idx    = UINT8_MAX;
+  teleinfo_contract.period_qty    = 0;
+  teleinfo_contract.str_code[0]   = 0;
+  teleinfo_contract.str_period[0] = 0;
+  for (index = 0; index < TIC_PERIOD_MAX; index ++)
+  {
+    teleinfo_contract.arr_period[index].valid = 0;
+    teleinfo_contract.arr_period[index].level = 0;
+    teleinfo_contract.arr_period[index].hchp  = 1;
+    teleinfo_contract.arr_period[index].str_code  = "";
+    teleinfo_contract.arr_period[index].str_label = "";
+  }
 
   // load hourly status slots
   for (slot = 0; slot < 24; slot++)
@@ -516,15 +559,15 @@ void TeleinfoLoadConfig ()
   // load littlefs settings
 #ifdef USE_UFILESYS
   int    position;
-  char   str_text[16];
-  char   str_line[64];
+  char   str_text[32];
+  char   str_line[256];
   char   *pstr_key, *pstr_value;
   File   file;
 
   // if file exists, open and read each line
-  if (ffsp->exists (D_TELEINFO_CFG))
+  if (ffsp->exists (F (TIC_FILE_CFG)))
   {
-    file = ffsp->open (D_TELEINFO_CFG, "r");
+    file = ffsp->open (F (TIC_FILE_CFG), "r");
     while (file.available ())
     {
       // read current line and extract key and value
@@ -536,14 +579,35 @@ void TeleinfoLoadConfig ()
       // if key and value are defined, look for config keys
       if ((pstr_key != nullptr) && (pstr_value != nullptr))
       {
+        // look for configuration key
         index = GetCommandCode (str_text, sizeof (str_text), pstr_key, kTeleinfoConfigKey);
-        if ((index >= 0) && (index < TELEINFO_CONFIG_MAX)) teleinfo_config.param[index] = atol (pstr_value);
+        if ((index >= 0) && (index < TIC_CONFIG_MAX)) teleinfo_config.param[index] = atol (pstr_value);
+
+        else
+        {
+          index = GetCommandCode (str_text, sizeof (str_text), pstr_key, kTeleinfoContractKey);
+          switch (index)
+          {
+            case TIC_CONTRACT_INDEX:
+              teleinfo_contract.index = atoi (pstr_value);
+              break;
+
+            case TIC_CONTRACT_NAME:
+              strcpy (teleinfo_contract.str_code, pstr_value);
+              break;
+
+            case TIC_CONTRACT_PERIOD:
+              slot = TeleinfoContractString2Period (pstr_value);
+              teleinfo_contract.period_qty = max (teleinfo_contract.period_qty, slot);
+              break;
+          }
+        }
       }
     }
 
     // update yesterday totals
-    teleinfo_conso.yesterday_wh = teleinfo_config.param[TELEINFO_CONFIG_YESTERDAY_CONSO];
-    teleinfo_prod.yesterday_wh  = teleinfo_config.param[TELEINFO_CONFIG_YESTERDAY_PROD];
+    teleinfo_conso.yesterday_wh = teleinfo_config.param[TIC_CONFIG_YESTERDAY_CONSO];
+    teleinfo_prod.yesterday_wh  = teleinfo_config.param[TIC_CONFIG_YESTERDAY_PROD];
   }
 
 # endif     // USE_UFILESYS
@@ -553,7 +617,7 @@ void TeleinfoLoadConfig ()
 }
 
 // Save configuration to Settings or to LittleFS
-void TeleinfoSaveConfig () 
+void TeleinfoConfigSave () 
 {
   uint8_t   index, day, slot, part;
   long long today_wh;
@@ -562,12 +626,20 @@ void TeleinfoSaveConfig ()
   Settings->teleinfo.percent   = teleinfo_config.percent;
   Settings->teleinfo.policy    = teleinfo_config.policy;
   Settings->teleinfo.meter     = teleinfo_config.meter;
-  Settings->teleinfo.tic       = teleinfo_config.tic;
+  Settings->teleinfo.energy    = teleinfo_config.energy;
   Settings->teleinfo.calendar  = teleinfo_config.calendar;
   Settings->teleinfo.relay     = teleinfo_config.relay;
-  Settings->teleinfo.contract  = teleinfo_config.contract;
-  Settings->teleinfo.adjust_v  = (teleinfo_config.max_volt - TELEINFO_GRAPH_MIN_VOLTAGE) / 5;
-  Settings->teleinfo.adjust_va = (teleinfo_config.max_power - TELEINFO_GRAPH_MIN_POWER) / 3000;
+  Settings->teleinfo.tic       = teleinfo_config.tic;
+  Settings->teleinfo.led_level = teleinfo_config.led_level;
+  Settings->teleinfo.sensor    = teleinfo_config.sensor;
+  Settings->teleinfo.adjust_v  = (teleinfo_config.max_volt - TIC_GRAPH_MIN_VOLTAGE) / 5;
+  Settings->teleinfo.adjust_va = (teleinfo_config.max_power - TIC_GRAPH_MIN_POWER) / 3000;
+
+  // update today and yesterday conso/prod
+  teleinfo_config.param[TIC_CONFIG_TODAY_CONSO]     = teleinfo_conso.today_wh;
+  teleinfo_config.param[TIC_CONFIG_YESTERDAY_CONSO] = teleinfo_conso.yesterday_wh;
+  teleinfo_config.param[TIC_CONFIG_TODAY_PROD]      = teleinfo_prod.today_wh;;
+  teleinfo_config.param[TIC_CONFIG_YESTERDAY_PROD]  = teleinfo_prod.yesterday_wh;
 
   // save hourly status slots
   for (slot = 0; slot < 24; slot++)
@@ -579,40 +651,65 @@ void TeleinfoSaveConfig ()
 
   // save littlefs settings
 #ifdef USE_UFILESYS
-  char    str_value[16];
-  char    str_text[32];
+  char    str_key[64];
+  char    str_text[64];
   File    file;
 
-  // update today and yesterday conso
-  teleinfo_config.param[TELEINFO_CONFIG_TODAY_CONSO] = teleinfo_conso.today_wh;
-  teleinfo_config.param[TELEINFO_CONFIG_YESTERDAY_CONSO] = teleinfo_conso.yesterday_wh;
-
-  // update today and yesterday production
-  teleinfo_config.param[TELEINFO_CONFIG_TODAY_PROD] = teleinfo_prod.today_wh;;
-  teleinfo_config.param[TELEINFO_CONFIG_YESTERDAY_PROD] = teleinfo_prod.yesterday_wh;
-
   // open file and write content
-  file = ffsp->open (D_TELEINFO_CFG, "w");
-  for (index = 0; index < TELEINFO_CONFIG_MAX; index ++)
-  {
-    if (GetTextIndexed (str_text, sizeof (str_text), index, kTeleinfoConfigKey) != nullptr)
-    {
-      // generate key=value
-      strcat (str_text, "=");
-      ltoa (teleinfo_config.param[index], str_value, 10);
-      strcat (str_text, str_value);
-      strcat (str_text, "\n");
+  file = ffsp->open (F (TIC_FILE_CFG), "w");
 
-      // write to file
+  // save configuration parameters
+  file.print (F ("[config]\n"));
+  for (index = 0; index < TIC_CONFIG_MAX; index ++)
+  {
+    GetTextIndexed (str_key, sizeof (str_key), index, kTeleinfoConfigKey);
+    sprintf_P (str_text, PSTR ("%s=%d\n"), str_key, teleinfo_config.param[index]);
+    file.print (str_text);
+  }
+
+  // save contract parameters
+  file.print (F ("\n[contract]\n"));
+
+  sprintf_P (str_text, PSTR ("%s=%u\n"), PSTR (CMND_TIC_CONTRACT_INDEX), teleinfo_contract.index);
+  file.print (str_text);
+
+  sprintf_P (str_text, PSTR ("%s=%s\n"), PSTR (CMND_TIC_CONTRACT_NAME), teleinfo_contract.str_code);
+  file.print (str_text);
+
+  // loop thru periods
+  for (index = 0; index < TIC_PERIOD_MAX; index ++)
+    if (TeleinfoContractPeriod2String (str_key, sizeof (str_key), index))
+    {
+      sprintf_P (str_text, PSTR ("%s=%s\n"), PSTR (CMND_TIC_CONTRACT_PERIOD), str_key);
       file.print (str_text);
     }
-  }
 
   file.close ();
 # endif     // USE_UFILESYS
 
   // log
-  AddLog (LOG_LEVEL_DEBUG, PSTR ("TIC: Saving config"));
+  AddLog (LOG_LEVEL_DEBUG, PSTR ("TIC: Configuration saved"));
+}
+
+void TeleinfoContractReset ()
+{
+  uint8_t index;
+
+  // init contract data
+  teleinfo_contract.index       = 0;
+  teleinfo_contract.period_qty  = 0;
+  teleinfo_contract.period_idx  = UINT8_MAX;
+  teleinfo_contract.str_code[0] = 0;
+
+  // init periods
+  for (index = 0; index < TIC_PERIOD_MAX; index ++) teleinfo_contract.arr_period[index].valid = 0;
+
+  // init conso data
+  teleinfo_conso.total_wh = 0;
+  for (index = 0; index < TIC_PERIOD_MAX; index ++) teleinfo_conso.index_wh[index] = 0;
+
+  // init prod data
+  teleinfo_prod.total_wh = 0;
 }
 
 // calculate line checksum
@@ -622,21 +719,21 @@ char TeleinfoCalculateChecksum (const char* pstr_line, char* pstr_etiquette, con
   uint8_t  line_checksum, given_checksum;
   uint32_t index;
   size_t   size_line, size_checksum;
-  char     str_line[TELEINFO_LINE_MAX];
+  char     str_line[TIC_LINE_SIZE];
   char     *pstr_token, *pstr_key, *pstr_data;
 
   // check parameters
   if ((pstr_line == nullptr) || (pstr_etiquette == nullptr) || (pstr_donnee == nullptr)) return 0;
 
   // init result
-  strcpy (str_line, "");
-  strcpy (pstr_etiquette, "");
-  strcpy (pstr_donnee, "");
+  str_line[0]       = 0;
+  pstr_etiquette[0] = 0;
+  pstr_donnee[0]    = 0;
   pstr_key = pstr_data = nullptr;
 
   // if line is less than 5 char, no handling
   size_line = strlen (pstr_line);
-  if ((size_line < 5) || (size_line > TELEINFO_LINE_MAX)) return 0;
+  if ((size_line < 5) || (size_line > TIC_LINE_SIZE)) return 0;
   
   // get given checksum
   size_checksum  = size_line - 1;
@@ -655,6 +752,7 @@ char TeleinfoCalculateChecksum (const char* pstr_line, char* pstr_etiquette, con
   {
     // declare error
     line_checksum = 0;
+    teleinfo_message.error = 1;
 
     // if network is fully up, account error
     if (MqttIsConnected ())
@@ -693,6 +791,7 @@ char TeleinfoCalculateChecksum (const char* pstr_line, char* pstr_etiquette, con
   {
     AddLog (LOG_LEVEL_DEBUG, PSTR ("TIC: No data [%s]"), str_line);
     line_checksum = 0;
+    teleinfo_message.error = 1;
 
     // extract key only
     strlcpy (pstr_etiquette, str_line, size_etiquette);
@@ -725,7 +824,7 @@ void TeleinfoUpdateConsoGlobalCounter ()
   if (teleinfo_conso.total_wh == 0) teleinfo_conso.total_wh = total;
 
   // if needed, update midnight value
-  if ((teleinfo_conso.midnight_wh == 0) && (teleinfo_conso.total_wh > 0)) teleinfo_conso.midnight_wh = teleinfo_conso.total_wh - (long long)teleinfo_config.param[TELEINFO_CONFIG_TODAY_CONSO];
+  if ((teleinfo_conso.midnight_wh == 0) && (teleinfo_conso.total_wh > 0)) teleinfo_conso.midnight_wh = teleinfo_conso.total_wh - (long long)teleinfo_config.param[TIC_CONFIG_TODAY_CONSO];
 
   // if no increment, return
   if (total == teleinfo_conso.total_wh) return;
@@ -768,7 +867,7 @@ void TeleinfoProdGlobalCounterUpdate (const char* pstr_value)
   if (teleinfo_prod.total_wh == 0) teleinfo_prod.total_wh = total;
 
   // if needed, update midnight value
-  if ((teleinfo_prod.midnight_wh == 0) && (teleinfo_prod.total_wh > 0)) teleinfo_prod.midnight_wh = teleinfo_prod.total_wh - (long long)teleinfo_config.param[TELEINFO_CONFIG_TODAY_PROD];
+  if ((teleinfo_prod.midnight_wh == 0) && (teleinfo_prod.total_wh > 0)) teleinfo_prod.midnight_wh = teleinfo_prod.total_wh - (long long)teleinfo_config.param[TIC_CONFIG_TODAY_PROD];
 
   // if no increment, return
   if (total == teleinfo_prod.total_wh) return;
@@ -808,7 +907,7 @@ void TeleinfoConsoIndexCounterUpdate (const char* pstr_value, const uint8_t inde
 
   // check parameter
   if (pstr_value == nullptr) return;
-  if (index >= TELEINFO_INDEX_MAX) return;
+  if (index >= TIC_PERIOD_MAX) return;
 
   // check if value is in kWh
   strlcpy (str_value, pstr_value, sizeof (str_value));
@@ -831,6 +930,9 @@ void TeleinfoConsoIndexCounterUpdate (const char* pstr_value, const uint8_t inde
 
   // else if less than 10% increase
   else if ((value > teleinfo_conso.index_wh[index]) && (value < teleinfo_conso.index_wh[index] + max_increase)) teleinfo_conso.index_wh[index] = value;
+
+  // if needed, update number of periods
+  if ((value > 0) && (index >= teleinfo_contract.period_qty)) teleinfo_contract.period_qty = index + 1;
 }
 
 // update phase voltage
@@ -859,7 +961,7 @@ void TeleinfoVoltageUpdate (const char* pstr_value, const uint8_t phase, const b
 
   // calculate and check validity
   value = atol (str_value);
-  if (value > TELEINFO_VOLTAGE_MAXIMUM) return;
+  if (value > TIC_VOLTAGE_MAXIMUM) return;
 
   // if value is valid
   if (value > 0)
@@ -964,13 +1066,13 @@ void TeleinfoSetPreavis (const uint8_t level, const char* pstr_label)
   if (level == TIC_PREAVIS_NONE)
   {
     // send alert & log
-    if (TeleinfoDriverMeterReady ()) teleinfo_meter.json.alert = 1;
+    if (TeleinfoDriverMeterReady ()) teleinfo_meter.json.data = 1;
     AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Preavis reset [%u->%u]"), teleinfo_meter.preavis.level, TIC_PREAVIS_NONE);
 
     // reset preavis
-    teleinfo_meter.preavis.level   = TIC_PREAVIS_NONE;
+    teleinfo_meter.preavis.level = TIC_PREAVIS_NONE;
     teleinfo_meter.preavis.timeout = UINT32_MAX;
-    strcpy (teleinfo_meter.preavis.str_label, "");
+    teleinfo_meter.preavis.str_label[0] = 0;
   } 
   
   // else preavis is declared
@@ -983,12 +1085,12 @@ void TeleinfoSetPreavis (const uint8_t level, const char* pstr_label)
     if (level > teleinfo_meter.preavis.level)
     {
       // set alert & log
-      if (TeleinfoDriverMeterReady ()) teleinfo_meter.json.alert = 1;
+      if (TeleinfoDriverMeterReady ()) teleinfo_meter.json.data = 1;
       AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Preavis updated to %s [%u->%u]"), pstr_label, teleinfo_meter.preavis.level, level);
 
       // update data
       teleinfo_meter.preavis.level = level;
-      strcpy (teleinfo_meter.preavis.str_label, pstr_label);
+      strlcpy (teleinfo_meter.preavis.str_label, pstr_label, sizeof (teleinfo_meter.preavis.str_label));
     }
   }
 }
@@ -1004,13 +1106,13 @@ void TeleinfoAnalyseSTGE (const char* pstr_donnee)
   // get phase over voltage
   calc   = (uint32_t)value >> 6;
   signal = (uint8_t)calc & 0x01;
-  if (TeleinfoDriverMeterReady () && (teleinfo_meter.flag.overvolt != signal)) teleinfo_meter.json.alert = 1;
+  if (TeleinfoDriverMeterReady () && (teleinfo_meter.flag.overvolt != signal)) teleinfo_meter.json.data = 1;
   teleinfo_meter.flag.overvolt = signal;
 
   // get phase overload
   calc   = (uint32_t)value >> 7;
   signal = (uint8_t)calc & 0x01;
-  if (TeleinfoDriverMeterReady () && (teleinfo_meter.flag.overload != signal)) teleinfo_meter.json.alert = 1;
+  if (TeleinfoDriverMeterReady () && (teleinfo_meter.flag.overload != signal)) teleinfo_meter.json.data = 1;
   teleinfo_meter.flag.overload = signal;
 
   // get preavis pointe mobile signal
@@ -1076,117 +1178,237 @@ long TeleinfoTimestampDelay (const long stamp_start, const long stamp_stop)
 }
 
 // set contract period
-void TeleinfoContractUpdate (const char* pstr_contract)
+bool TeleinfoContractUpdate ()
 {
-  int  index, quantity;
-  uint8_t contract = UINT8_MAX;
-  char str_contract[32];
-  char str_text[32];
+  bool    is_kw;
+  bool    result = true;
+  uint8_t period;
+  int     index;
+//  char    str_contract[32];
+  char    str_text[64];
 
-  // check parameter
-  if (pstr_contract == nullptr) return;
+  // if time not started, ignore
+  if (!RtcTime.valid) result = false;
 
-  // if contract already defined, ignore
-  if (teleinfo_contract.contract != TIC_C_UNDEFINED) return;
+  // if message contract code not defined, ignore
+  else if (strlen (teleinfo_message.str_contract) == 0) result = false;
 
-  // handle specificity of Historique Tempo where last char is dynamic (BBRx)
-  strlcpy (str_contract, pstr_contract, 4);
-  if (strcmp (str_contract, "BBR") != 0) strlcpy (str_contract, pstr_contract, sizeof (str_contract));
+  // else if contract code and message contract identical, nothing to do 
+  else if (strcmp (teleinfo_contract.str_code, teleinfo_message.str_contract) == 0) teleinfo_contract.changed = 0;
 
-  // handle specificity of historic BASE contract
-  if ((strcmp (str_contract, "BASE") == 0) && (teleinfo_contract.mode == TIC_MODE_HISTORIC)) strcpy (str_contract, "TH..");
-
-  // look for contract
-  index = GetCommandCode (str_text, sizeof (str_text), str_contract, kTicContractCode);
-
-  // if contract is detected
-  if (index > 0)
+  // if contract code defined and different than message contract, contract has changed
+  else if (strlen (teleinfo_contract.str_code) > 0)
   {
-    // set new period
-    teleinfo_contract.contract = (uint8_t)index;
+    teleinfo_contract.changed = 1;
+    result = false;
+  }
 
-    // look for period according to contract
-    quantity = 10;
-    switch (teleinfo_contract.contract)
-    {
-      case TIC_C_UNDEFINED:   quantity = sizeof (arrPeriodUndefLevel); break;
-      case TIC_C_HISTO_BASE:  quantity = sizeof (arrPeriodHistoBaseLevel); break;
-      case TIC_C_HISTO_HCHP:  quantity = sizeof (arrPeriodHistoHcHpLevel); break;
-      case TIC_C_HISTO_EJP:   quantity = sizeof (arrPeriodHistoEjpLevel); break;
-      case TIC_C_HISTO_TEMPO: quantity = sizeof (arrPeriodHistoTempoLevel); break;
-      case TIC_C_STD_BASE:    quantity = sizeof (arrPeriodStandardBaseLevel); break;
-      case TIC_C_STD_HCHP:    quantity = sizeof (arrPeriodStandardHcHpLevel); break;
-      case TIC_C_STD_EJP:     quantity = sizeof (arrPeriodStandardEjpLevel); break;
-      case TIC_C_STD_TEMPO:   quantity = sizeof (arrPeriodStandardTempoLevel); break;
-      case TIC_C_BT4SUP36:
-      case TIC_C_BT5SUP36:
-      case TIC_C_TJEJP:
-      case TIC_C_HTA5:  
-      case TIC_C_HTA8:        quantity = sizeof (arrPeriodPmePmiLevel); break;
-      case TIC_C_A5_BASE:
-      case TIC_C_A8_BASE:
-      case TIC_C_A5_EJP:
-      case TIC_C_A8_EJP:
-      case TIC_C_A8_MOD:      quantity = sizeof (arrPeriodEmeraude2Level); break;
-      
-    }
-    teleinfo_contract.period_qty = (uint8_t)quantity;
+  // else look for new contract
+  else
+  {
+    // handle specificity of Historique Tempo where last char is dynamic (BBRx)
+//    strlcpy (str_contract, teleinfo_message.str_contract, 4);
+//    if (strcmp_P (str_contract, PSTR ("BBR")) != 0) strlcpy (str_contract, teleinfo_message.str_contract, sizeof (str_contract));
+
+    // handle specificity of historic BASE contract
+//    if ((strcmp_P (str_contract, PSTR ("BASE")) == 0) && (teleinfo_contract.mode == TIC_MODE_HISTORIC)) strcpy_P (str_contract, PSTR ("TH.."));
+
+    // look for contract
+    index = GetCommandCode (str_text, sizeof (str_text), teleinfo_message.str_contract, kTicContractCode);
+    if ((index == -1) || (index >= TIC_C_MAX)) index = TIC_C_UNKNOWN;
+
+    // set contract index and code
+    teleinfo_contract.index = (uint8_t)index;
+    strcpy (teleinfo_contract.str_code, teleinfo_message.str_contract);
+
+    // init current period
+    teleinfo_contract.period_idx = UINT8_MAX;
+    teleinfo_contract.str_period[0] = 0;
+
+    // load contract periods
+    teleinfo_contract.period_qty = TeleinfoContractString2Period (arr_kTicPeriod[index]);
 
     // log
-    AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Contract %s with %d periods [%u]"), pstr_contract, quantity, index);
+    AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Nouveau contrat %s, %d périodes connues"), teleinfo_message.str_contract, teleinfo_contract.period_qty);
+
+    // save current contract
+    TeleinfoConfigSave ();
+  }
+
+  // if needed, detect contract unit
+  if ((teleinfo_contract.unit == TIC_UNIT_NONE) && (teleinfo_contract.mode != TIC_MODE_UNKNOWN))
+  {
+    // detect if contract unit is in kw
+    if (teleinfo_contract.mode == TIC_MODE_EMERAUDE) is_kw = true;
+      else if (teleinfo_contract.index == TIC_C_PME_TVA5_BASE) is_kw = true;
+      else if (teleinfo_contract.index == TIC_C_PME_TVA8_BASE) is_kw = true;
+      else is_kw = false;
+
+    // set contract unit
+    if (is_kw) teleinfo_contract.unit = TIC_UNIT_KW;
+      else teleinfo_contract.unit = TIC_UNIT_KVA;
+    if (teleinfo_contract.unit == TIC_UNIT_KW) AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Contrat en kW"));
+      else AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Contrat en kVA"));
+  }
+
+  return result;
+}
+
+// update contract period
+void TeleinfoPeriodUpdate ()
+{
+  bool    new_period = false;
+  int     index, period;
+  uint8_t count, hchp, level;
+
+  // if time not started, ignore
+  if (!RtcTime.valid) return;
+
+  // if message period is undefined, ignore
+  if (strlen (teleinfo_message.str_period) == 0) return;
+
+  // if contract period and message period are identical, ignore
+  if (strcmp (teleinfo_contract.str_period, teleinfo_message.str_period) == 0) return;
+  
+  // if message period index is defined, check for an unknown period index
+  if (teleinfo_message.period < TIC_PERIOD_MAX) new_period = (teleinfo_contract.arr_period[teleinfo_message.period].valid == 0) ;
+
+  // in historic contract, index is not given, look for period index in period code list
+  if (teleinfo_message.period == UINT8_MAX)
+  {
+    index = -1;
+    for (period = 0; period < TIC_PERIOD_MAX; period ++) if (teleinfo_contract.arr_period[period].str_code == teleinfo_message.str_period) index = period;
+    if (index != -1) teleinfo_message.period = (uint8_t)index;
+  }
+
+  // if message period index still not defined, ignore
+  if (teleinfo_message.period == UINT8_MAX) return;
+
+  // update contract current period
+  teleinfo_contract.period_idx = teleinfo_message.period;
+  strcpy (teleinfo_contract.str_period, teleinfo_message.str_period);
+
+  // if a new period is detected, update contract period
+  if (new_period)
+  {
+    // update contract period validity, code and label
+    teleinfo_contract.arr_period[teleinfo_message.period].valid     = 1;
+    teleinfo_contract.arr_period[teleinfo_message.period].str_code  = teleinfo_message.str_period;
+    teleinfo_contract.arr_period[teleinfo_message.period].str_label = teleinfo_message.str_period;
+
+    // detect and update contract period HC/HP
+    hchp  = 1;
+    if (strstr_P (teleinfo_message.str_period, PSTR ("HC")) != nullptr) hchp = 0;
+      else if (strstr_P (teleinfo_message.str_period, PSTR ("CREUSE")) != nullptr) hchp = 0;
+    teleinfo_contract.arr_period[teleinfo_message.period].hchp = hchp;
+
+    // detect and update contract period level
+    level = 1;
+    if (strstr_P (teleinfo_message.str_period, PSTR ("JW")) != nullptr) level = 2;
+      else if (strstr_P (teleinfo_message.str_period, PSTR ("BLANC")) != nullptr) level = 2;
+      else if (strstr_P (teleinfo_message.str_period, PSTR ("JR")) != nullptr) level = 3;
+      else if (strstr_P (teleinfo_message.str_period, PSTR ("ROUGE")) != nullptr) level = 3;
+      else if (strstr_P (teleinfo_message.str_period, PSTR ("PM")) != nullptr) level = 3;
+      else if (strstr_P (teleinfo_message.str_period, PSTR ("POINTE")) != nullptr) level = 3;
+      else if (strcmp_P (teleinfo_message.str_period, PSTR ("P")) == 0) level = 3;
+    teleinfo_contract.arr_period[teleinfo_message.period].level = level;
+
+    // update contract period quantity
+    if (teleinfo_contract.period_qty < teleinfo_message.period + 1) teleinfo_contract.period_qty = teleinfo_message.period + 1;
+
+    // publish updated calendar
+    if (teleinfo_config.calendar) teleinfo_meter.json.data = 1;
+
+    // log
+    AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Nouvelle période %s (index %u, level %u, hchp %u), %u périodes connues"), teleinfo_message.str_period, teleinfo_message.period + 1, level, hchp, teleinfo_contract.period_qty);
+
+    // save new period
+    TeleinfoConfigSave ();
+  }
+
+  // else log period change
+  else 
+  {
+    level = teleinfo_contract.arr_period[teleinfo_contract.period_idx].level;
+    hchp  = teleinfo_contract.arr_period[teleinfo_contract.period_idx].hchp;
+    count = teleinfo_contract.period_idx + 1;
+    AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Changement de période %s (index %u, level %u, hchp %u)"), teleinfo_contract.str_period, count, level, hchp);
   }
 }
 
-// set contract period
-void TeleinfoPeriodUpdate (const char* pstr_period)
+// update periods from a description string (return quantity of periods)
+uint8_t TeleinfoContractString2Period (const char *pstr_description)
 {
-  int  index = INT_MAX;
-  char str_text[32];
+  bool    extract = true;
+  uint8_t result  = 0;
+  uint8_t period;
+  int     index = 0;
+  char    str_period[4];
+  char    str_level[4];
+  char    str_hchp[4];
+  char    str_code[16];
+  char    str_label[32];
+  
+  // check parameter
+  if (pstr_description == nullptr) extract = false;
+  else if (strlen_P (pstr_description) == 0) extract = false;
+
+  // loop to extract data
+  while (extract)
+  {
+    // init
+    period = UINT8_MAX;
+    str_period[0] = 0;
+    str_level[0]  = 0;
+    str_hchp[0]   = 0;
+    str_code[0]   = 0;
+    str_label[0]  = 0;
+    
+    // extract data
+    GetTextIndexed (str_period, sizeof (str_period), index++, pstr_description);
+    if (strlen (str_period) > 0) period = (uint8_t)atoi (str_period) - 1;
+    if (period < TIC_PERIOD_MAX) GetTextIndexed (str_level, sizeof (str_level), index++, pstr_description);
+    if (strlen (str_level) > 0)  GetTextIndexed (str_hchp,  sizeof (str_hchp),  index++, pstr_description);
+    if (strlen (str_hchp)  > 0)  GetTextIndexed (str_code,  sizeof (str_code),  index++, pstr_description);
+    if (strlen (str_code)  > 0)  GetTextIndexed (str_label, sizeof (str_label), index++, pstr_description);
+
+    // if data are available
+    if (strlen (str_code) > 0)
+    {
+      // load period data
+      teleinfo_contract.arr_period[period].valid     = 1;
+      teleinfo_contract.arr_period[period].level     = (uint8_t)atoi (str_level);
+      teleinfo_contract.arr_period[period].hchp      = (uint8_t)atoi (str_hchp);
+      teleinfo_contract.arr_period[period].str_code  = str_code;
+      teleinfo_contract.arr_period[period].str_label = str_label;
+
+      // update number of periods
+      period++;
+      result = max (result, period);
+    }
+    else extract = false;
+  }
+
+  return result;
+}
+
+bool TeleinfoContractPeriod2String (char *pstr_description, const size_t size_description, const uint8_t period)
+{
+  bool result = true;
 
   // check parameter
-  if (pstr_period == nullptr) return;
-  if (teleinfo_contract.contract == TIC_C_UNDEFINED) return;
-
-  // look for period according to contract
-  switch (teleinfo_contract.contract)
-  {
-    case TIC_C_HISTO_BASE:  index = GetCommandCode (str_text, sizeof (str_text), pstr_period, kTicPeriodHistoBaseCode); break;
-    case TIC_C_HISTO_HCHP:  index = GetCommandCode (str_text, sizeof (str_text), pstr_period, kTicPeriodHistoHcHpCode); break;
-    case TIC_C_HISTO_EJP:   index = GetCommandCode (str_text, sizeof (str_text), pstr_period, kTicPeriodHistoEjpCode); break;
-    case TIC_C_HISTO_TEMPO: index = GetCommandCode (str_text, sizeof (str_text), pstr_period, kTicPeriodHistoTempoCode); break;
-    case TIC_C_STD_BASE:    index = GetCommandCode (str_text, sizeof (str_text), pstr_period, kTicPeriodStandardBaseCode); break;
-    case TIC_C_STD_HCHP:    index = GetCommandCode (str_text, sizeof (str_text), pstr_period, kTicPeriodStandardHcHpCode); break;
-    case TIC_C_STD_EJP:     index = GetCommandCode (str_text, sizeof (str_text), pstr_period, kTicPeriodStandardEjpCode); break;
-    case TIC_C_STD_TEMPO:   index = GetCommandCode (str_text, sizeof (str_text), pstr_period, kTicPeriodStandardTempoCode); break;
-    case TIC_C_BT4SUP36:
-    case TIC_C_BT5SUP36:
-    case TIC_C_TJEJP:
-    case TIC_C_HTA5:  
-    case TIC_C_HTA8:        index = GetCommandCode (str_text, sizeof (str_text), pstr_period, kTicPeriodPmePmiCode); break;
-    case TIC_C_A5_BASE:
-    case TIC_C_A8_BASE:
-    case TIC_C_A5_EJP:
-    case TIC_C_A8_EJP:
-    case TIC_C_A8_MOD:      index = GetCommandCode (str_text, sizeof (str_text), pstr_period, kTicPeriodEmeraude2Code); break;    
-  }
-
-  // if index not found, log
-  if (index == -1) AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Period unknown [%s]"), pstr_period);
+  if (pstr_description == nullptr) result = false;
+  else if (period >= TIC_PERIOD_MAX) result = false;
+  else if (teleinfo_contract.arr_period[period].valid == 0) result = false;
   
-  // else if new period changed
-  else if ((index != INT_MAX) && (teleinfo_contract.period != (uint8_t)index))    
-  {
-    // if period update, publish calendar
-    if (teleinfo_config.calendar && (teleinfo_contract.period != UINT8_MAX)) teleinfo_meter.json.calendar = 1;
+  // generate period description string
+  if (result) snprintf_P (pstr_description, size_description, PSTR ("%u|%u|%u|%s|%s"), period + 1, teleinfo_contract.arr_period[period].level, teleinfo_contract.arr_period[period].hchp, teleinfo_contract.arr_period[period].str_code.c_str (), teleinfo_contract.arr_period[period].str_label.c_str ());
 
-    // set new period and log
-    teleinfo_contract.period = (uint8_t)index;
-    AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Period updated to %s [%d]"), pstr_period, index);
-  }
+  return result;
 }
 
 // set contract max power par phase
-void TeleinfoContractPowerUpdate (const char *pstr_donnee, const bool is_kilo)
+void TeleinfoContractPowerUpdate (const char *pstr_donnee)
 {
   long value;
   char *pstr_match;
@@ -1203,15 +1425,15 @@ void TeleinfoContractPowerUpdate (const char *pstr_donnee, const bool is_kilo)
   value = atol (str_value);
 
   // update contrat max values
-  if ((value > 0) && (value < LONG_MAX))
+  if (value > 0)
   {
     // adjust value in kilo and per phase
-    if (is_kilo) value *= 1000;
+    if (value < 1000) value = value * 1000;
     if (teleinfo_contract.phase > 1) value = value / teleinfo_contract.phase;
 
     // update boundaries
     teleinfo_contract.ssousc = value;                
-    teleinfo_contract.isousc = value / TELEINFO_VOLTAGE_REF;
+    teleinfo_contract.isousc = value / TIC_VOLTAGE_REF;
   }
 }
 
@@ -1223,143 +1445,66 @@ void TeleinfoContractGetName (char* pstr_name, size_t size_name)
   if (size_name == 0) return;
 
   // get contract name
-  GetTextIndexed (pstr_name, size_name, teleinfo_contract.contract, kTicContractName);
+  if ((teleinfo_contract.index == TIC_C_UNKNOWN) || (teleinfo_contract.index == UINT8_MAX)) strlcpy (pstr_name, teleinfo_contract.str_code, size_name);
+    else GetTextIndexed (pstr_name, size_name, teleinfo_contract.index, kTicContractName);
 }
 
 // get period code
-void TeleinfoPeriodGetCode (char* pstr_code, size_t size_code) { TeleinfoPeriodGetCode (teleinfo_contract.period, pstr_code, size_code); }
-void TeleinfoPeriodGetCode (const uint8_t period, char* pstr_code, size_t size_code)
+void TeleinfoPeriodGetCode (char* pstr_code, size_t size_code) { TeleinfoPeriodGetCode (pstr_code, size_code, teleinfo_contract.period_idx); }
+void TeleinfoPeriodGetCode (char* pstr_code, size_t size_code, const uint8_t period)
 {
   // check parameter
   if (pstr_code == nullptr) return;
   if (size_code == 0) return;
+  if (period >= TIC_PERIOD_MAX) return;
 
-  // look for period according to contract
-  strlcpy (pstr_code, "NONE", size_code);
-  switch (teleinfo_contract.contract)
-  {
-    case TIC_C_UNDEFINED:   GetTextIndexed (pstr_code, size_code, period, kTicPeriodUndefCode); break;
-    case TIC_C_HISTO_BASE:  GetTextIndexed (pstr_code, size_code, period, kTicPeriodHistoBaseCode); break;
-    case TIC_C_HISTO_HCHP:  GetTextIndexed (pstr_code, size_code, period, kTicPeriodHistoHcHpCode); break;
-    case TIC_C_HISTO_EJP:   GetTextIndexed (pstr_code, size_code, period, kTicPeriodHistoEjpCode); break;
-    case TIC_C_HISTO_TEMPO: GetTextIndexed (pstr_code, size_code, period, kTicPeriodHistoTempoCode); break;
-    case TIC_C_STD_BASE:    GetTextIndexed (pstr_code, size_code, period, kTicPeriodStandardBaseCode); break;
-    case TIC_C_STD_HCHP:    GetTextIndexed (pstr_code, size_code, period, kTicPeriodStandardHcHpCode); break;
-    case TIC_C_STD_EJP:     GetTextIndexed (pstr_code, size_code, period, kTicPeriodStandardEjpCode); break;
-    case TIC_C_STD_TEMPO:   GetTextIndexed (pstr_code, size_code, period, kTicPeriodStandardTempoCode); break;
-    case TIC_C_BT4SUP36:
-    case TIC_C_BT5SUP36:
-    case TIC_C_TJEJP:
-    case TIC_C_HTA5:  
-    case TIC_C_HTA8:        GetTextIndexed (pstr_code, size_code, period, kTicPeriodPmePmiCode); break;
-    case TIC_C_A5_BASE:
-    case TIC_C_A8_BASE:
-    case TIC_C_A5_EJP:
-    case TIC_C_A8_EJP:
-    case TIC_C_A8_MOD:      GetTextIndexed (pstr_code, size_code, period, kTicPeriodEmeraude2Code); break;    
-  } 
+  // look for period code according to contract
+  if (teleinfo_contract.period_qty < period + 1) pstr_code[0] = 0;
+    else if (teleinfo_contract.arr_period[period].valid == 0) sprintf_P (pstr_code, PSTR ("PERIOD%u"), period + 1);
+    else strlcpy (pstr_code, teleinfo_contract.arr_period[period].str_code.c_str (), size_code);
 }
 
 // get period name
-void TeleinfoPeriodGetName (char* pstr_name, size_t size_name) { TeleinfoPeriodGetName (teleinfo_contract.period, pstr_name, size_name); }
-void TeleinfoPeriodGetName (const uint8_t period, char* pstr_name, size_t size_name)
+void TeleinfoPeriodGetLabel (char* pstr_name, const size_t size_name) { TeleinfoPeriodGetLabel (pstr_name, size_name, teleinfo_contract.period_idx); }
+void TeleinfoPeriodGetLabel (char* pstr_name, const size_t size_name, const uint8_t period)
 {
   // check parameter
   if (pstr_name == nullptr) return;
   if (size_name == 0) return;
+  if (period >= TIC_PERIOD_MAX) return;
 
-  // look for period according to contract
-  strlcpy (pstr_name, "Indéterminée", size_name);
-  switch (teleinfo_contract.contract)
-  {
-    case TIC_C_UNDEFINED:   GetTextIndexed (pstr_name, size_name, period, kTicPeriodUndefName); break;
-    case TIC_C_HISTO_BASE:  GetTextIndexed (pstr_name, size_name, period, kTicPeriodHistoBaseName); break;
-    case TIC_C_HISTO_HCHP:  GetTextIndexed (pstr_name, size_name, period, kTicPeriodHistoHcHpName); break;
-    case TIC_C_HISTO_EJP:   GetTextIndexed (pstr_name, size_name, period, kTicPeriodHistoEjpName); break;
-    case TIC_C_HISTO_TEMPO: GetTextIndexed (pstr_name, size_name, period, kTicPeriodHistoTempoName); break;
-    case TIC_C_STD_BASE:    GetTextIndexed (pstr_name, size_name, period, kTicPeriodStandardBaseName); break;
-    case TIC_C_STD_HCHP:    GetTextIndexed (pstr_name, size_name, period, kTicPeriodStandardHcHpName); break;
-    case TIC_C_STD_EJP:     GetTextIndexed (pstr_name, size_name, period, kTicPeriodStandardEjpName); break;
-    case TIC_C_STD_TEMPO:   GetTextIndexed (pstr_name, size_name, period, kTicPeriodStandardTempoName); break;
-    case TIC_C_BT4SUP36:
-    case TIC_C_BT5SUP36:
-    case TIC_C_TJEJP:
-    case TIC_C_HTA5:  
-    case TIC_C_HTA8:        GetTextIndexed (pstr_name, size_name, period, kTicPeriodPmePmiName); break;
-    case TIC_C_A5_BASE:
-    case TIC_C_A8_BASE:
-    case TIC_C_A5_EJP:
-    case TIC_C_A8_EJP:
-    case TIC_C_A8_MOD:      GetTextIndexed (pstr_name, size_name, period, kTicPeriodEmeraude2Name); break;    
-  }
+  // look for period label according to contract
+  if (teleinfo_contract.period_qty < period + 1) pstr_name[0] = 0;
+    else if (teleinfo_contract.arr_period[period].valid == 0) sprintf_P (pstr_name, PSTR ("Période %u"), period + 1);
+    else strlcpy (pstr_name, teleinfo_contract.arr_period[period].str_label.c_str (), size_name);
 }
 
 // get period level
-uint8_t TeleinfoPeriodGetLevel () { return TeleinfoPeriodGetLevel (teleinfo_contract.period); }
+uint8_t TeleinfoPeriodGetLevel () { return TeleinfoPeriodGetLevel (teleinfo_contract.period_idx); }
 uint8_t TeleinfoPeriodGetLevel (const uint8_t period)
 {
-  uint8_t level;
+  uint8_t value;
 
-  // look for period according to contract
-  level = TIC_LEVEL_NONE;
-  switch (teleinfo_contract.contract)
-  {
-    case TIC_C_UNDEFINED:   if (period < sizeof (arrPeriodUndefLevel)) level = arrPeriodUndefLevel[period]; break;
-    case TIC_C_HISTO_BASE:  if (period < sizeof (arrPeriodHistoBaseLevel)) level = arrPeriodHistoBaseLevel[period]; break;
-    case TIC_C_HISTO_HCHP:  if (period < sizeof (arrPeriodHistoHcHpLevel)) level = arrPeriodHistoHcHpLevel[period]; break;
-    case TIC_C_HISTO_EJP:   if (period < sizeof (arrPeriodHistoEjpLevel)) level = arrPeriodHistoEjpLevel[period]; break;
-    case TIC_C_HISTO_TEMPO: if (period < sizeof (arrPeriodHistoTempoLevel)) level = arrPeriodHistoTempoLevel[period]; break;
-    case TIC_C_STD_BASE:    if (period < sizeof (arrPeriodStandardBaseLevel)) level = arrPeriodStandardBaseLevel[period]; break;
-    case TIC_C_STD_HCHP:    if (period < sizeof (arrPeriodStandardHcHpLevel)) level = arrPeriodStandardHcHpLevel[period]; break;
-    case TIC_C_STD_EJP:     if (period < sizeof (arrPeriodStandardEjpLevel)) level = arrPeriodStandardEjpLevel[period]; break;
-    case TIC_C_STD_TEMPO:   if (period < sizeof (arrPeriodStandardTempoLevel)) level = arrPeriodStandardTempoLevel[period]; break;
-    case TIC_C_BT4SUP36:
-    case TIC_C_BT5SUP36:
-    case TIC_C_TJEJP:
-    case TIC_C_HTA5:  
-    case TIC_C_HTA8:        if (period < sizeof (arrPeriodPmePmiLevel)) level = arrPeriodPmePmiLevel[period]; break;
-    case TIC_C_A5_BASE:
-    case TIC_C_A8_BASE:
-    case TIC_C_A5_EJP:
-    case TIC_C_A8_EJP:
-    case TIC_C_A8_MOD:      if (period < sizeof (arrPeriodEmeraude2Level)) level = arrPeriodEmeraude2Level[period]; break;   
-  }
+  if (period >= TIC_PERIOD_MAX) value = 0;
+    else if (teleinfo_contract.period_qty < period + 1) value = 0;
+    else if (teleinfo_contract.arr_period[period].valid == 0) value = 0;
+    else value = teleinfo_contract.arr_period[period].level;
 
-  return level;
+  return value;
 }
 
 // get period HP status
-uint8_t TeleinfoPeriodGetHP () { return TeleinfoPeriodGetHP (teleinfo_contract.period); }
+uint8_t TeleinfoPeriodGetHP () { return TeleinfoPeriodGetHP (teleinfo_contract.period_idx); }
 uint8_t TeleinfoPeriodGetHP (const uint8_t period)
 {
-  uint8_t status;
+  uint8_t value;
 
-  // look for period according to contract
-  status = 1;
-  switch (teleinfo_contract.contract)
-  {
-    case TIC_C_UNDEFINED:   if (period < sizeof (arrPeriodUndefHP)) status = arrPeriodUndefHP[period]; break;
-    case TIC_C_HISTO_BASE:  if (period < sizeof (arrPeriodHistoBaseHP)) status = arrPeriodHistoBaseHP[period]; break;
-    case TIC_C_HISTO_HCHP:  if (period < sizeof (arrPeriodHistoHcHpHP)) status = arrPeriodHistoHcHpHP[period]; break;
-    case TIC_C_HISTO_EJP:   if (period < sizeof (arrPeriodHistoEjpHP)) status = arrPeriodHistoEjpHP[period]; break;
-    case TIC_C_HISTO_TEMPO: if (period < sizeof (arrPeriodHistoTempoHP)) status = arrPeriodHistoTempoHP[period]; break;
-    case TIC_C_STD_BASE:    if (period < sizeof (arrPeriodStandardBaseHP)) status = arrPeriodStandardBaseHP[period]; break;
-    case TIC_C_STD_HCHP:    if (period < sizeof (arrPeriodStandardHcHpHP)) status = arrPeriodStandardHcHpHP[period]; break;
-    case TIC_C_STD_EJP:     if (period < sizeof (arrPeriodStandardEjpHP)) status = arrPeriodStandardEjpHP[period]; break;
-    case TIC_C_STD_TEMPO:   if (period < sizeof (arrPeriodStandardTempoHP)) status = arrPeriodStandardTempoHP[period]; break;
-    case TIC_C_BT4SUP36:
-    case TIC_C_BT5SUP36:
-    case TIC_C_TJEJP:
-    case TIC_C_HTA5:  
-    case TIC_C_HTA8:        if (period < sizeof (arrPeriodPmePmiHP)) status = arrPeriodPmePmiHP[period]; break;
-    case TIC_C_A5_BASE:
-    case TIC_C_A8_BASE:
-    case TIC_C_A5_EJP:
-    case TIC_C_A8_EJP:
-    case TIC_C_A8_MOD:      if (period < sizeof (arrPeriodEmeraude2HP)) status = arrPeriodEmeraude2HP[period]; break;   
-  }
+  if (period >= TIC_PERIOD_MAX) value = 1;
+    else if (teleinfo_contract.period_qty < period + 1) value = 1;
+    else if (teleinfo_contract.arr_period[period].valid == 0) value = 1;
+    else value = teleinfo_contract.arr_period[period].hchp;
 
-  return status;
+  return value;
 }
 
 /*********************************************\
@@ -1434,7 +1579,7 @@ void TeleinfoCalendarTomorrowProfile (char *pstr_donnee)
   teleinfo_meter.arr_day[TIC_DAY_TOMORROW].valid = 1;
 
   // ask for JSON update
-  if (teleinfo_config.calendar && TeleinfoDriverMeterReady ()) teleinfo_meter.json.calendar = 1;
+  if (teleinfo_config.calendar && TeleinfoDriverMeterReady ()) teleinfo_meter.json.data = 1;
 }
 
 void TeleinfoCalendarPointeDeclare (const char *pstr_donnee)
@@ -1553,7 +1698,7 @@ void TeleinfoCalendarPointeProfile (char *pstr_donnee)
   }
 
   // ask for JSON update
-  if (teleinfo_config.calendar && TeleinfoDriverMeterReady ()) teleinfo_meter.json.calendar = 1;
+  if (teleinfo_config.calendar && TeleinfoDriverMeterReady ()) teleinfo_meter.json.data = 1;
 }
 
 void TeleinfoUpdateCosphi (long cosphi, struct tic_cosphi &struct_cosphi, const long papp)
@@ -1578,25 +1723,25 @@ void TeleinfoUpdateCosphi (long cosphi, struct tic_cosphi &struct_cosphi, const 
   struct_cosphi.last_papp = papp;
 
   // if apparent power increased more than 5% of the contract power, average on 2 samples to update cosphi very fast
-  if (delta >= contract5percent) for (index = 1; index < TELEINFO_COSPHI_SAMPLE; index++) struct_cosphi.arr_value[index] = LONG_MAX;
+  if (delta >= contract5percent) for (index = 1; index < TIC_COSPHI_SAMPLE; index++) struct_cosphi.arr_value[index] = LONG_MAX;
 
   // else if apparent power increased more than 2% of the contract power, average on 4 samples to update cosphi quite fast
-  else if (delta >= contract2percent) for (index = 3; index < TELEINFO_COSPHI_SAMPLE; index++) struct_cosphi.arr_value[index] = LONG_MAX;
+  else if (delta >= contract2percent) for (index = 3; index < TIC_COSPHI_SAMPLE; index++) struct_cosphi.arr_value[index] = LONG_MAX;
 
   // else if apparent power decreased more than 5% of the contract power, average on 2 samples to update cosphi very fast
-  else if (delta <= -contract5percent) for (index = 1; index < TELEINFO_COSPHI_SAMPLE; index++) struct_cosphi.arr_value[index] = LONG_MAX;
+  else if (delta <= -contract5percent) for (index = 1; index < TIC_COSPHI_SAMPLE; index++) struct_cosphi.arr_value[index] = LONG_MAX;
 
   // if apparent power increased more than 5% of the contract power, cancel current cosphi average calculation to avoid spikes
   if (delta >= contract5percent) return;
 
   // shift values and update first one
-  for (index = TELEINFO_COSPHI_SAMPLE - 1; index > 0; index--) struct_cosphi.arr_value[index] = struct_cosphi.arr_value[index - 1];
+  for (index = TIC_COSPHI_SAMPLE - 1; index > 0; index--) struct_cosphi.arr_value[index] = struct_cosphi.arr_value[index - 1];
   struct_cosphi.arr_value[0] = cosphi;
 
   // calculate cosphi average
   result = 0;
   sample = 0;
-  for (index = 0; index < TELEINFO_COSPHI_SAMPLE; index++)
+  for (index = 0; index < TIC_COSPHI_SAMPLE; index++)
     if (struct_cosphi.arr_value[index] != LONG_MAX) { result += struct_cosphi.arr_value[index]; sample++; }
 
   // if at least one sample, update resulting value, avoiding out of range values
@@ -1624,12 +1769,18 @@ void TeleinfoInit ()
 
 #ifdef USE_UFILESYS
   // log result
-  if (ufs_type) AddLog (LOG_LEVEL_DEBUG, PSTR ("TIC: Partition mounted"));
+  if (ufs_type) AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Partition mounted"));
   else AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Partition could not be mounted"));
 #endif  // USE_UFILESYS
 
   // remove serial logging
   TasmotaGlobal.seriallog_timer = 0;
+
+  // remove standard energy display
+  bitWrite (Settings->sensors[1][0], 3, 0);
+
+  // set web refresh to 3 sec (linky ready)
+  Settings->web_refresh = 3000;
 
   // set measure resolution
   Settings->flag2.current_resolution = 1;
@@ -1640,89 +1791,88 @@ void TeleinfoInit ()
   // init hardware energy counter
   Settings->flag3.hardware_energy_total = true;
 
+  // disable automatic data saving
+  Settings->save_data = 0;
+  TasmotaGlobal.save_data_counter = 0;
+
   // set default energy parameters
   Energy->voltage_available = true;
   Energy->current_available = true;
 
-  // load configuration
-  TeleinfoLoadConfig ();
+  // init first power delta detection value
+  if (Settings->energy_power_delta[0] == 0) Settings->energy_power_delta[0] = 100;
 
-  // initialise meter indexes
-  for (index = 0; index < TELEINFO_INDEX_MAX; index ++) teleinfo_conso.index_wh[index] = 0;
-  teleinfo_meter.sep_line = ' ';
+  // meter : separator and JSON flags
+  teleinfo_meter.sep_line  = ' ';
+  teleinfo_meter.json.tic  = 0;
+  teleinfo_meter.json.data = 0;
 
-  // init JSON flags
-  teleinfo_meter.json.alert    = 0;
-  teleinfo_meter.json.meter    = 0;
-  teleinfo_meter.json.contract = 0;
-  teleinfo_meter.json.tic      = 0;
-  teleinfo_meter.json.calendar = 0;
-  teleinfo_meter.json.relay    = 0;
-
-  // init meter stge data
+  // meter : stge data
   teleinfo_meter.flag.overload   = 0;
   teleinfo_meter.flag.overvolt   = 0;
   teleinfo_meter.preavis.level   = TIC_PREAVIS_NONE;
   teleinfo_meter.preavis.timeout = UINT32_MAX;
-  strcpy (teleinfo_meter.preavis.str_label, "");
+  teleinfo_meter.preavis.str_label[0] = 0;
 
-  // init pointe period
+  // meter : pointe period
   teleinfo_meter.pointe.hour        = UINT8_MAX;
   teleinfo_meter.pointe.day         = UINT8_MAX;
   teleinfo_meter.pointe.start       = UINT32_MAX;
   teleinfo_meter.pointe.crc_start   = 0;
   teleinfo_meter.pointe.crc_profile = 0;
 
-  // init calendar days
+  // meter : calendar days
   for (index = TIC_DAY_YESTERDAY; index < TIC_DAY_MAX; index ++)
   {
     teleinfo_meter.arr_day[index].valid = 0;
     for (slot = 0; slot < 24; slot ++) teleinfo_meter.arr_day[index].arr_period[slot] = TIC_LEVEL_NONE;
   }
 
-  // initialise message data
+  // message data
   teleinfo_message.timestamp = UINT32_MAX;
-  strcpy (teleinfo_message.str_line, "");
-  for (index = 0; index < TELEINFO_LINE_QTY; index ++) 
+  teleinfo_message.str_line[0] = 0;
+  for (index = 0; index < TIC_LINE_QTY; index ++) 
   {
     // init current message data
-    teleinfo_message.arr_line[index].str_etiquette = "";
-    teleinfo_message.arr_line[index].str_donnee    = "";
-    teleinfo_message.arr_line[index].checksum      = 0;
+    teleinfo_message.arr_line[index].str_etiquette[0] = 0;
+    teleinfo_message.arr_line[index].str_donnee[0] = 0;
+    teleinfo_message.arr_line[index].checksum = 0;
 
     // init last message data
-    teleinfo_message.arr_last[index].str_etiquette = "";
-    teleinfo_message.arr_last[index].str_donnee    = "";
-    teleinfo_message.arr_last[index].checksum      = 0;
+    teleinfo_message.arr_last[index].str_etiquette[0] = 0;
+    teleinfo_message.arr_last[index].str_donnee[0] = 0;
+    teleinfo_message.arr_last[index].checksum = 0;
   }
 
-  // init cosphi calculation data
+  // conso data
+  teleinfo_conso.total_wh = 0;
+  for (index = 0; index < TIC_PERIOD_MAX; index ++) teleinfo_conso.index_wh[index] = 0;
   teleinfo_conso.cosphi.nb_measure   = 0;
-  teleinfo_prod.cosphi.nb_measure    = 0;
   teleinfo_conso.cosphi.last_papp    = 0;
-  teleinfo_prod.cosphi.last_papp     = 0;
-  teleinfo_conso.cosphi.value        = TELEINFO_COSPHI_DEFAULT;     
-  teleinfo_prod.cosphi.value         = TELEINFO_COSPHI_DEFAULT;
-  teleinfo_conso.cosphi.arr_value[0] = TELEINFO_COSPHI_DEFAULT;
-  teleinfo_prod.cosphi.arr_value[0]  = TELEINFO_COSPHI_DEFAULT;
-  for (index = 1; index < TELEINFO_COSPHI_SAMPLE; index++)
-  {
-    teleinfo_conso.cosphi.arr_value[index] = LONG_MAX;
-    teleinfo_prod.cosphi.arr_value[index]  = LONG_MAX;
-  }
+  teleinfo_conso.cosphi.value        = TIC_COSPHI_DEFAULT;     
+  teleinfo_conso.cosphi.arr_value[0] = TIC_COSPHI_DEFAULT;
+  for (index = 1; index < TIC_COSPHI_SAMPLE; index++) teleinfo_conso.cosphi.arr_value[index] = LONG_MAX;
 
-  // loop thru phases
+  // prod data
+  teleinfo_prod.total_wh = 0;
+  teleinfo_prod.cosphi.nb_measure   = 0;
+  teleinfo_prod.cosphi.last_papp    = 0;
+  teleinfo_prod.cosphi.value        = TIC_COSPHI_DEFAULT;
+  teleinfo_prod.cosphi.arr_value[0] = TIC_COSPHI_DEFAULT;
+  for (index = 1; index < TIC_COSPHI_SAMPLE; index++) teleinfo_prod.cosphi.arr_value[index]  = LONG_MAX;
+
+  // conso data per phase
   for (phase = 0; phase < ENERGY_MAX_PHASES; phase++)
   {
     // init energy data 
-    Energy->voltage[phase]        = TELEINFO_VOLTAGE;
+    Energy->voltage[phase]        = TIC_VOLTAGE;
     Energy->current[phase]        = 0;
     Energy->active_power[phase]   = 0;
     Energy->apparent_power[phase] = 0;
 
     // init conso data
     teleinfo_conso.phase[phase].volt_set  = false;
-    teleinfo_conso.phase[phase].voltage   = TELEINFO_VOLTAGE;
+    teleinfo_conso.phase[phase].voltage   = TIC_VOLTAGE;
     teleinfo_conso.phase[phase].current   = 0;
     teleinfo_conso.phase[phase].papp      = 0;
     teleinfo_conso.phase[phase].sinsts    = 0;
@@ -1732,8 +1882,11 @@ void TeleinfoInit ()
     teleinfo_conso.phase[phase].cosphi    = 1000;
   }
 
+  // load configuration
+  TeleinfoConfigLoad ();
+
   // log default method & help command
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: EnergyConfig to get help on all Teleinfo commands"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Run energyconfig to get help on all Teleinfo commands"));
 }
 
 // set environment for new message
@@ -1755,35 +1908,343 @@ void TeleinfoReceptionMessageStart ()
   // set next stage
   teleinfo_meter.reception = TIC_RECEPTION_MESSAGE;
 
-  // reset line index and current line content
-  teleinfo_message.line_index = 0;
-  memset (teleinfo_message.str_line, 0, TELEINFO_LINE_MAX);
+  // reset error flag, line index and current line content
+  teleinfo_message.error = 0;
+  teleinfo_message.line_idx = 0;
+  teleinfo_message.injection = 0;
+  teleinfo_message.str_line[0] = 0;
+
+  // init message period and contract to current one
+  teleinfo_message.period = UINT8_MAX;
+  teleinfo_message.str_period[0] = 0;
+  strlcpy (teleinfo_message.str_contract, teleinfo_contract.str_code, sizeof (teleinfo_message.str_contract));
 
   // reset voltage flags
   for (phase = 0; phase < teleinfo_contract.phase; phase++) teleinfo_conso.phase[phase].volt_set = false;
 }
 
+// Conso : calcultate Cosphi and Active Power 
+//   from Instant Apparent Power (VA) and Active Power counters (Wh)
+void TeleinfoConsoCalculateActivePower_VA_Wh ()
+{
+  uint8_t phase;
+  long    sinsts, current, cosphi;
+
+  // calculate total current
+  current = 0;
+  for (phase = 0; phase < teleinfo_contract.phase; phase++) current += teleinfo_conso.phase[phase].current;
+
+  // check if sinsts per phase should be used (+/- 5VA difference with PAPP)
+  if ((teleinfo_meter.use_sinsts == 0) && (teleinfo_contract.mode == TIC_MODE_STANDARD) && (teleinfo_conso.papp > 5))
+  {
+    sinsts = 0;
+    for (phase = 0; phase < teleinfo_contract.phase; phase++) sinsts += teleinfo_conso.phase[phase].sinsts;
+    if ((sinsts > teleinfo_conso.papp - 5) && (sinsts < teleinfo_conso.papp + 5)) teleinfo_meter.use_sinsts = 1;
+  }  
+
+  // loop thru phase to update apparent power
+  for (phase = 0; phase < teleinfo_contract.phase; phase++)
+  {
+    // set apparent power
+    if (teleinfo_meter.use_sinsts == 1) teleinfo_conso.phase[phase].papp = teleinfo_conso.phase[phase].sinsts;
+    else if (current > 0) teleinfo_conso.phase[phase].papp = teleinfo_conso.papp * teleinfo_conso.phase[phase].current / current;
+    else if (teleinfo_contract.phase > 0) teleinfo_conso.phase[phase].papp = teleinfo_conso.papp / teleinfo_contract.phase;
+
+    // update mvah increment
+    teleinfo_conso.delta_mvah += teleinfo_conso.phase[phase].papp * teleinfo_message.duration / 36;
+  }
+
+  // if active power has increased
+  if (teleinfo_conso.delta_mvah > 0)
+  {
+    // if global counter increased, calculate new cosphi
+    if (teleinfo_conso.delta_mwh > 0)
+    {
+      cosphi = 1000 * 100 * teleinfo_conso.delta_mwh / teleinfo_conso.delta_mvah;
+      if (cosphi < 50) cosphi = 0;
+      TeleinfoUpdateCosphi (cosphi, teleinfo_conso.cosphi, teleinfo_conso.papp);
+    }
+
+    // else try to forecast cosphi evolution in case of very low power
+    else
+    {
+      cosphi = 1000 * 100 * 1000 / teleinfo_conso.delta_mvah;
+      if (cosphi < 50) cosphi = 0;
+      if (cosphi <= teleinfo_conso.cosphi.value) TeleinfoUpdateCosphi (cosphi, teleinfo_conso.cosphi, teleinfo_conso.papp);
+    }
+  }
+
+  // loop thru phase to update cosphi and calculate active power
+  for (phase = 0; phase < teleinfo_contract.phase; phase++)
+  {
+    teleinfo_conso.phase[phase].cosphi = teleinfo_conso.cosphi.value;
+    teleinfo_conso.phase[phase].pact   = teleinfo_conso.phase[phase].papp * teleinfo_conso.phase[phase].cosphi / 1000;
+  }
+
+  // if global counter increased, reset apparent power sum, active power delta and increase cosphi counter
+  if (teleinfo_conso.delta_mwh > 0)
+  {
+    teleinfo_conso.delta_mwh  = 0;
+    teleinfo_conso.delta_mvah = 0;
+  }
+}
+
+// Conso : calcultate Cosphi, Apparent Power (VA) and Active Power (W)
+//   from Apparent Power (VAh) and Active Power (Wh) increments
+void TeleinfoConsoCalculateApparentandActivePower_VAh_Wh ()
+{
+  uint8_t phase;
+  long    delay, increment, cosphi;
+
+  // if current stamp is valid
+  if (teleinfo_conso.last_stamp != LONG_MAX)
+  {
+    // init timestamp
+    if (teleinfo_conso.papp_stamp == LONG_MAX) teleinfo_conso.papp_stamp = teleinfo_conso.last_stamp;
+    if (teleinfo_conso.pact_stamp == LONG_MAX) teleinfo_conso.pact_stamp = teleinfo_conso.last_stamp;
+
+    // apparent power increment management
+    if (teleinfo_conso.papp_now != LONG_MAX)
+    {
+      // init apparent power increment reference
+      if (teleinfo_conso.papp_prev == LONG_MAX) teleinfo_conso.papp_prev = teleinfo_conso.papp_now;
+
+      // else detect apparent power rollback
+      if (teleinfo_conso.papp_now < teleinfo_conso.papp_prev)
+      {
+        teleinfo_conso.papp_prev  = LONG_MAX;
+        teleinfo_conso.papp_stamp = LONG_MAX;
+        AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Counter rollback [VAh], start from %d"), teleinfo_conso.papp_now);
+      }
+    }
+
+    // active power increment management
+    if (teleinfo_conso.pact_now != LONG_MAX)
+    {
+      // init active power increment
+      if (teleinfo_conso.pact_prev == LONG_MAX) teleinfo_conso.pact_prev = teleinfo_conso.pact_now;
+
+      // detect active power rollback
+      if (teleinfo_conso.pact_now < teleinfo_conso.pact_prev)
+      {
+        teleinfo_conso.pact_prev  = LONG_MAX;
+        teleinfo_conso.pact_stamp = LONG_MAX;
+        AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Counter rollback [Wh], start from %d"), teleinfo_conso.pact_now);
+      }
+    }
+
+    // if more than 2 sec. difference, calculate new apparent power 
+    if (teleinfo_conso.papp_stamp != LONG_MAX)
+    {
+      delay = TeleinfoTimestampDelay (teleinfo_conso.papp_stamp, teleinfo_conso.last_stamp);
+      increment = teleinfo_conso.papp_now - teleinfo_conso.papp_prev;
+      if ((delay > 2) && (increment > 2))
+      {
+        // calculate new apparent power
+        teleinfo_conso.phase[0].papp = increment * 3600 / delay;
+
+        // reset calculation data
+        teleinfo_conso.papp_prev  = teleinfo_conso.papp_now;
+        teleinfo_conso.papp_stamp = teleinfo_conso.last_stamp;
+      }
+    }
+
+    // if more than 2 sec. difference, calculate new active power 
+    if (teleinfo_conso.pact_stamp != LONG_MAX)
+    {
+      delay = TeleinfoTimestampDelay (teleinfo_conso.pact_stamp, teleinfo_conso.last_stamp);
+      increment = teleinfo_conso.pact_now - teleinfo_conso.pact_prev;
+      if ((delay > 2) && (increment > 2))
+      {
+        // calculate new active power
+        teleinfo_conso.phase[0].pact = increment * 3600 / delay;
+
+        // reset calculation data
+        teleinfo_conso.pact_prev  = teleinfo_conso.pact_now;
+        teleinfo_conso.pact_stamp = teleinfo_conso.last_stamp;
+      }
+    }
+
+    // if possible, calculate new cosphi
+    if (teleinfo_conso.phase[0].papp > 0)
+    {
+      // calculate new cosphi
+      cosphi = 1000 * teleinfo_conso.phase[0].pact / teleinfo_conso.phase[0].papp;
+      if (cosphi > 1000) cosphi = 1000;
+      teleinfo_conso.cosphi.value = (teleinfo_conso.cosphi.value + cosphi) / 2;
+
+      // increase counter
+      teleinfo_conso.cosphi.nb_measure++;
+    }
+  }
+
+  // loop thru phase to update cosphi
+  for (phase = 0; phase < teleinfo_contract.phase; phase++) teleinfo_conso.phase[phase].cosphi = teleinfo_conso.cosphi.value;
+
+  // reset last time stamp
+  teleinfo_conso.last_stamp = LONG_MAX;
+}
+
+// Conso : calcultate Cosphi, Apparent Power (VA) and Active Power (W)
+//   from Active Power (Wh) and Reactive Power (Varh) increments
+void TeleinfoConsoCalculateApparentandActivePower_VAh_Varh ()
+{
+  uint8_t   phase;
+  long      delay, increment, cosphi;
+  long long llpact, llpreact, llpapp;
+
+  // if current stamp is valid
+  if (teleinfo_conso.last_stamp != LONG_MAX)
+  {
+    // init timestamp
+    if (teleinfo_conso.pact_stamp   == LONG_MAX) teleinfo_conso.pact_stamp   = teleinfo_conso.last_stamp;
+    if (teleinfo_conso.preact_stamp == LONG_MAX) teleinfo_conso.preact_stamp = teleinfo_conso.last_stamp;
+
+    // active power increment management
+    if (teleinfo_conso.pact_now != LONG_MAX)
+    {
+      // init active power increment
+      if (teleinfo_conso.pact_prev == LONG_MAX) teleinfo_conso.pact_prev = teleinfo_conso.pact_now;
+
+      // detect active power rollback
+      if (teleinfo_conso.pact_now < teleinfo_conso.pact_prev)
+      {
+        teleinfo_conso.pact_prev  = LONG_MAX;
+        teleinfo_conso.pact_stamp = LONG_MAX;
+        AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Counter rollback [Wh], start from %d"), teleinfo_conso.pact_now);
+      }
+    }
+
+    // reactive power increment management
+    if (teleinfo_conso.preact_now != LONG_MAX)
+    {
+      // init active power increment
+      if (teleinfo_conso.preact_prev == LONG_MAX) teleinfo_conso.preact_prev = teleinfo_conso.preact_now;
+
+      // detect active power rollback
+      if (teleinfo_conso.preact_now < teleinfo_conso.preact_prev)
+      {
+        teleinfo_conso.preact_prev  = LONG_MAX;
+        teleinfo_conso.preact_stamp = LONG_MAX;
+        AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Counter rollback [varh], start from %d"), teleinfo_conso.preact_now);
+      }
+    }
+
+    // if more than 2 sec. difference, calculate new active power 
+    if (teleinfo_conso.pact_stamp != LONG_MAX)
+    {
+      delay = TeleinfoTimestampDelay (teleinfo_conso.pact_stamp, teleinfo_conso.last_stamp);
+      increment = teleinfo_conso.pact_now - teleinfo_conso.pact_prev;
+      if ((delay > 5) && (increment > 2))
+      {
+        // calculate new active power
+        teleinfo_conso.phase[0].pact = increment * 3600 / delay;
+
+        // reset calculation data
+        teleinfo_conso.pact_prev  = teleinfo_conso.pact_now;
+        teleinfo_conso.pact_stamp = teleinfo_conso.last_stamp;
+      }
+    }
+
+    // if more than 5 sec. and 2varh difference, calculate new reactive power 
+    if (teleinfo_conso.preact_stamp != LONG_MAX)
+    {
+      delay = TeleinfoTimestampDelay (teleinfo_conso.preact_stamp, teleinfo_conso.last_stamp);
+      increment = teleinfo_conso.preact_now - teleinfo_conso.preact_prev;
+      if ((delay > 5) && (increment > 2))
+      {
+        // calculate new active power
+        teleinfo_conso.phase[0].preact = increment * 3600 / delay;
+
+        // calculate apparent power
+        llpact   = (long long)teleinfo_conso.phase[0].pact;
+        llpreact = (long long)teleinfo_conso.phase[0].preact;
+        llpapp   = llsqrt (llpact * llpact + llpreact * llpreact);
+        teleinfo_conso.phase[0].papp = (long)llpapp;
+
+        // reset calculation data
+        teleinfo_conso.preact_prev  = teleinfo_conso.preact_now;
+        teleinfo_conso.preact_stamp = teleinfo_conso.last_stamp;
+      }
+    }
+
+    // if possible, calculate new cosphi
+    if (teleinfo_conso.phase[0].papp > 0)
+    {
+      // calculatation
+      cosphi = 1000 * teleinfo_conso.phase[0].pact / teleinfo_conso.phase[0].papp;
+      if (cosphi > 1000) cosphi = 1000;
+      teleinfo_conso.cosphi.value = (teleinfo_conso.cosphi.value + cosphi) / 2;
+
+      // update counter
+      teleinfo_conso.cosphi.nb_measure++;
+    }
+
+    // loop thru phase to update cosphi
+    for (phase = 0; phase < teleinfo_contract.phase; phase++) teleinfo_conso.phase[phase].cosphi = teleinfo_conso.cosphi.value;
+  }
+
+  // reset last time stamp
+  teleinfo_conso.last_stamp = LONG_MAX;
+}
+
+// Prod : calcultate Cosphi and Active Power (W)
+//   from Instant Apparent Power (VA) and Active Power counters (Wh)
+void TeleinfoProdCalculateActivePower_VA_Wh ()
+{
+  long cosphi;
+  
+  // add apparent power increment according to message time window
+  teleinfo_prod.delta_mvah += teleinfo_prod.papp * teleinfo_message.duration / 36;
+
+  // if active power has increased 
+  if (teleinfo_prod.delta_mvah > 0)
+  {
+    // if global counter increased, calculate new cosphi
+    if (teleinfo_prod.delta_mwh > 0)
+    {
+      cosphi = 1000 * 100 * teleinfo_prod.delta_mwh / teleinfo_prod.delta_mvah;
+      if (cosphi < 50) cosphi = 0;
+      TeleinfoUpdateCosphi (cosphi, teleinfo_prod.cosphi, teleinfo_prod.papp);
+    }
+
+    // else try to forecast cosphi drop in case of very low active power production (photovoltaic router ...)
+    else
+    {
+      cosphi = 1000 * 100 * 1000 / teleinfo_prod.delta_mvah;
+      if (cosphi < 50) cosphi = 0;
+      if (cosphi <= teleinfo_prod.cosphi.value) TeleinfoUpdateCosphi (cosphi, teleinfo_prod.cosphi, teleinfo_prod.papp);
+    }
+  }
+
+  // calculate production active power
+  teleinfo_prod.pact = teleinfo_prod.papp * teleinfo_prod.cosphi.value / 1000;
+
+  // if global counter increased, reset apparent power sum, active power delta and increase cosphi counter
+  if (teleinfo_prod.delta_mwh > 0)
+  {
+    teleinfo_prod.delta_mwh  = 0;
+    teleinfo_prod.delta_mvah = 0;
+  }
+}
+
 // set environment for end of message
 void TeleinfoReceptionMessageStop ()
 {
-  bool      percentage, update;
-  uint8_t   phase, period, relay;
-  uint32_t  time_over, timestamp, duration;
-  int       index;
-  long      value, total, delay, increment, total_current, sinsts, cosphi;
-  long long llpact, llpreact, llpapp;
-  char      checksum;
-  char*     pstr_match;
-  char      str_byte[2] = {0, 0};
-  char      str_etiquette[TELEINFO_KEY_MAX];
-  char      str_donnee[TELEINFO_DATA_MAX];
-  char      str_text[TELEINFO_DATA_MAX];
+  bool     delta_va = false;
+  int      index;
+  uint8_t  phase;
+  uint32_t timestamp;
+  long     value;
   
+  // get current timestamp
+  timestamp = millis ();
+
   // set next stage
   teleinfo_meter.reception = TIC_RECEPTION_NONE;
 
-  // get current timestamp
-  timestamp = millis ();
+  // handle contract type and period update
+  if (TeleinfoContractUpdate ()) TeleinfoPeriodUpdate ();
 
   // calculate delay between 2 messages
   if (teleinfo_message.timestamp != UINT32_MAX) teleinfo_message.duration = (long)(timestamp - teleinfo_message.timestamp);
@@ -1793,46 +2254,42 @@ void TeleinfoReceptionMessageStop ()
   teleinfo_meter.nb_message++;
 
   // loop thru message data
-  for (index = 0; index < TELEINFO_LINE_QTY; index++)
+  for (index = 0; index < TIC_LINE_QTY; index++)
   {
     // save data from last message
-    if (index < teleinfo_message.line_index)
+    if (index < teleinfo_message.line_idx)
     {
-      teleinfo_message.arr_last[index].str_etiquette = teleinfo_message.arr_line[index].str_etiquette;
-      teleinfo_message.arr_last[index].str_donnee    = teleinfo_message.arr_line[index].str_donnee;
-      teleinfo_message.arr_last[index].checksum      = teleinfo_message.arr_line[index].checksum;
+      strcpy (teleinfo_message.arr_last[index].str_etiquette, teleinfo_message.arr_line[index].str_etiquette);
+      strcpy (teleinfo_message.arr_last[index].str_donnee, teleinfo_message.arr_line[index].str_donnee);
+      teleinfo_message.arr_last[index].checksum = teleinfo_message.arr_line[index].checksum;
     }
     else
     {
-      teleinfo_message.arr_last[index].str_etiquette = "";
-      teleinfo_message.arr_last[index].str_donnee    = "";
-      teleinfo_message.arr_last[index].checksum      = 0;
+      teleinfo_message.arr_last[index].str_etiquette[0] = 0;
+      teleinfo_message.arr_last[index].str_donnee[0] = 0;
+      teleinfo_message.arr_last[index].checksum = 0;
     }
 
     // init next message data
-    teleinfo_message.arr_line[index].str_etiquette = "";
-    teleinfo_message.arr_line[index].str_donnee    = "";
-    teleinfo_message.arr_line[index].checksum      = 0;
+    teleinfo_message.arr_line[index].str_etiquette[0] = 0;
+    teleinfo_message.arr_line[index].str_donnee[0] = 0;
+    teleinfo_message.arr_line[index].checksum = 0;
   }
 
   // save number of lines and reset index
-  teleinfo_message.line_last  = teleinfo_message.line_index;
-  teleinfo_message.line_max   = max (teleinfo_message.line_last, teleinfo_message.line_max);
-  teleinfo_message.line_index = 0;
-  memset (teleinfo_message.str_line, 0, TELEINFO_LINE_MAX);
+  teleinfo_message.line_last   = teleinfo_message.line_idx;
+  teleinfo_message.line_max    = max (teleinfo_message.line_last, teleinfo_message.line_max);
+  teleinfo_message.line_idx    = 0;
+  teleinfo_message.str_line[0] = 0;
   
   // if needed, calculate max contract power from max phase current
-  if ((teleinfo_contract.ssousc == 0) && (teleinfo_contract.isousc != 0)) teleinfo_contract.ssousc = teleinfo_contract.isousc * TELEINFO_VOLTAGE_REF;
+  if ((teleinfo_contract.ssousc == 0) && (teleinfo_contract.isousc != 0)) teleinfo_contract.ssousc = teleinfo_contract.isousc * TIC_VOLTAGE_REF;
 
   // ----------------------
   // counter global indexes
 
   // if needed, adjust number of phases
   if (Energy->phase_count < teleinfo_contract.phase) Energy->phase_count = teleinfo_contract.phase;
-
-  // calculate total current
-  total_current = 0;
-  for (phase = 0; phase < teleinfo_contract.phase; phase++) total_current += teleinfo_conso.phase[phase].current;
 
   // update total conso energy counter
   TeleinfoUpdateConsoGlobalCounter ();
@@ -1847,252 +2304,19 @@ void TeleinfoReceptionMessageStop ()
     // ------------------------------------------------------------------------------------------------
     case TIC_MODE_HISTORIC:
     case TIC_MODE_STANDARD:
-
-      // check if sinsts per phase should be used (+/- 5VA difference with PAPP)
-      if ((teleinfo_meter.use_sinsts == 0) && (teleinfo_contract.mode == TIC_MODE_STANDARD) && (teleinfo_conso.papp > 5))
-      {
-        sinsts = 0;
-        for (phase = 0; phase < teleinfo_contract.phase; phase++) sinsts += teleinfo_conso.phase[phase].sinsts;
-        if ((sinsts > teleinfo_conso.papp - 5) && (sinsts < teleinfo_conso.papp + 5)) teleinfo_meter.use_sinsts = 1;
-      }  
-
-      // loop thru phase to update apparent power
-      for (phase = 0; phase < teleinfo_contract.phase; phase++)
-      {
-        // set apparent power
-        if (teleinfo_meter.use_sinsts == 1) teleinfo_conso.phase[phase].papp = teleinfo_conso.phase[phase].sinsts;
-        else if (total_current > 0) teleinfo_conso.phase[phase].papp = teleinfo_conso.papp * teleinfo_conso.phase[phase].current / total_current;
-        else if (teleinfo_contract.phase > 0) teleinfo_conso.phase[phase].papp = teleinfo_conso.papp / teleinfo_contract.phase;
-
-        // update mvah increment
-        teleinfo_conso.delta_mvah += teleinfo_conso.phase[phase].papp * teleinfo_message.duration / 36;
-      }
-
-      // if active power has increased
-      if (teleinfo_conso.delta_mvah > 0)
-      {
-        // if global counter increased, calculate new cosphi
-        if (teleinfo_conso.delta_mwh > 0)
-        {
-          cosphi = 1000 * 100 * teleinfo_conso.delta_mwh / teleinfo_conso.delta_mvah;
-          TeleinfoUpdateCosphi (cosphi, teleinfo_conso.cosphi, teleinfo_conso.papp);
-        }
-
-        // else try to forecast cosphi evolution in case of very low power
-        else
-        {
-          cosphi = 1000 * 100 * 1000 / teleinfo_conso.delta_mvah;
-          if (cosphi < 50) cosphi = 0;
-          if (cosphi < teleinfo_conso.cosphi.value) TeleinfoUpdateCosphi (cosphi, teleinfo_conso.cosphi, teleinfo_conso.papp);
-        }
-      }
-
-      // loop thru phase to update cosphi and calculate active power
-      for (phase = 0; phase < teleinfo_contract.phase; phase++)
-      {
-        teleinfo_conso.phase[phase].cosphi = teleinfo_conso.cosphi.value;
-        teleinfo_conso.phase[phase].pact   = teleinfo_conso.phase[phase].papp * teleinfo_conso.phase[phase].cosphi / 1000;
-      }
-
-      // if global counter increased, reset apparent power sum, active power delta and increase cosphi counter
-      if (teleinfo_conso.delta_mwh > 0)
-      {
-        teleinfo_conso.delta_mwh  = 0;
-        teleinfo_conso.delta_mvah = 0;
-      }
+      TeleinfoConsoCalculateActivePower_VA_Wh ();
     break;
 
     // PME/PMI : use apparent power and active power increments, timestamp from published time
     // ---------------------------------------------------------------------------------------
     case TIC_MODE_PMEPMI:
-
-      // if current stamp is valid
-      if (teleinfo_conso.last_stamp != LONG_MAX)
-      {
-        // init timestamp
-        if (teleinfo_conso.papp_stamp == LONG_MAX) teleinfo_conso.papp_stamp = teleinfo_conso.last_stamp;
-        if (teleinfo_conso.pact_stamp == LONG_MAX) teleinfo_conso.pact_stamp = teleinfo_conso.last_stamp;
-
-        // apparent power increment management
-        if (teleinfo_conso.papp_now != LONG_MAX)
-        {
-          // init apparent power increment reference
-          if (teleinfo_conso.papp_prev == LONG_MAX) teleinfo_conso.papp_prev = teleinfo_conso.papp_now;
-
-          // else detect apparent power rollback
-          if (teleinfo_conso.papp_now < teleinfo_conso.papp_prev)
-          {
-            teleinfo_conso.papp_prev  = LONG_MAX;
-            teleinfo_conso.papp_stamp = LONG_MAX;
-            AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Counter rollback [VAh], start from %d"), teleinfo_conso.papp_now);
-          }
-        }
-
-        // active power increment management
-        if (teleinfo_conso.pact_now != LONG_MAX)
-        {
-          // init active power increment
-          if (teleinfo_conso.pact_prev == LONG_MAX) teleinfo_conso.pact_prev = teleinfo_conso.pact_now;
-
-          // detect active power rollback
-          if (teleinfo_conso.pact_now < teleinfo_conso.pact_prev)
-          {
-            teleinfo_conso.pact_prev  = LONG_MAX;
-            teleinfo_conso.pact_stamp = LONG_MAX;
-            AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Counter rollback [Wh], start from %d"), teleinfo_conso.pact_now);
-          }
-        }
-
-        // if more than 2 sec. difference, calculate new apparent power 
-        if (teleinfo_conso.papp_stamp != LONG_MAX)
-        {
-          delay = TeleinfoTimestampDelay (teleinfo_conso.papp_stamp, teleinfo_conso.last_stamp);
-          increment = teleinfo_conso.papp_now - teleinfo_conso.papp_prev;
-          if ((delay > 2) && (increment > 2))
-          {
-            // calculate new apparent power
-            teleinfo_conso.phase[0].papp = increment * 3600 / delay;
-
-            // reset calculation data
-            teleinfo_conso.papp_prev  = teleinfo_conso.papp_now;
-            teleinfo_conso.papp_stamp = teleinfo_conso.last_stamp;
-          }
-        }
-
-        // if more than 2 sec. difference, calculate new active power 
-        if (teleinfo_conso.pact_stamp != LONG_MAX)
-        {
-          delay = TeleinfoTimestampDelay (teleinfo_conso.pact_stamp, teleinfo_conso.last_stamp);
-          increment = teleinfo_conso.pact_now - teleinfo_conso.pact_prev;
-          if ((delay > 2) && (increment > 2))
-          {
-            // calculate new active power
-            teleinfo_conso.phase[0].pact = increment * 3600 / delay;
-
-            // reset calculation data
-            teleinfo_conso.pact_prev  = teleinfo_conso.pact_now;
-            teleinfo_conso.pact_stamp = teleinfo_conso.last_stamp;
-          }
-        }
-
-        // if possible, calculate new cosphi
-        if (teleinfo_conso.phase[0].papp > 0)
-        {
-          // calculate new cosphi
-          cosphi = 1000 * teleinfo_conso.phase[0].pact / teleinfo_conso.phase[0].papp;
-          if (cosphi > 1000) cosphi = 1000;
-          teleinfo_conso.cosphi.value = (teleinfo_conso.cosphi.value + cosphi) / 2;
-
-          // increase counter
-          teleinfo_conso.cosphi.nb_measure++;
-        }
-      }
-
-      // loop thru phase to update cosphi
-      for (phase = 0; phase < teleinfo_contract.phase; phase++) teleinfo_conso.phase[phase].cosphi = teleinfo_conso.cosphi.value;
-
-
-      // reset last time stamp
-      teleinfo_conso.last_stamp = LONG_MAX;
+      TeleinfoConsoCalculateApparentandActivePower_VAh_Wh ();
       break;
 
     // Emeraude : use active power and reactive power increments, timestamp from published time
     // ----------------------------------------------------------------------------------------
     case TIC_MODE_EMERAUDE:
-
-      // if current stamp is valid
-      if (teleinfo_conso.last_stamp != LONG_MAX)
-      {
-        // init timestamp
-        if (teleinfo_conso.pact_stamp   == LONG_MAX) teleinfo_conso.pact_stamp   = teleinfo_conso.last_stamp;
-        if (teleinfo_conso.preact_stamp == LONG_MAX) teleinfo_conso.preact_stamp = teleinfo_conso.last_stamp;
-
-        // active power increment management
-        if (teleinfo_conso.pact_now != LONG_MAX)
-        {
-          // init active power increment
-          if (teleinfo_conso.pact_prev == LONG_MAX) teleinfo_conso.pact_prev = teleinfo_conso.pact_now;
-
-          // detect active power rollback
-          if (teleinfo_conso.pact_now < teleinfo_conso.pact_prev)
-          {
-            teleinfo_conso.pact_prev  = LONG_MAX;
-            teleinfo_conso.pact_stamp = LONG_MAX;
-            AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Counter rollback [Wh], start from %d"), teleinfo_conso.pact_now);
-          }
-        }
-
-        // reactive power increment management
-        if (teleinfo_conso.preact_now != LONG_MAX)
-        {
-          // init active power increment
-          if (teleinfo_conso.preact_prev == LONG_MAX) teleinfo_conso.preact_prev = teleinfo_conso.preact_now;
-
-          // detect active power rollback
-          if (teleinfo_conso.preact_now < teleinfo_conso.preact_prev)
-          {
-            teleinfo_conso.preact_prev  = LONG_MAX;
-            teleinfo_conso.preact_stamp = LONG_MAX;
-            AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Counter rollback [varh], start from %d"), teleinfo_conso.preact_now);
-          }
-        }
-
-        // if more than 2 sec. difference, calculate new active power 
-        if (teleinfo_conso.pact_stamp != LONG_MAX)
-        {
-          delay = TeleinfoTimestampDelay (teleinfo_conso.pact_stamp, teleinfo_conso.last_stamp);
-          increment = teleinfo_conso.pact_now - teleinfo_conso.pact_prev;
-          if ((delay > 5) && (increment > 2))
-          {
-            // calculate new active power
-            teleinfo_conso.phase[0].pact = increment * 3600 / delay;
-
-            // reset calculation data
-            teleinfo_conso.pact_prev  = teleinfo_conso.pact_now;
-            teleinfo_conso.pact_stamp = teleinfo_conso.last_stamp;
-          }
-        }
-
-        // if more than 5 sec. and 2varh difference, calculate new reactive power 
-        if (teleinfo_conso.preact_stamp != LONG_MAX)
-        {
-          delay = TeleinfoTimestampDelay (teleinfo_conso.preact_stamp, teleinfo_conso.last_stamp);
-          increment = teleinfo_conso.preact_now - teleinfo_conso.preact_prev;
-          if ((delay > 5) && (increment > 2))
-          {
-            // calculate new active power
-            teleinfo_conso.phase[0].preact = increment * 3600 / delay;
-
-            // calculate apparent power
-            llpact   = (long long)teleinfo_conso.phase[0].pact;
-            llpreact = (long long)teleinfo_conso.phase[0].preact;
-            llpapp   = llsqrt (llpact * llpact + llpreact * llpreact);
-            teleinfo_conso.phase[0].papp = (long)llpapp;
-
-            // reset calculation data
-            teleinfo_conso.preact_prev  = teleinfo_conso.preact_now;
-            teleinfo_conso.preact_stamp = teleinfo_conso.last_stamp;
-          }
-        }
-
-        // if possible, calculate new cosphi
-        if (teleinfo_conso.phase[0].papp > 0)
-        {
-          // calculate new cosphi
-          cosphi = 1000 * teleinfo_conso.phase[0].pact / teleinfo_conso.phase[0].papp;
-          if (cosphi > 1000) cosphi = 1000;
-          teleinfo_conso.cosphi.value = (teleinfo_conso.cosphi.value + cosphi) / 2;
-
-          // update counter
-          teleinfo_conso.cosphi.nb_measure++;
-        }
-
-        // loop thru phase to update cosphi
-        for (phase = 0; phase < teleinfo_contract.phase; phase++) teleinfo_conso.phase[phase].cosphi = teleinfo_conso.cosphi.value;
-      }
-
-      // reset last time stamp
-      teleinfo_conso.last_stamp = LONG_MAX;
+      TeleinfoConsoCalculateApparentandActivePower_VAh_Varh ();
       break;
   }
 
@@ -2100,80 +2324,53 @@ void TeleinfoReceptionMessageStop ()
   //    calculate production active power 
   // ---------------------------------------
 
-  if (teleinfo_prod.total_wh > 0)
-  {
-    // add apparent power increment according to message time window
-    teleinfo_prod.delta_mvah += teleinfo_prod.papp * teleinfo_message.duration / 36;
-
-    // if active power has increased 
-    if (teleinfo_prod.delta_mvah > 0)
-    {
-      // if global counter increased, calculate new cosphi
-      if (teleinfo_prod.delta_mwh > 0)
-      {
-        cosphi = 1000 * 100 * teleinfo_prod.delta_mwh / teleinfo_prod.delta_mvah;
-        TeleinfoUpdateCosphi (cosphi, teleinfo_prod.cosphi, teleinfo_prod.papp);
-      }
-
-      // else try to forecast cosphi drop in case of very low active power production (photovoltaic router ...)
-      else
-      {
-        cosphi = 1000 * 100 * 1000 / teleinfo_prod.delta_mvah;
-        if (cosphi < 50) cosphi = 0;
-        if (cosphi < teleinfo_prod.cosphi.value) TeleinfoUpdateCosphi (cosphi, teleinfo_prod.cosphi, teleinfo_prod.papp);
-      }
-    }
-
-    // calculate production active power
-    teleinfo_prod.pact = teleinfo_prod.papp * teleinfo_prod.cosphi.value / 1000;
-
-    // if global counter increased, reset apparent power sum, active power delta and increase cosphi counter
-    if (teleinfo_prod.delta_mwh > 0)
-    {
-      teleinfo_prod.delta_mwh  = 0;
-      teleinfo_prod.delta_mvah = 0;
-    }
-  }
+  if (teleinfo_prod.total_wh > 0) TeleinfoProdCalculateActivePower_VA_Wh ();
   
   // -----------------------------
   //    update publication flags
   // -----------------------------
 
-  percentage = false;
   if (TeleinfoDriverMeterReady ())
   {
     // loop thru phases to detect overload
     for (phase = 0; phase < teleinfo_contract.phase; phase++)
-      if (teleinfo_conso.phase[phase].papp > teleinfo_contract.ssousc * (long)teleinfo_config.percent / 100) teleinfo_meter.json.alert = 1;
-
-    // loop thru phase to detect % power change (should be > to handle 0 conso)
-    for (phase = 0; phase < teleinfo_contract.phase; phase++) 
-      if (abs (teleinfo_conso.phase[phase].papp_last - teleinfo_conso.phase[phase].papp) > (teleinfo_contract.ssousc * TELEINFO_PERCENT_CHANGE / 100)) percentage = true;
-
-    // detect % power change on production (should be > to handle 0 prod)
-    if (abs (teleinfo_prod.papp_last - teleinfo_prod.papp) > (teleinfo_contract.ssousc * TELEINFO_PERCENT_CHANGE / 100)) percentage = true;
+      if (teleinfo_conso.phase[phase].papp > teleinfo_contract.ssousc * (long)teleinfo_config.percent / 100) teleinfo_meter.json.data = 1;
 
     // if publication every new message
-    if (teleinfo_config.policy == TELEINFO_POLICY_MESSAGE)
+    if (teleinfo_config.policy == TIC_POLICY_MESSAGE)
     {
       // set publication flags
-      if (teleinfo_config.meter) teleinfo_meter.json.meter = 1;
+      if (teleinfo_config.meter || teleinfo_config.calendar || teleinfo_config.relay) teleinfo_meter.json.data = 1;
       if (teleinfo_config.tic) teleinfo_meter.json.tic = 1;
     }
 
     // else if % power change detected
-    else if (percentage && (teleinfo_config.policy == TELEINFO_POLICY_PERCENT))
+    else if ((teleinfo_config.policy == TIC_POLICY_DELTA) && (Settings->energy_power_delta[0] > 0))
     {
-      // update phases reference
-      for (phase = 0; phase < teleinfo_contract.phase; phase++) teleinfo_conso.phase[phase].papp_last = teleinfo_conso.phase[phase].papp;
-      teleinfo_prod.papp_last = teleinfo_prod.papp;
+      // get delta power for dynamic publication
+      value = (long)Settings->energy_power_delta[0];
 
-      // if deepsleep not enabled, set publication flags
-      if (Settings->deepsleep == 0)
+      // loop thru phase to detect % power change (should be > to handle 0 conso)
+      for (phase = 0; phase < teleinfo_contract.phase; phase++) 
+        if (abs (teleinfo_conso.phase[phase].papp_last - teleinfo_conso.phase[phase].papp) >= value) delta_va = true;
+
+      // detect % power change on production (should be > to handle 0 prod)
+      if (abs (teleinfo_prod.papp_last - teleinfo_prod.papp) >= value) delta_va = true;
+
+      // if energy has changed more than the trigger, publish
+      if (delta_va)
       {
-        if (teleinfo_config.meter) teleinfo_meter.json.meter = 1;
-        if (teleinfo_config.tic) teleinfo_meter.json.tic = 1;
-      } 
+        // update phases reference
+        for (phase = 0; phase < teleinfo_contract.phase; phase++) teleinfo_conso.phase[phase].papp_last = teleinfo_conso.phase[phase].papp;
+        teleinfo_prod.papp_last = teleinfo_prod.papp;
+
+        // if deepsleep not enabled, set publication flags
+        if (Settings->deepsleep == 0)
+        {
+          if (teleinfo_config.meter || teleinfo_config.calendar || teleinfo_config.relay) teleinfo_meter.json.data = 1;
+          if (teleinfo_config.tic) teleinfo_meter.json.tic = 1;
+        } 
+      }
     }
   }
 
@@ -2193,12 +2390,22 @@ void TeleinfoReceptionMessageStop ()
       else teleinfo_conso.phase[phase].current = 0;
 
     // set voltage, current, apparent, active and reactive power
-    Energy->voltage[phase] = (float)teleinfo_conso.phase[phase].voltage;
-    Energy->current[phase] = (float)teleinfo_conso.phase[phase].current / 1000;
-    Energy->apparent_power[phase] = (float)teleinfo_conso.phase[phase].papp;
-    Energy->active_power[phase]   = (float)teleinfo_conso.phase[phase].pact;
-    if (teleinfo_conso.phase[phase].preact != 0) Energy->reactive_power[phase] = (float)teleinfo_conso.phase[phase].preact;
+    Energy->voltage[phase]          = (float)teleinfo_conso.phase[phase].voltage;
+    Energy->current[phase]          = (float)teleinfo_conso.phase[phase].current / 1000;
+    Energy->apparent_power[phase]   = (float)teleinfo_conso.phase[phase].papp;
+    Energy->active_power[phase]     = (float)teleinfo_conso.phase[phase].pact;
+    if (teleinfo_conso.phase[phase].preact != 0)
+      Energy->reactive_power[phase] = (float)teleinfo_conso.phase[phase].preact;
   }
+
+  // -------------------
+  //  update LED state
+
+#ifdef USE_LIGHT
+  // set last LED timestamp and status
+  if (teleinfo_message.error == 0) TeleinfoLedSetStatus (TIC_LED_STEP_OK);
+    else TeleinfoLedSetStatus (TIC_LED_STEP_ERR);
+#endif    // USE_LIGHT
 }
 
 void TeleinfoReceptionLineStart ()
@@ -2207,19 +2414,19 @@ void TeleinfoReceptionLineStart ()
   teleinfo_meter.reception = TIC_RECEPTION_LINE;
 
   // reset line content
-  memset (teleinfo_message.str_line, 0, TELEINFO_LINE_MAX);
+  teleinfo_message.str_line[0] = 0;
 }
 
 void TeleinfoReceptionLineStop ()
 {
-  uint8_t relay;
-  int     index;
+  uint8_t phase, relay;
+  int     index = -1;
   long    value;
   char    checksum;
   char*   pstr_match;
-  char    str_etiquette[TELEINFO_KEY_MAX];
-  char    str_donnee[TELEINFO_DATA_MAX];
-  char    str_text[TELEINFO_DATA_MAX];
+  char    str_etiquette[TIC_KEY_MAX];
+  char    str_donnee[TIC_DATA_MAX];
+  char    str_text[TIC_DATA_MAX];
 
   // set next stage
   teleinfo_meter.reception = TIC_RECEPTION_MESSAGE;
@@ -2231,97 +2438,126 @@ void TeleinfoReceptionLineStop ()
   checksum = TeleinfoCalculateChecksum (teleinfo_message.str_line, str_etiquette, sizeof (str_etiquette), str_donnee, sizeof (str_donnee));
   if (checksum != 0)
   {
-    // get etiquette type
-    index = GetCommandCode (str_text, sizeof (str_text), str_etiquette, kTeleinfoEtiquetteName);
+    // select etiquette list according to contract
+    if (teleinfo_contract.mode < TIC_MODE_MAX)
+    {
+      index = GetCommandCode (str_text, sizeof (str_text), str_etiquette, arr_kTicEtiquette[teleinfo_contract.mode]);
+      if (index != -1) index += arrTicEtiquetteDelta[teleinfo_contract.mode];
+      AddLog (LOG_LEVEL_DEBUG, PSTR ("TIC: %s = %d"), str_etiquette, index);
+    }
 
     // update data according to etiquette
     switch (index)
     {
       //   Reference
-      // -------------
+      // ------------- 
       
-      case TIC_ADCO:
-        if (teleinfo_contract.mode != TIC_MODE_HISTORIC) AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Meter Historique"));
-        if (teleinfo_contract.unit != TIC_UNIT_KVA) AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Contract in kVA"));
-        teleinfo_contract.mode = TIC_MODE_HISTORIC;
-        teleinfo_contract.unit = TIC_UNIT_KVA;
-        if (teleinfo_contract.ident == 0) teleinfo_contract.ident = atoll (str_donnee);
+      // identifiant compteur mode historique
+      case TIC_UKN_ADCO:
+        teleinfo_contract.mode  = TIC_MODE_HISTORIC;
+        AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Mode %s"), GetTextIndexed (str_text, sizeof (str_text), TIC_MODE_HISTORIC, kTeleinfoModeName));
+        teleinfo_contract.ident = atoll (str_donnee);
+        AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Contrat n° %s"), str_donnee);
+        break;
+      // identifiant compteur mode standard
+      case TIC_UKN_ADSC:
+        teleinfo_contract.mode  = TIC_MODE_STANDARD;
+        AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Mode %s"), GetTextIndexed (str_text, sizeof (str_text), TIC_MODE_STANDARD, kTeleinfoModeName));
+        teleinfo_contract.ident = atoll (str_donnee);
+        AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Contrat n° %s"), str_donnee);
         break;
 
-      case TIC_ADSC:
-        if (teleinfo_contract.mode != TIC_MODE_STANDARD) AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Meter Standard"));
-        if (teleinfo_contract.unit != TIC_UNIT_KVA) AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Contract in kVA"));
-        teleinfo_contract.mode = TIC_MODE_STANDARD;
-        teleinfo_contract.unit = TIC_UNIT_KVA;
-        if (teleinfo_contract.ident == 0) teleinfo_contract.ident = atoll (str_donnee);
+      // identifiant compteur PME/PMI
+      case TIC_UKN_ADS:
+        teleinfo_contract.mode  = TIC_MODE_PMEPMI;
+        AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Mode %s"), GetTextIndexed (str_text, sizeof (str_text), TIC_MODE_PMEPMI, kTeleinfoModeName));
+        teleinfo_contract.ident = atoll (str_donnee);
+        AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Contrat n° %s"), str_donnee);
         break;
 
-      case TIC_ADS:
-        if (teleinfo_contract.ident == 0) teleinfo_contract.ident = atoll (str_donnee);
+      // contract compteur Emeraude
+      case TIC_UKN_CONTRAT:
+        teleinfo_contract.mode = TIC_MODE_EMERAUDE;
+        AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Meter %s"), GetTextIndexed (str_text, sizeof (str_text), TIC_MODE_EMERAUDE, kTeleinfoModeName));
+        strlcpy (teleinfo_message.str_contract, str_donnee, sizeof (teleinfo_message.str_contract));
         break;
 
-      case TIC_CONFIG:
-        if (teleinfo_contract.mode != TIC_MODE_PMEPMI) AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Meter PME/PMI"));
-        if (teleinfo_contract.unit != TIC_UNIT_KW) AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Contract in kW"));
-        teleinfo_contract.mode = TIC_MODE_PMEPMI;
-        teleinfo_contract.unit = TIC_UNIT_KW;
+      // contract compteur Jaune
+      case TIC_UKN_JAUNE:
+        teleinfo_contract.mode = TIC_MODE_JAUNE;
+        AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Meter %s"), GetTextIndexed (str_text, sizeof (str_text), TIC_MODE_JAUNE, kTeleinfoModeName));
         break;
 
       //   Timestamp
       // -------------
       
-      case TIC_DATE:
-      case TIC_DATECOUR:
+      case TIC_STD_DATE:
+      case TIC_PME_DATE:
+      case TIC_EME_DATECOUR:
         teleinfo_conso.last_stamp = TeleinfoTimestampCalculate (str_donnee);
         break;
 
-      //   Contract
-      // ------------
-      
-      case TIC_OPTARIF:
-      case TIC_NGTF:
-      case TIC_MESURES1:
-        TeleinfoContractUpdate (str_donnee);
+      //   Identifiant compteur
+      // -----------------------
+      case TIC_HIS_ADCO:
+      case TIC_STD_ADSC:
+      case TIC_PME_ADS:
+        // if not set, set meter identifier
+        if (teleinfo_contract.ident == 0) teleinfo_contract.ident = atoll (str_donnee);
         break;
 
-      case TIC_CONTRAT:
-        if (teleinfo_contract.mode != TIC_MODE_EMERAUDE) AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Meter Emeraude"));
-        if (teleinfo_contract.unit != TIC_UNIT_KW) AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Contract in kW"));
-        teleinfo_contract.mode = TIC_MODE_EMERAUDE;
-        teleinfo_contract.unit = TIC_UNIT_KW;
-        TeleinfoContractUpdate (str_donnee);
+      //   Contract period
+      // -------------------
+
+      case TIC_HIS_OPTARIF:
+        // handle specificity of Historique Tempo where last char is dynamic (BBRx)
+        strlcpy (teleinfo_message.str_contract, str_donnee, 4);
+        if (strcmp_P (teleinfo_message.str_contract, PSTR ("BBR")) != 0) strlcpy (teleinfo_message.str_contract, str_donnee, sizeof (teleinfo_message.str_contract));
+        break;
+
+      case TIC_STD_NGTF:
+      case TIC_PME_MESURES1:
+      case TIC_EME_CONTRAT:
+        strlcpy (teleinfo_message.str_contract, str_donnee, sizeof (teleinfo_message.str_contract));
         break;
 
       //   Period
       // -----------
 
+      // switching to production data
+      case TIC_EME_APPLI:
+        teleinfo_message.injection = 1;
+        break;
+
       // period name
-      case TIC_PTEC:
-      case TIC_LTARF:
-      case TIC_PTCOUR:
-      case TIC_PTCOUR1:
-        TeleinfoPeriodUpdate (str_donnee);
+      case TIC_HIS_PTEC:
+      case TIC_STD_LTARF:
+      case TIC_PME_PTCOUR1:
+      case TIC_EME_PTCOUR:
+        strlcpy (teleinfo_message.str_period, str_donnee, sizeof (teleinfo_message.str_period));
+        break;
+
+      // period index
+      case TIC_STD_NTARF:
+        teleinfo_message.period = (uint8_t)(atoi (str_donnee) - 1);
         break;
 
       //   Current
       // -----------
 
-      case TIC_IINST:
-      case TIC_IRMS1:
-      case TIC_IINST1:
-      case TIC_I1:
+      case TIC_HIS_IINST:
+      case TIC_HIS_IINST1:
+      case TIC_STD_IRMS1:
         TeleinfoCurrentUpdate (str_donnee, 0);
         break;
 
-      case TIC_IRMS2:
-      case TIC_IINST2:
-      case TIC_I2:
+      case TIC_HIS_IINST2:
+      case TIC_STD_IRMS2:
         TeleinfoCurrentUpdate (str_donnee, 1);
         break;
 
-      case TIC_IRMS3:
-      case TIC_IINST3:
-      case TIC_I3:
+      case TIC_HIS_IINST3:
+      case TIC_STD_IRMS3:
         TeleinfoCurrentUpdate (str_donnee, 2);
         teleinfo_contract.phase = 3; 
         break;
@@ -2330,30 +2566,30 @@ void TeleinfoReceptionLineStop ()
       // ---------
 
       // instant apparent power, 
-      case TIC_PAPP:
-      case TIC_SINSTS:
+      case TIC_HIS_PAPP:
+      case TIC_STD_SINSTS:
         TeleinfoConsoApparentPowerUpdate (str_donnee);
         break;
 
-      case TIC_SINSTS1:
+      case TIC_STD_SINSTS1:
         TeleinfoConsoApparentPowerUpdate (str_donnee, 0);
         break;
 
-      case TIC_SINSTS2:
+      case TIC_STD_SINSTS2:
         TeleinfoConsoApparentPowerUpdate (str_donnee, 1);
         break;
 
-      case TIC_SINSTS3:
+      case TIC_STD_SINSTS3:
         TeleinfoConsoApparentPowerUpdate (str_donnee, 2);
         break;
 
       // if in prod mode, instant apparent power, 
-      case TIC_SINSTI:
+      case TIC_STD_SINSTI:
         TeleinfoProdApparentPowerUpdate (str_donnee);
         break;
 
       // apparent power counter since last period
-      case TIC_EAPPS:
+      case TIC_PME_EAPPS:
         strcpy (str_text, str_donnee);
         pstr_match = strchr (str_text, 'V');
         if (pstr_match != nullptr) *pstr_match = 0;
@@ -2361,8 +2597,8 @@ void TeleinfoReceptionLineStop ()
         break;
 
       // active power counter since last period
-      case TIC_EAS:
-      case TIC_EA:
+      case TIC_PME_EAS:
+      case TIC_EME_EA:
         strcpy (str_text, str_donnee);
         pstr_match = strchr (str_text, 'W');
         if (pstr_match != nullptr) *pstr_match = 0;
@@ -2370,7 +2606,7 @@ void TeleinfoReceptionLineStop ()
         break;
 
       // reactive power counter since last period
-      case TIC_ERP:
+      case TIC_EME_ERP:
         strcpy (str_text, str_donnee);
         pstr_match = strchr (str_text, 'v');
         if (pstr_match != nullptr) *pstr_match = 0;
@@ -2381,196 +2617,199 @@ void TeleinfoReceptionLineStop ()
       // -----------
 
       // RMS voltage
-      case TIC_URMS1:
+      case TIC_STD_URMS1:
         TeleinfoVoltageUpdate (str_donnee, 0, true);
         break;
 
-      case TIC_URMS2:
+      case TIC_STD_URMS2:
         TeleinfoVoltageUpdate (str_donnee, 1, true);
         break;
 
-      case TIC_URMS3:
+      case TIC_STD_URMS3:
         TeleinfoVoltageUpdate (str_donnee, 2, true);
         teleinfo_contract.phase = 3; 
         break;
 
       // average voltage
-      case TIC_U10MN:         // for the last 10 mn
-      case TIC_UMOY1:
+      case TIC_STD_UMOY1:
         TeleinfoVoltageUpdate (str_donnee, 0, false);
         break;
 
-      case TIC_UMOY2:
+      case TIC_STD_UMOY2:
         TeleinfoVoltageUpdate (str_donnee, 1, false);
         break;
 
-      case TIC_UMOY3:
+      case TIC_STD_UMOY3:
         TeleinfoVoltageUpdate (str_donnee, 2, false);
         teleinfo_contract.phase = 3; 
+        break;
+
+      case TIC_EME_U10MN:         // for the last 10 mn
+        for (phase = 0; phase < teleinfo_contract.phase; phase ++) TeleinfoVoltageUpdate (str_donnee, phase, false);
         break;
 
       //   Contract max values
       // -----------------------
 
       // Maximum Current
-      case TIC_ISOUSC:
+      case TIC_HIS_ISOUSC:
         value = atol (str_donnee);
         if ((value > 0) && (teleinfo_contract.isousc != value))
         {
           teleinfo_contract.isousc = value;
-          teleinfo_contract.ssousc = teleinfo_contract.isousc * TELEINFO_VOLTAGE_REF;
+          teleinfo_contract.ssousc = teleinfo_contract.isousc * TIC_VOLTAGE_REF;
         }
         break;
 
       // Contract maximum Power
-      case TIC_PREF:
-      case TIC_PCOUP:
-      case TIC_PS:
-        TeleinfoContractPowerUpdate (str_donnee, true);
+      case TIC_STD_PREF:
+      case TIC_STD_PCOUP:
+      case TIC_PME_PS:
+        TeleinfoContractPowerUpdate (str_donnee);
         break;
 
-      case TIC_PSP:
-        if (teleinfo_contract.period == 0) TeleinfoContractPowerUpdate (str_donnee, true);
+      case TIC_EME_PSP:
+        if (teleinfo_contract.period_idx == 0) TeleinfoContractPowerUpdate (str_donnee);
         break;
 
-      case TIC_PSPM:
-        if (teleinfo_contract.period == 1) TeleinfoContractPowerUpdate (str_donnee, true);
+      case TIC_EME_PSPM:
+        if (teleinfo_contract.period_idx == 1) TeleinfoContractPowerUpdate (str_donnee);
         break;
 
-      case TIC_PSHPH:
-        if (teleinfo_contract.period == 2) TeleinfoContractPowerUpdate (str_donnee, true);
+      case TIC_EME_PSHPH:
+        if (teleinfo_contract.period_idx == 2) TeleinfoContractPowerUpdate (str_donnee);
         break;
 
-      case TIC_PSHPD:
-        if (teleinfo_contract.period == 3) TeleinfoContractPowerUpdate (str_donnee, true);
+      case TIC_EME_PSHPD:
+        if (teleinfo_contract.period_idx == 3) TeleinfoContractPowerUpdate (str_donnee);
         break;
 
-      case TIC_PSHCH:
-        if (teleinfo_contract.period == 4) TeleinfoContractPowerUpdate (str_donnee, true);
+      case TIC_EME_PSHCH:
+        if (teleinfo_contract.period_idx == 4) TeleinfoContractPowerUpdate (str_donnee);
         break;
 
-      case TIC_PSHCD:
-        if (teleinfo_contract.period == 5) TeleinfoContractPowerUpdate (str_donnee, true);
+      case TIC_EME_PSHCD:
+        if (teleinfo_contract.period_idx == 5) TeleinfoContractPowerUpdate (str_donnee);
         break;
 
-      case TIC_PSHPE:
-        if (teleinfo_contract.period == 6) TeleinfoContractPowerUpdate (str_donnee, true);
+      case TIC_EME_PSHPE:
+        if (teleinfo_contract.period_idx == 6) TeleinfoContractPowerUpdate (str_donnee);
         break;
 
-      case TIC_PSHCE:
-        if (teleinfo_contract.period == 7) TeleinfoContractPowerUpdate (str_donnee, true);
+      case TIC_EME_PSHCE:
+        if (teleinfo_contract.period_idx == 7) TeleinfoContractPowerUpdate (str_donnee);
         break;
 
-      case TIC_PSJA:
-        if (teleinfo_contract.period == 8) TeleinfoContractPowerUpdate (str_donnee, true);
+      case TIC_EME_PSJA:
+        if (teleinfo_contract.period_idx == 8) TeleinfoContractPowerUpdate (str_donnee);
         break;
 
-      case TIC_PSHH:
-        if (teleinfo_contract.period == 9) TeleinfoContractPowerUpdate (str_donnee, true);
+      case TIC_EME_PSHH:
+        if (teleinfo_contract.period_idx == 9) TeleinfoContractPowerUpdate (str_donnee);
         break;
 
-      case TIC_PSHD:
-        if (teleinfo_contract.period == 10) TeleinfoContractPowerUpdate (str_donnee, true);
+      case TIC_EME_PSHD:
+        if (teleinfo_contract.period_idx == 10) TeleinfoContractPowerUpdate (str_donnee);
         break;
 
-      case TIC_PSHM:
-        if (teleinfo_contract.period == 11) TeleinfoContractPowerUpdate (str_donnee, true);
+      case TIC_EME_PSHM:
+        if (teleinfo_contract.period_idx == 11) TeleinfoContractPowerUpdate (str_donnee);
         break;
 
-      case TIC_PSDSM:
-        if (teleinfo_contract.period == 12) TeleinfoContractPowerUpdate (str_donnee, true);
+      case TIC_EME_PSDSM:
+        if (teleinfo_contract.period_idx == 12) TeleinfoContractPowerUpdate (str_donnee);
         break;
 
-      case TIC_PSSCM:
-        if (teleinfo_contract.period == 13) TeleinfoContractPowerUpdate (str_donnee, true);
+      case TIC_EME_PSSCM:
+        if (teleinfo_contract.period_idx == 13) TeleinfoContractPowerUpdate (str_donnee);
         break;
 
       //   Counters
       // ------------
 
       // counter according to current period
-      case TIC_EAPS:
-        TeleinfoConsoIndexCounterUpdate (str_donnee, teleinfo_contract.period);
+      case TIC_PME_EAPS:
+        TeleinfoConsoIndexCounterUpdate (str_donnee, teleinfo_contract.period_idx);
         break;
 
-      case TIC_EAIT:
+      case TIC_STD_EAIT:
         TeleinfoProdGlobalCounterUpdate (str_donnee);
         break;
 
-      case TIC_BASE:
-      case TIC_HCHC:
-      case TIC_EJPHN:
-      case TIC_BBRHCJB:
-      case TIC_EAPP:
-      case TIC_EASF01:
+      case TIC_HIS_BASE:
+      case TIC_HIS_HCHC:
+      case TIC_HIS_EJPHN:
+      case TIC_HIS_BBRHCJB:
+      case TIC_STD_EASF01:
+      case TIC_EME_EAPP:
         TeleinfoConsoIndexCounterUpdate (str_donnee, 0);
         break;
 
-      case TIC_HCHP:
-      case TIC_EJPHPM:
-      case TIC_BBRHPJB:
-      case TIC_EAPPM:
-      case TIC_EASF02:
+      case TIC_HIS_HCHP:
+      case TIC_HIS_EJPHPM:
+      case TIC_HIS_BBRHPJB:
+      case TIC_STD_EASF02:
+      case TIC_EME_EAPPM:
         TeleinfoConsoIndexCounterUpdate (str_donnee, 1);
         break;
 
-      case TIC_BBRHCJW:
-      case TIC_EAPHPH:
-      case TIC_EASF03:
+      case TIC_HIS_BBRHCJW:
+      case TIC_STD_EASF03:
+      case TIC_EME_EAPHPH:
         TeleinfoConsoIndexCounterUpdate (str_donnee, 2);
         break;
 
-      case TIC_BBRHPJW:
-      case TIC_EAPHPD:
-      case TIC_EASF04:
+      case TIC_HIS_BBRHPJW:
+      case TIC_STD_EASF04:
+      case TIC_EME_EAPHPD:
         TeleinfoConsoIndexCounterUpdate (str_donnee, 3);
         break;
 
-      case TIC_BBRHCJR:
-      case TIC_EAPHCH:
-      case TIC_EASF05:
+      case TIC_HIS_BBRHCJR:
+      case TIC_STD_EASF05:
+      case TIC_EME_EAPHCH:
         TeleinfoConsoIndexCounterUpdate (str_donnee, 4);
         break;
 
-      case TIC_BBRHPJR:
-      case TIC_EAPHCD:
-      case TIC_EASF06:
+      case TIC_HIS_BBRHPJR:
+      case TIC_STD_EASF06:
+      case TIC_EME_EAPHCD:
         TeleinfoConsoIndexCounterUpdate (str_donnee, 5);
         break;
 
-      case TIC_EAPHPE:
-      case TIC_EASF07:
+      case TIC_STD_EASF07:
+      case TIC_EME_EAPHPE:
         TeleinfoConsoIndexCounterUpdate (str_donnee, 6);
         break;
 
-      case TIC_EAPHCE:
-      case TIC_EASF08:
+      case TIC_STD_EASF08:
+      case TIC_EME_EAPHCE:
         TeleinfoConsoIndexCounterUpdate (str_donnee, 7);
         break;
 
-      case TIC_EAPJA:
-      case TIC_EASF09:
+      case TIC_STD_EASF09:
+      case TIC_EME_EAPJA:
         TeleinfoConsoIndexCounterUpdate (str_donnee, 8);
       break;
 
-      case TIC_EAPHH:
-      case TIC_EASF10:
+      case TIC_STD_EASF10:
+      case TIC_EME_EAPHH:
         TeleinfoConsoIndexCounterUpdate (str_donnee, 9);
         break;
 
-      case TIC_EAPHD:
+      case TIC_EME_EAPHD:
         TeleinfoConsoIndexCounterUpdate (str_donnee, 10);
         break;
 
-      case TIC_EAPHM:
+      case TIC_EME_EAPHM:
         TeleinfoConsoIndexCounterUpdate (str_donnee, 11);
         break;
 
-      case TIC_EAPDSM:
+      case TIC_EME_EAPDSM:
         TeleinfoConsoIndexCounterUpdate (str_donnee, 12);
         break;
 
-      case TIC_EAPSCM:
+      case TIC_EME_EAPSCM:
         TeleinfoConsoIndexCounterUpdate (str_donnee, 13);
         break;
 
@@ -2578,67 +2817,68 @@ void TeleinfoReceptionLineStop ()
       // ---------
 
       // Overload
-      case TIC_ADPS:
+      case TIC_HIS_ADPS:
         TeleinfoSetPreavis (TIC_PREAVIS_DANGER, "DEP");
         break;
 
-      case TIC_ADIR1:
+      case TIC_HIS_ADIR1:
         TeleinfoSetPreavis (TIC_PREAVIS_DANGER, "DEP1");
       break;
 
-      case TIC_ADIR2:
+      case TIC_HIS_ADIR2:
         TeleinfoSetPreavis (TIC_PREAVIS_DANGER, "DEP2");
         break;
 
-      case TIC_ADIR3:
+      case TIC_HIS_ADIR3:
         TeleinfoSetPreavis (TIC_PREAVIS_DANGER, "DEP3");
         break;
 
-      case TIC_PEJP:
+      case TIC_HIS_PEJP:
         TeleinfoSetPreavis (TIC_PREAVIS_ALERT, "EJP");
         break;
 
-      case TIC_PREAVIS:
+      case TIC_PME_PREAVIS:
+      case TIC_EME_PREAVIS:
         TeleinfoSetPreavis (TIC_PREAVIS_ALERT, str_donnee);
         break;
 
       // start of next pointe period
-      case TIC_DPM1:
+      case TIC_STD_DPM1:
         TeleinfoCalendarPointeDeclare (str_donnee);
         break;
         
       // next day standard profile
-      case TIC_PJOURF1:
+      case TIC_STD_PJOURF1:
         TeleinfoCalendarTomorrowProfile (str_donnee);
         break;
         
       // next pointe profile
-      case TIC_PPOINTE:
+      case TIC_STD_PPOINTE:
         TeleinfoCalendarPointeProfile (str_donnee);
         break;
         
       // STGE flags
-      case TIC_STGE:
+      case TIC_STD_STGE:
         TeleinfoAnalyseSTGE (str_donnee);
         break;
 
-      case TIC_RELAIS:
+      case TIC_STD_RELAIS:
         relay = (uint8_t)atoi (str_donnee);
-        if ((relay != teleinfo_meter.relay) && TeleinfoDriverMeterReady ()) teleinfo_meter.json.relay = 1;
+        if ((relay != teleinfo_meter.relay) && TeleinfoDriverMeterReady ()) teleinfo_meter.json.data = 1;
         teleinfo_meter.relay = relay;
         break;
     }
   }
 
   // if maximum number of lines not reached, save new line
-  index = teleinfo_message.line_index;
-  teleinfo_message.arr_line[index].str_etiquette = str_etiquette;
-  teleinfo_message.arr_line[index].str_donnee    = str_donnee;
-  teleinfo_message.arr_line[index].checksum      = checksum;
+  index = teleinfo_message.line_idx;
+  strcpy (teleinfo_message.arr_line[index].str_etiquette, str_etiquette);
+  strcpy (teleinfo_message.arr_line[index].str_donnee, str_donnee);
+  teleinfo_message.arr_line[index].checksum = checksum;
 
   // increment line index and stay on last line if reached
-  teleinfo_message.line_index++;
-  if (teleinfo_message.line_index >= TELEINFO_LINE_QTY) teleinfo_message.line_index = TELEINFO_LINE_QTY - 1;
+  teleinfo_message.line_idx++;
+  if (teleinfo_message.line_idx >= TIC_LINE_QTY) teleinfo_message.line_idx = TIC_LINE_QTY - 1;
 }
 
 // Handling of received teleinfo data
@@ -2648,67 +2888,73 @@ void TeleinfoReceptionLineStop ()
 //   0x0A : Line start
 //   0x0D : Line stop
 //   0x09 : Line separator
-void TeleinfoReceiveData (const uint32_t timeout)
+void TeleinfoReceptionProcess ()
 {
-  uint32_t time_over;
-  char     str_byte[2] = {0, 0};
-  
+  char   character;
+  size_t index, buffer;
+  char   str_character[2];
+  char   str_buffer[1024];
+
   // check serial port
   if (teleinfo_serial == nullptr) return;
 
-  // if reception is not active, drop all data
-  if (teleinfo_meter.serial != TIC_SERIAL_ACTIVE)
-  {
-    teleinfo_serial->flush ();
-    return;
-  }
+  // read pending data
+  buffer = 0;
+  if (teleinfo_serial->available ()) buffer = teleinfo_serial->read (str_buffer, 1024);
 
-  // serial receive loop
-  time_over = millis () + timeout;
-  while (!TimeReached (time_over) && teleinfo_serial->available ()) 
+  // loop thru reception buffer
+  for (index = 0; index < buffer; index++)
   {
     // read character
-    str_byte[0] = (char)teleinfo_serial->read ();
+    character = str_buffer[index];
 
 #ifdef USE_TCPSERVER
     // send character thru TCP stream
-    TCPSend (str_byte[0]); 
+    TCPSend (character); 
 #endif
 
-    // handle reset
-    if (str_byte[0] == 0x04) TeleinfoReceptionMessageReset ();
-
-    // else handle according to reception stage
-    else switch (teleinfo_meter.reception)
+    // handle according to reception stage
+    switch (teleinfo_meter.reception)
     {
       case TIC_RECEPTION_NONE:
+        // reset
+        if (character == 0x04) TeleinfoReceptionMessageReset ();
+
         // message start
-        if (str_byte[0] == 0x02) TeleinfoReceptionMessageStart ();
+        else if (character == 0x02) TeleinfoReceptionMessageStart ();
         break;
 
       case TIC_RECEPTION_MESSAGE:
+        // reset
+        if (character == 0x04) TeleinfoReceptionMessageReset ();
+
         // line start
-        if (str_byte[0] == 0x0A) TeleinfoReceptionLineStart ();
+        else if (character == 0x0A) TeleinfoReceptionLineStart ();
 
         // message stop
-        else if (str_byte[0] == 0x03) TeleinfoReceptionMessageStop ();
+        else if (character == 0x03) TeleinfoReceptionMessageStop ();
         break;
 
       case TIC_RECEPTION_LINE:
+        // reset
+        if (character == 0x04) TeleinfoReceptionMessageReset ();
+
         // line stop
-        if (str_byte[0] == 0x0D) TeleinfoReceptionLineStop ();
+        else if (character == 0x0D) TeleinfoReceptionLineStop ();
 
         // message stop
-        else if (str_byte[0] == 0x03) TeleinfoReceptionMessageStop ();
+        else if (character == 0x03) TeleinfoReceptionMessageStop ();
 
         // append character to line
         else
         {
           // set line separator
-          if ((str_byte[0] == 0x09) && (teleinfo_meter.nb_message == 0)) teleinfo_meter.sep_line = 0x09;
+          if ((teleinfo_meter.nb_message == 0) && (character == 0x09)) teleinfo_meter.sep_line = 0x09;
 
           // append separator to line
-          strlcat (teleinfo_message.str_line, str_byte, sizeof (teleinfo_message.str_line));
+          str_character[0] = character;
+          str_character[1] = 0;
+          strlcat (teleinfo_message.str_line, str_character, sizeof (teleinfo_message.str_line));
         }
         break;
 
@@ -2741,6 +2987,37 @@ void TeleinfoEnergyEverySecond ()
 
   // get current time
   time_now = LocalTime ();
+
+  //   Serial speed auto-detection
+  // -------------------------------
+  if (Settings->teleinfo.autodetect == 1)
+  {
+
+    // if received more than 2 messages, speed has been found
+    if (teleinfo_meter.nb_message > 2)
+    {
+      // disable auto-detection process
+      Settings->teleinfo.autodetect = 0;
+
+      // ask for a reboot
+      TasmotaGlobal.restart_flag = 2;
+    }
+
+    else if ((teleinfo_meter.speed_changed == 0) && ((teleinfo_meter.nb_error > 2) || (teleinfo_meter.nb_reset > 2) || (TasmotaGlobal.uptime > 30)))
+    {
+      // adjust speed to next one
+      if (TasmotaGlobal.baudrate == 1200)       { TasmotaGlobal.baudrate = 9600;   Settings->baudrate = 9600 / 300;   }
+      else if (TasmotaGlobal.baudrate == 9600)  { TasmotaGlobal.baudrate = 19200;  Settings->baudrate = 19200 / 300;  }
+      else if (TasmotaGlobal.baudrate == 19200) { TasmotaGlobal.baudrate = 115200; Settings->baudrate = 115200 / 300; }
+
+      // if all speed tested, disable auto-detection
+      if (TasmotaGlobal.baudrate == 115200) Settings->teleinfo.autodetect = 0;
+
+      TasmotaGlobal.restart_flag = 2;
+
+      teleinfo_meter.speed_changed = 1;
+    }
+  }
 
   //   Counters and Totals
   // -----------------------
@@ -2835,9 +3112,6 @@ bool Xnrg15 (uint32_t function)
       break;
     case FUNC_COMMAND:
       result = TeleinfoHandleCommand ();
-      break;
-    case FUNC_LOOP:
-      TeleinfoReceiveData (TELEINFO_RECV_TIMEOUT_LOOP);
       break;
     case FUNC_ENERGY_EVERY_SECOND:
       TeleinfoEnergyEverySecond ();

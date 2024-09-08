@@ -4,7 +4,9 @@
   Copyright (C) 2024  Nicolas Bernaerts
 
   Version history :
-    16/02/2024 - v1.0 - Creation
+    16/02/2024 - v1.0 - Creation, support for Winky C6
+    25/08/2024 - v1.1 - Add Thingsboard integration
+                        Support for Winky C3
 
   Configuration values are stored in :
     - Settings->knx_GA_addr[0..2] : multiplicator
@@ -72,9 +74,10 @@ const uint32_t arrTeleinfoWinkyCritical[]   = { WINKY_USB_CRITICAL,   WINKY_CAPA
 \***************************************/
 
 static struct {
+  uint8_t  nb_source = 0;
   uint32_t arr_multiply[WINKY_SOURCE_MAX];      // measure multiplier
-  uint32_t arr_value[WINKY_SOURCE_MAX];         // input raw value
   uint32_t arr_voltage[WINKY_SOURCE_MAX];       // input voltage
+  uint32_t arr_value[WINKY_SOURCE_MAX];         // input raw value
   uint32_t vcap_boot = 0;                       // capa voltage at start
   uint32_t time_boot = UINT32_MAX;              // timestamp of device start
   uint32_t time_ip   = UINT32_MAX;              // timestamp of network connectivity
@@ -82,47 +85,30 @@ static struct {
   uint32_t time_mqtt = UINT32_MAX;              // timestamp of mqtt connectivity
 } teleinfo_winky;
 
-/**********************************************\
- *                Configuration
-\**********************************************/
-
-// load configuration
-void TeleinfoWinkyLoadConfig () 
-{
-  uint8_t index;
-
-  for (index = 0; index < WINKY_SOURCE_MAX; index ++)
-  {
-    teleinfo_winky.arr_multiply[index] = (uint32_t)Settings->knx_GA_addr[index];
-    if (teleinfo_winky.arr_multiply[index] < WINKY_MULTIPLY_MINIMUM) teleinfo_winky.arr_multiply[index] = WINKY_MULTIPLY_MAXIMUM;
-    else if (teleinfo_winky.arr_multiply[index] > WINKY_MULTIPLY_MAXIMUM) teleinfo_winky.arr_multiply[index] = WINKY_MULTIPLY_MAXIMUM;
-  }
-}
-
-// save configuration
-void TeleinfoWinkySaveConfig () 
-{
-  uint8_t index;
-  
-  for (index = 0; index < WINKY_SOURCE_MAX; index ++)
-  {
-    Settings->knx_GA_addr[index] = (uint16_t)teleinfo_winky.arr_multiply[index];
-  }
-}
-
 /************************************\
  *           Functions
 \************************************/
 
+// save multipliers to settings
+void TeleinfoWinkySaveMultipliers () 
+{
+  uint8_t  index;
+  uint16_t value;
+
+  // save multipliers
+  for (index = 0; index < WINKY_SOURCE_MAX; index ++)
+  {
+    value = (uint16_t)teleinfo_winky.arr_multiply[index];
+    if (Settings->knx_GA_addr[index] != value) Settings->knx_GA_addr[index] = value;
+  }
+}
+
 // check winky configuration
 bool TeleinfoWinkyIsConfigured ()
 {
-  bool    conf_ok = true;
-  uint8_t index;
-
-  for (index = 0; index < WINKY_SOURCE_MAX; index ++) if (Adc[index].pin == 0) conf_ok = false;
-
-  return conf_ok;
+  // if USB and CAPA sensors are declared, all is right
+  if (teleinfo_winky.nb_source > WINKY_SOURCE_CAPA) return true;
+    else return false;
 }
 
 // check winky configuration
@@ -132,7 +118,7 @@ void TeleinfoWinkyUpdateVoltage ()
   uint32_t value;
 
   // loop to read current values
-  for (index = 0; index < WINKY_SOURCE_MAX; index ++)
+  for (index = 0; index < teleinfo_winky.nb_source; index ++)
   {
     // read raw value
     teleinfo_winky.arr_value[index] = (uint32_t)AdcRead (Adc[index].pin, 1);
@@ -181,8 +167,8 @@ bool TeleinfoWinkyIsBootPossible ()
   return false;
 }
 
-// check winky configuration
-bool TeleinfoWinkyIsVoltageCorrect ()
+// check winky supply voltage
+bool TeleinfoWinkyVoltageIsCorrect ()
 {
   // if ADC not configured, return voltage ok
   if (!TeleinfoWinkyIsConfigured ()) return true;
@@ -207,6 +193,11 @@ void TeleinfoWinkyEnterSleepMode ()
 {
   // if deep sleep less than 30 sec, ignore
   if (Settings->deepsleep < WINKY_SLEEP_MINIMUM) return;
+
+#ifdef USE_LIGHT
+  // set LED in sleep mode
+  TeleinfoLedSwitch (TIC_LED_PWR_SLEEP);
+#endif    // USE_LIGHT  
 
   // enter deepsleep
   DeepSleepStart ();
@@ -244,8 +235,19 @@ void TeleinfoWinkyPublish ()
 // Domoticz init message
 void TeleinfoWinkyInit ()
 {
-  // load config
-  TeleinfoWinkyLoadConfig ();
+  uint8_t index;
+
+  // load multipliers
+  for (index = 0; index < WINKY_SOURCE_MAX; index ++)
+  {
+    // if source is used, update number of sources
+    if (Adc[index].pin != 0) teleinfo_winky.nb_source = index + 1;
+
+    // set multiplier
+    teleinfo_winky.arr_multiply[index] = (uint32_t)Settings->knx_GA_addr[index];
+    if (teleinfo_winky.arr_multiply[index] < WINKY_MULTIPLY_MINIMUM) teleinfo_winky.arr_multiply[index] = WINKY_MULTIPLY_MAXIMUM;
+    else if (teleinfo_winky.arr_multiply[index] > WINKY_MULTIPLY_MAXIMUM) teleinfo_winky.arr_multiply[index] = WINKY_MULTIPLY_MAXIMUM;
+  }
 
   // if voltage problem, entering deep sleep
   if (!TeleinfoWinkyIsBootPossible ()) TeleinfoWinkyEnterSleepMode ();
@@ -253,9 +255,6 @@ void TeleinfoWinkyInit ()
   // get start datatime_t TeleinfoHistoGetLastWrite (const uint8_t period)
   teleinfo_winky.time_boot = millis ();
   teleinfo_winky.vcap_boot = teleinfo_winky.arr_voltage[WINKY_SOURCE_CAPA];
-
-  // publish static data asap
-  if (teleinfo_config.calendar) teleinfo_meter.json.calendar = 1;
 }
 
 // called 10 times per second
@@ -280,34 +279,34 @@ void TeleinfoWinkyEvery100ms ()
   if ((teleinfo_winky.time_ntp == UINT32_MAX) && RtcTime.valid) teleinfo_winky.time_ntp = millis ();
 
   // check that input voltage is not too low
-  if (!TeleinfoWinkyIsVoltageCorrect ())
+  if (!TeleinfoWinkyVoltageIsCorrect ())
   {
-    // stop serial reception
-    TeleinfoSerialStop ();
+//  TeleinfoSerialStop ();
 
     // log end
     AddLog (LOG_LEVEL_INFO, PSTR ("TIC: CAPA voltage low, switching off ..."));
 
     // publish dynamic data
-    TeleinfoDriverPublishTrigger ();
-    if (teleinfo_meter.json.meter)    TeleinfoDriverPublishMeter ();
-    if (teleinfo_meter.json.relay)    TeleinfoDriverPublishRelay ();
-    if (teleinfo_meter.json.contract) TeleinfoDriverPublishContract ();
-    if (teleinfo_meter.json.tic)      TeleinfoDriverPublishTic ();
-    if (teleinfo_meter.json.alert)    TeleinfoDriverPublishAlert ();
+    TeleinfoDriverPublishAllData (false);
+    if (teleinfo_meter.json.tic) TeleinfoDriverPublishTic ();
 
 #ifdef USE_TELEINFO_DOMOTICZ
-    // if voltage is not too low, publish Domoticz data
-    if (!TeleinfoWinkyIsVoltageCorrect ()) DomoticzIntegrationPublishAll ();
+    // publish Domoticz data
+    DomoticzIntegrationPublishAll ();
 #endif    // USE_TELEINFO_DOMOTICZ
 
 #ifdef USE_TELEINFO_HOMIE
-    // if voltage is not too low, publish Homie data
-    if (!TeleinfoWinkyIsVoltageCorrect ()) HomieIntegrationPublishAllData ();
+    // publish Homie data
+    HomieIntegrationPublishAllData ();
 #endif    // USE_TELEINFO_HOMIE
 
-    // if voltage is not too low, publish WINKY message
-    if (!TeleinfoWinkyIsVoltageCorrect ()) TeleinfoWinkyPublish ();
+#ifdef USE_TELEINFO_THINGSBOARD
+    // publish Thingsboard data
+    ThingsboardIntegrationPublishData ();
+#endif    // USE_TELEINFO_HOMIE
+
+    // publish WINKY message
+    TeleinfoWinkyPublish ();
 
     // enter deep sleep
     TeleinfoWinkyEnterSleepMode ();
@@ -327,10 +326,11 @@ void TeleinfoWinkyWebSensor ()
   if (!TeleinfoWinkyIsConfigured ()) return;
 
   // start
+  WSContentSend_P (PSTR ("<style>table hr{display:none;}</style>\n"));
   WSContentSend_P (PSTR ("<div style='font-size:13px;text-align:center;padding:4px 6px;margin-bottom:5px;background:#333333;border-radius:12px;'>\n"));
   WSContentSend_P (PSTR ("<div style='width:100%%;padding:0px;text-align:left;font-weight:bold;'>Winky</div>\n"));
 
-  for (index = 0; index < WINKY_SOURCE_MAX; index++)
+  for (index = 0; index < teleinfo_winky.nb_source; index++)
   {
     // calculate voltage criticity level
     if (teleinfo_winky.arr_voltage[index] <= arrTeleinfoWinkyCritical[index]) level = WINKY_LEVEL_CRITICAL;
@@ -354,9 +354,6 @@ void TeleinfoWinkyWebSensor ()
 
   // end
   WSContentSend_P (PSTR ("</div>\n"));
-
-  // update data reception
-  TeleinfoProcessRealTime ();
 }
 
 #endif  // USE_WEBSERVER
@@ -380,7 +377,7 @@ bool Xsns126 (uint32_t function)
       TeleinfoWinkyEvery100ms ();
       break;
     case FUNC_SAVE_BEFORE_RESTART:
-      TeleinfoWinkySaveConfig ();
+      TeleinfoWinkySaveMultipliers ();
       break;
 
 #ifdef USE_WEBSERVER

@@ -9,6 +9,8 @@
     31/03/2024 - v1.2 - Remove SetOption19 dependancy
     14/04/2024 - v1.3 - Switch to rf_code configuration
                         Change key 2DAY to TDAY
+    28/04/2024 - v1.4 - Publish all counters even if equal to 0
+    20/06/2024 - v1.5 - Add meter serial number and global conso counter
 
   Configuration values are stored in :
     - Settings->rf_code[16][0]  : Flag en enable/disable integration
@@ -37,10 +39,55 @@
 
 #define TELEINFO_HASS_NB_MESSAGE    5
 
-const char kTicHassVersion[] PROGMEM = EXTENSION_VERSION;
+static const char PSTR_HASS_PUB_CONTRACT_NAME[]   PROGMEM = "Contrat"               "|CONTRACT_NAME"   "|.CONTRACT.name"     "|calendar"   "|" "|" "|";
+static const char PSTR_HASS_PUB_CONTRACT_SERIAL[] PROGMEM = "N° série compteur"     "|CONTRACT_SERIAL" "|.CONTRACT.serial"   "|calendar"   "|" "|" "|";
+
+static const char PSTR_HASS_PUB_CALENDAR_PERIOD[] PROGMEM = "Contrat Période"       "|CONTRACT_PERIOD" "|.CONTRACT.period"   "|calendar"   "|" "|" "|";
+static const char PSTR_HASS_PUB_CALENDAR_COLOR[]  PROGMEM = "Contrat Couleur"       "|CONTRACT_COLOR"  "|.CONTRACT.color"    "|calendar"   "|" "|" "|";
+static const char PSTR_HASS_PUB_CALENDAR_HOUR[]   PROGMEM = "Contrat Heure"         "|CONTRACT_HOUR"   "|.CONTRACT.hour"     "|calendar"   "|" "|" "|";
+static const char PSTR_HASS_PUB_CALENDAR_TODAY[]  PROGMEM = "Couleur Aujourdhui"    "|CONTRACT_TDAY"   "|.CONTRACT.today"    "|calendar"   "|" "|" "|";
+static const char PSTR_HASS_PUB_CALENDAR_TOMRW[]  PROGMEM = "Couleur Demain"        "|CONTRACT_TMRW"   "|.CONTRACT.tomorrow" "|calendar"   "|" "|" "|";
+
+static const char PSTR_HASS_PUB_PROD_P[]          PROGMEM = "Prod Puiss. apparente" "|METER_PP"    "|.METER.PP"    "|alpha-p-circle" "|apparent_power" "|measurement" "|VA";
+static const char PSTR_HASS_PUB_PROD_W[]          PROGMEM = "Prod Puiss. active"    "|METER_PW"    "|.METER.PW"    "|alpha-p-circle" "|power"          "|measurement" "|W";
+static const char PSTR_HASS_PUB_PROD_C[]          PROGMEM = "Prod Cos φ"            "|METER_PC"    "|.METER.PC"    "|alpha-p-circle" "|power_factor"   "|measurement" "|";
+static const char PSTR_HASS_PUB_PROD_YTDAY[]      PROGMEM = "Prod Hier"             "|METER_PYDAY" "|.METER.PYDAY" "|alpha-p-circle" "|energy"         "|total"       "|Wh";
+static const char PSTR_HASS_PUB_PROD_TODAY[]      PROGMEM = "Prod Aujourdhui"       "|METER_PTDAY" "|.METER.PTDAY" "|alpha-p-circle" "|energy"         "|total"       "|Wh";
+
+static const char PSTR_HASS_PUB_CONSO_U[]         PROGMEM = "Conso Tension"          "|METER_U"    "|.METER.U"     "|alpha-c-circle" "|voltage"        "|measurement" "|V";
+static const char PSTR_HASS_PUB_CONSO_I[]         PROGMEM = "Conso Courant"          "|METER_I"    "|.METER.I"     "|alpha-c-circle" "|current"        "|measurement" "|A";
+static const char PSTR_HASS_PUB_CONSO_P[]         PROGMEM = "Conso Puiss. apparente" "|METER_P"    "|.METER.P"     "|alpha-c-circle" "|apparent_power" "|measurement" "|VA";
+static const char PSTR_HASS_PUB_CONSO_W[]         PROGMEM = "Conso Puiss. active"    "|METER_W"    "|.METER.W"     "|alpha-c-circle" "|power"          "|measurement" "|W";
+static const char PSTR_HASS_PUB_CONSO_C[]         PROGMEM = "Conso Cos φ"            "|METER_C"    "|.METER.C"     "|alpha-c-circle" "|power_factor"   "|measurement" "|";
+static const char PSTR_HASS_PUB_CONSO_YTDAY[]     PROGMEM = "Conso Hier"             "|METER_YDAY" "|.METER.YDAY"  "|alpha-c-circle" "|energy"         "|total"       "|Wh";
+static const char PSTR_HASS_PUB_CONSO_TODAY[]     PROGMEM = "Conso Aujourdhui"       "|METER_TDAY" "|.METER.TDAY"  "|alpha-c-circle" "|energy"         "|total"       "|Wh";
+
+static const char PSTR_HASS_PUB_PH1_U[]           PROGMEM = "Ph1 Tension"            "|METER_U1"   "|.METER.U1"    "|numeric-1-box-multiple" "|voltage"        "|measurement" "|V";
+static const char PSTR_HASS_PUB_PH1_I[]           PROGMEM = "Ph1 Courant"            "|METER_I1"   "|.METER.I1"    "|numeric-1-box-multiple" "|current"        "|measurement" "|A";
+static const char PSTR_HASS_PUB_PH1_P[]           PROGMEM = "Ph1 Puiss. apparente"   "|METER_P1"   "|.METER.P1"    "|numeric-1-box-multiple" "|apparent_power" "|measurement" "|VA";
+static const char PSTR_HASS_PUB_PH1_W[]           PROGMEM = "Ph1 Puiss. active"      "|METER_W1"   "|.METER.W1"    "|numeric-1-box-multiple" "|power"          "|measurement" "|W";
+
+static const char PSTR_HASS_PUB_PH2_U[]           PROGMEM = "Ph2 Tension"            "|METER_U2"   "|.METER.U2"    "|numeric-2-box-multiple" "|voltage"        "|measurement" "|V";
+static const char PSTR_HASS_PUB_PH2_I[]           PROGMEM = "Ph2 Courant"            "|METER_I2"   "|.METER.I2"    "|numeric-2-box-multiple" "|current"        "|measurement" "|A";
+static const char PSTR_HASS_PUB_PH2_P[]           PROGMEM = "Ph2 Puiss. apparente"   "|METER_P2"   "|.METER.P2"    "|numeric-2-box-multiple" "|apparent_power" "|measurement" "|VA";
+static const char PSTR_HASS_PUB_PH2_W[]           PROGMEM = "Ph2 Puiss. active"      "|METER_W2"   "|.METER.W2"    "|numeric-2-box-multiple" "|power"          "|measurement" "|W";
+
+static const char PSTR_HASS_PUB_PH3_U[]           PROGMEM = "Ph3 Tension"            "|METER_U3"   "|.METER.U3"    "|numeric-3-box-multiple" "|voltage"        "|measurement" "|V";
+static const char PSTR_HASS_PUB_PH3_I[]           PROGMEM = "Ph3 Courant"            "|METER_I3"   "|.METER.I3"    "|numeric-3-box-multiple" "|current"        "|measurement" "|A";
+static const char PSTR_HASS_PUB_PH3_P[]           PROGMEM = "Ph3 Puiss. apparente"   "|METER_P3"   "|.METER.P3"    "|numeric-3-box-multiple" "|apparent_power" "|measurement" "|VA";
+static const char PSTR_HASS_PUB_PH3_W[]           PROGMEM = "Ph3 Puiss. active"      "|METER_W3"   "|.METER.W3"    "|numeric-3-box-multiple" "|power"          "|measurement" "|W";
+
+static const char PSTR_HASS_PUB_RELAY_DATA[]      PROGMEM = "Relai virtuel %u"       "|RELAY_%u"       "|.RELAY.R%u"         "|toggle-switch-off" "|"       "|"      "|";
+
+static const char PSTR_HASS_PUB_TOTAL_PROD[]      PROGMEM = "Total Production"       "|CONTRACT_PROD"  "|.CONTRACT.PROD"     "|counter"           "|energy" "|total" "|Wh";
+
+static const char PSTR_HASS_PUB_TOTAL_CONSO[]     PROGMEM = "Total Conso"            "|CONTRACT_CONSO" "|.CONTRACT.CONSO"    "|counter"           "|energy" "|total" "|Wh";
+static const char PSTR_HASS_PUB_TOTAL_PERIOD[]    PROGMEM = "Index %s"               "|CONTRACT_%u"    "|['CONTRACT']['%s']" "|counter"           "|energy" "|total" "|Wh";
+
+static const char kTicHassVersion[] PROGMEM = EXTENSION_VERSION;
 
 // Commands
-const char kHassIntegrationCommands[] PROGMEM = "hass_" "|" "enable";
+static const char kHassIntegrationCommands[] PROGMEM = "" "|" "hass";
 void (* const HassIntegrationCommand[])(void) PROGMEM = { &CmndHassIntegrationEnable };
 
 /********************************\
@@ -48,9 +95,9 @@ void (* const HassIntegrationCommand[])(void) PROGMEM = { &CmndHassIntegrationEn
 \********************************/
 
 static struct {
-  uint8_t  enabled = 0;
-  uint8_t  stage   = TIC_PUB_CONNECT;       // auto-discovery publication stage
-  uint8_t  index   = 0;                     // period within CONTRACT stage
+  uint8_t  enabled   = 0;
+  uint8_t  stage     = TIC_PUB_CONNECT;       // auto-discovery publication stage
+  uint8_t  sub_stage = 0;                     // period within CONTRACT stage
 } hass_integration;
 
 /**********************************************\
@@ -80,8 +127,8 @@ void HassIntegrationSet (const bool enabled)
   hass_integration.enabled = enabled;
 
   // reset publication flags
-  hass_integration.stage = TIC_PUB_CONNECT; 
-  hass_integration.index = 0; 
+  hass_integration.stage     = TIC_PUB_CONNECT; 
+  hass_integration.sub_stage = 0; 
 
   // save configuration
   HassIntegrationSaveConfig ();
@@ -114,7 +161,7 @@ void CmndHassIntegrationInit ()
   HassIntegrationLoadConfig ();
 
   // log help command
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: hass_enable to enable Home Assistant auto-discovery [%u]"), hass_integration.enabled);
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Run hass to set Home Assistant auto-discovery [%u]"), hass_integration.enabled);
 }
 
 // trigger publication
@@ -126,19 +173,19 @@ void HassIntegrationEvery250ms ()
   // if already published or running on battery, ignore 
   if (!hass_integration.enabled) return;
   if (hass_integration.stage == UINT8_MAX) return;
-  if (teleinfo_meter.nb_message <= TELEINFO_HASS_NB_MESSAGE) return;
+//  if (teleinfo_meter.nb_message <= TELEINFO_HASS_NB_MESSAGE) return;
   if (!RtcTime.valid) return;
   if (!MqttIsConnected ()) return;
 
   // publication
-  HassIntegrationPublish (hass_integration.stage, hass_integration.index);
+  HassIntegrationPublish (hass_integration.stage, hass_integration.sub_stage);
 
   // handle increment
-  if ((hass_integration.stage == TIC_PUB_RELAY_DATA) || (hass_integration.stage == TIC_PUB_TOTAL_CONSO)) hass_integration.index++;
+  if ((hass_integration.stage == TIC_PUB_RELAY_DATA) || (hass_integration.stage == TIC_PUB_TOTAL_INDEX)) hass_integration.sub_stage++;
     else hass_integration.stage++;
-  if ((hass_integration.stage == TIC_PUB_RELAY_DATA)  && (hass_integration.index >= 8)) hass_integration.stage++;
-  if ((hass_integration.stage == TIC_PUB_TOTAL_CONSO) && (hass_integration.index >= teleinfo_contract.period_qty)) hass_integration.stage++;
-  if ((hass_integration.stage != TIC_PUB_RELAY_DATA)  && (hass_integration.stage != TIC_PUB_TOTAL_CONSO)) hass_integration.index = 0; 
+  if ((hass_integration.stage == TIC_PUB_RELAY_DATA)  && (hass_integration.sub_stage >= 8)) hass_integration.stage++;
+  if ((hass_integration.stage == TIC_PUB_TOTAL_INDEX) && (hass_integration.sub_stage >= teleinfo_contract.period_qty)) hass_integration.stage++;
+  if ((hass_integration.stage != TIC_PUB_RELAY_DATA)  && (hass_integration.stage != TIC_PUB_TOTAL_INDEX)) hass_integration.sub_stage = 0; 
 
   // increment to next stage
   if ((hass_integration.stage == TIC_PUB_CALENDAR)    && (!teleinfo_config.calendar))    hass_integration.stage = TIC_PUB_PROD;
@@ -147,7 +194,7 @@ void HassIntegrationEvery250ms ()
   if ((hass_integration.stage == TIC_PUB_CONSO)       && (teleinfo_conso.total_wh == 0)) hass_integration.stage = TIC_PUB_RELAY;
   if ((hass_integration.stage == TIC_PUB_PH1)         && (teleinfo_contract.phase == 1)) hass_integration.stage = TIC_PUB_RELAY;
   if ((hass_integration.stage == TIC_PUB_RELAY)       && (!teleinfo_config.relay))       hass_integration.stage = TIC_PUB_TOTAL;
-  if ((hass_integration.stage == TIC_PUB_TOTAL)       && (!teleinfo_config.contract))    hass_integration.stage = TIC_PUB_MAX;
+  if ((hass_integration.stage == TIC_PUB_TOTAL)       && (!teleinfo_config.meter))       hass_integration.stage = TIC_PUB_MAX;
   if ((hass_integration.stage == TIC_PUB_TOTAL_PROD)  && (teleinfo_prod.total_wh == 0))  hass_integration.stage = TIC_PUB_TOTAL_CONSO;
   if ((hass_integration.stage == TIC_PUB_TOTAL_CONSO) && (teleinfo_conso.total_wh == 0)) hass_integration.stage = TIC_PUB_MAX;
   if (hass_integration.stage == TIC_PUB_MAX) hass_integration.stage = UINT8_MAX;
@@ -159,101 +206,111 @@ void HassIntegrationEvery250ms ()
 
 void HassIntegrationPublish (const uint8_t stage, const uint8_t index)
 {
-  uint32_t ip_address;
-  char     str_icon[24];
-  char     str_key[32];
-  char     str_text[32];
-  char     str_name[64];
-  char     str_sensor[64];
-  char     str_param[128];
-  String   str_topic;
+  uint32_t    ip_address;
+  const char* pstr_param;
+  char        str_text1[32];
+  char        str_text2[128];
+  char        str_name[64];
+  char        str_id[32];
+  char        str_key[32];
+  char        str_icon[24];
 
   // check parameters
   if (stage >= TIC_PUB_MAX) return;
   if ((stage == TIC_PUB_RELAY_DATA) && (index >= 8)) return;
-  if ((stage == TIC_PUB_TOTAL_CONSO) && (index >= TELEINFO_INDEX_MAX)) return;
+  if ((stage == TIC_PUB_TOTAL_INDEX) && (index >= TIC_PERIOD_MAX)) return;
 
-  // process data reception
-  TeleinfoProcessRealTime ();
+  // init
+  strcpy (str_text1, "");
+  strcpy (str_text2, "");
+  strcpy (str_name,  "");
+  strcpy (str_id,    "");
+  strcpy (str_key,   "");
 
   // set parameter according to data
-  strcpy (str_param, "");
+  pstr_param = nullptr;
   switch (stage)
   {
     // contract
-    case TIC_PUB_CONTRACT_NAME:   strcpy_P (str_param, PSTR ("Contrat"             "|CONTRACT_NAME"   "|.CONTRACT.name"     "|calendar"   "|" "|" "|")); break;
+    case TIC_PUB_CONTRACT_NAME:   pstr_param = PSTR_HASS_PUB_CONTRACT_NAME;   break;
+    case TIC_PUB_CONTRACT_SERIAL: pstr_param = PSTR_HASS_PUB_CONTRACT_SERIAL; break;
 
     // calendar
-    case TIC_PUB_CALENDAR_PERIOD: strcpy_P (str_param, PSTR ("Contrat Période"     "|CONTRACT_PERIOD" "|.CONTRACT.period"   "|calendar"   "|" "|" "|")); break;
-    case TIC_PUB_CALENDAR_COLOR:  strcpy_P (str_param, PSTR ("Contrat Couleur"     "|CONTRACT_COLOR"  "|.CONTRACT.color"    "|calendar"   "|" "|" "|")); break;
-    case TIC_PUB_CALENDAR_HOUR:   strcpy_P (str_param, PSTR ("Contrat Heure"       "|CONTRACT_HOUR"   "|.CONTRACT.hour"     "|calendar"   "|" "|" "|")); break;
-    case TIC_PUB_CALENDAR_TODAY:  strcpy_P (str_param, PSTR ("Couleur Aujourdhui"  "|CONTRACT_TDAY"   "|.CONTRACT.today"    "|calendar"   "|" "|" "|")); break;
-    case TIC_PUB_CALENDAR_TOMRW:  strcpy_P (str_param, PSTR ("Couleur Demain"      "|CONTRACT_TMRW"   "|.CONTRACT.tomorrow" "|calendar"   "|" "|" "|")); break;
+    case TIC_PUB_CALENDAR_PERIOD: pstr_param = PSTR_HASS_PUB_CALENDAR_PERIOD; break;
+    case TIC_PUB_CALENDAR_COLOR:  pstr_param = PSTR_HASS_PUB_CALENDAR_COLOR;  break;
+    case TIC_PUB_CALENDAR_HOUR:   pstr_param = PSTR_HASS_PUB_CALENDAR_HOUR;   break;
+    case TIC_PUB_CALENDAR_TODAY:  pstr_param = PSTR_HASS_PUB_CALENDAR_TODAY;  break;
+    case TIC_PUB_CALENDAR_TOMRW:  pstr_param = PSTR_HASS_PUB_CALENDAR_TOMRW;  break;
 
     // production
-    case TIC_PUB_PROD_P:    strcpy_P (str_param, PSTR ("Prod Puiss. apparente" "|METER_PP"      "|.METER.PP"     "|alpha-p-circle"  "|apparent_power"  "|measurement"  "|VA")); break;
-    case TIC_PUB_PROD_W:    strcpy_P (str_param, PSTR ("Prod Puiss. active"    "|METER_PW"      "|.METER.PW"     "|alpha-p-circle"  "|power"           "|measurement"  "|W" )); break;
-    case TIC_PUB_PROD_C:    strcpy_P (str_param, PSTR ("Prod Cos φ"            "|METER_PC"      "|.METER.PC"     "|alpha-p-circle"  "|power_factor"    "|measurement"  "|"  )); break;
-    case TIC_PUB_PROD_YDAY: strcpy_P (str_param, PSTR ("Prod Hier"             "|METER_PYDAY"   "|.METER.PYDAY"  "|alpha-p-circle"  "|energy"          "|total"        "|Wh")); break;
-    case TIC_PUB_PROD_2DAY: strcpy_P (str_param, PSTR ("Prod Aujourdhui"       "|METER_PTDAY"   "|.METER.PTDAY"  "|alpha-p-circle"  "|energy"          "|total"        "|Wh")); break;
+    case TIC_PUB_PROD_P:     pstr_param = PSTR_HASS_PUB_PROD_P; break;
+    case TIC_PUB_PROD_W:     pstr_param = PSTR_HASS_PUB_PROD_W; break;
+    case TIC_PUB_PROD_C:     pstr_param = PSTR_HASS_PUB_PROD_C; break;
+    case TIC_PUB_PROD_YTDAY: pstr_param = PSTR_HASS_PUB_PROD_YTDAY; break;
+    case TIC_PUB_PROD_TODAY: pstr_param = PSTR_HASS_PUB_PROD_TODAY; break;
 
     // conso
-    case TIC_PUB_CONSO_U:    strcpy_P (str_param, PSTR ("Conso Tension"          "|METER_U"     "|.METER.U"      "|alpha-c-circle"  "|voltage"         "|measurement"  "|V" )); break;
-    case TIC_PUB_CONSO_I:    strcpy_P (str_param, PSTR ("Conso Courant"          "|METER_I"     "|.METER.I"      "|alpha-c-circle"  "|current"         "|measurement"  "|A" )); break;
-    case TIC_PUB_CONSO_P:    strcpy_P (str_param, PSTR ("Conso Puiss. apparente" "|METER_P"     "|.METER.P"      "|alpha-c-circle"  "|apparent_power"  "|measurement"  "|VA")); break;
-    case TIC_PUB_CONSO_W:    strcpy_P (str_param, PSTR ("Conso Puiss. active"    "|METER_W"     "|.METER.W"      "|alpha-c-circle"  "|power"           "|measurement"  "|W" )); break;
-    case TIC_PUB_CONSO_C:    strcpy_P (str_param, PSTR ("Conso Cos φ"            "|METER_C"     "|.METER.C"      "|alpha-c-circle"  "|power_factor"    "|measurement"  "|"  )); break;
-    case TIC_PUB_CONSO_YDAY: strcpy_P (str_param, PSTR ("Conso Hier"             "|METER_YDAY"  "|.METER.YDAY"   "|alpha-c-circle"  "|energy"          "|total"        "|Wh")); break;
-    case TIC_PUB_CONSO_2DAY: strcpy_P (str_param, PSTR ("Conso Aujourdhui"       "|METER_TDAY"  "|.METER.TDAY"   "|alpha-c-circle"  "|energy"          "|total"        "|Wh")); break;
+    case TIC_PUB_CONSO_U:     pstr_param = PSTR_HASS_PUB_CONSO_U; break;
+    case TIC_PUB_CONSO_I:     pstr_param = PSTR_HASS_PUB_CONSO_I; break;
+    case TIC_PUB_CONSO_P:     pstr_param = PSTR_HASS_PUB_CONSO_P; break;
+    case TIC_PUB_CONSO_W:     pstr_param = PSTR_HASS_PUB_CONSO_W; break;
+    case TIC_PUB_CONSO_C:     pstr_param = PSTR_HASS_PUB_CONSO_C; break;
+    case TIC_PUB_CONSO_YTDAY: pstr_param = PSTR_HASS_PUB_CONSO_YTDAY; break;
+    case TIC_PUB_CONSO_TODAY: pstr_param = PSTR_HASS_PUB_CONSO_TODAY; break;
 
     // 3 phases
-    case TIC_PUB_PH1_U: strcpy_P (str_param, PSTR ("Ph1 Tension"           "|METER_U1"  "|.METER.U1"  "|numeric-1-box-multiple"  "|voltage"         "|measurement"  "|V" )); break;
-    case TIC_PUB_PH1_I: strcpy_P (str_param, PSTR ("Ph1 Courant"           "|METER_I1"  "|.METER.I1"  "|numeric-1-box-multiple"  "|current"         "|measurement"  "|A" )); break;
-    case TIC_PUB_PH1_P: strcpy_P (str_param, PSTR ("Ph1 Puiss. apparente"  "|METER_P1"  "|.METER.P1"  "|numeric-1-box-multiple"  "|apparent_power"  "|measurement"  "|VA")); break;
-    case TIC_PUB_PH1_W: strcpy_P (str_param, PSTR ("Ph1 Puiss. active"     "|METER_W1"  "|.METER.W1"  "|numeric-1-box-multiple"  "|power"           "|measurement"  "|W" )); break;
+    case TIC_PUB_PH1_U: pstr_param = PSTR_HASS_PUB_PH1_U; break;
+    case TIC_PUB_PH1_I: pstr_param = PSTR_HASS_PUB_PH1_I; break;
+    case TIC_PUB_PH1_P: pstr_param = PSTR_HASS_PUB_PH1_P; break;
+    case TIC_PUB_PH1_W: pstr_param = PSTR_HASS_PUB_PH1_W; break;
 
-    case TIC_PUB_PH2_U: strcpy_P (str_param, PSTR ("Ph2 Tension"           "|METER_U2"  "|.METER.U2"  "|numeric-2-box-multiple"  "|voltage"         "|measurement"  "|V" )); break;
-    case TIC_PUB_PH2_I: strcpy_P (str_param, PSTR ("Ph2 Courant"           "|METER_I2"  "|.METER.I2"  "|numeric-2-box-multiple"  "|current"         "|measurement"  "|A" )); break;
-    case TIC_PUB_PH2_P: strcpy_P (str_param, PSTR ("Ph2 Puiss. apparente"  "|METER_P2"  "|.METER.P2"  "|numeric-2-box-multiple"  "|apparent_power"  "|measurement"  "|VA")); break;
-    case TIC_PUB_PH2_W: strcpy_P (str_param, PSTR ("Ph2 Puiss. active"     "|METER_W2"  "|.METER.W2"  "|numeric-2-box-multiple"  "|power"           "|measurement"  "|W" )); break;
+    case TIC_PUB_PH2_U: pstr_param = PSTR_HASS_PUB_PH2_U; break;
+    case TIC_PUB_PH2_I: pstr_param = PSTR_HASS_PUB_PH2_I; break;
+    case TIC_PUB_PH2_P: pstr_param = PSTR_HASS_PUB_PH2_P; break;
+    case TIC_PUB_PH2_W: pstr_param = PSTR_HASS_PUB_PH2_W; break;
 
-    case TIC_PUB_PH3_U: strcpy_P (str_param, PSTR ("Ph3 Tension"           "|METER_U3"  "|.METER.U3"  "|numeric-3-box-multiple"  "|voltage"         "|measurement"  "|V" )); break;
-    case TIC_PUB_PH3_I: strcpy_P (str_param, PSTR ("Ph3 Courant"           "|METER_I3"  "|.METER.I3"  "|numeric-3-box-multiple"  "|current"         "|measurement"  "|A" )); break;
-    case TIC_PUB_PH3_P: strcpy_P (str_param, PSTR ("Ph3 Puiss. apparente"  "|METER_P3"  "|.METER.P3"  "|numeric-3-box-multiple"  "|apparent_power"  "|measurement"  "|VA")); break;
-    case TIC_PUB_PH3_W: strcpy_P (str_param, PSTR ("Ph3 Puiss. active"     "|METER_W3"  "|.METER.W3"  "|numeric-3-box-multiple"  "|power"           "|measurement"  "|W" )); break;
+    case TIC_PUB_PH3_U: pstr_param = PSTR_HASS_PUB_PH3_U; break;
+    case TIC_PUB_PH3_I: pstr_param = PSTR_HASS_PUB_PH3_I; break;
+    case TIC_PUB_PH3_P: pstr_param = PSTR_HASS_PUB_PH3_P; break;
+    case TIC_PUB_PH3_W: pstr_param = PSTR_HASS_PUB_PH3_W; break;
 
     // relay
     case TIC_PUB_RELAY_DATA:
-      GetTextIndexed (str_text, sizeof (str_text), index, kTeleinfoRelayName);
-      snprintf_P (str_param, sizeof (str_param), PSTR ("Relai %u (%s)"     "|RELAY_%u"  "|.RELAY.R%u"  "|toggle-switch-off"  "|" "|" "|"), index + 1, str_text, index + 1,  index + 1);
+      pstr_param = PSTR_HASS_PUB_RELAY_DATA;
+      sprintf_P (str_name, GetTextIndexed (str_text1, sizeof (str_text1), 0, pstr_param), index + 1);
+      sprintf_P (str_id,   GetTextIndexed (str_text1, sizeof (str_text1), 1, pstr_param), index + 1);
+      sprintf_P (str_key,  GetTextIndexed (str_text1, sizeof (str_text1), 2, pstr_param), index + 1);
       break;
 
     // production counter
-    case TIC_PUB_TOTAL_PROD: 
-      strcpy_P (str_param, PSTR ("Total Production"                        "|CONTRACT_PROD"  "|.CONTRACT.PROD"  "|counter"  "|energy"  "|total"  "|Wh"));
-      break;
+    case TIC_PUB_TOTAL_PROD: pstr_param = PSTR_HASS_PUB_TOTAL_PROD; break;
 
-    // loop thru conso counters
-    case TIC_PUB_TOTAL_CONSO:
-      if (teleinfo_conso.index_wh[index] > 0)
-      {
-        TeleinfoPeriodGetName (index, str_name, sizeof (str_name));
-        TeleinfoPeriodGetCode (index, str_text, sizeof (str_text));
-        snprintf_P (str_param, sizeof (str_param), PSTR ("%s"              "|CONTRACT_%u"  "|['CONTRACT']['%s']"  "|counter"  "|energy"  "|total"  "|Wh"), str_name, index, str_text);
-      }
+    // conso global counter
+    case TIC_PUB_TOTAL_CONSO: pstr_param = PSTR_HASS_PUB_TOTAL_CONSO; break;
+
+    // loop thru conso period counters
+    case TIC_PUB_TOTAL_INDEX:
+      pstr_param = PSTR_HASS_PUB_TOTAL_PERIOD;
+      TeleinfoPeriodGetLabel (str_text2, sizeof (str_text2), index);
+      sprintf_P (str_name, GetTextIndexed (str_text1, sizeof (str_text1), 0, pstr_param), str_text2);
+      sprintf_P (str_id,   GetTextIndexed (str_text1, sizeof (str_text1), 1, pstr_param), index);
+      TeleinfoPeriodGetCode (str_text2, sizeof (str_text2), index);
+      sprintf_P (str_key,  GetTextIndexed (str_text1, sizeof (str_text1), 2, pstr_param), str_text2);
       break;
   }
 
   // if data are available, publish
-  if (strlen (str_param) > 0)
+  if (pstr_param != nullptr)
   {
-   // publish auto-discovery retained message
-    GetTextIndexed (str_name, sizeof (str_name), 0, str_param);
-    GetTextIndexed (str_text, sizeof (str_text), 1, str_param);
-    GetTextIndexed (str_key,  sizeof (str_key),  2, str_param);
-    GetTextIndexed (str_icon, sizeof (str_icon), 3, str_param);
-    GetTopic_P (str_sensor, TELE, TasmotaGlobal.mqtt_topic, PSTR (D_RSLT_SENSOR));
-    Response_P (PSTR ("{\"name\":\"%s\",\"state_topic\":\"%s\",\"unique_id\":\"%s_%s\",\"value_template\":\"{{value_json%s}}\",\"icon\":\"mdi:%s\""), str_name, str_sensor, NetworkUniqueId().c_str(), str_text, str_key, str_icon);
+    // publish auto-discovery retained message
+    if (strlen (str_name) == 0) GetTextIndexed (str_name, sizeof (str_name), 0, pstr_param);
+    if (strlen (str_id) == 0)   GetTextIndexed (str_id,   sizeof (str_id),   1, pstr_param);
+    if (strlen (str_key) == 0)  GetTextIndexed (str_key,  sizeof (str_key),  2, pstr_param);
+    GetTextIndexed (str_icon, sizeof (str_icon), 3, pstr_param);
+
+    // set response
+    GetTopic_P (str_text2, TELE, TasmotaGlobal.mqtt_topic, D_RSLT_SENSOR);
+    Response_P (PSTR ("{\"name\":\"%s\",\"state_topic\":\"%s\",\"unique_id\":\"%s_%s\",\"value_template\":\"{{value_json%s}}\",\"icon\":\"mdi:%s\""), str_name, str_text2, NetworkUniqueId().c_str(), str_id, str_key, str_icon);
 
     // if first call, append device description
     if (hass_integration.stage == TIC_PUB_CONTRACT_NAME) 
@@ -271,23 +328,21 @@ void HassIntegrationPublish (const uint8_t stage, const uint8_t index)
     else ResponseAppend_P (PSTR (",\"device\":{\"identifiers\":[\"%s\"]}"), NetworkUniqueId().c_str());
 
     // if defined, append specific values
-    GetTextIndexed (str_text, sizeof (str_text), 4, str_param);
-    if (strlen (str_text) > 0) ResponseAppend_P (PSTR (",\"device_class\":\"%s\""), str_text);
-    GetTextIndexed (str_text, sizeof (str_text), 5, str_param);
-    if (strlen (str_text) > 0) ResponseAppend_P (PSTR (",\"state_class\":\"%s\""), str_text);
-    GetTextIndexed (str_text, sizeof (str_text), 6, str_param);
-    if (strlen (str_text) > 0) ResponseAppend_P (PSTR (",\"unit_of_measurement\":\"%s\""), str_text);
+    GetTextIndexed (str_text1, sizeof (str_text1), 4, pstr_param);
+    if (strlen (str_text1) > 0) ResponseAppend_P (PSTR (",\"device_class\":\"%s\""), str_text1);
+    GetTextIndexed (str_text1, sizeof (str_text1), 5, pstr_param);
+    if (strlen (str_text1) > 0) ResponseAppend_P (PSTR (",\"state_class\":\"%s\""), str_text1);
+    GetTextIndexed (str_text1, sizeof (str_text1), 6, pstr_param);
+    if (strlen (str_text1) > 0) ResponseAppend_P (PSTR (",\"unit_of_measurement\":\"%s\""), str_text1);
     ResponseAppend_P (PSTR ("}"));
 
-    // get sensor topic
-    str_topic  = PSTR ("homeassistant/sensor/");
-    str_topic += NetworkUniqueId () + "_";
-    GetTextIndexed (str_text, sizeof (str_text), 1, str_param);
-    str_topic += str_text;
-    str_topic += "/config";
-
-    // publish data
-    MqttPublish (str_topic.c_str (), true);
+    // publish sensor topic
+    strcpy_P (str_text2, PSTR ("homeassistant/sensor/"));
+    strlcat  (str_text2, NetworkUniqueId ().c_str (), sizeof (str_text2));
+    strcat_P (str_text2, PSTR ("_"));
+    strlcat  (str_text2, str_id, sizeof (str_text2));
+    strcat_P (str_text2, PSTR ("/config"));
+    MqttPublish (str_text2, true);
   }
 }
 

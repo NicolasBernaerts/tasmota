@@ -104,23 +104,23 @@
 #define D_CMND_RTE_PUBLISH          "publish"
 
 // URL
-#define RTE_URL_OAUTH2              "https://digital.iservices.rte-france.com/token/oauth/"
-#define RTE_URL_ECOWATT_DATA        "https://digital.iservices.rte-france.com/open_api/ecowatt/v5/signals"
-#define RTE_URL_ECOWATT_SANDBOX     "https://digital.iservices.rte-france.com/open_api/ecowatt/v5/sandbox/signals"
-#define RTE_URL_TEMPO_DATA          "https://digital.iservices.rte-france.com/open_api/tempo_like_supply_contract/v1/tempo_like_calendars"
-#define RTE_URL_POINTE_DATA         "https://digital.iservices.rte-france.com/open_api/demand_response_signal/v2/signals"
+static const char RTE_URL_OAUTH2[]          PROGMEM = "https://digital.iservices.rte-france.com/token/oauth/";
+static const char RTE_URL_ECOWATT_DATA[]    PROGMEM = "https://digital.iservices.rte-france.com/open_api/ecowatt/v5/signals";
+static const char RTE_URL_ECOWATT_SANDBOX[] PROGMEM = "https://digital.iservices.rte-france.com/open_api/ecowatt/v5/sandbox/signals";
+static const char RTE_URL_TEMPO_DATA[]      PROGMEM = "https://digital.iservices.rte-france.com/open_api/tempo_like_supply_contract/v1/tempo_like_calendars";
+static const char RTE_URL_POINTE_DATA[]     PROGMEM = "https://digital.iservices.rte-france.com/open_api/demand_response_signal/v2/signals";
 
 // Commands
-const char kRteCommands[] PROGMEM = "rte_" "|" D_CMND_RTE_HELP "|" D_CMND_RTE_KEY "|" D_CMND_RTE_TOKEN "|" D_CMND_RTE_SANDBOX;
+static const char kRteCommands[] PROGMEM = "rte" "|" "|_" D_CMND_RTE_KEY "|_" D_CMND_RTE_TOKEN "|_" D_CMND_RTE_SANDBOX;
 void (* const RteCommand[])(void) PROGMEM = { &CmndRteHelp, &CmndRteKey, &CmndRteToken, &CmndRteSandbox };
 
-const char kEcowattCommands[] PROGMEM = "eco_" "|" D_CMND_RTE_ENABLE "|" D_CMND_RTE_DISPLAY "|" D_CMND_RTE_UPDATE "|" D_CMND_RTE_PUBLISH;
+static const char kEcowattCommands[] PROGMEM = "eco_" "|" D_CMND_RTE_ENABLE "|" D_CMND_RTE_DISPLAY "|" D_CMND_RTE_UPDATE "|" D_CMND_RTE_PUBLISH;
 void (* const EcowattCommand[])(void) PROGMEM = { &CmndEcowattEnable, &CmndEcowattDisplay, &CmndEcowattUpdate, &CmndEcowattPublish };
 
-const char kTempoCommands[] PROGMEM = "tempo_" "|" D_CMND_RTE_ENABLE "|" D_CMND_RTE_DISPLAY "|" D_CMND_RTE_UPDATE "|" D_CMND_RTE_PUBLISH;
+static const char kTempoCommands[] PROGMEM = "tempo_" "|" D_CMND_RTE_ENABLE "|" D_CMND_RTE_DISPLAY "|" D_CMND_RTE_UPDATE "|" D_CMND_RTE_PUBLISH;
 void (* const TempoCommand[])(void) PROGMEM = { &CmndTempoEnable, &CmndTempoDisplay, &CmndTempoUpdate, &CmndTempoPublish };
 
-const char kPointeCommands[] PROGMEM = "pointe_" "|" D_CMND_RTE_ENABLE "|" D_CMND_RTE_DISPLAY "|" D_CMND_RTE_UPDATE "|" D_CMND_RTE_PUBLISH;
+static const char kPointeCommands[] PROGMEM = "pointe_" "|" D_CMND_RTE_ENABLE "|" D_CMND_RTE_DISPLAY "|" D_CMND_RTE_UPDATE "|" D_CMND_RTE_PUBLISH;
 void (* const PointeCommand[])(void) PROGMEM = { &CmndPointeEnable, &CmndPointeDisplay, &CmndPointeUpdate, &CmndPointePublish };
 
 // https stream status
@@ -128,7 +128,7 @@ enum RteHttpsUpdate { RTE_UPDATE_NONE, RTE_UPDATE_TOKEN_BEGIN, RTE_UPDATE_TOKEN_
 
 // config
 enum RteConfigKey { RTE_CONFIG_KEY, RTE_CONFIG_SANDBOX, RTE_CONFIG_ECOWATT, RTE_CONFIG_ECOWATT_DISPLAY, RTE_CONFIG_TEMPO, RTE_CONFIG_TEMPO_DISPLAY, RTE_CONFIG_POINTE, RTE_CONFIG_POINTE_DISPLAY, RTE_CONFIG_MAX };                   // configuration parameters
-const char kEcowattConfigKey[] PROGMEM = D_CMND_RTE_KEY "|" D_CMND_RTE_SANDBOX "|" D_CMND_RTE_ECOWATT "|" D_CMND_RTE_ECOWATT "_" D_CMND_RTE_DISPLAY "|" D_CMND_RTE_TEMPO "|" D_CMND_RTE_TEMPO "_" D_CMND_RTE_DISPLAY "|" D_CMND_RTE_POINTE "|" D_CMND_RTE_POINTE "_" D_CMND_RTE_DISPLAY;        // configuration keys
+static const char kEcowattConfigKey[] PROGMEM = D_CMND_RTE_KEY "|" D_CMND_RTE_SANDBOX "|" D_CMND_RTE_ECOWATT "|" D_CMND_RTE_ECOWATT "_" D_CMND_RTE_DISPLAY "|" D_CMND_RTE_TEMPO "|" D_CMND_RTE_TEMPO "_" D_CMND_RTE_DISPLAY "|" D_CMND_RTE_POINTE "|" D_CMND_RTE_POINTE "_" D_CMND_RTE_DISPLAY;        // configuration keys
 
 enum RteDay { RTE_DAY_YESTERDAY, RTE_DAY_TODAY, RTE_DAY_TOMORROW, RTE_DAY_MAX };
 enum RtePeriod { RTE_PERIOD_PLEINE, RTE_PERIOD_CREUSE, RTE_PERIOD_MAX };
@@ -136,22 +136,22 @@ enum RteGlobalLevel { RTE_LEVEL_UNKNOWN, RTE_LEVEL_BLUE, RTE_LEVEL_WHITE, RTE_LE
 
 // tempo data
 enum TempoLevel  { RTE_TEMPO_LEVEL_UNKNOWN, RTE_TEMPO_LEVEL_BLUE, RTE_TEMPO_LEVEL_WHITE, RTE_TEMPO_LEVEL_RED, RTE_TEMPO_LEVEL_MAX };
-const char kRteTempoStream[] PROGMEM = "|BLUE|WHITE|RED";
-const char kRteTempoJSON[]   PROGMEM = "undef|blue|white|red";
-const char kRteTempoColor[]  PROGMEM = "#252525|#06b|#ccc|#b00";
-const char kRteTempoDot[]    PROGMEM = "⚪|⚪|⚫|⚪";
-const char kRteTempoIcon[]   PROGMEM = "❔|🟦|⬜|🟥|❔|🔵|⚪|🔴";
+static const char kRteTempoStream[] PROGMEM = "|BLUE|WHITE|RED";
+static const char kRteTempoJSON[]   PROGMEM = "undef|blue|white|red";
+static const char kRteTempoColor[]  PROGMEM = "#252525|#06b|#ccc|#b00";
+static const char kRteTempoDot[]    PROGMEM = "⚪|⚪|⚫|⚪";
+static const char kRteTempoIcon[]   PROGMEM = "❔|🟦|⬜|🟥|❔|🔵|⚪|🔴";
 
 // pointe data
 enum PointeLevel  { RTE_POINTE_LEVEL_UNKNOWN, RTE_POINTE_LEVEL_BLUE, RTE_POINTE_LEVEL_RED, RTE_POINTE_LEVEL_MAX };
-const char kRtePointeJSON[]  PROGMEM = "undef|blue|red";
-const char kRtePointeColor[] PROGMEM = "#252525|#06b|#900";
-const char kRtePointeIcon[]  PROGMEM = "❔|🟦|🟥";
+static const char kRtePointeJSON[]  PROGMEM = "undef|blue|red";
+static const char kRtePointeColor[] PROGMEM = "#252525|#06b|#900";
+static const char kRtePointeIcon[]  PROGMEM = "❔|🟦|🟥";
 
 // ecowatt data
 enum EcowattDays { RTE_ECOWATT_DAY_TODAY, RTE_ECOWATT_DAY_TOMORROW, RTE_ECOWATT_DAY_PLUS2, RTE_ECOWATT_DAY_DAYPLUS3, RTE_ECOWATT_DAY_MAX };
 enum EcowattLevel { RTE_ECOWATT_LEVEL_CARBONFREE, RTE_ECOWATT_LEVEL_NORMAL, RTE_ECOWATT_LEVEL_WARNING, RTE_ECOWATT_LEVEL_POWERCUT, RTE_ECOWATT_LEVEL_MAX };
-const char kRteEcowattLevelColor[] PROGMEM = "#0a0|#080|#F80|#A00";
+static const char kRteEcowattLevelColor[] PROGMEM = "#0a0|#080|#F80|#A00";
 
 /***********************************************************\
  *                        Data
@@ -448,15 +448,6 @@ void CmndPointePublish ()
  *                      Configuration
 \***********************************************************/
 
-// process realtime data
-void RteProcessRealTime () 
-{
-#ifdef USE_TELEINFO
-    // update teleinfo data reception
-    TeleinfoProcessRealTime ();
-#endif    // USE_TELEINFO
-}
-
 // load configuration
 void RteLoadConfig () 
 {
@@ -613,7 +604,7 @@ void RtePublishTempoJson ()
 
   // publish message
   ResponseJsonEndEnd ();
-  MqttPublishTeleSensor ();
+  MqttPublishPrefixTopicRulesProcess_P (TELE, PSTR ("RTE"), false);
 
   // plan next update
   tempo_status.json_publish = 0;
@@ -645,7 +636,7 @@ void RtePublishPointeJson ()
 
   // publish message
   ResponseJsonEndEnd ();
-  MqttPublishTeleSensor ();
+  MqttPublishPrefixTopicRulesProcess_P (TELE, PSTR ("RTE"), false);
 
   // plan next update
   pointe_status.json_publish = 0;
@@ -685,7 +676,7 @@ void RtePublishEcowattJson ()
   
   // publish message
   ResponseJsonEndEnd ();
-  MqttPublishTeleSensor ();
+  MqttPublishPrefixTopicRulesProcess_P (TELE, PSTR("RTE"), false);
 
   // plan next update
   ecowatt_status.json_publish = 0;
@@ -759,9 +750,6 @@ bool RteStreamTokenGet ()
   // connexion
   http_code = rte_http.POST (nullptr, 0);
 
-  // handle realtime data reception
-  RteProcessRealTime ();
-
   // check if connexion failed
   is_ok = ((http_code == HTTP_CODE_OK) || (http_code == HTTP_CODE_MOVED_PERMANENTLY));
   if (is_ok) AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Token - Success [%d]"), http_code);
@@ -830,10 +818,10 @@ uint8_t RteEcowattGetGlobalLevel (const uint8_t day, const uint8_t slot)
   // convert level
   switch (level)
   {
-    case RTE_ECOWATT_LEVEL_CARBONFREE: result = RTE_LEVEL_BLUE; break;
-    case RTE_ECOWATT_LEVEL_NORMAL:     result = RTE_LEVEL_BLUE; break;
-    case RTE_ECOWATT_LEVEL_WARNING:    result = RTE_LEVEL_WHITE; break;
-    case RTE_ECOWATT_LEVEL_POWERCUT:   result = RTE_LEVEL_RED; break;
+    case RTE_ECOWATT_LEVEL_CARBONFREE: result = RTE_LEVEL_BLUE;    break;
+    case RTE_ECOWATT_LEVEL_NORMAL:     result = RTE_LEVEL_BLUE;    break;
+    case RTE_ECOWATT_LEVEL_WARNING:    result = RTE_LEVEL_WHITE;   break;
+    case RTE_ECOWATT_LEVEL_POWERCUT:   result = RTE_LEVEL_RED;     break;
     default:                           result = RTE_LEVEL_UNKNOWN; break;
   }
 
@@ -851,6 +839,7 @@ void RteEcowattStreamRetry ()
 bool RteEcowattStreamBegin ()
 {
   bool is_ok;
+  const char* pstr_url;
   char str_text[256];
 
   // check token
@@ -861,15 +850,15 @@ bool RteEcowattStreamBegin ()
   if (is_ok) 
   {
     // connexion
-    if (rte_config.sandbox) strcpy (str_text, RTE_URL_ECOWATT_SANDBOX);
-      else strcpy (str_text, RTE_URL_ECOWATT_DATA);
-    is_ok = rte_http.begin (rte_wifi, str_text);
+    if (rte_config.sandbox) pstr_url = RTE_URL_ECOWATT_SANDBOX;
+      else pstr_url = RTE_URL_ECOWATT_DATA;
+    is_ok = rte_http.begin (rte_wifi, pstr_url);
 
    // connexion report
-    if (is_ok) AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Ecowatt - Connexion done [%s]"), str_text);
+    if (is_ok) AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Ecowatt - Connexion done [%s]"), pstr_url);
     else
     {
-      AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Ecowatt - Connexion refused [%s]"), str_text);
+      AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Ecowatt - Connexion refused [%s]"), pstr_url);
       rte_http.end ();
       rte_wifi.stop ();
     }
@@ -901,9 +890,6 @@ bool RteEcowattStreamGet ()
 
   // connexion
   http_code = rte_http.GET ();
-
-  // handle realtime data reception
-  RteProcessRealTime ();
 
   // check if connexion failed
   is_ok = ((http_code == HTTP_CODE_OK) || (http_code == HTTP_CODE_MOVED_PERMANENTLY));
@@ -1130,9 +1116,6 @@ bool RteTempoStreamGet ()
   // connexion
   http_code = rte_http.GET ();
 
-  // handle realtime data reception
-  RteProcessRealTime ();
-
   // check if connexion failed
   is_ok = ((http_code == HTTP_CODE_OK) || (http_code == HTTP_CODE_MOVED_PERMANENTLY));
   if (is_ok) AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Tempo - Success [%d]"), http_code);
@@ -1296,9 +1279,6 @@ bool RtePointeStreamGet ()
   // connexion
   http_code = rte_http.GET ();
 
-  // handle realtime data reception
-  RteProcessRealTime ();
-
   // check if connexion failed
   is_ok = ((http_code == HTTP_CODE_OK) || (http_code == HTTP_CODE_MOVED_PERMANENTLY));
   if (is_ok) AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Pointe - Success [%d]"), http_code);
@@ -1396,7 +1376,7 @@ void RteInit ()
   rte_wifi.setInsecure ();
 
   // log help command
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: rte_help to get help on RTE modules"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Run rte to get help on RTE modules"));
 }
 
 // called every second
@@ -1696,6 +1676,8 @@ void RteWebSensor ()
   time_now = LocalTime ();
   BreakTime (time_now, dst_now);
 
+  WSContentSend_P (PSTR ("<style>table hr{display:none;}</style>\n"));
+
   // tempo display
   // -------------
   if (rte_config.tempo_enable && rte_config.tempo_display)
@@ -1706,7 +1688,7 @@ void RteWebSensor ()
     // title display
     WSContentSend_P (PSTR ("<div style='display:flex;margin:2px 0px 0px 0px;padding:0px;font-size:16px;'>\n"));
     WSContentSend_P (PSTR ("<div style='width:25%%;padding:0px;text-align:left;font-weight:bold;'>Tempo</div>\n"));
-    WSContentSend_P (PSTR ("<div style='width:13%%;padding:4px 0px;text-align:left;font-size:10px;font-style:italic;'>RTE v1</div>\n"));
+    WSContentSend_P (PSTR ("<div style='width:13%%;padding:4px 0px;text-align:left;font-size:10px;font-style:italic;'>v1</div>\n"));
     WSContentSend_P (PSTR ("<div style='width:60%%;padding:4px 0px 8px 0px;text-align:right;font-size:10px;font-style:italic;'>"));
 
     // set display message
@@ -1723,24 +1705,32 @@ void RteWebSensor ()
     // if data are available
     if (tempo_status.arr_day[RTE_DAY_TODAY] != RTE_TEMPO_LEVEL_UNKNOWN)
     {
+      // ecowatt styles
+      WSContentSend_P (PSTR ("<style>\n"));
+      WSContentSend_P (PSTR (".tempod{display:flex;margin:0px;padding:1px;height:14px;}\n"));
+      WSContentSend_P (PSTR (".tempoh{width:20.8%%;padding:0px;text-align:left;}\n"));
+      for (index = 0; index < RTE_TEMPO_LEVEL_MAX; index ++)
+      {
+        GetTextIndexed (str_color, sizeof (str_color), index, kRteTempoColor);
+        WSContentSend_P (PSTR (".tempo%u{width:3.3%%;padding:1px 0px;background-color:%s;}\n"), index, str_color);
+      }
+      WSContentSend_P (PSTR ("</style>\n"));
+
       // loop thru days
       for (index = RTE_DAY_TODAY; index < RTE_DAY_MAX; index ++)
       {
-        WSContentSend_P (PSTR ("<div style='display:flex;margin:0px;padding:1px;height:14px;'>\n"));
+        WSContentSend_P (PSTR ("<div class='tempod'>\n"));
 
         // display day
         if (index == RTE_DAY_TODAY) strcpy (str_text, "Aujourd'hui"); else strcpy (str_text, "Demain");
-        WSContentSend_P (PSTR ("<div style='width:20.8%%;padding:0px;text-align:left;'>%s</div>\n"), str_text);
+        WSContentSend_P (PSTR ("<div class='tempoh'>%s</div>\n"), str_text);
 
         // display hourly slots
         for (slot = 0; slot < 24; slot ++)
         {
           // calculate color of current slot
           level = RteTempoGetLevel (index, slot);
-          GetTextIndexed (str_color, sizeof (str_color), level, kRteTempoColor);  
-
-          // segment beginning
-          WSContentSend_P (PSTR ("<div style='width:3.3%%;padding:1px 0px;background-color:%s;"), str_color);
+          WSContentSend_P (PSTR ("<div class='tempo%u' style='"), level);
 
           // set opacity for HC
           if ((slot < 6) || (slot >= 22)) WSContentSend_P (PSTR ("opacity:75%%;"));
@@ -1758,11 +1748,8 @@ void RteWebSensor ()
           else WSContentSend_P (PSTR ("'></div>\n"));
         }
         WSContentSend_P (PSTR ("</div>\n"));
-
-        // handle realtime data reception
-        RteProcessRealTime ();
       }
-
+    
       // hour scale
       WSContentSend_P (PSTR ("<div style='display:flex;margin:0px;padding:0px;'>\n"));
       WSContentSend_P (PSTR ("<div style='width:20.8%%;padding:0px;'></div>\n"), 0);
@@ -1776,9 +1763,6 @@ void RteWebSensor ()
 
     // end of tempo data
     WSContentSend_P (PSTR ("</div>\n")); 
-
-    // handle realtime data reception
-    RteProcessRealTime ();
   }
 
   // pointe period display
@@ -1791,7 +1775,7 @@ void RteWebSensor ()
     // title display
     WSContentSend_P (PSTR ("<div style='display:flex;margin:2px 0px 0px 0px;padding:0px;font-size:16px;'>\n"));
     WSContentSend_P (PSTR ("<div style='width:25%%;padding:0px;text-align:left;font-weight:bold;'>Pointe</div>\n"));
-    WSContentSend_P (PSTR ("<div style='width:13%%;padding:4px 0px;text-align:left;font-size:10px;font-style:italic;'>RTE v2</div>\n"));
+    WSContentSend_P (PSTR ("<div style='width:13%%;padding:4px 0px;text-align:left;font-size:10px;font-style:italic;'>v2</div>\n"));
     WSContentSend_P (PSTR ("<div style='width:60%%;padding:4px 0px 8px 0px;text-align:right;font-size:10px;font-style:italic;'>"));
 
     // set display message
@@ -1808,24 +1792,32 @@ void RteWebSensor ()
     // if data are available
     if (pointe_status.arr_day[RTE_DAY_TODAY] != RTE_POINTE_LEVEL_UNKNOWN)
     {
+      // pointe styles
+      WSContentSend_P (PSTR ("<style>\n"));
+      WSContentSend_P (PSTR (".pointed{display:flex;margin:0px;padding:1px;height:14px;}\n"));
+      WSContentSend_P (PSTR (".pointeh{width:20.8%%;padding:0px;text-align:left;}\n"));
+      for (index = 0; index < RTE_POINTE_LEVEL_MAX; index ++)
+      {
+        GetTextIndexed (str_color, sizeof (str_color), index, kRtePointeColor);  
+        WSContentSend_P (PSTR (".pointe%u{width:3.3%%;padding:1px 0px;background-color:%s;}\n"), index, str_color);
+      }
+      WSContentSend_P (PSTR ("</style>\n"));
+
       // loop thru days
       for (index = RTE_DAY_TODAY; index < RTE_DAY_MAX; index ++)
       {
-        WSContentSend_P (PSTR ("<div style='display:flex;margin:0px;padding:1px;height:14px;'>\n"));
+        WSContentSend_P (PSTR ("<div class='pointed'>\n"));
 
         // display day
         if (index == RTE_DAY_TODAY) strcpy (str_text, "Aujourd'hui"); else strcpy (str_text, "Demain");
-        WSContentSend_P (PSTR ("<div style='width:20.8%%;padding:0px;text-align:left;'>%s</div>\n"), str_text);
+        WSContentSend_P (PSTR ("<div class='pointeh'>%s</div>\n"), str_text);
 
         // display hourly slots
         for (slot = 0; slot < 24; slot ++)
         {
           // calculate color of current slot
           level = RtePointeGetLevel (index, slot);
-          GetTextIndexed (str_color, sizeof (str_color), level, kRtePointeColor);  
-
-          // segment beginning
-          WSContentSend_P (PSTR ("<div style='width:3.3%%;padding:1px 0px;background-color:%s;"), str_color);
+          WSContentSend_P (PSTR ("<div class='pointe%u' style='"), level);
 
           // first and last segment specificities
           if (slot == 0) WSContentSend_P (PSTR ("border-top-left-radius:6px;border-bottom-left-radius:6px;"));
@@ -1836,9 +1828,6 @@ void RteWebSensor ()
             else WSContentSend_P (PSTR ("'></div>\n"));
         }
         WSContentSend_P (PSTR ("</div>\n"));
-
-        // handle realtime data reception
-        RteProcessRealTime ();
       }
 
       // hour scale
@@ -1855,9 +1844,6 @@ void RteWebSensor ()
 
     // end of pointe data
     WSContentSend_P (PSTR ("</div>\n")); 
-
-    // handle realtime data reception
-    RteProcessRealTime ();
   }
 
   // ecowatt display
@@ -1870,7 +1856,7 @@ void RteWebSensor ()
     // title display
     WSContentSend_P (PSTR ("<div style='display:flex;margin:2px 0px 0px 0px;padding:0px;font-size:16px;'>\n"));
     WSContentSend_P (PSTR ("<div style='width:25%%;padding:0px;text-align:left;font-weight:bold;'>Ecowatt</div>\n"));
-    WSContentSend_P (PSTR ("<div style='width:13%%;padding:4px 0px;text-align:left;font-size:10px;font-style:italic;'>RTE v5</div>\n"));
+    WSContentSend_P (PSTR ("<div style='width:13%%;padding:4px 0px;text-align:left;font-size:10px;font-style:italic;'>v5</div>\n"));
     WSContentSend_P (PSTR ("<div style='width:60%%;padding:4px 0px 8px 0px;text-align:right;font-size:10px;font-style:italic;'>"));
 
     // set display message
@@ -1884,21 +1870,29 @@ void RteWebSensor ()
     WSContentSend_P (PSTR ("<div style='width:2%%;padding:0px;'></div>\n"));
     WSContentSend_P (PSTR ("</div>\n"));
 
-    // handle realtime data reception
-    RteProcessRealTime ();
-
     // if ecowatt signal has been received previously
     if (ecowatt_status.arr_day[0].month != 0)
     {
+      // ecowatt styles
+      WSContentSend_P (PSTR ("<style>\n"));
+      WSContentSend_P (PSTR (".ecod{display:flex;margin:0px;padding:1px;height:14px;}\n"));
+      WSContentSend_P (PSTR (".ecoh{width:20.8%%;padding:0px;text-align:left;}\n"));
+      for (index = 0; index < RTE_ECOWATT_LEVEL_MAX; index ++)
+      {
+        GetTextIndexed (str_color, sizeof (str_color), index, kRteEcowattLevelColor);
+        WSContentSend_P (PSTR (".eco%u{width:3.3%%;padding:1px 0px;background-color:%s;}\n"), index, str_color);
+      }
+      WSContentSend_P (PSTR ("</style>\n"));
+
       // loop thru days
       for (index = 0; index < RTE_ECOWATT_DAY_MAX; index ++)
       {
-        WSContentSend_P (PSTR ("<div style='display:flex;margin:0px;padding:1px;height:14px;opacity:%u%%;'>\n"), 100);
+        WSContentSend_P (PSTR ("<div class='ecod'>\n"));
 
         // display day
-        if (index == 0) WSContentSend_P (PSTR ("<div style='width:20.8%%;padding:0px;text-align:left;'>%s</div>\n"), "Aujourd'hui");
-          else if (index == 1) WSContentSend_P (PSTR ("<div style='width:20.8%%;padding:0px;text-align:left;'>%s</div>\n"), "Demain");
-          else if (strlen (ecowatt_status.arr_day[index].str_day_of_week) == 0) WSContentSend_P (PSTR ("<div style='width:20.8%%;padding:0px;text-align:left;'>%s</div>\n"), "");
+        if (index == 0) WSContentSend_P (PSTR ("<div class='ecoh'>%s</div>\n"), "Aujourd'hui");
+          else if (index == 1) WSContentSend_P (PSTR ("<div class='ecoh'>%s</div>\n"), "Demain");
+          else if (strlen (ecowatt_status.arr_day[index].str_day_of_week) == 0) WSContentSend_P (PSTR ("<div class='ecoh'>%s</div>\n"), "");
           else WSContentSend_P (PSTR ("<div style='width:8.4%%;padding:0px;text-align:left;'>%s</div><div style='width:12.4%%;padding:0px;text-align:left;'>%02u/%02u</div>\n"), ecowatt_status.arr_day[index].str_day_of_week, ecowatt_status.arr_day[index].day_of_month, ecowatt_status.arr_day[index].month);
 
         // display hourly slots
@@ -1906,8 +1900,7 @@ void RteWebSensor ()
         {
           // segment beginning
           level = ecowatt_status.arr_day[index].arr_hvalue[slot];
-          GetTextIndexed (str_color, sizeof (str_color), level, kRteEcowattLevelColor);
-          WSContentSend_P (PSTR ("<div style='width:3.3%%;padding:1px 0px;background-color:%s;"), str_color);
+          WSContentSend_P (PSTR ("<div class='eco%u' style='"), level);
 
           // first and last segment specificities
           if (slot == 0) WSContentSend_P (PSTR ("border-top-left-radius:6px;border-bottom-left-radius:6px;"));
@@ -1918,9 +1911,6 @@ void RteWebSensor ()
             else WSContentSend_P (PSTR ("'></div>\n"));
         }
         WSContentSend_P (PSTR ("</div>\n"));
-
-        // handle realtime data reception
-        RteProcessRealTime ();
       }
 
       // hour scale
@@ -1936,9 +1926,6 @@ void RteWebSensor ()
 
     // end of ecowatt data
     WSContentSend_P (PSTR ("</div>\n")); 
-
-    // handle realtime data reception
-    RteProcessRealTime ();
   }
 }
 

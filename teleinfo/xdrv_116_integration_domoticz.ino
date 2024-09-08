@@ -5,7 +5,8 @@
 
   Version history :
     07/02/2024 - v1.0 - Creation
-    14/04/2024 - v1.1 - switch to rf_code configuration
+    14/04/2024 - v1.1 - Switch to rf_code configuration
+    16/07/2024 - v1.2 - Add global power, current and voltage
 
   Configuration values are stored in :
     - Settings->rf_code[16][2]  : Flag en enable/disable integration
@@ -42,8 +43,46 @@
 
 #define TELEINFO_DOMOTICZ_NB_MESSAGE    5
 
+// Data type
+enum DomoticzDataType { DOMO_DATA_METER_BLUE, DOMO_DATA_METER_WHITE, DOMO_DATA_METER_RED, 
+                        DOMO_DATA_POWER_CONSO, DOMO_DATA_CURRENT,
+                        DOMO_DATA_VOLTAGE1, DOMO_DATA_VOLTAGE2, DOMO_DATA_VOLTAGE3,
+                        DOMO_DATA_METER_PROD, 
+                        DOMO_DATA_ALERT_HCHP, DOMO_DATA_ALERT_TODAY, DOMO_DATA_ALERT_TOMORROW,
+                        DOMO_DATA_12, DOMO_DATA_13, DOMO_DATA_14, DOMO_DATA_15, DOMO_DATA_MAX };
+
+const char kDomoticzIntegrationLabels[] PROGMEM = 
+                        "Totaux conso. Bleu" "|" 
+                        "Totaux conso. Blanc" "|" 
+                        "Totaux conso. Rouge" "|"
+                        "Total global conso." "|" 
+                        "Courant (3 phases)" "|" 
+                        "Tension (phase 1)" "|" 
+                        "Tension (phase 2)" "|" 
+                        "Tension (phase 3)" "|"
+                        "Total Production" "|"
+                        "Heure Pleine /Creuse" "|" 
+                        "Couleur du Jour" "|" 
+                        "Couleur du Lendemain" "|"
+                        "12" "|" "13" "|" "14" "|" "15";
+
+const char kDomoticzIntegrationTitles[] PROGMEM = 
+                        "[P1SmartMeter] Totaux HC/HP pour contrat Base, EJP, HC/HP, Tempo bleu, ..." "|"
+                        "[P1SmartMeter] Totaux HC/HP pour période Tempo Blanc" "|"
+                        "[P1SmartMeter] Totaux HC/HP pour période Tempo Rouge" "|"
+                        "[Instant & counter] Total global de consommation" "|" 
+                        "[Current] Courant monophasé ou sur chacune des 3 phases" "|" 
+                        "[Voltage] Tension monophasée ou phase 1" "|" 
+                        "[Voltage] Tension phase 2" "|" 
+                        "[Voltage] Tension phase 3" "|"
+                        "[P1SmartMeter] Total global de production" "|"
+                        "[Alert] Status HC/HP (0:Heure Pleine, 1:Heure creuse)" "|"
+                        "[Alert] Couleur du Jour (0:Inconnue, 1:Bleu, 2:Blanc, 4:Rouge)" "|" 
+                        "[Alert] Couleur du Lendemain (0:Inconnue, 1:Bleu, 2:Blanc, 4:Rouge)" "|"
+                        "Non utilisé" "|" "Non utilisé" "|" "Non utilisé" "|" "Non utilisé";
+
 // Commands
-const char kDomoticzIntegrationCommands[] PROGMEM = "domo_" "|" "help" "|" "enable" "|" "key";
+const char kDomoticzIntegrationCommands[] PROGMEM = "domo" "|"  "|" "_set" "|" "_key";
 void (* const DomoticzIntegrationCommand[])(void) PROGMEM = { &CmndDomoticzIntegrationHelp, &CmndDomoticzIntegrationEnable, &CmndDomoticzIntegrationSetKey };
 
 /**************************************\
@@ -94,6 +133,31 @@ bool DomoticzIntegrationGet ()
   return (domoticz_integration.enabled == 1);
 }
 
+// set Domoticz key
+void DomoticzIntegrationSetKey (const uint8_t index, const uint16_t value)
+{
+  // key stored in SENSOR IDX
+  if (index < MAX_DOMOTICZ_SNS_IDX) Settings->domoticz_sensor_idx[index] = value;
+
+  // key stored in SWITCH IDX
+  else if (index < MAX_DOMOTICZ_SNS_IDX + MAX_DOMOTICZ_IDX) Settings->domoticz_switch_idx[index - MAX_DOMOTICZ_SNS_IDX] = value;
+}
+
+// get Domoticz key
+uint16_t DomoticzIntegrationGetKey () { return DomoticzIntegrationGetKey (domoticz_integration.index); }
+uint16_t DomoticzIntegrationGetKey (const uint8_t index)
+{
+  uint16_t value = 0;
+
+  // key stored in SENSOR IDX
+  if (index < MAX_DOMOTICZ_SNS_IDX) value = Settings->domoticz_sensor_idx[index];
+
+  // key stored in SWITCH IDX
+  else if (index < MAX_DOMOTICZ_SNS_IDX + MAX_DOMOTICZ_IDX) value = Settings->domoticz_switch_idx[index - MAX_DOMOTICZ_SNS_IDX];
+
+  return value;
+}
+
 /****************************\
  *        Commands
 \****************************/
@@ -101,16 +165,14 @@ bool DomoticzIntegrationGet ()
 // Domoticz interation help
 void CmndDomoticzIntegrationHelp ()
 {
+  uint8_t index;
+  char    str_text[48];
+
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: commands for Teleinfo Domoticz integration"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("  domo_enable <%u>    = enable/disable Domoticz integration"), domoticz_integration.enabled);
-  AddLog (LOG_LEVEL_INFO, PSTR ("  domo_key <num,idx> = set key num to index idx"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("    <0,%u>  : total Wh (hc/hp) and power W for conso (base,hc/hp,ejp,bleu)"), Settings->domoticz_sensor_idx[0]);
-  AddLog (LOG_LEVEL_INFO, PSTR ("    <1,%u>  : total Wh (hc/hp) and power W for conso (blanc)"), Settings->domoticz_sensor_idx[1]);
-  AddLog (LOG_LEVEL_INFO, PSTR ("    <2,%u>  : total Wh (hc/hp) and power W for conso (rouge)"), Settings->domoticz_sensor_idx[2]);
-  AddLog (LOG_LEVEL_INFO, PSTR ("    <8,%u>  : total Wh and power W for production"), Settings->domoticz_sensor_idx[8]);
-  AddLog (LOG_LEVEL_INFO, PSTR ("    <9,%u>  : alert for current hc/hp"), Settings->domoticz_sensor_idx[9]);
-  AddLog (LOG_LEVEL_INFO, PSTR ("    <10,%u> : alert fot current period color (bleu, blanc, rouge)"), Settings->domoticz_sensor_idx[10]);
-  AddLog (LOG_LEVEL_INFO, PSTR ("    <11,%u> : alert for tomorrow's period color (bleu, blanc, rouge)"), Settings->domoticz_sensor_idx[11]);
+  AddLog (LOG_LEVEL_INFO, PSTR ("  domo_set <%u>      = activation/desactivation de l'integration"), domoticz_integration.enabled);
+  AddLog (LOG_LEVEL_INFO, PSTR ("  domo_key <num,idx> = index idx pour la clé num"));
+  for (index = 0; index < DOMO_DATA_12; index ++) AddLog (LOG_LEVEL_INFO, PSTR ("    <%u,%u>  : %s"), index, DomoticzIntegrationGetKey (index), GetTextIndexed (str_text, sizeof (str_text), index, kDomoticzIntegrationLabels));
+
   ResponseCmndDone ();
 }
 
@@ -124,10 +186,10 @@ void CmndDomoticzIntegrationEnable ()
 // set Domoticz key
 void CmndDomoticzIntegrationSetKey ()
 {
-  uint8_t index = UINT8_MAX;
-  char   *pstr_value;
-  char    str_data[16];
-  char    str_text[64];
+  uint8_t  index = UINT8_MAX;
+  uint16_t value = 0;
+  char    *pstr_value;
+  char     str_data[64];
 
   if (XdrvMailbox.data_len > 0)
   {
@@ -136,19 +198,18 @@ void CmndDomoticzIntegrationSetKey ()
     pstr_value = strchr (str_data, ',');
     if (pstr_value != nullptr) *pstr_value++ = 0;
 
-    // get key
-    index = (uint8_t)atoi (str_data);
-
     // if separator was found, update value
-    if ((index < MAX_DOMOTICZ_SNS_IDX) && (pstr_value != nullptr)) Settings->domoticz_sensor_idx[index] = (uint16_t)atoi (pstr_value);
+    index = (uint8_t)atoi (str_data);
+    if (pstr_value != nullptr) DomoticzIntegrationSetKey (index, (uint16_t)atoi (pstr_value));
   }
 
   // answer
-  if (index < MAX_DOMOTICZ_SNS_IDX)
+  if (index < DOMO_DATA_MAX)
   {
-    if (Settings->domoticz_sensor_idx[index] > 0) snprintf_P (str_text, sizeof (str_text), PSTR ("Domoticz sensor %u enabled (idx %u)"), index, Settings->domoticz_sensor_idx[index]);
-      else snprintf_P (str_text, sizeof (str_text), PSTR ("Domoticz sensor %u disabled"), index);
-    ResponseCmndChar_P (str_text);
+    value = DomoticzIntegrationGetKey (index);
+    if (value > 0) snprintf_P (str_data, sizeof (str_data), PSTR ("Domoticz sensor %u enabled (idx %u)"), index, value);
+      else snprintf_P (str_data, sizeof (str_data), PSTR ("Domoticz sensor %u disabled"), index);
+    ResponseCmndChar_P (str_data);
   }
   else ResponseCmndFailed ();
 }
@@ -164,20 +225,19 @@ void DomoticzIntegrationInit ()
   DomoticzIntegrationLoadConfig ();
   
   // log help command
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: domo_help to get help on Domoticz integration"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Run domo to get help on Domoticz integration"));
 }
 
 // called 10 times per second
-void DomoticzIntegrationEvery100ms ()
+void DomoticzIntegrationEvery250ms ()
 {
   // check if enabled
   if (!domoticz_integration.enabled) return;
-  if (teleinfo_meter.nb_message <= TELEINFO_DOMOTICZ_NB_MESSAGE) return;
   if (!RtcTime.valid) return;
   if (!MqttIsConnected ()) return;
 
   // publish if needed
-  if (domoticz_integration.index < MAX_DOMOTICZ_SNS_IDX) DomoticzIntegrationPublish ();
+  if (domoticz_integration.index < DOMO_DATA_MAX) DomoticzIntegrationPublish ();
 }
 
 /***************************************\
@@ -202,67 +262,89 @@ uint8_t DomoticzIntegrationPublish ()
   char     str_svalue[64];
 
   // check for current period 
-  if (!domoticz_integration.enabled) return MAX_DOMOTICZ_SNS_IDX;
-  if (teleinfo_contract.period == UINT8_MAX) return MAX_DOMOTICZ_SNS_IDX;
+  if (!domoticz_integration.enabled) return DOMO_DATA_MAX;
+  if (teleinfo_contract.period_idx == UINT8_MAX) return DOMO_DATA_MAX;
 
   // check if there is something to publish
-  if (domoticz_integration.index >= MAX_DOMOTICZ_SNS_IDX) return MAX_DOMOTICZ_SNS_IDX;
-
-  // process data reception
-  TeleinfoProcessRealTime ();
+  if (domoticz_integration.index >= DOMO_DATA_MAX) return DOMO_DATA_MAX;
 
   // publish next topic
-  while ((domoticz_integration.index < MAX_DOMOTICZ_SNS_IDX) && (Settings->domoticz_sensor_idx[domoticz_integration.index] == 0)) domoticz_integration.index++;
-  if (domoticz_integration.index < MAX_DOMOTICZ_SNS_IDX)
+  while ((domoticz_integration.index < DOMO_DATA_MAX) && (DomoticzIntegrationGetKey () == 0)) domoticz_integration.index++;
+  if (domoticz_integration.index < DOMO_DATA_MAX)
   {
     // init
     nvalue = 0;
     strcpy (str_svalue,  "" );
-    strcpy (str_total_1, "0");
-    strcpy (str_total_2, "0");
-    sns_index = Settings->domoticz_sensor_idx[domoticz_integration.index];
+    strcpy_P (str_total_1, PSTR ("0"));
+    strcpy_P (str_total_2, PSTR ("0"));
+    sns_index = DomoticzIntegrationGetKey ();
 
     // set data according to index
     switch (domoticz_integration.index)
     {
-      // conso
-      case 0:
-      case 1:
-      case 2:
+      // conso (hc/hp for first 3 periods)
+      case DOMO_DATA_METER_BLUE:
+      case DOMO_DATA_METER_WHITE:
+      case DOMO_DATA_METER_RED:
         value = 0;
         index = domoticz_integration.index * 2;
-        nvalue = 0;
         lltoa (teleinfo_conso.index_wh[index], str_total_1, 10);
         lltoa (teleinfo_conso.index_wh[index + 1], str_total_2, 10);
-        if ((teleinfo_contract.period == index) || (teleinfo_contract.period == index + 1)) value = teleinfo_conso.pact;
+        if ((teleinfo_contract.period_idx == index) || (teleinfo_contract.period_idx == index + 1)) value = teleinfo_conso.pact;
         sprintf_P (str_svalue, PSTR ("%s;%s;0;0;%d;0"), str_total_1, str_total_2, value);
         break;
 
+      // total power
+      case DOMO_DATA_POWER_CONSO:
+        lltoa (teleinfo_conso.total_wh, str_total_1, 10);
+        sprintf_P (str_svalue, PSTR ("%d;%s"), teleinfo_conso.phase[0].pact, str_total_1);
+        break;
+
+      // current on 3 phases
+      case DOMO_DATA_CURRENT:
+        sprintf_P (str_svalue, PSTR ("%d.%d;%d.%d;%d.%d"), teleinfo_conso.phase[0].current / 1000, teleinfo_conso.phase[0].current % 1000, teleinfo_conso.phase[1].current / 1000, teleinfo_conso.phase[1].current % 1000, teleinfo_conso.phase[2].current / 1000, teleinfo_conso.phase[2].current % 1000);
+        break;
+
+      // voltage phase 1
+      case DOMO_DATA_VOLTAGE1:
+        sprintf_P (str_svalue, PSTR ("%d"), teleinfo_conso.phase[0].voltage);
+        break;
+
+      // voltage phase 2
+      case DOMO_DATA_VOLTAGE2:
+        sprintf_P (str_svalue, PSTR ("%d"), teleinfo_conso.phase[1].voltage);
+        break;
+      
+      // voltage phase 3
+      case DOMO_DATA_VOLTAGE3:
+        sprintf_P (str_svalue, PSTR ("%d"), teleinfo_conso.phase[2].voltage);
+        break;
+
       // prod
-      case 8:
-        nvalue = 0;
+      case DOMO_DATA_METER_PROD:
         lltoa (teleinfo_prod.total_wh, str_total_1, 10);
         sprintf_P (str_svalue, PSTR ("%s;0;0;0;%d;0"), str_total_1, teleinfo_prod.pact);
         break;
 
       // current hc / hp
-      case 9:
+      case DOMO_DATA_ALERT_HCHP:
         nvalue = 1;
         if (TeleinfoPeriodGetHP ()) nvalue = 0;
-        if (nvalue == 0) strcpy (str_svalue, "Heure Pleine"); else strcpy (str_svalue, "Heure Creuse");
+        if (nvalue == 0) strcpy_P (str_svalue, PSTR ("Heure Pleine")); 
+          else strcpy_P (str_svalue, PSTR ("Heure Creuse"));
         break;
 
-      // current level
-      case 10:
+      // color today
+      case DOMO_DATA_ALERT_TODAY:
         nvalue = TeleinfoPeriodGetLevel ();
-        GetTextIndexed (str_svalue, sizeof (str_svalue), nvalue, kTeleinfoPeriodLevel);
+        GetTextIndexed (str_svalue, sizeof (str_svalue), nvalue, kTeleinfoPeriodLabel);
         if (nvalue == 3) nvalue = 4;
         break;
 
-      // tomorrow's level
-      case 11:
+      // color tomorrow
+      case DOMO_DATA_ALERT_TOMORROW:
         nvalue = TeleinfoDriverCalendarGetLevel (TIC_DAY_TOMORROW, 12, true);
-        GetTextIndexed (str_svalue, sizeof (str_svalue), nvalue, kTeleinfoPeriodLevel);
+        GetTextIndexed (str_svalue, sizeof (str_svalue), nvalue, kTeleinfoPeriodLabel);
         if (nvalue == 3) nvalue = 4;
         break;
     }
@@ -270,13 +352,15 @@ uint8_t DomoticzIntegrationPublish ()
     // if some data should be published;
     if (strlen (str_svalue) > 0)
     {
-      // get data
+      // get wifi RSSI data
       rssi = WiFi.RSSI ();
       wifi = WifiGetRssiAsQuality (rssi);
 
       // publish data
       ResponseClear ();
       ResponseAppend_P (PSTR ("{\"idx\":%u,\"nvalue\":%d,\"svalue\":\"%s\",\"Battery\":%u,\"RSSI\":%d}"), sns_index, nvalue, str_svalue, 100, wifi / 10);
+
+      // publish message
       MqttPublishPayload (DOMOTICZ_IN_TOPIC, ResponseData());
     }
   }
@@ -292,8 +376,45 @@ void DomoticzIntegrationPublishAll ()
 {
   uint8_t result = 0;
 
-  while (result < MAX_DOMOTICZ_SNS_IDX) result = DomoticzIntegrationPublish ();
+  while (result < DOMO_DATA_MAX) result = DomoticzIntegrationPublish ();
 }
+
+/***************************************\
+ *              Web
+\***************************************/
+
+#ifdef USE_WEBSERVER
+
+void DomoticzIntegrationDisplayParameters ()
+{
+  uint8_t index;
+  char    str_text[32];
+  char    str_title[64];
+
+  // loop to display indexes
+  for (index = 0; index < DOMO_DATA_12; index ++)
+  {
+    GetTextIndexed (str_text,  sizeof (str_text),  index, kDomoticzIntegrationLabels);
+    GetTextIndexed (str_title, sizeof (str_title), index, kDomoticzIntegrationTitles);
+    WSContentSend_P (PSTR ("<p class='dat' title='%s'><span class='domo'>%s</span><span class='val'><input class='idx' type='number' name='idx%u' min='0' max='65535' step='1' value='%u'></span></p>\n"),  str_title, str_text, index, DomoticzIntegrationGetKey (index));
+  }
+}
+
+void DomoticzIntegrationRetrieveParameters ()
+{
+  uint8_t index;
+  char    str_param[8];
+  char    str_value[8];
+
+  for (index = 0; index < DOMO_DATA_12; index ++)
+  {
+    sprintf_P (str_param, PSTR ("idx%u"), index);
+    WebGetArg (str_param, str_value, sizeof (str_value));
+    DomoticzIntegrationSetKey (index, (uint16_t) atoi (str_value));
+  }
+}
+
+#endif    // USE_WEBSERVER
 
 /***************************************\
  *              Interface
@@ -313,8 +434,8 @@ bool Xdrv116 (uint32_t function)
     case FUNC_COMMAND:
       result = DecodeCommand (kDomoticzIntegrationCommands, DomoticzIntegrationCommand);
       break;
-   case FUNC_EVERY_100_MSECOND:
-      DomoticzIntegrationEvery100ms ();
+   case FUNC_EVERY_250_MSECOND:
+      DomoticzIntegrationEvery250ms ();
       break;
   }
 

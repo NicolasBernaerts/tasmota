@@ -5,6 +5,7 @@
 
   Version history :
     29/02/2024 - v14.0 - Split graph in 3 files
+    28/06/2024 - v14.6 - Remove all String for ESP8266 stability
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -26,31 +27,37 @@
 \*************************************************/
 
 // declare teleinfo graph curves
-#define XSNS_125                         125
+#define XSNS_125                          125
 
-#define TELEINFO_CURVE_BUFFER_MAX       1024      // history file buffer
+#define TELEINFO_CURVE_LINE_SIZE          192       // curve file line max size
+
+#ifdef ESP32
+  #define TELEINFO_CURVE_BUFFER_SIZE      1024      // curve file buffer size
+#else
+  #define TELEINFO_CURVE_BUFFER_SIZE      512       // curve file buffer size
+#endif
+
 
 // web URL
-const char D_TELEINFO_PAGE_GRAPH[]       PROGMEM = "/graph";
-const char D_TELEINFO_PAGE_GRAPH_DATA[]  PROGMEM = "/data.upd";
-const char D_TELEINFO_PAGE_GRAPH_CURVE[] PROGMEM = "/curve.upd";
+const char PSTR_TIC_PAGE_GRAPH[]       PROGMEM = "/graph";
+const char PSTR_TIC_PAGE_GRAPH_DATA[]  PROGMEM = "/data.upd";
+const char PSTR_TIC_PAGE_GRAPH_CURVE[] PROGMEM = "/curve.upd";
 
 #ifdef USE_UFILESYS
 
 // curve files
-const char D_TELEINFO_CURVE_HEADER[]    PROGMEM = "Idx;Date;Time";
-const char D_TELEINFO_CURVE_FILE_DAY[]  PROGMEM = "/teleinfo-day-%02u.csv";
-const char D_TELEINFO_CURVE_FILE_WEEK[] PROGMEM = "/teleinfo-week-%02u.csv";
+const char PSTR_TIC_CURVE_FILE_DAY[]  PROGMEM = "/teleinfo-day-%02u.csv";
+const char PSTR_TIC_CURVE_FILE_WEEK[] PROGMEM = "/teleinfo-week-%02u.csv";
 
 // curve - periods
-const char kTeleinfoCurvePeriod[] PROGMEM = "Live|Day|Week";                                                                                            // period labels
-const long ARR_TELEINFO_CURVE_WINDOW[] = { 300 / TELEINFO_GRAPH_SAMPLE, 86400 / TELEINFO_GRAPH_SAMPLE, 604800 / TELEINFO_GRAPH_SAMPLE, 1};                // time window between samples (sec.)
+const char kTeleinfoCurvePeriod[] PROGMEM = "Live|Day|Week";                                                                    // period labels
+const long ARR_TIC_CURVE_WINDOW[] = { 300 / TIC_GRAPH_SAMPLE, 86400 / TIC_GRAPH_SAMPLE, 604800 / TIC_GRAPH_SAMPLE, 1};          // time window between samples (sec.)
 
 #else
 
 // curve - periods
-const char kTeleinfoCurvePeriod[] PROGMEM = "Live";                                                               // period labels
-const long ARR_TELEINFO_CURVE_WINDOW[] = { 300 / TELEINFO_GRAPH_SAMPLE, 1 };                                     // time window between samples (sec.)
+const char kTeleinfoCurvePeriod[] PROGMEM = "Live";                                                                             // period labels
+const long ARR_TIC_CURVE_WINDOW[] = { 300 / TIC_GRAPH_SAMPLE, 1 };                                                              // time window between samples (sec.)
 
 #endif    // USE_UFILESYS
 
@@ -59,7 +66,7 @@ const long ARR_TELEINFO_CURVE_WINDOW[] = { 300 / TELEINFO_GRAPH_SAMPLE, 1 };    
 \****************************************/
 
 // teleinfo : calculation periods data
-struct tic_period {
+struct tic_graph_period {
   bool     updated;                                 // flag to ask for graph update
   int      index;                                   // current array index per refresh period (day of year for yearly period)
   long     counter;                                 // counter in seconds of current refresh period (10k*year + 100*month + day_of_month for yearly period)
@@ -71,17 +78,19 @@ struct tic_period {
   long  long pact_sum[ENERGY_MAX_PHASES];           // sum of active power during refresh period
   long  cosphi_sum[ENERGY_MAX_PHASES];              // sum of cos phi during refresh period
 
-  String str_filename;                              // log filename
-  String str_buffer;                                // buffer of data waiting to be logged
+#ifdef USE_UFILESYS
+  char  str_filename[UFS_FILENAME_SIZE];           // log filename
+  char  str_buffer[TELEINFO_CURVE_BUFFER_SIZE];    // buffer of data waiting to be logged
+#endif      // UFILESYS
 }; 
-static tic_period teleinfo_period[TELEINFO_PERIOD_MAX];
+static tic_graph_period teleinfo_period[TELEINFO_PERIOD_MAX];
 
 // teleinfo : graph data
 struct tic_graph {
-  uint8_t arr_papp[ENERGY_MAX_PHASES][TELEINFO_GRAPH_SAMPLE];     // array of apparent power graph values
-  uint8_t arr_pact[ENERGY_MAX_PHASES][TELEINFO_GRAPH_SAMPLE];     // array of active power graph values
-  uint8_t arr_volt[ENERGY_MAX_PHASES][TELEINFO_GRAPH_SAMPLE];     // array min and max voltage delta
-  uint8_t arr_cosphi[ENERGY_MAX_PHASES][TELEINFO_GRAPH_SAMPLE];   // array of cos phi
+  uint8_t arr_papp[ENERGY_MAX_PHASES][TIC_GRAPH_SAMPLE];     // array of apparent power graph values
+  uint8_t arr_pact[ENERGY_MAX_PHASES][TIC_GRAPH_SAMPLE];     // array of active power graph values
+  uint8_t arr_volt[ENERGY_MAX_PHASES][TIC_GRAPH_SAMPLE];     // array min and max voltage delta
+  uint8_t arr_cosphi[ENERGY_MAX_PHASES][TIC_GRAPH_SAMPLE];   // array of cos phi
 };
 
 static struct {
@@ -150,8 +159,8 @@ void TeleinfoCurveGetDate (const int period, const int histo, char* pstr_text)
   BreakTime (calc_time, start_dst);
 
   // set label according to period
-  if (period == TELEINFO_CURVE_DAY) sprintf (pstr_text, "%02u/%02u", start_dst.day_of_month, start_dst.month);
-  else if (period == TELEINFO_CURVE_WEEK) sprintf (pstr_text, "W %02u/%02u", start_dst.day_of_month, start_dst.month);
+  if (period == TELEINFO_CURVE_DAY) sprintf_P (pstr_text, PSTR ("%02u/%02u"), start_dst.day_of_month, start_dst.month);
+  else if (period == TELEINFO_CURVE_WEEK) sprintf_P (pstr_text, PSTR ("W %02u/%02u"), start_dst.day_of_month, start_dst.month);
   else strcpy (pstr_text, "");
 }
 
@@ -165,8 +174,8 @@ bool TeleinfoCurveGetFilename (const uint8_t period, const uint8_t histo, char* 
 
   // generate filename according to period
   strcpy (pstr_filename, "");
-  if (period == TELEINFO_CURVE_DAY) sprintf_P (pstr_filename, D_TELEINFO_CURVE_FILE_DAY, histo);
-  else if (period == TELEINFO_CURVE_WEEK) sprintf_P (pstr_filename, D_TELEINFO_CURVE_FILE_WEEK, histo);
+  if (period == TELEINFO_CURVE_DAY) sprintf_P (pstr_filename, PSTR_TIC_CURVE_FILE_DAY, histo);
+  else if (period == TELEINFO_CURVE_WEEK) sprintf_P (pstr_filename, PSTR_TIC_CURVE_FILE_WEEK, histo);
 
   // if filename defined, check existence
   if (strlen (pstr_filename) > 0) exists = ffsp->exists (pstr_filename);
@@ -179,49 +188,48 @@ void TeleinfoCurveFlushData (const uint8_t period)
 {
   uint8_t phase, index;
   char    str_value[32];
-  String  str_header;
+  char    str_header[92];
   File    file;
 
   // validate parameters
   if ((period != TELEINFO_CURVE_DAY) && (period != TELEINFO_CURVE_WEEK)) return;
 
   // if buffer is filled, save buffer to log
-  if (teleinfo_period[period].str_buffer.length () > 0)
+  if (strlen (teleinfo_period[period].str_buffer) > 0)
   {
     // if file doesn't exist, create it and append header
-    if (!ffsp->exists (teleinfo_period[period].str_filename.c_str ()))
+    if (!ffsp->exists (teleinfo_period[period].str_filename))
     {
       // create file
-      file = ffsp->open (teleinfo_period[period].str_filename.c_str (), "w");
+      file = ffsp->open (teleinfo_period[period].str_filename, "w");
 
       // create header
-      str_header = D_TELEINFO_CURVE_HEADER;
+      strcpy_P (str_header, PSTR ("Idx;Date;Time"));
       for (phase = 1; phase <= teleinfo_contract.phase; phase++)
       {
-        sprintf (str_value, ";VA%d;W%d;V%d;C%d;pVA%d;pV%d", phase, phase, phase, phase, phase, phase);
-        str_header += str_value;
+        sprintf_P (str_value, PSTR (";VA%d;W%d;V%d;C%d;pVA%d;pV%d"), phase, phase, phase, phase, phase, phase);
+        strlcat (str_header, str_value, sizeof (str_header));
       }
+      file.print (str_header);
 
       // append contract period and totals
-      str_header += ";Period";
+      strcpy_P (str_header, PSTR (";Period"));
       for (index = 0; index < teleinfo_contract.period_qty; index++)
       {
         TeleinfoPeriodGetCode (str_value, sizeof (str_value));
-        str_header += ";";
-        str_header += str_value;
+        strcat_P (str_header, PSTR (";"));
+        strlcat (str_header, str_value, sizeof (str_header));
       }
- 
-      // write header
-      str_header += "\n";
-      file.print (str_header.c_str ());
+      strcat_P (str_header, PSTR ("\n"));
+      file.print (str_header);
     }
 
     // else, file exists, open in append mode
-    else file = ffsp->open (teleinfo_period[period].str_filename.c_str (), "a");
+    else file = ffsp->open (teleinfo_period[period].str_filename, "a");
 
     // write data in buffer and empty buffer
-    file.print (teleinfo_period[period].str_buffer.c_str ());
-    teleinfo_period[period].str_buffer = "";
+    file.print (teleinfo_period[period].str_buffer);
+    strcpy (teleinfo_period[period].str_buffer, "");
 
     // close file
     file.close ();
@@ -249,17 +257,17 @@ void TeleinfoCurveSaveData (const uint8_t period)
   if (period == TELEINFO_CURVE_DAY)
   {
     // set current weekly file name
-    sprintf_P (str_filename, D_TELEINFO_CURVE_FILE_DAY, 0);
+    sprintf_P (str_filename, PSTR_TIC_CURVE_FILE_DAY, 0);
 
     // calculate index of daily line
-    index = (time_dst.hour * 3600 + time_dst.minute * 60) * TELEINFO_GRAPH_SAMPLE / 86400;
+    index = (time_dst.hour * 3600 + time_dst.minute * 60) * TIC_GRAPH_SAMPLE / 86400;
   }
 
   // else if saving weekly record
   else if (period == TELEINFO_CURVE_WEEK)
   {
     // set current weekly file name
-    sprintf_P (str_filename, D_TELEINFO_CURVE_FILE_WEEK, 0);
+    sprintf_P (str_filename, PSTR_TIC_CURVE_FILE_WEEK, 0);
 
     // calculate start of current week
     start_dst = time_dst;
@@ -270,67 +278,73 @@ void TeleinfoCurveSaveData (const uint8_t period)
     start_time = MakeTime (start_dst) - 86400 * (day_of_week - 2);
 
     // calculate index of weekly line
-    index = (current_time - start_time) * TELEINFO_GRAPH_SAMPLE / 604800;
-    if (index >= TELEINFO_GRAPH_SAMPLE) index = TELEINFO_GRAPH_SAMPLE - 1;
+    index = (current_time - start_time) * TIC_GRAPH_SAMPLE / 604800;
+    if (index >= TIC_GRAPH_SAMPLE) index = TIC_GRAPH_SAMPLE - 1;
   }
 
   // if log file name has changed, flush data of previous file
-  if ((teleinfo_period[period].str_filename != "") && (teleinfo_period[period].str_filename != str_filename)) TeleinfoCurveFlushData (period);
+  if ((strlen (teleinfo_period[period].str_filename) > 0) && (strcmp (teleinfo_period[period].str_filename, str_filename) != 0)) TeleinfoCurveFlushData (period);
 
   // set new log filename
-  teleinfo_period[period].str_filename = str_filename;
+  strcpy (teleinfo_period[period].str_filename, str_filename);
 
   // line : index and date
-  teleinfo_period[period].str_buffer += index;
-  sprintf (str_value, ";%02u/%02u;%02u:%02u", time_dst.day_of_month, time_dst.month, time_dst.hour, time_dst.minute);
-  teleinfo_period[period].str_buffer += str_value;
+//  teleinfo_period[period].str_buffer += index;
+//  sprintf_P (str_value, PSTR (";%02u/%02u;%02u:%02u"), time_dst.day_of_month, time_dst.month, time_dst.hour, time_dst.minute);
+  sprintf_P (str_value, PSTR ("%u;%02u/%02u;%02u:%02u"), index, time_dst.day_of_month, time_dst.month, time_dst.hour, time_dst.minute);
+  strlcat (teleinfo_period[period].str_buffer, str_value, sizeof (teleinfo_period[period].str_buffer));
 
   // line : phase data
   for (phase = 0; phase < teleinfo_contract.phase; phase++)
   {
     // apparent power
-    teleinfo_period[period].str_buffer += ";";
-    if (teleinfo_curve.papp[phase] != LONG_MAX) teleinfo_period[period].str_buffer += teleinfo_curve.papp[phase];
+//    teleinfo_period[period].str_buffer += F (";");
+//    strcat_P (teleinfo_period[period].str_buffer, PSTR (";"));
+    if (teleinfo_curve.papp[phase] != LONG_MAX) sprintf_P (str_value, PSTR (";%d"), teleinfo_curve.papp[phase]);
+      else strcpy_P (str_value, PSTR (";"));
+    strlcat (teleinfo_period[period].str_buffer , str_value, sizeof (teleinfo_period[period].str_buffer));
 
     // active power
-    teleinfo_period[period].str_buffer += ";";
-    if (teleinfo_curve.pact[phase] != LONG_MAX) teleinfo_period[period].str_buffer += teleinfo_curve.pact[phase];
+    if (teleinfo_curve.pact[phase] != LONG_MAX) sprintf_P (str_value, PSTR (";%d"), teleinfo_curve.pact[phase]);
+      else strcpy_P (str_value, PSTR (";"));
+    strlcat (teleinfo_period[period].str_buffer , str_value, sizeof (teleinfo_period[period].str_buffer));
 
     // lower voltage
-    teleinfo_period[period].str_buffer += ";";
-    teleinfo_period[period].str_buffer += teleinfo_curve.volt_low[phase];
+    sprintf_P (str_value, PSTR (";%d"), teleinfo_curve.volt_low[phase]);
+    strlcat (teleinfo_period[period].str_buffer , str_value, sizeof (teleinfo_period[period].str_buffer));
 
     // cos phi
-    teleinfo_period[period].str_buffer += ";";
-    teleinfo_period[period].str_buffer += teleinfo_curve.cosphi[phase];
+    sprintf_P (str_value, PSTR (";%d"), teleinfo_curve.cosphi[phase]);
+    strlcat (teleinfo_period[period].str_buffer , str_value, sizeof (teleinfo_period[period].str_buffer));
 
     // peak apparent power
-    teleinfo_period[period].str_buffer += ";";
-    if (teleinfo_curve.papp_peak[phase] != LONG_MAX) teleinfo_period[period].str_buffer += teleinfo_curve.papp_peak[phase];
+    if (teleinfo_curve.papp_peak[phase] != LONG_MAX) sprintf_P (str_value, PSTR (";%d"), teleinfo_curve.papp_peak[phase]);
+      else strcpy_P (str_value, PSTR (";"));
+    strlcat (teleinfo_period[period].str_buffer , str_value, sizeof (teleinfo_period[period].str_buffer));
 
     // peak voltage
-    teleinfo_period[period].str_buffer += ";";
-    teleinfo_period[period].str_buffer += teleinfo_curve.volt_peak[phase];
+    sprintf_P (str_value, PSTR (";%d"), teleinfo_curve.volt_peak[phase]);
+    strlcat (teleinfo_period[period].str_buffer , str_value, sizeof (teleinfo_period[period].str_buffer));
   }
 
   // line : period name
   TeleinfoPeriodGetCode (str_value, sizeof (str_value));
-  teleinfo_period[period].str_buffer += ";";
-  teleinfo_period[period].str_buffer += str_value;
+  strcat_P (teleinfo_period[period].str_buffer, PSTR (";"));
+  strlcat (teleinfo_period[period].str_buffer , str_value, sizeof (teleinfo_period[period].str_buffer));
 
   // line : totals
   for (index = 0; index < teleinfo_contract.period_qty; index++)
   {
     lltoa (teleinfo_conso.index_wh[index], str_value, 10); 
-    teleinfo_period[period].str_buffer += ";";
-    teleinfo_period[period].str_buffer += str_value;
+    strcat_P (teleinfo_period[period].str_buffer, PSTR (";"));
+    strlcat (teleinfo_period[period].str_buffer , str_value, sizeof (teleinfo_period[period].str_buffer));
   }
 
   // line : end
-  teleinfo_period[period].str_buffer += "\n";
+    strcat_P (teleinfo_period[period].str_buffer, PSTR ("\n"));
 
   // if log should be saved now
-  if (teleinfo_period[period].str_buffer.length () > TELEINFO_CURVE_BUFFER_MAX) TeleinfoCurveFlushData (period);
+  if (strlen (teleinfo_period[period].str_buffer) > TELEINFO_CURVE_BUFFER_SIZE - TELEINFO_CURVE_LINE_SIZE) TeleinfoCurveFlushData (period);
 }
 
 // rotate file according to file naming convention
@@ -344,8 +358,8 @@ void TeleinfoCurveFileRotate (const char* pstr_filename, const uint8_t index)
   if (index == 0) return;
 
   // generate file names
-  sprintf (str_original, pstr_filename, index - 1);
-  sprintf (str_target, pstr_filename, index);
+  sprintf_P (str_original, pstr_filename, index - 1);
+  sprintf_P (str_target, pstr_filename, index);
 
   // if target exists, remove it
   if (ffsp->exists (str_target)) ffsp->remove (str_target);
@@ -363,14 +377,14 @@ void TeleinfoCurveRotate ()
 {
   // flush daily file and prepare rotation of daily files
   TeleinfoCurveFlushData (TELEINFO_CURVE_DAY);
-  teleinfo_curve.rotate_daily  = (uint8_t)teleinfo_config.param[TELEINFO_CONFIG_NBDAY];
+  teleinfo_curve.rotate_daily  = (uint8_t)teleinfo_config.param[TIC_CONFIG_NBDAY];
   AddLog (LOG_LEVEL_INFO, PSTR ("TIC: %u daily files will rotate"), teleinfo_curve.rotate_daily);
 
   // flush daily file and if we are on monday, prepare rotation of weekly files
   TeleinfoCurveFlushData (TELEINFO_CURVE_WEEK);
   if (RtcTime.day_of_week == 2)
   {
-    teleinfo_curve.rotate_weekly = (uint8_t)teleinfo_config.param[TELEINFO_CONFIG_NBWEEK];
+    teleinfo_curve.rotate_weekly = (uint8_t)teleinfo_config.param[TIC_CONFIG_NBWEEK];
     AddLog (LOG_LEVEL_INFO, PSTR ("TIC: %u weekly files will rotate"), teleinfo_curve.rotate_weekly);
   }
 }
@@ -389,10 +403,10 @@ void TeleinfoCurveSavePeriod (const uint8_t period)
 
   // if period out of range, return
   if (period >= TELEINFO_PERIOD_MAX) return;
-  if (ARR_TELEINFO_CURVE_WINDOW[period] == 0) return;
+  if (ARR_TIC_CURVE_WINDOW[period] == 0) return;
 
 #ifdef USE_UFILESYS
-  if (period < TELEINFO_HISTO_CONSO)
+  if (period < TIC_HISTO_CONSO)
 #endif    // USE_UFILESYS
 
     // loop thru phases to update period totals  
@@ -403,7 +417,7 @@ void TeleinfoCurveSavePeriod (const uint8_t period)
 
       // save average and peak value over the period
       power = LONG_MAX;
-      if (teleinfo_contract.ssousc > 0) power = (long)(teleinfo_period[period].papp_sum[phase] / ARR_TELEINFO_CURVE_WINDOW[period]);
+      if (teleinfo_contract.ssousc > 0) power = (long)(teleinfo_period[period].papp_sum[phase] / ARR_TIC_CURVE_WINDOW[period]);
       teleinfo_curve.papp[phase] = power;
       teleinfo_curve.papp_peak[phase] = teleinfo_period[period].papp_peak[phase];
 
@@ -416,7 +430,7 @@ void TeleinfoCurveSavePeriod (const uint8_t period)
 
       // save average value over the period
       power = LONG_MAX;
-      if (teleinfo_contract.ssousc > 0) power = (long)(teleinfo_period[period].pact_sum[phase] / ARR_TELEINFO_CURVE_WINDOW[period]);
+      if (teleinfo_contract.ssousc > 0) power = (long)(teleinfo_period[period].pact_sum[phase] / ARR_TIC_CURVE_WINDOW[period]);
       if (power > teleinfo_curve.papp[phase]) power = teleinfo_curve.papp[phase];
       teleinfo_curve.pact[phase] = power;
 
@@ -438,7 +452,7 @@ void TeleinfoCurveSavePeriod (const uint8_t period)
       // -----------
 
       // save average value over the period
-      teleinfo_curve.cosphi[phase] = (uint8_t)(teleinfo_period[period].cosphi_sum[phase] / ARR_TELEINFO_CURVE_WINDOW[period]);
+      teleinfo_curve.cosphi[phase] = (uint8_t)(teleinfo_period[period].cosphi_sum[phase] / ARR_TIC_CURVE_WINDOW[period]);
 
       // reset period _
       teleinfo_period[period].cosphi_sum[phase] = 0;
@@ -470,7 +484,7 @@ void TeleinfoCurveSaveLiveData ()
   for (phase = 0; phase < teleinfo_contract.phase; phase++)
   {
     // calculate graph values
-    voltage = 128 + teleinfo_curve.volt_low[phase] - TELEINFO_VOLTAGE;
+    voltage = 128 + teleinfo_curve.volt_low[phase] - TIC_VOLTAGE;
     if (teleinfo_contract.ssousc > 0)
     {
       apparent = teleinfo_curve.papp[phase] * 200 / teleinfo_contract.ssousc;
@@ -491,7 +505,7 @@ void TeleinfoCurveSaveLiveData ()
 
   // increase data index in the graph and set update flag
   cell_index++;
-  teleinfo_period[TELEINFO_CURVE_LIVE].index = cell_index % TELEINFO_GRAPH_SAMPLE;
+  teleinfo_period[TELEINFO_CURVE_LIVE].index = cell_index % TIC_GRAPH_SAMPLE;
 }
 
 // Save data before ESP restart
@@ -517,7 +531,7 @@ void TeleinfoCurveInit ()
 
   // maximum period to display curve
 #ifdef USE_UFILESYS
-  teleinfo_curve.period_max = TELEINFO_HISTO_CONSO;
+  teleinfo_curve.period_max = TIC_HISTO_CONSO;
 #else
   teleinfo_curve.period_max = TELEINFO_PERIOD_MAX;
 #endif      // USE_UFILESYS
@@ -525,6 +539,11 @@ void TeleinfoCurveInit ()
   // initialise period data
   for (period = 0; period < TELEINFO_PERIOD_MAX; period++)
   {
+#ifdef USE_UFILESYS
+    // init log filename
+    strcpy (teleinfo_period[period].str_filename, "");
+#endif      // USE_UFILESYS
+
     // init counter
     teleinfo_period[period].index    = 0;
     teleinfo_period[period].counter  = 0;
@@ -553,7 +572,7 @@ void TeleinfoCurveInit ()
     teleinfo_curve.cosphi[phase]    = 100;
     
     // init live values
-    for (index = 0; index < TELEINFO_GRAPH_SAMPLE; index++)
+    for (index = 0; index < TIC_GRAPH_SAMPLE; index++)
     {
       teleinfo_curve.live.arr_pact[phase][index]   = UINT8_MAX;
       teleinfo_curve.live.arr_papp[phase][index]   = UINT8_MAX;
@@ -585,7 +604,7 @@ void TeleinfoCurveEverySecond ()
 
   // handle only if time is valid and minimum messages received
   if (!RtcTime.valid) return;
-  if (teleinfo_meter.nb_message < TELEINFO_MESSAGE_MIN) return;
+  if (teleinfo_meter.nb_message < TIC_MESSAGE_MIN) return;
 
   // loop thru the periods and the phases, to update all values over the period
   for (period = 0; period < teleinfo_curve.period_max; period++)
@@ -615,16 +634,16 @@ void TeleinfoCurveEverySecond ()
 
     // increment graph period counter and update graph data if needed
     teleinfo_period[period].counter ++;
-    teleinfo_period[period].counter = teleinfo_period[period].counter % ARR_TELEINFO_CURVE_WINDOW[period];
+    teleinfo_period[period].counter = teleinfo_period[period].counter % ARR_TIC_CURVE_WINDOW[period];
     if (teleinfo_period[period].counter == 0) TeleinfoCurveSavePeriod (period);
   }
 
 #ifdef USE_UFILESYS
   // if needed, rotate daily file
-  if (teleinfo_curve.rotate_daily > 0) TeleinfoCurveFileRotate (D_TELEINFO_CURVE_FILE_DAY, teleinfo_curve.rotate_daily--);
+  if (teleinfo_curve.rotate_daily > 0) TeleinfoCurveFileRotate (PSTR_TIC_CURVE_FILE_DAY, teleinfo_curve.rotate_daily--);
 
   // else, if needed, rotate daily file
-  else if (teleinfo_curve.rotate_weekly > 0) TeleinfoCurveFileRotate (D_TELEINFO_CURVE_FILE_WEEK, teleinfo_curve.rotate_weekly--);
+  else if (teleinfo_curve.rotate_weekly > 0) TeleinfoCurveFileRotate (PSTR_TIC_CURVE_FILE_WEEK, teleinfo_curve.rotate_weekly--);
 #endif      // USE_UFILESYS
 }
 
@@ -655,7 +674,7 @@ void TeleinfoCurveDisplayFrame (const uint8_t data_type, const uint8_t month, co
     // voltage
     case TELEINFO_UNIT_V:
       unit_max   = teleinfo_config.max_volt;
-      unit_range = 2 * (teleinfo_config.max_volt - TELEINFO_VOLTAGE);
+      unit_range = 2 * (teleinfo_config.max_volt - TIC_VOLTAGE);
       unit_min   = unit_max - unit_range;
       for (index = 0; index < 5; index ++) ltoa (unit_min + index * unit_range / 4, arr_label[index], 10);
       break;
@@ -671,25 +690,25 @@ void TeleinfoCurveDisplayFrame (const uint8_t data_type, const uint8_t month, co
   }
 
   // graph frame
-  WSContentSend_P (PSTR ("<rect x='%d%%' y='%d%%' width='%d%%' height='99.9%%' rx='10' />\n"), TELEINFO_GRAPH_PERCENT_START, 0, TELEINFO_GRAPH_PERCENT_STOP - TELEINFO_GRAPH_PERCENT_START);
+  WSContentSend_P (PSTR ("<rect x='%d%%' y='%d%%' width='%d%%' height='99.9%%' rx='10' />\n"), TIC_GRAPH_PERCENT_START, 0, TIC_GRAPH_PERCENT_STOP - TIC_GRAPH_PERCENT_START);
 
   // graph separation lines
-  WSContentSend_P (PSTR ("<line class='dash' x1='%d%%' y1='%d%%' x2='%d%%' y2='%d%%' />\n"), TELEINFO_GRAPH_PERCENT_START, 25, TELEINFO_GRAPH_PERCENT_STOP, 25);
-  WSContentSend_P (PSTR ("<line class='dash' x1='%d%%' y1='%d%%' x2='%d%%' y2='%d%%' />\n"), TELEINFO_GRAPH_PERCENT_START, 50, TELEINFO_GRAPH_PERCENT_STOP, 50);
-  WSContentSend_P (PSTR ("<line class='dash' x1='%d%%' y1='%d%%' x2='%d%%' y2='%d%%' />\n"), TELEINFO_GRAPH_PERCENT_START, 75, TELEINFO_GRAPH_PERCENT_STOP, 75);
+  WSContentSend_P (PSTR ("<line class='dash' x1='%d%%' y1='%d%%' x2='%d%%' y2='%d%%' />\n"), TIC_GRAPH_PERCENT_START, 25, TIC_GRAPH_PERCENT_STOP, 25);
+  WSContentSend_P (PSTR ("<line class='dash' x1='%d%%' y1='%d%%' x2='%d%%' y2='%d%%' />\n"), TIC_GRAPH_PERCENT_START, 50, TIC_GRAPH_PERCENT_STOP, 50);
+  WSContentSend_P (PSTR ("<line class='dash' x1='%d%%' y1='%d%%' x2='%d%%' y2='%d%%' />\n"), TIC_GRAPH_PERCENT_START, 75, TIC_GRAPH_PERCENT_STOP, 75);
 
   // get unit label
   GetTextIndexed (str_text, sizeof (str_text), data_type, kTeleinfoGraphDisplay);
 
   // units graduation
-  WSContentSend_P (PSTR ("<text class='power' x='%d%%' y='%d%%'>%s</text>\n"), TELEINFO_GRAPH_PERCENT_STOP + 3, 2, str_text);
+  WSContentSend_P (PSTR ("<text class='power' x='%d%%' y='%d%%'>%s</text>\n"), TIC_GRAPH_PERCENT_STOP + 3, 2, str_text);
   for (index = 0; index < 5; index ++) WSContentSend_P (PSTR ("<text class='power' x='%u%%' y='%u%%'>%s</text>\n"), 2, arr_pos[index],  arr_label[index]);
 }
 
 // Append Teleinfo curve button to main page
 void TeleinfoCurveWebMainButton ()
 {
-  if (teleinfo_conso.total_wh > 0) WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>Courbes</button></form></p>\n"), D_TELEINFO_PAGE_GRAPH);
+  if (teleinfo_conso.total_wh > 0) WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>Courbes</button></form></p>\n"), PSTR_TIC_PAGE_GRAPH);
 }
 
 // Display graph frame and time marks
@@ -745,7 +764,6 @@ void TeleinfoCurveDisplayTime (const uint8_t period, const uint8_t histo)
       }
       break;
 #endif      // USE_UFILESYS
-
   }
 }
 
@@ -754,11 +772,11 @@ void TeleinfoCurveDisplay (const uint8_t phase, const uint8_t data)
 {
   bool     analyse;
   uint32_t timestart;
-  int      index, index_array, count;
+  int      index, index_array;
   long     graph_x, graph_y, graph_range, graph_delta;
   long     prev_x, prev_y, bezier_y1, bezier_y2; 
   long     value, prev_value;
-  long     arr_value[TELEINFO_GRAPH_SAMPLE];
+  long     arr_value[TIC_GRAPH_SAMPLE];
   char     str_value[36];
 
   // check parameters
@@ -768,16 +786,16 @@ void TeleinfoCurveDisplay (const uint8_t phase, const uint8_t data)
   timestart = millis ();
 
   // init array
-  for (index = 0; index < TELEINFO_GRAPH_SAMPLE; index ++) arr_value[index] = LONG_MAX;
+  for (index = 0; index < TIC_GRAPH_SAMPLE; index ++) arr_value[index] = LONG_MAX;
 
   // collect data in temporary array
   switch (teleinfo_graph.period)
   {
     case TELEINFO_CURVE_LIVE:
-      for (index = 0; index < TELEINFO_GRAPH_SAMPLE; index++)
+      for (index = 0; index < TIC_GRAPH_SAMPLE; index++)
       {
         // get current array index if in live memory mode
-        index_array = (teleinfo_period[teleinfo_graph.period].index + index) % TELEINFO_GRAPH_SAMPLE;
+        index_array = (teleinfo_period[teleinfo_graph.period].index + index) % TIC_GRAPH_SAMPLE;
 
         // display according to data type
         switch (data)
@@ -791,7 +809,7 @@ void TeleinfoCurveDisplay (const uint8_t phase, const uint8_t data)
             break;
 
           case TELEINFO_UNIT_V:
-            if (teleinfo_curve.live.arr_volt[phase][index_array] != UINT8_MAX) arr_value[index] = (long)TELEINFO_VOLTAGE - 128 + teleinfo_curve.live.arr_volt[phase][index_array];
+            if (teleinfo_curve.live.arr_volt[phase][index_array] != UINT8_MAX) arr_value[index] = (long)TIC_VOLTAGE - 128 + teleinfo_curve.live.arr_volt[phase][index_array];
             break;
 
           case TELEINFO_UNIT_COSPHI:
@@ -812,7 +830,6 @@ void TeleinfoCurveDisplay (const uint8_t phase, const uint8_t data)
       File     file;
 
       // if data file exists
-      count = 0;
       if (TeleinfoCurveGetFilename (teleinfo_graph.period, teleinfo_graph.histo, str_filename))
       {
         // set column with data
@@ -847,16 +864,12 @@ void TeleinfoCurveDisplay (const uint8_t phase, const uint8_t data)
             }
 
             // if index and value are valid, update value to be displayed
-            if ((index_array < TELEINFO_GRAPH_SAMPLE) && (value != LONG_MAX)) arr_value[index_array] = value;
+            if ((index_array < TIC_GRAPH_SAMPLE) && (value != LONG_MAX)) arr_value[index_array] = value;
 
             // next token in the line
             if (pstr_token != nullptr) pstr_token = strtok (nullptr, ";");
             index++;
           }
-
-          // receive new data every 20 lines
-          if (count % 20 == 0) TeleinfoProcessRealTime ();
-          count++;
         }
 
         // close file
@@ -867,11 +880,10 @@ void TeleinfoCurveDisplay (const uint8_t phase, const uint8_t data)
   }
 
   // display values
-  count = 0;
   graph_x = 0;
   prev_x = LONG_MAX;
   prev_y = 0;
-  for (index = 0; index < TELEINFO_GRAPH_SAMPLE; index++)
+  for (index = 0; index < TIC_GRAPH_SAMPLE; index++)
   {
     // if value is valid
     if (arr_value[index] != LONG_MAX) 
@@ -882,7 +894,7 @@ void TeleinfoCurveDisplay (const uint8_t phase, const uint8_t data)
         else prev_value = arr_value[index - 1];
 
       // calculate x position
-      graph_x = teleinfo_graph.left + (index * teleinfo_graph.width / TELEINFO_GRAPH_SAMPLE);
+      graph_x = teleinfo_graph.left + (index * teleinfo_graph.width / TIC_GRAPH_SAMPLE);
 
       // calculate y position according to data
       graph_y = 0;
@@ -892,20 +904,20 @@ void TeleinfoCurveDisplay (const uint8_t phase, const uint8_t data)
         case TELEINFO_UNIT_VA:
         case TELEINFO_UNIT_PEAK_VA:
         case TELEINFO_UNIT_W:
-          if (teleinfo_config.max_power != 0) graph_y = TELEINFO_GRAPH_HEIGHT - (value * TELEINFO_GRAPH_HEIGHT / teleinfo_config.max_power);
+          if (teleinfo_config.max_power != 0) graph_y = TIC_GRAPH_HEIGHT - (value * TIC_GRAPH_HEIGHT / teleinfo_config.max_power);
           break;
 
         case TELEINFO_UNIT_V:
         case TELEINFO_UNIT_PEAK_V:
-          graph_range = abs (teleinfo_config.max_volt - TELEINFO_VOLTAGE);
-          if (graph_range != 0) graph_delta = (TELEINFO_VOLTAGE - value) * TELEINFO_GRAPH_HEIGHT / 2 / graph_range;
-          graph_y = (TELEINFO_GRAPH_HEIGHT / 2) + graph_delta;
+          graph_range = abs (teleinfo_config.max_volt - TIC_VOLTAGE);
+          if (graph_range != 0) graph_delta = (TIC_VOLTAGE - value) * TIC_GRAPH_HEIGHT / 2 / graph_range;
+          graph_y = (TIC_GRAPH_HEIGHT / 2) + graph_delta;
           if (graph_y < 0) graph_y = 0;
-          if (graph_y > TELEINFO_GRAPH_HEIGHT) graph_y = TELEINFO_GRAPH_HEIGHT;
+          if (graph_y > TIC_GRAPH_HEIGHT) graph_y = TIC_GRAPH_HEIGHT;
           break;
 
         case TELEINFO_UNIT_COSPHI:
-          graph_y = TELEINFO_GRAPH_HEIGHT - (value * TELEINFO_GRAPH_HEIGHT / 100);
+          graph_y = TIC_GRAPH_HEIGHT - (value * TIC_GRAPH_HEIGHT / 100);
           break;
       }
 
@@ -918,7 +930,7 @@ void TeleinfoCurveDisplay (const uint8_t phase, const uint8_t data)
           if (prev_x == LONG_MAX)
           {
             // start point
-            WSContentSend_P (PSTR ("M%d %d "), graph_x, TELEINFO_GRAPH_HEIGHT); 
+            WSContentSend_P (PSTR ("M%d %d "), graph_x, TIC_GRAPH_HEIGHT); 
 
             // first point
             WSContentSend_P (PSTR ("L%d %d "), graph_x, graph_y); 
@@ -960,10 +972,6 @@ void TeleinfoCurveDisplay (const uint8_t phase, const uint8_t data)
       prev_x = graph_x;
       prev_y = graph_y;
     }
-
-    // handle received data update every 20 points
-    if (count % 20 == 0) TeleinfoProcessRealTime ();
-    count++;
   }
 
   // end data value curve
@@ -971,7 +979,7 @@ void TeleinfoCurveDisplay (const uint8_t phase, const uint8_t data)
   {
     case TELEINFO_UNIT_VA:
     case TELEINFO_UNIT_W:
-      WSContentSend_P (PSTR ("L%d,%d Z"), graph_x, TELEINFO_GRAPH_HEIGHT); 
+      WSContentSend_P (PSTR ("L%d,%d Z"), graph_x, TIC_GRAPH_HEIGHT); 
       break;
   }
 }
@@ -988,12 +996,12 @@ bool TeleinfoCurvePreviousPeriod (const bool update)
   // handle next according to period type
   if (teleinfo_graph.period == TELEINFO_CURVE_DAY)
   {
-    while (!is_file && (histo < teleinfo_config.param[TELEINFO_CONFIG_NBDAY])) is_file = TeleinfoCurveGetFilename (TELEINFO_CURVE_DAY, ++histo, str_filename);
+    while (!is_file && (histo < teleinfo_config.param[TIC_CONFIG_NBDAY])) is_file = TeleinfoCurveGetFilename (TELEINFO_CURVE_DAY, ++histo, str_filename);
   }
 
   else if (teleinfo_graph.period == TELEINFO_CURVE_WEEK)
   {
-    while (!is_file && (histo < teleinfo_config.param[TELEINFO_CONFIG_NBWEEK])) is_file = TeleinfoCurveGetFilename (TELEINFO_CURVE_WEEK, ++histo, str_filename);
+    while (!is_file && (histo < teleinfo_config.param[TIC_CONFIG_NBWEEK])) is_file = TeleinfoCurveGetFilename (TELEINFO_CURVE_WEEK, ++histo, str_filename);
   }
 
   // if asked, set next period
@@ -1044,7 +1052,7 @@ void TeleinfoCurveWebGraph ()
   timestart = millis ();
 
   // beginning of form without authentification
-  WSContentStart_P (D_TELEINFO_GRAPH, false);
+  WSContentStart_P (PSTR (TIC_GRAPH), false);
 
   // serve page if possible
   if (!teleinfo_graph.serving)
@@ -1053,14 +1061,14 @@ void TeleinfoCurveWebGraph ()
     teleinfo_graph.serving = true;
 
     // get numerical argument values
-    teleinfo_graph.data  = (uint8_t)TeleinfoDriverGetArgValue (D_CMND_TELEINFO_DATA,  0, TELEINFO_UNIT_MAX - 1, teleinfo_graph.data);
-    teleinfo_graph.histo = (uint8_t)TeleinfoDriverGetArgValue (D_CMND_TELEINFO_HISTO, 0, 52, teleinfo_graph.histo);
+    teleinfo_graph.data  = (uint8_t)TeleinfoDriverGetArgValue (CMND_TIC_DATA,  0, TELEINFO_UNIT_MAX - 1, teleinfo_graph.data);
+    teleinfo_graph.histo = (uint8_t)TeleinfoDriverGetArgValue (CMND_TIC_HISTO, 0, 52, teleinfo_graph.histo);
 
 #ifdef USE_UFILESYS
-    if (teleinfo_graph.period >= TELEINFO_HISTO_CONSO) teleinfo_graph.period = TELEINFO_CURVE_LIVE;
+    if (teleinfo_graph.period >= TIC_HISTO_CONSO) teleinfo_graph.period = TELEINFO_CURVE_LIVE;
 #endif      // USE_UFILESYS
 
-    choice = (uint8_t)TeleinfoDriverGetArgValue (D_CMND_TELEINFO_PERIOD, 0, TELEINFO_PERIOD_MAX - 1, teleinfo_graph.period);
+    choice = (uint8_t)TeleinfoDriverGetArgValue (CMND_TIC_PERIOD, 0, TELEINFO_PERIOD_MAX - 1, teleinfo_graph.period);
     if (choice != teleinfo_graph.period) teleinfo_graph.histo = 0;
     teleinfo_graph.period = choice;  
 
@@ -1068,32 +1076,32 @@ void TeleinfoCurveWebGraph ()
     if (teleinfo_graph.data == TELEINFO_UNIT_WH) teleinfo_graph.data = TELEINFO_UNIT_W;
 
     // check phase display argument
-    if (Webserver->hasArg (D_CMND_TELEINFO_PHASE)) WebGetArg (D_CMND_TELEINFO_PHASE, teleinfo_curve.str_phase, sizeof (teleinfo_curve.str_phase));
+    if (Webserver->hasArg (F (CMND_TIC_PHASE))) WebGetArg (PSTR (CMND_TIC_PHASE), teleinfo_curve.str_phase, sizeof (teleinfo_curve.str_phase));
     while (strlen (teleinfo_curve.str_phase) < teleinfo_contract.phase) strlcat (teleinfo_curve.str_phase, "1", sizeof (teleinfo_curve.str_phase));
 
     // graph increment
-    choice = TeleinfoDriverGetArgValue (D_CMND_TELEINFO_PLUS, 0, 1, 0);
+    choice = TeleinfoDriverGetArgValue (CMND_TIC_PLUS, 0, 1, 0);
     if (choice == 1)
     {
       if ((teleinfo_graph.data == TELEINFO_UNIT_VA) || (teleinfo_graph.data == TELEINFO_UNIT_W)) teleinfo_config.max_power *= 2;
-      else if (teleinfo_graph.data == TELEINFO_UNIT_V) teleinfo_config.max_volt += TELEINFO_GRAPH_INC_VOLTAGE;
+      else if (teleinfo_graph.data == TELEINFO_UNIT_V) teleinfo_config.max_volt += TIC_GRAPH_INC_VOLTAGE;
     }
 
     // graph decrement
-    choice = TeleinfoDriverGetArgValue (D_CMND_TELEINFO_MINUS, 0, 1, 0);
+    choice = TeleinfoDriverGetArgValue (CMND_TIC_MINUS, 0, 1, 0);
     if (choice == 1)
     {
-      if ((teleinfo_graph.data == TELEINFO_UNIT_VA) || (teleinfo_graph.data == TELEINFO_UNIT_W)) teleinfo_config.max_power = max ((long)TELEINFO_GRAPH_MIN_POWER, teleinfo_config.max_power / 2);
-      else if (teleinfo_graph.data == TELEINFO_UNIT_V) teleinfo_config.max_volt = max ((long)TELEINFO_GRAPH_MIN_VOLTAGE, teleinfo_config.max_volt - TELEINFO_GRAPH_INC_VOLTAGE);
+      if ((teleinfo_graph.data == TELEINFO_UNIT_VA) || (teleinfo_graph.data == TELEINFO_UNIT_W)) teleinfo_config.max_power = max ((long)TIC_GRAPH_MIN_POWER, teleinfo_config.max_power / 2);
+      else if (teleinfo_graph.data == TELEINFO_UNIT_V) teleinfo_config.max_volt = max ((long)TIC_GRAPH_MIN_VOLTAGE, teleinfo_config.max_volt - TIC_GRAPH_INC_VOLTAGE);
     }
 
 #ifdef USE_UFILESYS
     // handle previous page
-    choice = TeleinfoDriverGetArgValue (D_CMND_TELEINFO_PREV, 0, 1, 0);
+    choice = TeleinfoDriverGetArgValue (CMND_TIC_PREV, 0, 1, 0);
     if (choice == 1) TeleinfoCurvePreviousPeriod (true);
 
     // handle next page
-    choice = TeleinfoDriverGetArgValue (D_CMND_TELEINFO_NEXT, 0, 1, 0);
+    choice = TeleinfoDriverGetArgValue (CMND_TIC_NEXT, 0, 1, 0);
     if (choice == 1) TeleinfoCurveNextPeriod (true);
 #endif      // USE_UFILESYS
 
@@ -1103,8 +1111,8 @@ void TeleinfoCurveWebGraph ()
     WSContentSend_P (PSTR ("window.addEventListener('touchend',function(evt){stopX=evt.changedTouches[0].pageX;stopY=evt.changedTouches[0].pageY;handleGesture();},false);\n"));
     WSContentSend_P (PSTR ("function handleGesture(){\n"));
     WSContentSend_P (PSTR (" let deltaX=stopX-startX;let deltaY=Math.abs(stopY-startY);\n"));
-    WSContentSend_P (PSTR (" if(deltaY<10 && deltaX<-100){document.getElementById('%s').click();}\n"), D_CMND_TELEINFO_NEXT);
-    WSContentSend_P (PSTR (" else if(deltaY<10 && deltaX>100){document.getElementById('%s').click();}\n"), D_CMND_TELEINFO_PREV);
+    WSContentSend_P (PSTR (" if(deltaY<10 && deltaX<-100){document.getElementById('%s').click();}\n"), PSTR (CMND_TIC_NEXT));
+    WSContentSend_P (PSTR (" else if(deltaY<10 && deltaX>100){document.getElementById('%s').click();}\n"), PSTR (CMND_TIC_PREV));
     WSContentSend_P (PSTR ("}\n"));
 
     // end of script section
@@ -1121,7 +1129,7 @@ void TeleinfoCurveWebGraph ()
     WSContentSend_P (PSTR ("function updateData(){\n"));
 
     WSContentSend_P (PSTR (" httpData=new XMLHttpRequest();\n"));
-    WSContentSend_P (PSTR (" httpData.open('GET','%s',true);\n"), D_TELEINFO_PAGE_GRAPH_DATA);
+    WSContentSend_P (PSTR (" httpData.open('GET','%s',true);\n"), PSTR_TIC_PAGE_GRAPH_DATA);
 
     WSContentSend_P (PSTR (" httpData.onreadystatechange=function(){\n"));
     WSContentSend_P (PSTR ("  if (httpData.readyState===XMLHttpRequest.DONE){\n"));
@@ -1149,7 +1157,7 @@ void TeleinfoCurveWebGraph ()
     WSContentSend_P (PSTR ("function updateCurve(){\n"));
 
     WSContentSend_P (PSTR (" httpCurve=new XMLHttpRequest();\n"));
-    WSContentSend_P (PSTR (" httpCurve.open('GET','%s',true);\n"), D_TELEINFO_PAGE_GRAPH_CURVE);
+    WSContentSend_P (PSTR (" httpCurve.open('GET','%s',true);\n"), PSTR_TIC_PAGE_GRAPH_CURVE);
 
     WSContentSend_P (PSTR (" httpCurve.onreadystatechange=function(){\n"));
     WSContentSend_P (PSTR ("  if (httpCurve.readyState===XMLHttpRequest.DONE){\n"));
@@ -1247,15 +1255,15 @@ void TeleinfoCurveWebGraph ()
     WSContentSend_P (PSTR ("<body>\n"));
 
     // form start
-    WSContentSend_P (PSTR ("<form method='get' action='%s'>\n"), D_TELEINFO_PAGE_GRAPH);
+    WSContentSend_P (PSTR ("<form method='get' action='%s'>\n"), PSTR_TIC_PAGE_GRAPH);
 
     // -------------------
     //      Unit range
     // -------------------
 
     WSContentSend_P (PSTR ("<div class='range'>\n"));
-    WSContentSend_P (PSTR ("<button class='range' name='%s' id='%s' value=1>+</button><br>"), D_CMND_TELEINFO_PLUS,  D_CMND_TELEINFO_PLUS);
-    WSContentSend_P (PSTR ("<button class='range' name='%s' id='%s' value=1>-</button>\n"),   D_CMND_TELEINFO_MINUS, D_CMND_TELEINFO_MINUS);
+    WSContentSend_P (PSTR ("<button class='range' name='%s' id='%s' value=1>+</button><br>"), PSTR (CMND_TIC_PLUS),  PSTR (CMND_TIC_PLUS));
+    WSContentSend_P (PSTR ("<button class='range' name='%s' id='%s' value=1>-</button>\n"),   PSTR (CMND_TIC_MINUS), PSTR (CMND_TIC_MINUS));
     WSContentSend_P (PSTR ("</div>\n"));        // range
 
     // --------------------------
@@ -1267,13 +1275,13 @@ void TeleinfoCurveWebGraph ()
     {
       // previous button
       if (TeleinfoCurvePreviousPeriod (false)) strcpy (str_text, "");
-        else strcpy (str_text, "disabled");
-      WSContentSend_P (PSTR ("<div class='prev'><button class='navi' name='%s' id='%s' value=1 %s>&lt;&lt;</button></div>\n"), D_CMND_TELEINFO_PREV, D_CMND_TELEINFO_PREV, str_text);
+        else strcpy_P (str_text, PSTR ("disabled"));
+      WSContentSend_P (PSTR ("<div class='prev'><button class='navi' name='%s' id='%s' value=1 %s>&lt;&lt;</button></div>\n"), PSTR (CMND_TIC_PREV), PSTR (CMND_TIC_PREV), str_text);
 
       // next button
       if (TeleinfoCurveNextPeriod (false)) strcpy (str_text, "");
-        else strcpy (str_text, "disabled");
-      WSContentSend_P (PSTR ("<div class='next'><button class='navi' name='%s' id='%s' value=1 %s>&gt;&gt;</button></div>\n"), D_CMND_TELEINFO_NEXT, D_CMND_TELEINFO_NEXT, str_text);
+        else strcpy_P (str_text, PSTR ("disabled"));
+      WSContentSend_P (PSTR ("<div class='next'><button class='navi' name='%s' id='%s' value=1 %s>&gt;&gt;</button></div>\n"), PSTR (CMND_TIC_NEXT), PSTR (CMND_TIC_NEXT), str_text);
     }
 #endif      // USE_UFILESYS
 
@@ -1289,7 +1297,7 @@ void TeleinfoCurveWebGraph ()
     WSContentSend_P (PSTR ("<div class='live'>&nbsp;</div>\n"));
 
     // icon and counter
-    WSContentSend_P (PSTR ("<div><img src='%s'><div class='count'><span id='msg'>%u</span></div></div>\n"), D_TELEINFO_ICON_LINKY_PNG, teleinfo_meter.nb_message);
+    WSContentSend_P (PSTR ("<div><img src='%s'><div class='count'><span id='msg'>%u</span></div></div>\n"), PSTR (TIC_ICON_LINKY_PNG), teleinfo_meter.nb_message);
 
     // live values
     WSContentSend_P (PSTR ("<div class='live'>\n"));
@@ -1299,7 +1307,7 @@ void TeleinfoCurveWebGraph ()
       strlcpy (str_text, teleinfo_curve.str_phase, sizeof (str_text));
       display = (str_text[phase] != '0');
       if (display) str_text[phase] = '0'; else str_text[phase] = '1';
-      WSContentSend_P (PSTR ("<a href='%s?phase=%s'>"), D_TELEINFO_PAGE_GRAPH, str_text);
+      WSContentSend_P (PSTR ("<a href='%s?phase=%s'>"), PSTR_TIC_PAGE_GRAPH, str_text);
 
       // display phase data
       if (display) strcpy (str_text, ""); else strcpy_P (str_text, PSTR (" disabled"));
@@ -1319,7 +1327,7 @@ void TeleinfoCurveWebGraph ()
 
     // Live button
     GetTextIndexed (str_text, sizeof (str_text), TELEINFO_CURVE_LIVE, kTeleinfoCurvePeriod);
-    if (teleinfo_graph.period != TELEINFO_CURVE_LIVE) WSContentSend_P (PSTR ("<a href='%s?period=%d'>"), D_TELEINFO_PAGE_GRAPH, TELEINFO_CURVE_LIVE);
+    if (teleinfo_graph.period != TELEINFO_CURVE_LIVE) WSContentSend_P (PSTR ("<a href='%s?period=%d'>"), PSTR_TIC_PAGE_GRAPH, TELEINFO_CURVE_LIVE);
     WSContentSend_P (PSTR ("<div class='item period'>%s</div>"), str_text);
     if (teleinfo_graph.period != TELEINFO_CURVE_LIVE) WSContentSend_P (PSTR ("</a>"));
     WSContentSend_P (PSTR ("\n"));
@@ -1328,7 +1336,7 @@ void TeleinfoCurveWebGraph ()
 #ifdef USE_UFILESYS
     char str_filename[UFS_FILENAME_SIZE];
 
-    for (index = TELEINFO_CURVE_DAY; index < TELEINFO_HISTO_CONSO; index++)
+    for (index = TELEINFO_CURVE_DAY; index < TIC_HISTO_CONSO; index++)
     {
       // get period label
       GetTextIndexed (str_text, sizeof (str_text), index, kTeleinfoCurvePeriod);
@@ -1337,8 +1345,8 @@ void TeleinfoCurveWebGraph ()
       if (teleinfo_graph.period == index)
       {
         // get number of saved periods
-        if (teleinfo_graph.period == TELEINFO_CURVE_DAY) choice = teleinfo_config.param[TELEINFO_CONFIG_NBDAY];
-        else if (teleinfo_graph.period == TELEINFO_CURVE_WEEK) choice = teleinfo_config.param[TELEINFO_CONFIG_NBWEEK];
+        if (teleinfo_graph.period == TELEINFO_CURVE_DAY) choice = teleinfo_config.param[TIC_CONFIG_NBDAY];
+        else if (teleinfo_graph.period == TELEINFO_CURVE_WEEK) choice = teleinfo_config.param[TIC_CONFIG_NBWEEK];
         else choice = 0;
 
         WSContentSend_P (PSTR ("<select name='histo' id='histo' onchange='this.form.submit();'>\n"));
@@ -1357,7 +1365,7 @@ void TeleinfoCurveWebGraph ()
 
         WSContentSend_P (PSTR ("</select>\n"));      
       }
-      else WSContentSend_P (PSTR ("<a href='%s?period=%d&histo=%d'><div class='item period'>%s</div></a>\n"), D_TELEINFO_PAGE_GRAPH, index, teleinfo_graph.histo, str_text);
+      else WSContentSend_P (PSTR ("<a href='%s?period=%d&histo=%d'><div class='item period'>%s</div></a>\n"), PSTR_TIC_PAGE_GRAPH, index, teleinfo_graph.histo, str_text);
     }
 # endif     // USE_UFILESYS
 
@@ -1376,7 +1384,7 @@ void TeleinfoCurveWebGraph ()
       GetTextIndexed (str_text, sizeof (str_text), index, kTeleinfoGraphDisplay);
 
       // display selection
-      if (teleinfo_graph.data != index) WSContentSend_P (PSTR ("<a href='%s?data=%d'>"), D_TELEINFO_PAGE_GRAPH, index);
+      if (teleinfo_graph.data != index) WSContentSend_P (PSTR ("<a href='%s?data=%d'>"), PSTR_TIC_PAGE_GRAPH, index);
       WSContentSend_P (PSTR ("<div class='item data'>%s</div>"), str_text);
       if (teleinfo_graph.data != index) WSContentSend_P (PSTR ("</a>"));
       WSContentSend_P (PSTR ("\n"));
@@ -1392,7 +1400,7 @@ void TeleinfoCurveWebGraph ()
 
     // svg : start 
     WSContentSend_P (PSTR ("<div class='graph'>\n"));
-    WSContentSend_P (PSTR ("<svg class='graph' viewBox='0 0 1200 %d' preserveAspectRatio='none'>\n"), TELEINFO_GRAPH_HEIGHT);
+    WSContentSend_P (PSTR ("<svg class='graph' viewBox='0 0 1200 %d' preserveAspectRatio='none'>\n"), TIC_GRAPH_HEIGHT);
 
     // svg : style 
     WSContentSend_P (PSTR ("<style type='text/css'>\n"));
@@ -1444,8 +1452,8 @@ void TeleinfoCurveWebGraph ()
     for (phase = 0; phase < teleinfo_contract.phase; phase++)
     {
       // set curve typa according to data type
-      if ((teleinfo_graph.data == TELEINFO_UNIT_VA) || (teleinfo_graph.data == TELEINFO_UNIT_W)) strcpy (str_text, "ph");
-        else strcpy (str_text, "ln");
+      if ((teleinfo_graph.data == TELEINFO_UNIT_VA) || (teleinfo_graph.data == TELEINFO_UNIT_W)) strcpy_P (str_text, PSTR ("ph"));
+        else strcpy_P (str_text, PSTR ("ln"));
 
       // display main and peak curve
       WSContentSend_P (PSTR ("<path id='m%u' class='%s%u' d='' />\n"), phase, str_text, phase);     // main curve
@@ -1625,9 +1633,9 @@ bool Xsns125 (uint32_t function)
       break;
 
     case FUNC_WEB_ADD_HANDLER:
-      Webserver->on (FPSTR (D_TELEINFO_PAGE_GRAPH),       TeleinfoCurveWebGraph);
-      Webserver->on (FPSTR (D_TELEINFO_PAGE_GRAPH_DATA),  TeleinfoCurveWebGraphUpdateData);
-      Webserver->on (FPSTR (D_TELEINFO_PAGE_GRAPH_CURVE), TeleinfoCurveWebGraphUpdateCurve);
+      Webserver->on (FPSTR (PSTR_TIC_PAGE_GRAPH),       TeleinfoCurveWebGraph);
+      Webserver->on (FPSTR (PSTR_TIC_PAGE_GRAPH_DATA),  TeleinfoCurveWebGraphUpdateData);
+      Webserver->on (FPSTR (PSTR_TIC_PAGE_GRAPH_CURVE), TeleinfoCurveWebGraphUpdateCurve);
       break;
 
 #endif  // USE_WEBSERVER

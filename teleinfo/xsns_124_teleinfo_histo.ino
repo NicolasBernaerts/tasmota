@@ -5,6 +5,7 @@
 
   Version history :
     29/02/2024 - v14.0 - Split graph in 3 files
+    28/06/2024 - v14.6 - Remove all String for ESP8266 stability
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -28,16 +29,24 @@
 \*************************************************/
 
 // declare teleinfo graph curves
-#define XSNS_124                         124
+#define XSNS_124                       124
+
+#ifdef ESP32
+  #define TIC_HISTO_LINE_SIZE          384          // size of historisation line
+#else
+  #define TIC_HISTO_LINE_SIZE          256          // size of historisation line
+#endif
 
 // web URL
-const char D_TELEINFO_PAGE_GRAPH_CONSO[] PROGMEM = "/conso";
-const char D_TELEINFO_PAGE_GRAPH_PROD[]  PROGMEM = "/prod";
+const char PSTR_TIC_PAGE_GRAPH_CONSO[] PROGMEM = "/conso";
+const char PSTR_TIC_PAGE_GRAPH_PROD[]  PROGMEM = "/prod";
 
 // historisation files
-const char D_TELEINFO_HISTO_HEADER[]    PROGMEM = "Idx;Month;Day;Global;Daily;00h;01h;02h;03h;04h;05h;06h;07h;08h;09h;10h;11h;12h;13h;14h;15h;16h;17h;18h;19h;20h;21h;22h;23h";
-const char D_TELEINFO_HISTO_FILE_YEAR[] PROGMEM = "/teleinfo-year-%04d.csv";
-const char D_TELEINFO_HISTO_FILE_PROD[] PROGMEM = "/production-year-%04d.csv";
+const char PSTR_TIC_HISTO_FILE_YEAR[]  PROGMEM = "/teleinfo-year-%04d.csv";
+const char PSTR_TIC_HISTO_FILE_PROD[]  PROGMEM = "/production-year-%04d.csv";
+const char PSTR_TIC_HISTO_HEADER[]     PROGMEM = "Idx;Month;Day;Global;Daily;00h;01h;02h;03h;04h;05h;06h;07h;08h;09h;10h;11h;12h;13h;14h;15h;16h;17h;18h;19h;20h;21h;22h;23h";
+
+
 
 /****************************************\
  *                 Data
@@ -46,7 +55,7 @@ const char D_TELEINFO_HISTO_FILE_PROD[] PROGMEM = "/production-year-%04d.csv";
 struct histo_conso {
   long long start_wh;                               // first daily total
   long long hour_wh[24];                            // hours start total
-  long long period_wh[TELEINFO_INDEX_MAX];          // period first total
+  long long period_wh[TIC_PERIOD_MAX];              // period first total
 };
 
 struct histo_prod {
@@ -119,7 +128,7 @@ void TeleinfoHistoGetDate (const int period, const int histo, char* pstr_text)
   BreakTime (calc_time, start_dst);
 
   // set label according to period
-  if ((period == TELEINFO_HISTO_CONSO) || (period == TELEINFO_HISTO_PROD)) sprintf (pstr_text, "%04u", 1970 + start_dst.year - histo);
+  if ((period == TIC_HISTO_CONSO) || (period == TIC_HISTO_PROD)) sprintf_P (pstr_text, PSTR ("%04u"), 1970 + start_dst.year - histo);
    else strcpy (pstr_text, "");
 }
 
@@ -133,8 +142,8 @@ bool TeleinfoHistoGetFilename (const uint8_t period, const uint8_t histo, char* 
 
   // generate filename according to period
   strcpy (pstr_filename, "");
-  if (period == TELEINFO_HISTO_CONSO) sprintf_P (pstr_filename, D_TELEINFO_HISTO_FILE_YEAR, RtcTime.year - (uint16_t)histo);
-  else if (period == TELEINFO_HISTO_PROD) sprintf_P (pstr_filename, D_TELEINFO_HISTO_FILE_PROD, RtcTime.year - (uint16_t)histo);
+  if (period == TIC_HISTO_CONSO) sprintf_P (pstr_filename, PSTR_TIC_HISTO_FILE_YEAR, RtcTime.year - (uint16_t)histo);
+  else if (period == TIC_HISTO_PROD) sprintf_P (pstr_filename, PSTR_TIC_HISTO_FILE_PROD, RtcTime.year - (uint16_t)histo);
 
   // if filename defined, check existence
   if (strlen (pstr_filename) > 0) exists = ffsp->exists (pstr_filename);
@@ -149,7 +158,7 @@ long TeleinfoHistoConsoGetPeriod (const uint8_t index)
   long long value;
 
   // out of range
-  if (index >= TELEINFO_INDEX_MAX) value = 0;
+  if (index >= TIC_PERIOD_MAX) value = 0;
 
   // period not defined
   else if (teleinfo_histo.conso.period_wh[index] == 0) value = 0;
@@ -226,10 +235,10 @@ void TeleinfoHistoSaveData ()
   TIME_T    today_dst;
   long      result;
   long long value;
-  String    str_line;
   File      file;
   char      str_text[32];
   char      str_filename[UFS_FILENAME_SIZE];
+  char      str_line[TIC_HISTO_LINE_SIZE];
 
   // if date not defined, cancel
   if (!RtcTime.valid) return;
@@ -242,7 +251,7 @@ void TeleinfoHistoSaveData ()
   if (teleinfo_histo.conso.start_wh > 0)
   {
     // get filename
-    sprintf_P (str_filename, D_TELEINFO_HISTO_FILE_YEAR, year);
+    sprintf_P (str_filename, PSTR_TIC_HISTO_FILE_YEAR, year);
 
     // if file exists, open in append mode
     if (ffsp->exists (str_filename)) file = ffsp->open (str_filename, "a");
@@ -254,72 +263,72 @@ void TeleinfoHistoSaveData ()
       file = ffsp->open (str_filename, "w");
 
       // generate header with period name and totals
-      str_line = D_TELEINFO_HISTO_HEADER;
-      str_line += ";Period";
+      sprintf_P (str_line, PSTR ("%s;Period"), PSTR_TIC_HISTO_HEADER);
       for (index = 0; index < teleinfo_contract.period_qty; index++)
       {
-        TeleinfoPeriodGetCode (index, str_text, sizeof (str_text));
-        str_line += ";";
-        str_line += str_text;
+        TeleinfoPeriodGetCode (str_text, sizeof (str_text), index);
+        strcat_P (str_line, PSTR (";"));
+        strlcat (str_line, str_text, sizeof (str_line));
       }
-      str_line += "\n";
+      strcat_P (str_line, PSTR ("\n"));
  
       // write header
-      file.print (str_line.c_str ());
+      file.print (str_line);
     }
 
     // line : beginning
-    sprintf (str_text, "%u;%u;%u", today_dst.day_of_year, today_dst.month, today_dst.day_of_month);
-    str_line = str_text;
+    sprintf_P (str_line, PSTR ("%u;%u;%u"), today_dst.day_of_year, today_dst.month, today_dst.day_of_month);
 
     // line : global counter
     lltoa (teleinfo_conso.total_wh, str_text, 10);
-    str_line += ";";
-    str_line += str_text;
+    strcat_P (str_line, PSTR (";"));
+    strlcat (str_line, str_text, sizeof (str_line));
 
     // line : daily counter
     value = teleinfo_conso.total_wh - teleinfo_histo.conso.start_wh;
     lltoa (value, str_text, 10);
-    str_line += ";";
-    str_line += str_text;
+    strcat_P (str_line, PSTR (";"));
+    strlcat (str_line, str_text, sizeof (str_line));
 
     // line : hourly totals
     for (index = 0; index < 24; index ++)
     {
-      str_line += ";";
-      str_line += TeleinfoHistoConsoGetHour (index);
+      lltoa (TeleinfoHistoConsoGetHour (index), str_text, 10);
+      strcat_P (str_line, PSTR (";"));
+      strlcat (str_line, str_text, sizeof (str_line));
     }
 
     // line : period name
     TeleinfoPeriodGetCode (str_text, sizeof (str_text));
-    str_line += ";";
-    str_line += str_text;
+    strcat_P (str_line, PSTR (";"));
+    strlcat (str_line, str_text, sizeof (str_line));
 
     // line : totals
     for (index = 0; index < teleinfo_contract.period_qty; index++)
     {
-      str_line += ";";
-      str_line += TeleinfoHistoConsoGetPeriod (index);
+      ltoa (TeleinfoHistoConsoGetPeriod (index), str_text, 10);
+      strcat_P (str_line, PSTR (";"));
+      strlcat (str_line, str_text, sizeof (str_line));
     }
 
     // write line and close file
-    str_line += "\n";
-    file.print (str_line.c_str ());
+      strcat_P (str_line, PSTR ("\n"));
+    file.print (str_line);
     file.close ();
 
     // reset historisation data
     teleinfo_histo.conso.start_wh = teleinfo_conso.total_wh;
     for (index = 0; index < 24; index ++) teleinfo_histo.conso.hour_wh[index] = 0;
     teleinfo_histo.conso.hour_wh[RtcTime.hour] = teleinfo_conso.total_wh;
-    for (index = 0; index < TELEINFO_INDEX_MAX; index ++) teleinfo_histo.conso.period_wh[index] = 0;
-    teleinfo_histo.conso.period_wh[teleinfo_contract.period] = teleinfo_conso.index_wh[teleinfo_contract.period];
+    for (index = 0; index < TIC_PERIOD_MAX; index ++) teleinfo_histo.conso.period_wh[index] = 0;
+    teleinfo_histo.conso.period_wh[teleinfo_contract.period_idx] = teleinfo_conso.index_wh[teleinfo_contract.period_idx];
   }
 
   // if daily production is available
   if (teleinfo_histo.prod.start_wh > 0)
   {
     // get filename
-    sprintf_P (str_filename, D_TELEINFO_HISTO_FILE_PROD, year);
+    sprintf_P (str_filename, PSTR_TIC_HISTO_FILE_PROD, year);
 
     // if file exists, open in append mode
     if (ffsp->exists (str_filename)) file = ffsp->open (str_filename, "a");
@@ -331,36 +340,35 @@ void TeleinfoHistoSaveData ()
       file = ffsp->open (str_filename, "w");
 
       // write header
-      str_line = D_TELEINFO_HISTO_HEADER;
-      str_line += "\n";
-      file.print (str_line.c_str ());
+      sprintf_P (str_line, "%s\n", PSTR_TIC_HISTO_HEADER);
+      file.print (str_line);
     }
 
     // line : beginning
-    sprintf (str_text, "%u;%u;%u", today_dst.day_of_year, today_dst.month, today_dst.day_of_month);
-    str_line = str_text;
+    sprintf_P (str_line, PSTR ("%u;%u;%u"), today_dst.day_of_year, today_dst.month, today_dst.day_of_month);
 
     // line : global counter
     lltoa (teleinfo_prod.total_wh, str_text, 10);
-    str_line += ";";
-    str_line += str_text;
+    strcat_P (str_line, PSTR (";"));
+    strlcat (str_line, str_text, sizeof (str_line));
 
     // line : daily counter
     value = teleinfo_prod.total_wh - teleinfo_histo.prod.start_wh;
     lltoa (value, str_text, 10);
-    str_line += ";";
-    str_line += str_text;
+    strcat_P (str_line, PSTR (";"));
+    strlcat (str_line, str_text, sizeof (str_line));
 
     // line : hourly totals
     for (index = 0; index < 24; index ++)
     {
-      str_line += ";";
-      str_line += TeleinfoHistoProdGetHour (index);
+      ltoa (TeleinfoHistoProdGetHour (index), str_text, 10);
+      strcat_P (str_line, PSTR (";"));
+      strlcat (str_line, str_text, sizeof (str_line));
     }
 
     // write line and close file
-    str_line += "\n";
-    file.print (str_line.c_str ());
+      strcat_P (str_line, PSTR ("\n"));
+    file.print (str_line);
     file.close ();
 
     // reset historisation data
@@ -393,7 +401,7 @@ void TeleinfoHistoInit ()
   }
 
   // init period values
-  for (index = 0; index < TELEINFO_INDEX_MAX; index ++) teleinfo_histo.conso.period_wh[index] = 0;
+  for (index = 0; index < TIC_PERIOD_MAX; index ++) teleinfo_histo.conso.period_wh[index] = 0;
 }
 
 // called every second
@@ -407,7 +415,7 @@ void TeleinfoHistoEverySecond ()
   // init
   day    = RtcTime.day_of_month;
   hour   = RtcTime.hour;
-  period = teleinfo_contract.period;
+  period = teleinfo_contract.period_idx;
 
   // in case of day change
   if (teleinfo_histo.last_day == UINT8_MAX) teleinfo_histo.last_day = day;
@@ -433,7 +441,7 @@ void TeleinfoHistoEverySecond ()
     if (teleinfo_histo.conso.hour_wh[hour] == 0) teleinfo_histo.conso.hour_wh[hour] = teleinfo_conso.total_wh;
 
     // if needed, init current period counter
-    if (period < TELEINFO_INDEX_MAX)
+    if (period < TIC_PERIOD_MAX)
     {
       if (teleinfo_histo.conso.period_wh[period] == 0) teleinfo_histo.conso.period_wh[period] = teleinfo_conso.index_wh[period];
     }
@@ -471,43 +479,43 @@ void TeleinfoHistoDisplayFrame (const uint8_t month, const uint8_t day)
   uint8_t arr_pos[5] = {98,76,51,26,2};  
 
   // set labels according to data type
-  if (month == 0) unit_max = teleinfo_config.param[TELEINFO_CONFIG_MAX_MONTH];
-    else if (day == 0) unit_max = teleinfo_config.param[TELEINFO_CONFIG_MAX_DAY];
-      else unit_max = teleinfo_config.param[TELEINFO_CONFIG_MAX_HOUR];
+  if (month == 0) unit_max = teleinfo_config.param[TIC_CONFIG_MAX_MONTH];
+    else if (day == 0) unit_max = teleinfo_config.param[TIC_CONFIG_MAX_DAY];
+      else unit_max = teleinfo_config.param[TIC_CONFIG_MAX_HOUR];
   unit_max = unit_max * 1000;
   for (index = 0; index < 5; index ++) TeleinfoDriverGetDataDisplay (TELEINFO_UNIT_MAX, index * unit_max / 4, arr_label[index], sizeof (arr_label[index]), true);
 
 
   // graph frame
-  WSContentSend_P (PSTR ("<rect x='%d%%' y='%d%%' width='%d%%' height='99.9%%' rx='10' />\n"), TELEINFO_GRAPH_PERCENT_START, 0, TELEINFO_GRAPH_PERCENT_STOP - TELEINFO_GRAPH_PERCENT_START);
+  WSContentSend_P (PSTR ("<rect x='%d%%' y='%d%%' width='%d%%' height='99.9%%' rx='10' />\n"), TIC_GRAPH_PERCENT_START, 0, TIC_GRAPH_PERCENT_STOP - TIC_GRAPH_PERCENT_START);
 
   // graph separation lines
-  WSContentSend_P (PSTR ("<line class='dash' x1='%d%%' y1='%d%%' x2='%d%%' y2='%d%%' />\n"), TELEINFO_GRAPH_PERCENT_START, 25, TELEINFO_GRAPH_PERCENT_STOP, 25);
-  WSContentSend_P (PSTR ("<line class='dash' x1='%d%%' y1='%d%%' x2='%d%%' y2='%d%%' />\n"), TELEINFO_GRAPH_PERCENT_START, 50, TELEINFO_GRAPH_PERCENT_STOP, 50);
-  WSContentSend_P (PSTR ("<line class='dash' x1='%d%%' y1='%d%%' x2='%d%%' y2='%d%%' />\n"), TELEINFO_GRAPH_PERCENT_START, 75, TELEINFO_GRAPH_PERCENT_STOP, 75);
+  WSContentSend_P (PSTR ("<line class='dash' x1='%d%%' y1='%d%%' x2='%d%%' y2='%d%%' />\n"), TIC_GRAPH_PERCENT_START, 25, TIC_GRAPH_PERCENT_STOP, 25);
+  WSContentSend_P (PSTR ("<line class='dash' x1='%d%%' y1='%d%%' x2='%d%%' y2='%d%%' />\n"), TIC_GRAPH_PERCENT_START, 50, TIC_GRAPH_PERCENT_STOP, 50);
+  WSContentSend_P (PSTR ("<line class='dash' x1='%d%%' y1='%d%%' x2='%d%%' y2='%d%%' />\n"), TIC_GRAPH_PERCENT_START, 75, TIC_GRAPH_PERCENT_STOP, 75);
 
   // units graduation
-  WSContentSend_P (PSTR ("<text class='power' x='%d%%' y='%d%%'>Wh</text>\n"), TELEINFO_GRAPH_PERCENT_STOP + 3, 2);
+  WSContentSend_P (PSTR ("<text class='power' x='%d%%' y='%d%%'>Wh</text>\n"), TIC_GRAPH_PERCENT_STOP + 3, 2);
   for (index = 0; index < 5; index ++) WSContentSend_P (PSTR ("<text class='power' x='%u%%' y='%u%%'>%s</text>\n"), 2, arr_pos[index],  arr_label[index]);
 }
 
 // Append Teleinfo histo button to main page
 void TeleinfoHistoWebMainButton ()
 {
-  if (teleinfo_conso.total_wh > 0) WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>Consommation</button></form></p>\n"), D_TELEINFO_PAGE_GRAPH_CONSO);
-  if (teleinfo_prod.total_wh > 0)   WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>Production</button></form></p>\n"), D_TELEINFO_PAGE_GRAPH_PROD);
+  if (teleinfo_conso.total_wh > 0) WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>Consommation</button></form></p>\n"), PSTR_TIC_PAGE_GRAPH_CONSO);
+  if (teleinfo_prod.total_wh > 0)  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>Production</button></form></p>\n"), PSTR_TIC_PAGE_GRAPH_PROD);
 }
 
 // Display bar graph
 void TeleinfoHistoDisplayBar (const uint8_t histo, const bool is_main)
 {
   bool     analyse;
-  int      index, count;
+  int      index;
   int      month, day, hour;
   long     value, value_x, value_y;
   long     graph_x, graph_y, graph_delta, graph_width, graph_height, graph_x_end, graph_max;
   long     graph_start, graph_stop;  
-  long     arr_total[TELEINFO_GRAPH_MAX_BARGRAPH];
+  long     arr_total[TIC_GRAPH_MAX_BARGRAPH];
   uint8_t  day_of_week;
   uint32_t time_bar;
   uint32_t len_buffer;
@@ -520,7 +528,7 @@ void TeleinfoHistoDisplayBar (const uint8_t histo, const bool is_main)
   File     file;
 
   // init array
-  for (index = 0; index < TELEINFO_GRAPH_MAX_BARGRAPH; index ++) arr_total[index] = 0;
+  for (index = 0; index < TIC_GRAPH_MAX_BARGRAPH; index ++) arr_total[index] = 0;
 
   // if full month view, calculate first day of month
   if (teleinfo_graph.month != 0)
@@ -535,38 +543,38 @@ void TeleinfoHistoDisplayBar (const uint8_t histo, const bool is_main)
   // init graph units for full year display (month bars)
   if (teleinfo_graph.month == 0)
   {
-    graph_max = teleinfo_config.param[TELEINFO_CONFIG_MAX_MONTH];
+    graph_max = teleinfo_config.param[TIC_CONFIG_MAX_MONTH];
     graph_width = 90;             // width of graph bar area
     graph_start = 1;
     graph_stop  = 12;             // number of graph bars (months per year)
     graph_delta = 20;             // separation between bars (pixels)
-    strcpy (str_type, "month");
+    strcpy_P (str_type, PSTR ("month"));
   }
 
   // else init graph units for full month display (day bars)
   else if (teleinfo_graph.day == 0)
   {
-    graph_max = teleinfo_config.param[TELEINFO_CONFIG_MAX_DAY];
+    graph_max = teleinfo_config.param[TIC_CONFIG_MAX_DAY];
     graph_width = 35;             // width of graph bar area
     graph_start = 1;
     graph_stop  = 31;             // number of graph bars (days per month)
     graph_delta = 4;              // separation between bars (pixels)
-    strcpy (str_type, "day");
+    strcpy_P (str_type, PSTR ("day"));
   }
 
   // else init graph units for full day display (hour bars)
   else
   {
-    graph_max = teleinfo_config.param[TELEINFO_CONFIG_MAX_HOUR];
+    graph_max = teleinfo_config.param[TIC_CONFIG_MAX_HOUR];
     graph_width = 45;             // width of graph bar area
     graph_start = 0;
     graph_stop  = 23;             // number of graph bars (hours per day)
     graph_delta = 10;             // separation between bars (pixels)
-    strcpy (str_type, "hour");
+    strcpy_P (str_type, PSTR ("hour"));
   }
 
   // calculate graph height and graph start
-  graph_height = TELEINFO_GRAPH_HEIGHT;
+  graph_height = TIC_GRAPH_HEIGHT;
   graph_x      = teleinfo_graph.left + graph_delta / 2;
   graph_x_end  = graph_x + graph_width - graph_delta;
   if (!is_main) { graph_x +=4; graph_x_end -= 4; }
@@ -575,7 +583,6 @@ void TeleinfoHistoDisplayBar (const uint8_t histo, const bool is_main)
   if (TeleinfoHistoGetFilename (teleinfo_graph.period, histo, str_filename))
   {
     // open file
-    count = 0;
     file = ffsp->open (str_filename, "r");
     while (file.available ())
     {
@@ -607,7 +614,7 @@ void TeleinfoHistoDisplayBar (const uint8_t histo, const bool is_main)
         if ((teleinfo_graph.month == 0) && (index >= 4))
         {
           // update current month total
-          if (month > graph_stop) month = TELEINFO_GRAPH_MAX_BARGRAPH - 1;
+          if (month > graph_stop) month = TIC_GRAPH_MAX_BARGRAPH - 1;
           if (arr_total[month] == LONG_MAX) arr_total[month] = value; 
             else arr_total[month] += value;
 
@@ -619,7 +626,7 @@ void TeleinfoHistoDisplayBar (const uint8_t histo, const bool is_main)
         else if ((teleinfo_graph.month == month) && (teleinfo_graph.day == 0) && (index >= 4))
         {
           // update current day total
-          if (day > graph_stop) day = TELEINFO_GRAPH_MAX_BARGRAPH - 1;
+          if (day > graph_stop) day = TIC_GRAPH_MAX_BARGRAPH - 1;
           if (arr_total[day] == LONG_MAX) arr_total[day] = value; 
             else arr_total[day] += value;
 
@@ -642,10 +649,6 @@ void TeleinfoHistoDisplayBar (const uint8_t histo, const bool is_main)
         // next token in the line
         if (pstr_token != nullptr) pstr_token = strtok (nullptr, ";");
       }
-
-      // handle data reception update every 20 lines
-      if (count % 20 == 0) TeleinfoProcessRealTime ();
-      count++;
     }
 
     // close file
@@ -656,7 +659,7 @@ void TeleinfoHistoDisplayBar (const uint8_t histo, const bool is_main)
   if (histo == 0)
   {
     // if displaying production data
-    if (teleinfo_graph.period == TELEINFO_HISTO_PROD)
+    if (teleinfo_graph.period == TIC_HISTO_PROD)
     {
       // if dealing with current day, add live values to hourly slots
       if ((teleinfo_graph.month == RtcTime.month) && (teleinfo_graph.day == RtcTime.day_of_month))
@@ -682,7 +685,7 @@ void TeleinfoHistoDisplayBar (const uint8_t histo, const bool is_main)
     } 
 
     // else displaying conso data
-    else if (teleinfo_graph.period == TELEINFO_HISTO_CONSO)
+    else if (teleinfo_graph.period == TIC_HISTO_CONSO)
     {
       // if current daily data, init previous hour slot from live values
       if ((teleinfo_graph.month == RtcTime.month) && (teleinfo_graph.day == RtcTime.day_of_month))
@@ -721,12 +724,12 @@ void TeleinfoHistoDisplayBar (const uint8_t histo, const bool is_main)
       if (graph_y < 0) graph_y = 0;
 
       // display link
-      if (teleinfo_graph.period == TELEINFO_HISTO_PROD) strcpy (str_value, D_TELEINFO_PAGE_GRAPH_PROD); else strcpy (str_value, D_TELEINFO_PAGE_GRAPH_CONSO);
+      if (teleinfo_graph.period == TIC_HISTO_PROD) strcpy_P (str_value, PSTR_TIC_PAGE_GRAPH_PROD); else strcpy_P (str_value, PSTR_TIC_PAGE_GRAPH_CONSO);
       if (is_main && (teleinfo_graph.month == 0)) WSContentSend_P (PSTR ("<a href='%s?histo=%u&month=%d&day=0'>"), str_value, histo, index);
       else if (is_main && (teleinfo_graph.day == 0)) WSContentSend_P (PSTR ("<a href='%s?histo=%u&month=%u&day=%d'>"), str_value, histo, teleinfo_graph.month, index);
 
       // display bar
-      if (is_main) strcpy (str_value, "now"); else strcpy (str_value, "prev");
+      if (is_main) strcpy_P (str_value, PSTR ("now")); else strcpy_P (str_value, PSTR ("prev"));
       WSContentSend_P (PSTR ("<path class='%s' d='M%d %d L%d %d L%d %d L%d %d L%d %d L%d %d Z'></path>"), str_value, graph_x, graph_height, graph_x, graph_y + 2, graph_x + 2, graph_y, graph_x_end - 2, graph_y, graph_x_end, graph_y + 2, graph_x_end, graph_height);
 
       // end of link 
@@ -760,8 +763,8 @@ void TeleinfoHistoDisplayBar (const uint8_t histo, const bool is_main)
 
         // if full year, get month name else get day of month
         if (teleinfo_graph.month == 0) strlcpy (str_value, kMonthNames + (index - 1) * 3, 4);
-          else if (teleinfo_graph.day == 0) sprintf (str_value, "%02d", index);
-            else sprintf (str_value, "%dh", index);
+          else if (teleinfo_graph.day == 0) sprintf_P (str_value, PSTR ("%02d"), index);
+            else sprintf_P (str_value, PSTR ("%dh"), index);
 
         // display
         value_y = graph_height - 10;
@@ -789,9 +792,6 @@ void TeleinfoHistoDisplayBar (const uint8_t histo, const bool is_main)
     // increment bar position
     graph_x     += graph_width;
     graph_x_end += graph_width;
-
-    // handle data update
-    TeleinfoProcessRealTime ();
   }
 }
 
@@ -901,8 +901,8 @@ bool TeleinfoHistoNextPeriod (const bool update)
 }
 
 // Graph public page
-void TeleinfoHistoGraphWebConso () { TeleinfoHistoGraphWeb (TELEINFO_HISTO_CONSO); }
-void TeleinfoHistoGraphWebProd () { TeleinfoHistoGraphWeb (TELEINFO_HISTO_PROD); }
+void TeleinfoHistoGraphWebConso () { TeleinfoHistoGraphWeb (TIC_HISTO_CONSO); }
+void TeleinfoHistoGraphWebProd () { TeleinfoHistoGraphWeb (TIC_HISTO_PROD); }
 void TeleinfoHistoGraphWeb (const uint8_t period_type)
 {
   uint8_t  choice, counter, index;  
@@ -917,7 +917,7 @@ void TeleinfoHistoGraphWeb (const uint8_t period_type)
   timestart = millis ();
 
   // beginning of form without authentification
-  WSContentStart_P (D_TELEINFO_GRAPH, false);
+  WSContentStart_P (PSTR (TIC_GRAPH), false);
 
   // serve page if possible
   if (!teleinfo_graph.serving)
@@ -928,34 +928,34 @@ void TeleinfoHistoGraphWeb (const uint8_t period_type)
     // get numerical argument values
     teleinfo_graph.period = period_type;
     teleinfo_graph.data   = TELEINFO_UNIT_WH;
-    teleinfo_graph.day    = (uint8_t)TeleinfoDriverGetArgValue (D_CMND_TELEINFO_DAY,   0, 31, teleinfo_graph.day);
-    teleinfo_graph.month  = (uint8_t)TeleinfoDriverGetArgValue (D_CMND_TELEINFO_MONTH, 0, 12, teleinfo_graph.month);
-    teleinfo_graph.histo  = (uint8_t)TeleinfoDriverGetArgValue (D_CMND_TELEINFO_HISTO, 0, 20, teleinfo_graph.histo);
+    teleinfo_graph.day    = (uint8_t)TeleinfoDriverGetArgValue (CMND_TIC_DAY,   0, 31, teleinfo_graph.day);
+    teleinfo_graph.month  = (uint8_t)TeleinfoDriverGetArgValue (CMND_TIC_MONTH, 0, 12, teleinfo_graph.month);
+    teleinfo_graph.histo  = (uint8_t)TeleinfoDriverGetArgValue (CMND_TIC_HISTO, 0, 20, teleinfo_graph.histo);
 
     // graph increment
-    choice = TeleinfoDriverGetArgValue (D_CMND_TELEINFO_PLUS, 0, 1, 0);
+    choice = TeleinfoDriverGetArgValue (CMND_TIC_PLUS, 0, 1, 0);
     if (choice == 1)
     {
-      if (teleinfo_graph.month == 0) teleinfo_config.param[TELEINFO_CONFIG_MAX_MONTH] *= 2;
-      else if (teleinfo_graph.day == 0) teleinfo_config.param[TELEINFO_CONFIG_MAX_DAY] *= 2;
-      else teleinfo_config.param[TELEINFO_CONFIG_MAX_HOUR] *= 2;
+      if (teleinfo_graph.month == 0) teleinfo_config.param[TIC_CONFIG_MAX_MONTH] *= 2;
+      else if (teleinfo_graph.day == 0) teleinfo_config.param[TIC_CONFIG_MAX_DAY] *= 2;
+      else teleinfo_config.param[TIC_CONFIG_MAX_HOUR] *= 2;
     }
 
     // graph decrement
-    choice = TeleinfoDriverGetArgValue (D_CMND_TELEINFO_MINUS, 0, 1, 0);
+    choice = TeleinfoDriverGetArgValue (CMND_TIC_MINUS, 0, 1, 0);
     if (choice == 1)
     {
-      if (teleinfo_graph.month == 0) teleinfo_config.param[TELEINFO_CONFIG_MAX_MONTH] = max ((long)TELEINFO_GRAPH_MIN_WH_MONTH, teleinfo_config.param[TELEINFO_CONFIG_MAX_MONTH] / 2);
-      else if (teleinfo_graph.day == 0) teleinfo_config.param[TELEINFO_CONFIG_MAX_DAY] = max ((long)TELEINFO_GRAPH_MIN_WH_DAY , teleinfo_config.param[TELEINFO_CONFIG_MAX_DAY] / 2);
-      else teleinfo_config.param[TELEINFO_CONFIG_MAX_HOUR] = max ((long)TELEINFO_GRAPH_MIN_WH_HOUR, teleinfo_config.param[TELEINFO_CONFIG_MAX_HOUR] / 2);
+      if (teleinfo_graph.month == 0) teleinfo_config.param[TIC_CONFIG_MAX_MONTH] = max ((long)TIC_GRAPH_MIN_WH_MONTH, teleinfo_config.param[TIC_CONFIG_MAX_MONTH] / 2);
+      else if (teleinfo_graph.day == 0) teleinfo_config.param[TIC_CONFIG_MAX_DAY] = max ((long)TIC_GRAPH_MIN_WH_DAY , teleinfo_config.param[TIC_CONFIG_MAX_DAY] / 2);
+      else teleinfo_config.param[TIC_CONFIG_MAX_HOUR] = max ((long)TIC_GRAPH_MIN_WH_HOUR, teleinfo_config.param[TIC_CONFIG_MAX_HOUR] / 2);
     }
 
     // handle previous page
-    choice = TeleinfoDriverGetArgValue (D_CMND_TELEINFO_PREV, 0, 1, 0);
+    choice = TeleinfoDriverGetArgValue (CMND_TIC_PREV, 0, 1, 0);
     if (choice == 1) TeleinfoHistoPreviousPeriod (true);
 
     // handle next page
-    choice = TeleinfoDriverGetArgValue (D_CMND_TELEINFO_NEXT, 0, 1, 0);
+    choice = TeleinfoDriverGetArgValue (CMND_TIC_NEXT, 0, 1, 0);
     if (choice == 1) TeleinfoHistoNextPeriod (true);
 
     // javascript : screen swipe for previous and next period
@@ -964,8 +964,8 @@ void TeleinfoHistoGraphWeb (const uint8_t period_type)
     WSContentSend_P (PSTR ("window.addEventListener('touchend',function(evt){stopX=evt.changedTouches[0].pageX;stopY=evt.changedTouches[0].pageY;handleGesture();},false);\n"));
     WSContentSend_P (PSTR ("function handleGesture(){\n"));
     WSContentSend_P (PSTR (" let deltaX=stopX-startX;let deltaY=Math.abs(stopY-startY);\n"));
-    WSContentSend_P (PSTR (" if(deltaY<10 && deltaX<-100){document.getElementById('%s').click();}\n"), D_CMND_TELEINFO_NEXT);
-    WSContentSend_P (PSTR (" else if(deltaY<10 && deltaX>100){document.getElementById('%s').click();}\n"), D_CMND_TELEINFO_PREV);
+    WSContentSend_P (PSTR (" if(deltaY<10 && deltaX<-100){document.getElementById('%s').click();}\n"), PSTR (CMND_TIC_NEXT));
+    WSContentSend_P (PSTR (" else if(deltaY<10 && deltaX>100){document.getElementById('%s').click();}\n"), PSTR (CMND_TIC_PREV));
     WSContentSend_P (PSTR ("}\n"));
 
     // end of script section
@@ -980,7 +980,7 @@ void TeleinfoHistoGraphWeb (const uint8_t period_type)
     // page style
     WSContentSend_P (PSTR ("<style>\n"));
 
-    WSContentSend_P (PSTR ("body {color:white;background-color:%s;font-family:Arial, Helvetica, sans-serif;}\n"), COLOR_BACKGROUND);
+    WSContentSend_P (PSTR ("body {color:white;background-color:%s;font-family:Arial, Helvetica, sans-serif;}\n"), PSTR (COLOR_BACKGROUND));
     WSContentSend_P (PSTR ("div {margin:8px auto;padding:2px 0px;text-align:center;vertical-align:top;}\n"));
 
     WSContentSend_P (PSTR ("a {text-decoration:none;}\n"));
@@ -991,8 +991,8 @@ void TeleinfoHistoGraphWeb (const uint8_t period_type)
     WSContentSend_P (PSTR ("div.next {position:absolute;top:16px;right:2%%;padding:0px;}\n"));
 
     WSContentSend_P (PSTR ("div.title {font-size:28px;}\n"));
-    if (teleinfo_graph.period == TELEINFO_HISTO_PROD) strcpy (str_text, TELEINFO_COLOR_PROD);
-      else strcpy (str_text, TELEINFO_COLOR_CONSO);
+    if (teleinfo_graph.period == TIC_HISTO_PROD) strcpy_P (str_text, PSTR (TIC_COLOR_PROD));
+      else strcpy_P (str_text, PSTR (TIC_COLOR_CONSO));
     WSContentSend_P (PSTR ("div.type {font-size:24px;font-weight:bold;color:%s;}\n"), str_text);
 
     WSContentSend_P (PSTR ("div.level {margin-top:-4px;}\n"));
@@ -1015,9 +1015,9 @@ void TeleinfoHistoGraphWeb (const uint8_t period_type)
     WSContentSend_P (PSTR ("button.navi {padding:2px 16px;}\n"));
     WSContentSend_P (PSTR ("button.range {width:24px;margin-bottom:8px;}\n"));
     WSContentSend_P (PSTR ("button:hover {background:#aaa;}\n"));
-    WSContentSend_P (PSTR ("button:disabled {background:%s;color:%s;}\n"), COLOR_BACKGROUND, COLOR_BACKGROUND);
+    WSContentSend_P (PSTR ("button:disabled {background:%s;color:%s;}\n"), PSTR (COLOR_BACKGROUND), PSTR (COLOR_BACKGROUND));
 
-    WSContentSend_P (PSTR ("button.menu {background:%s;color:%s;line-height:2rem;font-size:1.2rem;cursor:pointer;border:none;border-radius:0.3rem;width:150px;margin:2vh;}\n"), COLOR_BUTTON, COLOR_BUTTON_TEXT);
+    WSContentSend_P (PSTR ("button.menu {background:%s;color:%s;line-height:2rem;font-size:1.2rem;cursor:pointer;border:none;border-radius:0.3rem;width:150px;margin:2vh;}\n"), PSTR (COLOR_BUTTON), PSTR (COLOR_BUTTON_TEXT));
 
     WSContentSend_P (PSTR ("div.graph {width:100%%;margin:auto;margin-top:4px;}\n"));
     WSContentSend_P (PSTR ("svg.graph {width:100%%;height:60vh;}\n"));
@@ -1029,8 +1029,8 @@ void TeleinfoHistoGraphWeb (const uint8_t period_type)
     WSContentSend_P (PSTR ("<body>\n"));
 
     // form start
-    if (teleinfo_graph.period == TELEINFO_HISTO_PROD) strcpy (str_text, D_TELEINFO_PAGE_GRAPH_PROD);
-      else strcpy (str_text, D_TELEINFO_PAGE_GRAPH_CONSO);
+    if (teleinfo_graph.period == TIC_HISTO_PROD) strcpy_P (str_text, PSTR_TIC_PAGE_GRAPH_PROD);
+      else strcpy_P (str_text, PSTR_TIC_PAGE_GRAPH_CONSO);
     WSContentSend_P (PSTR ("<form method='get' action='%s'>\n"), str_text);
 
     // -------------------
@@ -1038,8 +1038,8 @@ void TeleinfoHistoGraphWeb (const uint8_t period_type)
     // -------------------
 
     WSContentSend_P (PSTR ("<div class='range'>\n"));
-    WSContentSend_P (PSTR ("<button class='range' name='%s' id='%s' value=1>+</button><br>\n"), D_CMND_TELEINFO_PLUS, D_CMND_TELEINFO_PLUS);
-    WSContentSend_P (PSTR ("<button class='range' name='%s' id='%s' value=1>-</button><br>\n"), D_CMND_TELEINFO_MINUS, D_CMND_TELEINFO_MINUS);
+    WSContentSend_P (PSTR ("<button class='range' name='%s' id='%s' value=1>+</button><br>\n"), PSTR (CMND_TIC_PLUS),  PSTR (CMND_TIC_PLUS));
+    WSContentSend_P (PSTR ("<button class='range' name='%s' id='%s' value=1>-</button><br>\n"), PSTR (CMND_TIC_MINUS), PSTR (CMND_TIC_MINUS));
     WSContentSend_P (PSTR ("</div>\n"));
 
     // --------------------------
@@ -1048,13 +1048,13 @@ void TeleinfoHistoGraphWeb (const uint8_t period_type)
 
     // previous button
     if (TeleinfoHistoPreviousPeriod (false)) strcpy (str_text, "");
-      else strcpy (str_text, "disabled");
-    WSContentSend_P (PSTR ("<div class='prev'><button class='navi' name='%s' id='%s' value=1 %s>&lt;&lt;</button></div>\n"), D_CMND_TELEINFO_PREV, D_CMND_TELEINFO_PREV, str_text);
+      else strcpy_P (str_text, PSTR ("disabled"));
+    WSContentSend_P (PSTR ("<div class='prev'><button class='navi' name='%s' id='%s' value=1 %s>&lt;&lt;</button></div>\n"), PSTR (CMND_TIC_PREV), PSTR (CMND_TIC_PREV), str_text);
 
     // next button
     if (TeleinfoHistoNextPeriod (false)) strcpy (str_text, "");
-      else strcpy (str_text, "disabled");
-    WSContentSend_P (PSTR ("<div class='next'><button class='navi' name='%s' id='%s' value=1 %s>&gt;&gt;</button></div>\n"), D_CMND_TELEINFO_NEXT, D_CMND_TELEINFO_NEXT, str_text);
+      else strcpy_P (str_text, PSTR ("disabled"));
+    WSContentSend_P (PSTR ("<div class='next'><button class='navi' name='%s' id='%s' value=1 %s>&gt;&gt;</button></div>\n"), PSTR (CMND_TIC_NEXT), PSTR (CMND_TIC_NEXT), str_text);
 
     // -----------------
     //    Title
@@ -1063,7 +1063,7 @@ void TeleinfoHistoGraphWeb (const uint8_t period_type)
     WSContentSend_P (PSTR ("<div>\n"));
 
     WSContentSend_P (PSTR ("<div class='title'>%s</div>\n"), SettingsText (SET_DEVICENAME));
-    if (teleinfo_graph.period == TELEINFO_HISTO_PROD) strcpy (str_text, "Production"); else strcpy (str_text, "Consommation");
+    if (teleinfo_graph.period == TIC_HISTO_PROD) strcpy_P (str_text, PSTR ("Production")); else strcpy_P (str_text, PSTR ("Consommation"));
     WSContentSend_P (PSTR ("<div class='type'>%s</div>\n"), str_text);
 
     WSContentSend_P (PSTR ("</div>\n"));
@@ -1115,8 +1115,8 @@ void TeleinfoHistoGraphWeb (const uint8_t period_type)
       }
 
       // display month selection
-      if (teleinfo_graph.period == TELEINFO_HISTO_PROD) strcpy (str_text, D_TELEINFO_PAGE_GRAPH_PROD);
-        else strcpy (str_text, D_TELEINFO_PAGE_GRAPH_CONSO);
+      if (teleinfo_graph.period == TIC_HISTO_PROD) strcpy_P (str_text, PSTR_TIC_PAGE_GRAPH_PROD);
+        else strcpy_P (str_text, PSTR_TIC_PAGE_GRAPH_CONSO);
       WSContentSend_P (PSTR ("<a href='%s?histo=%u&month=%u&day=0'><div class='item month%s'>%s</div></a>\n"), str_text, teleinfo_graph.histo, index, str_active, str_date);       
     }
 
@@ -1145,8 +1145,8 @@ void TeleinfoHistoGraphWeb (const uint8_t period_type)
         if ((teleinfo_graph.day == counter) && (teleinfo_graph.day != 0)) index = 0;
 
         // display day selection
-        if (teleinfo_graph.period == TELEINFO_HISTO_PROD) strcpy (str_text, D_TELEINFO_PAGE_GRAPH_PROD);
-          else strcpy (str_text, D_TELEINFO_PAGE_GRAPH_CONSO);
+        if (teleinfo_graph.period == TIC_HISTO_PROD) strcpy_P (str_text, PSTR_TIC_PAGE_GRAPH_PROD);
+          else strcpy_P (str_text, PSTR_TIC_PAGE_GRAPH_CONSO);
         WSContentSend_P (PSTR ("<a href='%s?histo=%u&month=%u&day=%u'><div class='item day%s'>%u</div></a>\n"), str_text, teleinfo_graph.histo, teleinfo_graph.month, index, str_active, counter);
       }
 
@@ -1164,7 +1164,7 @@ void TeleinfoHistoGraphWeb (const uint8_t period_type)
 
     // svg : start
     WSContentSend_P (PSTR ("<div class='graph'>\n"));
-    WSContentSend_P (PSTR ("<svg class='graph' viewBox='0 0 1200 %d' preserveAspectRatio='none'>\n"), TELEINFO_GRAPH_HEIGHT);
+    WSContentSend_P (PSTR ("<svg class='graph' viewBox='0 0 1200 %d' preserveAspectRatio='none'>\n"), TIC_GRAPH_HEIGHT);
 
      // svg : style
     WSContentSend_P (PSTR ("<style type='text/css'>\n"));
@@ -1175,11 +1175,11 @@ void TeleinfoHistoGraphWeb (const uint8_t period_type)
 
     // bar graph
     WSContentSend_P (PSTR ("path {stroke-width:1.5;opacity:0.8;fill-opacity:0.6;}\n"));
-    if (teleinfo_graph.period == TELEINFO_HISTO_PROD) strcpy (str_text, TELEINFO_COLOR_PROD_PREV);
-      else strcpy (str_text, TELEINFO_COLOR_CONSO_PREV);
+    if (teleinfo_graph.period == TIC_HISTO_PROD) strcpy_P (str_text, PSTR (TIC_COLOR_PROD_PREV));
+      else strcpy_P (str_text, PSTR (TIC_COLOR_CONSO_PREV));
     WSContentSend_P (PSTR ("path.prev {stroke:%s;fill:%s;fill-opacity:1;}\n"), str_text, str_text);
-    if (teleinfo_graph.period == TELEINFO_HISTO_PROD) strcpy (str_text, TELEINFO_COLOR_PROD);
-      else strcpy (str_text, TELEINFO_COLOR_CONSO);
+    if (teleinfo_graph.period == TIC_HISTO_PROD) strcpy_P (str_text, PSTR (TIC_COLOR_PROD));
+      else strcpy_P (str_text, PSTR (TIC_COLOR_CONSO));
     WSContentSend_P (PSTR ("path.now {stroke:%s;fill:%s;}\n"), str_text, str_text);
     if (teleinfo_graph.day == 0) WSContentSend_P (PSTR ("path.now:hover {fill-opacity:0.8;}\n"));
 
@@ -1255,8 +1255,8 @@ bool Xsns124 (uint32_t function)
       break;
 
     case FUNC_WEB_ADD_HANDLER:
-      Webserver->on (FPSTR (D_TELEINFO_PAGE_GRAPH_CONSO), TeleinfoHistoGraphWebConso);
-      Webserver->on (FPSTR (D_TELEINFO_PAGE_GRAPH_PROD),  TeleinfoHistoGraphWebProd);
+      Webserver->on (FPSTR (PSTR_TIC_PAGE_GRAPH_CONSO), TeleinfoHistoGraphWebConso);
+      Webserver->on (FPSTR (PSTR_TIC_PAGE_GRAPH_PROD),  TeleinfoHistoGraphWebProd);
       break;
 
 #endif  // USE_WEBSERVER
