@@ -384,8 +384,8 @@ Voici la liste exhaustive des fichiers concernés :
 | File    |  Comment  |
 | --- | --- |
 | **platformio_override.ini** |    |
-| partition/**esp32_partition_....csv** | Specific ESP32 partitionning files   |
-| boards/**esp....json** | ESP8266 and ESP32 boards description  |
+| partition/**esp32_partition_xxx.csv** | Specific ESP32 partitionning files   |
+| boards/**espxxx.json** | ESP8266 and ESP32 boards description  |
 | lib/default/**ArduinoJSON** | JSON handling library used by Ecowatt server, extract content of **ArduinoJson.zip** |
 | tasmota/**user_config_override.h**  |    |
 | tasmota/include/**tasmota_type.h** | Redefinition of teleinfo structure |
