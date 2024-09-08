@@ -384,31 +384,21 @@ Voici la liste exhaustive des fichiers concernés :
 | File    |  Comment  |
 | --- | --- |
 | **platformio_override.ini** |    |
-| partition/**esp32_partition_4M_app1800k_fs1200k.csv** | Safeboot partitioning to get 1.3Mb FS on 4Mb ESP32   |
-| partition/**esp32_partition_8M_app3M_fs4M.csv** | Safeboot partitioning to get 4Mb FS on 8Mb ESP32   |
-| partition/**esp32_partition_16M_app3M_fs12M.csv** | Safeboot partitioning to get 12Mb FS on 16Mb ESP32   |
-| boards/**esp8266_4M2M.json** | ESP8266 4Mb boards  |
-| boards/**esp8266_16M14M.json** | ESP8266 16Mb boards  |
-| boards/**esp32_4M1200k.json** | ESP32 4Mb boards  |
-| boards/**esp32c3_4M1200k.json** | ESP32 C3 4Mb boards  |
-| boards/**esp32c6_winky.json** | ESP32 S3 16Mb boards  |
-| boards/**esp32s2_4M1200k.json** | ESP32 S2 4Mb boards  |
-| boards/**esp32s3_4M1200k-safeboot.json** | ESP32 S3 4Mb boards  |
-| boards/**esp32s3_16M12M-safeboot.json** | ESP32 S3 16Mb boards  |
-| boards/**denkyd4_8M4M-safeboot.json** | ESP32 Denky D4 8Mb boards  |
+| partition/**esp32_partition_....csv** | Specific ESP32 partitionning files   |
+| boards/**esp....json** | ESP8266 and ESP32 boards description  |
 | lib/default/**ArduinoJSON** | JSON handling library used by Ecowatt server, extract content of **ArduinoJson.zip** |
-| lib/default/**FTPClientServer** | FTP server library, extract content of **FTPClientServer.zip** |
 | tasmota/**user_config_override.h**  |    |
 | tasmota/include/**tasmota_type.h** | Redefinition of teleinfo structure |
 | tasmota/tasmota_nrg_energy/**xnrg_15_teleinfo.ino** | Teleinfo energy driver  |
 | tasmota/tasmota_drv_driver/**xdrv_01_9_webserver.ino** | Add compilation target in footer  |
-| tasmota/tasmota_drv_driver/**xdrv_94_ip_address.ino** | Fixed IP address Web configuration |
-| tasmota/tasmota_drv_driver/**xdrv_96_ftp_server.ino** | Embedded FTP server |
+| tasmota/tasmota_drv_driver/**xdrv_94_ip_option.ino** | Fixed IP address and misc options Web configuration |
 | tasmota/tasmota_drv_driver/**xdrv_97_tcp_server.ino** | Embedded TCP stream server |
 | tasmota/tasmota_drv_energy/**xdrv_115_teleinfo.ino** | Teleinfo driver  |
 | tasmota/tasmota_drv_energy/**xdrv_116_integration_domoticz.ino** | Teleinfo domoticz integration  |
 | tasmota/tasmota_drv_energy/**xdrv_117_integration_hass.ino** | Teleinfo home assistant integration  |
 | tasmota/tasmota_drv_energy/**xdrv_118_integration_homie.ino** | Teleinfo homie protocol integration  |
+| tasmota/tasmota_drv_energy/**xdrv_119_integration_thingsboard.ino** | Teleinfo Thingsboard protocol integration  |
+| tasmota/tasmota_drv_energy/**xdrv_120_linky_relay.ino** | Management of relays according to periods and virtual relays  |
 | tasmota/tasmota_sns_sensor/**xsns_99_timezone.ino** | Timezone Web configuration |
 | tasmota/tasmota_sns_sensor/**xsns_119_rte_server.ino** | RTE Tempo, Pointe and Ecowatt data collection |
 | tasmota/tasmota_sns_sensor/**xsns_124_teleinfo_histo.ino** | Teleinfo sensor to handle historisation |
