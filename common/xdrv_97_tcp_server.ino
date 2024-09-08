@@ -168,7 +168,7 @@ int TCPServer::get_port ()
 \***********************************************************/
 
 // TCP - MQTT commands
-const char kTCPServerCommands[] PROGMEM = "tcp_" "|" "help" "|" "start" "|" "stop" "|" "status";
+const char kTCPServerCommands[] PROGMEM = "tcp" "|" "" "|" "_start" "|" "_stop" "|" "_status";
 void (* const TCPServerCommand[])(void) PROGMEM = { &CmndTCPHelp, &CmndTCPStart, &CmndTCPStop, &CmndTCPStatus };
 
 // TCP server instance
@@ -271,7 +271,7 @@ void CmndTCPStatus (void)
 void TCPInit ()
 {
   // log help command
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tcp_help to get help on TCP Server commands"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Run tcp to get help on TCP Server commands"));
 }
 
 // check for client connexion
