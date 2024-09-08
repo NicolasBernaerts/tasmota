@@ -8,12 +8,12 @@ Le **changelog** général est disponible dans le fichier **user_config_override
 
 ## Presentation
 
-Cette évolution du firmware **Tasmota 14** permet de :
+Cette évolution du firmware **Tasmota 14.1** permet de :
   * gérer le flux **Teleinfo** des compteurs français (**Linky**, **PME/PMI** et **Emeraude**)
   * gérer les compteurs en mode **Historique** et en mode **Standard**
   * gérer les compteurs en mode **Consommation** et/ou **Production**
   * calculer le **Cosφ** en quasi temps réel
-  * publier les données pour **Domoticz**, **Home Assistant** et **Homie**
+  * publier les données pour **Domoticz**, **Home Assistant**, **Homie** et **Thingsboard**
   * s'abonner aux API RTE **Tempo**, **Pointe** et **Ecowatt**
 
 Ce firmware a été développé et testé sur les compteurs suivants :
@@ -66,6 +66,7 @@ Voici un tableau récapitulatif des fonctionnalités par famille d'ESP :
 | Intégration Home Assistant  |     x      |      x      |     x     |
 | Intégration Domoticz        |     x      |      x      |     x     |
 | Intégration Homie           |     x      |      x      |     x     |
+| Intégration Thingsboard     |     x      |      x      |     x     |
 | Intégration API RTE         |            |             |     x     |
 | Taille max d'une étiquette  |    32      |    32       |    112    |
 | Nombre max d'étiquettes     |    48      |    48       |    74     |
