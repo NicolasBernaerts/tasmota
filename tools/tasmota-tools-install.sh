@@ -3,7 +3,7 @@
 
 # install tools
 sudo apt -y install fping python3-pip
-pip3 install --upgrade esptool
+pip3 install --upgrade esptool --break-system-packages
 
 # tasmota-discover
 sudo wget -O /usr/local/bin/tasmota-discover https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/tools/tasmota-discover
