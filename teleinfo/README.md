@@ -446,7 +446,7 @@ If you want to remove default Tasmota energy display, you just need to run this 
 
 ## Configuration
 
-![Config page](./screen/tasmota-teleinfo-config.png)
+![Config 1](./screen/tasmota-teleinfo-config-1.png)  ![Config 2](./screen/tasmota-teleinfo-config-2.png)  ![Config 3](./screen/tasmota-teleinfo-config-3.png)
 
 ### Realtime messages ###
 
