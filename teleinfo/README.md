@@ -20,6 +20,7 @@ Cette évolution du firmware **Tasmota 14.1** permet de :
 
 Ce firmware a été développé et testé sur les compteurs suivants :
   * **Sagem Classic monophase** en TIC **Historique**
+  * **Actaris A14C5** en TIC **Historique**
   * **Linky monophase** en TIC **Historique** & **Standard**
   * **Linky triphase** en TIC **Historique** & **Standard**
   * **Ace6000 triphase** en TIC **PME/PMI**
