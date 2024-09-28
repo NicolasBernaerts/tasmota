@@ -6,6 +6,8 @@ Pour la famille des **ESP32**, merci de faire systématiquement un premier flash
 
 Le **changelog** général est disponible dans le fichier **user_config_override.h**
 
+![Homepage page](./screen/tasmota-teleinfo-homepage.png)
+
 ## Presentation
 
 Cette évolution du firmware **Tasmota 14.1** permet de :
