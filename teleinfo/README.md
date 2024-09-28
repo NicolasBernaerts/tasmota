@@ -437,8 +437,7 @@ Finaly, in **Configure Teleinfo** you need to select your Teleinfo adapter proto
 
 ## Main screen ##
 
-![Monophasé](./screen/tasmota-teleinfo-main.png)
-![Triphasé](./screen/tasmota-teleinfo-main-triphase.png)
+![Monophasé](./screen/tasmota-teleinfo-main.png)  ![Triphasé](./screen/tasmota-teleinfo-main-triphase.png)
 
 If you want to remove default Tasmota energy display, you just need to run this command in console :
 
@@ -454,13 +453,8 @@ If you want to remove default Tasmota energy display, you just need to run this 
 
 ### Graph for Power, Voltage and Cos φ ###
 
-![Grah monophase power](./screen/tasmota-teleinfo-graph-daily.png)
-![Grah monophase power](./screen/tasmota-teleinfo-graph-weekly.png)
-![Grah monophase voltage](./screen/tasmota-teleinfo-graph-voltage.png) 
-![Grah monophase Cos phi](./screen/tasmota-teleinfo-graph-cosphi.png) 
+![Grah monophase power](./screen/tasmota-teleinfo-graph-daily.png)  ![Grah monophase power](./screen/tasmota-teleinfo-graph-weekly.png)  ![Grah monophase voltage](./screen/tasmota-teleinfo-graph-voltage.png)  ![Grah monophase Cos phi](./screen/tasmota-teleinfo-graph-cosphi.png) 
  
 ### Totals Counters (kWh) ###
 
-![Yearly total](./screen/tasmota-teleinfo-total-year.png)
-![Monthly total](./screen/tasmota-teleinfo-total-month.png)
-![Daily total](./screen/tasmota-teleinfo-total-day.png)
+![Yearly total](./screen/tasmota-teleinfo-total-year.png)  ![Monthly total](./screen/tasmota-teleinfo-total-month.png)  ![Daily total](./screen/tasmota-teleinfo-total-day.png)
