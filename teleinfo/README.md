@@ -73,13 +73,13 @@ Voici un tableau récapitulatif des fonctionnalités par famille d'ESP :
 
 ## Publication MQTT
 
-En complément de la section officielle **ENERGY**, les sections suivantes peuvent être publiées :
+Dans le topic **../SENSOR**, les sections suivantes peuvent être publiées 
+  * **ENERGY** : section officielle de Tasmota, qui ne contien qu'un sous ensemble de données
   * **METER** : données normalisées de consommation et production en temps réel
-  * **CAL** : calendrier consolidé entre la publication compteur et les données RTE reçues (Tempo, Pointe et/ou Ecowatt)
+  * **CONTRACT** : données normalisées du contrat intégrant les compteurs de périodes en Wh
+  * **CAL** : calendrier heure/heure du jour et du lendemain, consolidé entre la publication compteur et les données RTE reçues (Tempo, Pointe et/ou Ecowatt)
   * **RELAY** : relais virtuels publiés par le compteur
-  * **CONTRACT** : données du contrat intégrant les compteurs de périodes en Wh
   * **ALERT** : alertes publiées dans les messages STGE (changement Tempo / EJP, surpuissance & survoltage)
-  * **TIC** : etiquettes et données brutes reçues depuis le compteur
 
 Toutes ces publications sont activables à travers la page **Configuration Teleinfo**.
 
@@ -104,6 +104,16 @@ Toutes ces publications sont activables à travers la page **Configuration Telei
 |              |    PC       | Facteur de puissance (cos φ) de la **production**  | 
 |              |   PTDAY     | Puissance totale **produite** aujourd'hui (Wh) | 
 |              |   PYDAY     | Puissance totale **produite** hier (Wh) | 
+| **CONTRACT** |   serial    | Numéro de série du compteur    | 
+|              |    name     | Nom du contrat en cours        | 
+|              |   period    | Nom de la periode en cours     | 
+|              |    color    | Couleur de la periode en cours     | 
+|              |    hour     | Type de la periode en cours     | 
+|              |    tday     | Couleur du jour   | 
+|              |    tmrw     | Couleur du lendemain     | 
+|              |    CONSO    | Compteur global (Wh) de l'ensemble des périodes de consommation    | 
+|              |  *PERIODE*  | Compteur total (Wh) de la période de consommation *PERIODE*      | 
+|              |    PROD     | Compteur global (Wh) de la production    | 
 | **CAL**      |    lv       | Niveau de la période actuelle (0 inconnu, 1 bleu, 2 blanc, 3 rouge)     | 
 |              |    hp       | Type de la période courante (0:heure creuse, 1 heure pleine) | 
 |              |  **tday**   | Section avec le niveau et le type de chaque heure du jour | 
@@ -116,14 +126,6 @@ Toutes ces publications sont activables à travers la page **Configuration Telei
 |              |    ...      |                                                 | 
 |              |    P9       | Etat de la période n°9 (0:inactive, 1:active)   | 
 |              |    L9       | Libellé de la période n°9   | 
-| **CONTRACT** |   serial    | Numéro de série du compteur    | 
-|              |    name     | Nom du contrat en cours        | 
-|              |   period    | Nom de la periode en cours     | 
-|              |    color    | Couleur de la periode en cours     | 
-|              |    hour     | Type de la periode en cours     | 
-|              |    CONSO    | Compteur global (Wh) de l'ensemble des périodes de consommation    | 
-|              |  *PERIODE*  | Compteur total (Wh) de la période de consommation *PERIODE*      | 
-|              |    PROD     | Compteur global (Wh) de la production    | 
 | **ALERT**    |    Load     | Indicateur de surconsommation (0:pas de pb, 1:sur-consommation)     | 
 |              |    Volt     | Indicateur de surtension (0:pas de pb, 1:au moins 1 phase est en surtension)    | 
 |              |   Preavis   | Niveau du prochain préavis (utilisé en Tempo & EJP)     | 
@@ -269,7 +271,7 @@ Ce firmware intègre l'auto-découverte à destination de [**Domoticz**](https:/
 
 La configuration des messages émis doit être réalisée en mode console :
 
-    domo_help
+    domo
     HLP: commands for Teleinfo Domoticz integration
     domo_enable <0> = enable/disable Domoticz integration (0/1)
     domo_key <num,idx> = set key num to index idx
@@ -288,7 +290,7 @@ Ce firmware intègre l'auto-découverte à destination de [**Home Assistant**](h
 
 Cette intégration peut être activée via le menu **Configuration / Teleinfo** ou en mode console : 
 
-    hass_enable 1
+    hass 1
 
 A chaque boot, toutes les données candidates à intégration dans **Home Assistant** sont émises via MQTT en mode **retain** .
 
@@ -305,7 +307,7 @@ Ce firmware intègre l'auto-découverte à destination des solutions utilisant l
 
 Cette intégration peut être activée via le menu **Configuration / Teleinfo** ou en mode console : 
 
-    homie_enable 1
+    homie 1
  
 A chaque boot, toutes les données candidates à intégration dans un client **Homie** sont émises via MQTT en mode **retain**.
 
@@ -318,7 +320,7 @@ Ce firmware gère la publication des données à destination de la plateforme Io
 
 Cette intégration peut être activée via le menu **Configuration / Teleinfo** ou en mode console : 
 
-    tboard_enable 1
+    thingsboard 1
  
 Voici le paramétrage à appliquer coté **Tasmota** et coté **Thingsboard** pour que les données soient publiées et consommées :
 
@@ -377,7 +379,6 @@ Si vous voulez compiler ce firmware vous-même, vous devez :
 1. installer les sources **tasmota** officielles (utilisez la même version que celle déclarée en tête de cette page
 2. déposez ou remplacez les fichiers de ce **repository**
 3. déposez ou remplacez les fichiers du repository **tasmota/common**
-4. installez les librairies **FTPClientServer** et **ArduinoJson**
 
 Voici la liste exhaustive des fichiers concernés :
 
@@ -386,7 +387,6 @@ Voici la liste exhaustive des fichiers concernés :
 | **platformio_override.ini** |    |
 | partition/**esp32_partition_xxx.csv** | Specific ESP32 partitionning files   |
 | boards/**espxxx.json** | ESP8266 and ESP32 boards description  |
-| lib/default/**ArduinoJSON** | JSON handling library used by Ecowatt server, extract content of **ArduinoJson.zip** |
 | tasmota/**user_config_override.h**  |    |
 | tasmota/include/**tasmota_type.h** | Redefinition of teleinfo structure |
 | tasmota/tasmota_nrg_energy/**xnrg_15_teleinfo.ino** | Teleinfo energy driver  |
