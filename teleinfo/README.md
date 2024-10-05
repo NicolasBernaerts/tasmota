@@ -83,16 +83,23 @@ Ce firmware propose différentes options de configuration. Merci de bien lire ce
 
 ![Donnees publiées](./screen/tasmota-teleinfo-config-mode.png)
 
-Ces options permettent de définir le type de compteur auquel est connecté le module. Les anciens compteurs sont tous en mode **Historique**. Les Linky sont principalement en mode **Historique** mais ceux utilisés avec les nouveaux contrats sont le plus souvent configurés en mode **Standard**.
+Ces options permettent de définir le type de compteur auquel est connecté le module.
+Les anciens compteurs sont tous en mode **Historique**.
+Les Linky sont principalement en mode **Historique** mais ceux utilisés avec les nouveaux contrats sont le plus souvent configurés en mode **Standard**.
+Si vous modifiez cette option, le module redémarrera après sauvegarde.
 
 ### Données publiées
 
 ![Donnees publiées](./screen/tasmota-teleinfo-config-donnees.png)
 
-  - **Energie Tasmota** : Cette option publie la section **ENERGY**, publication standard de tasmota. La plupart du temps vous n'avez pas besoin de cocher cette option car elle ne prend pas en compte la moitié des données publiées par un compteur Linky.
-  - **Consommation & Production** : Cette option publie la section **METER** et **CONTRACT**. C'est l'option que vous devriez cocher par défaut. Elle permet de publier toutes les données utiles du compteur en mode consommation, production et/ou auto-consommation.
-  - **Relais virtuels** : Cette option publie la section **RELAY**. Elle permet de s'abonner à l'état des relais virtuels publiés par le compteur ou à des relais fonction de la période en cours du contrat. Elle est à utiliser avec des device ayant été programmés avec mon firmware **Relai**.
-  - **Calendrier** : Cette option publie la section **CAL**. Elle permet de publier les couleurs de contrat heure / heure pour le jour courant et le lendemain.
+#### Energie Tasmota
+Cette option publie la section **ENERGY**, publication standard de tasmota. La plupart du temps vous n'avez pas besoin de cocher cette option car elle ne prend pas en compte la moitié des données publiées par un compteur Linky.
+#### Consommation & Production
+Cette option publie la section **METER** et **CONTRACT**. C'est l'option que vous devriez cocher par défaut. Elle permet de publier toutes les données utiles du compteur en mode consommation, production et/ou auto-consommation.
+#### Relais virtuels
+Cette option publie la section **RELAY**. Elle permet de s'abonner à l'état des relais virtuels publiés par le compteur ou à des relais fonction de la période en cours du contrat. Elle est à utiliser avec des device ayant été programmés avec mon firmware **Relai**.
+#### Calendrier
+Cette option publie la section **CAL**. Elle permet de publier les couleurs de contrat heure / heure pour le jour courant et le lendemain.
 
 ### Politique de publication
 
@@ -111,30 +118,41 @@ Ces options permettent de publier les données dans un format spécifiquement at
 Les données sont émises au boot après la réception de quelques messages complets depuis le compteur.
 Cela permet d'émettre des données correspondant exactement au contrat lié au compteur raccordé.
 
-  - **Home Assistant** : Toutes les données sélectionnées dans **Données publiées** sont annoncées à Home Assistant à chaque démarrage. Dans le cas particulier du Wenky, les messages d'auto-découverte ne sont pas émis au réveil s'il ne dispose pas d'une alimentation fixe via USB. Comme les données sont annoncées à HA, vous ne devriez plus avoir qu'à les sélectionner dans HA, qui s'abonnera et utilisera les données publiées. 
+#### Home Assistant
+
+Toutes les données sélectionnées dans **Données publiées** sont annoncées à Home Assistant à chaque démarrage. Dans le cas particulier du Wenky, les messages d'auto-découverte ne sont pas émis au réveil s'il ne dispose pas d'une alimentation fixe via USB. Comme les données sont annoncées à HA, vous ne devriez plus avoir qu'à les sélectionner dans HA, qui s'abonnera et utilisera les données publiées. 
 
 ![Home Assistant integration](./screen/tasmota-ha-integration-1.png)  ![Home Assistant integration](./screen/tasmota-ha-integration-2.png)
 
+#### Homie
 
-  - **Homie** : Les données sont publiées dans un format spécifique reconnu par les applications domotique compatibles [**Homie**](https://homieiot.github.io/). A chaque boot, toutes les données candidates à intégration dans un client **Homie** sont émises via MQTT en mode **retain**. Dans le cas particulier du Wenky, les messages d'auto-découverte ne sont pas émis au réveil s'il ne dispose pas d'une alimentation fixe via USB.
+Les données sont publiées dans un format spécifique reconnu par les applications domotique compatibles [**Homie**](https://homieiot.github.io/). A chaque boot, toutes les données candidates à intégration dans un client **Homie** sont émises via MQTT en mode **retain**. Dans le cas particulier du Wenky, les messages d'auto-découverte ne sont pas émis au réveil s'il ne dispose pas d'une alimentation fixe via USB.
 
+#### Thingsboard
 
-  - **Thingsboard** : Les données sont publiées dans un format spécifique reconnu nativement par la plateforme IoT  [**Thingsboard**](https://thingsboard.io/). Le paramétrage à appliquer coté **Tasmota** et coté **Thingsboard** pour que les données soient publiées et consommées est le suivant :
+Les données sont publiées dans un format spécifique reconnu nativement par la plateforme IoT  [**Thingsboard**](https://thingsboard.io/). Le paramétrage à appliquer coté **Tasmota** et coté **Thingsboard** pour que les données soient publiées et consommées est le suivant :
 
 ![Tasmota config](./screen/tasmota-thingsboard-config.jpg)  ![Thingsboard device](./screen/thingsboard-device.jpg)  ![Thingsboard credentials](./screen/thingsboard-credentials.jpg)
 
+#### Domoticz
 
-  - **Domoticz** : Les données sont publiées dans un format spécifique reconnu nativement par Domoticz. Une fois l'option sélectionnée et sauvegardée, vous pourrez définir les index Domoticz définis pour chacune des données publiées. Pour chaque donnée, un tooltip explique le type de données à définir dans Domoticz.
+Les données sont publiées dans un format spécifique reconnu nativement par Domoticz. Une fois l'option sélectionnée et sauvegardée, vous pourrez définir les index Domoticz définis pour chacune des données publiées. Pour chaque donnée, un tooltip explique le type de données à définir dans Domoticz.
 
+#### InfluxDB
 
-  - **InfluxDB** : Les données sont publiées à travers les API InfluxDB. Une fois l'option sélectionnée et sauvegardée, vous pourrez définir les caractéristiques de votre serveur InfluxDB.
+Les données sont publiées à travers les API InfluxDB. Une fois l'option sélectionnée et sauvegardée, vous pourrez définir les caractéristiques de votre serveur InfluxDB.
 
 ### Spécificités
 
 Ces options ne sont pas nécessaires dans la plupart des cas, en particulier si vous utilisez une solution domotique. Si vous n'en avez pas un besoin express, évitez de les sélectionner.
 
-  - **Données temps réel** : Toutes les données liées à la consommation et la production sont publiée en complément sur un topic **LIVE/...** toutes les 3 secondes.
-  - **Données Teleinfo brutes** : Les données recues depuis le compteur sont publiées telles quelles en complément sur un topic **TIC/...**. Ces données étant des données brutes, elles n'ont d'autre intérêt que l'analyse des trames en cas de problème.
+#### Données temps réel
+
+Toutes les données liées à la consommation et la production sont publiée en complément sur un topic **LIVE/...** toutes les 3 secondes.
+
+#### Données Teleinfo brutes
+
+Les données recues depuis le compteur sont publiées telles quelles en complément sur un topic **TIC/...**. Ces données étant des données brutes, elles n'ont d'autre intérêt que l'analyse des trames en cas de problème.
 
 ## Publication MQTT
 
