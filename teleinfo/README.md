@@ -140,7 +140,11 @@ Les données sont publiées dans un format spécifique reconnu nativement par Do
 
 #### InfluxDB
 
-Les données sont publiées à travers les API InfluxDB. Une fois l'option sélectionnée et sauvegardée, vous pourrez définir les caractéristiques de votre serveur InfluxDB.
+Les principales données (contrat, consommation et production) sont publiées sur un serveur InfluxDB, à travers les API https.
+
+Une fois l'option sélectionnée et sauvegardée, vous pourrez définir les caractéristiques de votre serveur InfluxDB.
+
+Les données publiées devraient apparaître automatiquement sur votre instance InfluxDB.
 
 ### Spécificités
 
