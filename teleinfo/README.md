@@ -4,6 +4,8 @@
 
 Pour la famille des **ESP32**, merci de faire systématiquement un premier flash en mode **Série** afin de regénérer le partitionnement et d'éviter tout dysfonctionnement. Vous pourrez alors faire toutes les mises à jour suivantes en mode **OTA**.
 
+Si votre ESP est un **Denky D4**, vous pouvez flasher directement le firmware Denky D4 en mode **OTA**.
+
 Le **changelog** général est disponible dans le fichier **user_config_override.h**
 
 ![Homepage page](./screen/tasmota-teleinfo-homepage.png)
