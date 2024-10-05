@@ -268,15 +268,21 @@ La configuration des messages émis pour Domoticz peut être réalisée en mode 
 
     domo
     HLP: commands for Teleinfo Domoticz integration
-    domo_enable <0> = enable/disable Domoticz integration (0/1)
-    domo_key <num,idx> = set key num to index idx
-             <0,index>  : index Domoticz du total Wh (hc/hp) et puissance active W pour la 1ère période du contrat (base,hc/hp,ejp,bleu)
-             <1,index>  : index Domoticz du total Wh (hc/hp) et puissance active W pour la 1ère période du contrat (blanc)
-             <2,index>  : index Domoticz du total Wh (hc/hp) et puissance active W pour la 1ère période du contrat (rouge)
-             <8,index>  : index Domoticz du total Wh (hc/hp) et puissance active W pour la production
-             <9,index>  : index Domoticz de l'alerte de publication hc/hp
-             <10,index> : index Domoticz de l'alerte de publication de la couleur actuelle (bleu, blanc, rouge)
-             <11,index> : index Domoticz de l'alerte de publication de la couleur du lendemain (bleu, blanc, rouge)
+      domo_set <0/1>     = activation de l'integration [0]
+      domo_va <0/1>      = puissances en VA plutot que W [0]
+      domo_key <num,idx> = set key num to index idx
+        <0,index>  : Totaux conso. Bleu
+        <1,index>  : Totaux conso. Blanc
+        <2,index>  : Totaux conso. Rouge
+        <3,index>  : Total global conso.
+        <4,index>  : Courant (3 phases)
+        <5,index>  : Tension (phase 1)
+        <6,index>  : Tension (phase 2)
+        <7,index>  : Tension (phase 3)
+        <8,index>  : Total Production
+        <9,index>  : Heure Pleine /Creuse
+        <10,index> : Couleur du Jour
+        <11,index> : Couleur du Lendemain
 
 ### Home Assistant
 
