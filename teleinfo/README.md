@@ -19,8 +19,8 @@ Cette évolution du firmware **Tasmota 14.1** permet de :
   * s'abonner aux API RTE **Tempo**, **Pointe** et **Ecowatt**
 
 Ce firmware a été développé et testé sur les compteurs suivants :
-  * **Sagem Classic monophase** en TIC **Historique**
-  * **Actaris A14C5** en TIC **Historique**
+  * **Sagem Blanc monophase** en TIC **Historique**
+  * **Actaris A14C5** en TIC **Historique** (merci à Charles Hallard pour le cadeau)
   * **Linky monophase** en TIC **Historique** & **Standard**
   * **Linky triphase** en TIC **Historique** & **Standard**
   * **Ace6000 triphase** en TIC **PME/PMI**
@@ -133,6 +133,44 @@ Toutes ces publications sont activables à travers la page **Configuration Telei
 |              |    Volt     | Indicateur de surtension (0:pas de pb, 1:au moins 1 phase est en surtension)    | 
 |              |   Preavis   | Niveau du prochain préavis (utilisé en Tempo & EJP)     | 
 |              |    Label    | Libellé du prochain préavis    | 
+
+## Options de configuration
+
+Ce firmware propose différentes options de configuration. Merci de bien lire ce qui suit afin d'avoir un système optimisé.
+
+### Teleinfo
+
+Ces options permettent de définir le type de compteur auquel est connecté le module. Les anciens compteurs sont tous en mode **Historique**. Les Linky sont principalement en mode **Historique** mais ceux utilisés avec les nouveaux contrats sont le plus souvent configurés en mode **Standard**.
+
+### Données publiées
+
+  - **Energie Tasmota** : Cette option publie la section **ENERGY**, publication standard de tasmota. La plupart du temps vous n'avez pas besoin de cocher cette option car elle ne prend pas en compte la moitié des données publiées par un compteur Linky.
+  - **Consommation & Production** : Cette option publie la section **METER** et **CONTRACT**. C'est l'option que vous devriez cocher par défaut. Elle permet de publier toutes les données utiles du compteur en mode consommation, production et/ou auto-consommation.
+  - **Relais virtuels** : Cette option publie la section **RELAY**. Elle permet de s'abonner à l'état des relais virtuels publiés par le compteur ou à des relais fonction de la période en cours du contrat. Elle est à utiliser avec des device ayant été programmés avec mon firmware **Relai**.
+  - **Calendrier** : Cette option publie la section **CAL**. Elle permet de publier les couleurs de contrat heure / heure pour le jour courant et le lendemain.
+
+### Politique de publication
+
+Cette option vous permet de définir la fréquence de publication des données :
+  - **A chaque télémétrie** : Les données sont publiées à chaque déclenchement de la télémétrie, configurée par **Période télémétrie**.
+  - **Evolution de +-** : Les données sont publiées chaque fois que la puissance varie de la valeur configurée sur l'une des phases. C'est mon option de prédilection.
+  - **A chaque message reçu** : Les données sont publiées à chaque trame publiée par le compteur, soit toutes les 1 à 2 secondes. Cette option n'est à utiliser que dans des cas très particuliers.
+
+### Intégration
+
+Ces options permettent de publier les données dans un format spécifiquement attendu par un logiciel domotique ou SGBD.
+  - **Home Assistant** : Toutes les données sélectionnées dans **Données publiées** sont annoncées à Home Assistant à chaque démarrage. Comme les données sont annoncées à HA, vous ne devriez plus avoir qu'à les sélectionner dans HA, qui s'abonnera et utilisera les données publiées.
+  - **Homie** : Les données sont publiées dans un format spécifique reconnu par les applications domotique compatibles Homie.
+  - **Thingsboard** : Les données sont publiées dans un format spécifique reconnu nativement par la solution domotique Thingsboard.
+  - **Domoticz** : Les données sont publiées dans un format spécifique reconnu nativement par Domoticz. Une fois l'option sélectionnée et sauvegardée, vous pourrez définir les index Domoticz définis pour chacune des données publiées. Pour chaque donnée, un tooltip explique le type de données à définir dans Domoticz.
+  - **InfluxDB** : Les données sont publiées à travers les API InfluxDB. Une fois l'option sélectionnée et sauvegardée, vous pourrez définir les caractéristiques de votre serveur InfluxDB.
+
+### Spécificités
+
+Ces options ne sont pas nécessaires dans la plupart des cas, en particulier si vous utilisez une solution domotique. Si vous n'en avez pas un besoin express, évitez de les sélectionner.
+
+  - **Données temps réel** : Toutes les données liées à la consommation et la production sont publiée en complément sur un topic **LIVE/...** toutes les 3 secondes.
+  - **Données Teleinfo brutes** : Les données recues depuis le compteur sont publiées telles quelles en complément sur un topic **TIC/...**. Ces données étant des données brutes, elles n'ont d'autre intérêt que l'analyse des trames en cas de problème.
 
 ## Commands
 
