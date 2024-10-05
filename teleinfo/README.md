@@ -120,23 +120,33 @@ Cela permet d'émettre des données correspondant exactement au contrat lié au 
 
 #### Home Assistant
 
-Toutes les données sélectionnées dans **Données publiées** sont annoncées à Home Assistant à chaque démarrage. Dans le cas particulier du Wenky, les messages d'auto-découverte ne sont pas émis au réveil s'il ne dispose pas d'une alimentation fixe via USB. Comme les données sont annoncées à HA, vous ne devriez plus avoir qu'à les sélectionner dans HA, qui s'abonnera et utilisera les données publiées. 
+Toutes les données sélectionnées dans **Données publiées** sont annoncées à Home Assistant à chaque démarrage.
+
+Comme les données sont annoncées à HA, vous ne devriez plus avoir qu'à les sélectionner dans HA, qui s'abonnera et utilisera les données publiées. 
+
+Dans le cas particulier du Wenky, les messages d'auto-découverte ne sont pas émis au réveil s'il ne dispose pas d'une alimentation fixe via USB.
 
 ![Home Assistant integration](./screen/tasmota-ha-integration-1.png)  ![Home Assistant integration](./screen/tasmota-ha-integration-2.png)
 
 #### Homie
 
-Les données sont publiées dans un format spécifique reconnu par les applications domotique compatibles [**Homie**](https://homieiot.github.io/). A chaque boot, toutes les données candidates à intégration dans un client **Homie** sont émises via MQTT en mode **retain**. Dans le cas particulier du Wenky, les messages d'auto-découverte ne sont pas émis au réveil s'il ne dispose pas d'une alimentation fixe via USB.
+Les données sont publiées dans un format spécifique reconnu par les applications domotique compatibles [**Homie**](https://homieiot.github.io/). A chaque boot, toutes les données candidates à intégration dans un client **Homie** sont émises via MQTT en mode **retain**.
+
+Dans le cas particulier du Wenky, les messages d'auto-découverte ne sont pas émis au réveil s'il ne dispose pas d'une alimentation fixe via USB.
 
 #### Thingsboard
 
-Les données sont publiées dans un format spécifique reconnu nativement par la plateforme IoT  [**Thingsboard**](https://thingsboard.io/). Le paramétrage à appliquer coté **Tasmota** et coté **Thingsboard** pour que les données soient publiées et consommées est le suivant :
+Les données sont publiées dans un format spécifique reconnu nativement par la plateforme IoT  [**Thingsboard**](https://thingsboard.io/).
+
+Le paramétrage à appliquer coté **Tasmota** et coté **Thingsboard** pour que les données soient publiées et consommées est le suivant :
 
 ![Tasmota config](./screen/tasmota-thingsboard-config.jpg)  ![Thingsboard device](./screen/thingsboard-device.jpg)  ![Thingsboard credentials](./screen/thingsboard-credentials.jpg)
 
 #### Domoticz
 
-Les données sont publiées dans un format spécifique reconnu nativement par Domoticz. Une fois l'option sélectionnée et sauvegardée, vous pourrez définir les index Domoticz définis pour chacune des données publiées. Pour chaque donnée, un tooltip explique le type de données à définir dans Domoticz.
+Les données sont publiées dans un format spécifique reconnu nativement par Domoticz.
+
+Une fois l'option sélectionnée et sauvegardée, vous pourrez définir les index Domoticz définis pour chacune des données publiées. Pour chaque donnée, un tooltip explique le type de données à définir dans Domoticz.
 
 #### InfluxDB
 
