@@ -70,9 +70,71 @@ Voici un tableau récapitulatif des fonctionnalités par famille d'ESP :
 | Intégration Domoticz        |     x      |      x      |     x     |
 | Intégration Homie           |     x      |      x      |     x     |
 | Intégration Thingsboard     |     x      |      x      |     x     |
+| Intégration InfluxDB        |            |             |     x     |
 | Intégration API RTE         |            |             |     x     |
 | Taille max d'une étiquette  |    32      |    32       |    112    |
 | Nombre max d'étiquettes     |    48      |    48       |    74     |
+
+## Options de configuration
+
+Ce firmware propose différentes options de configuration. Merci de bien lire ce qui suit afin d'avoir un système optimisé.
+
+### Teleinfo
+
+![Donnees publiées](./screen/tasmota-teleinfo-config-mode.png)
+
+Ces options permettent de définir le type de compteur auquel est connecté le module. Les anciens compteurs sont tous en mode **Historique**. Les Linky sont principalement en mode **Historique** mais ceux utilisés avec les nouveaux contrats sont le plus souvent configurés en mode **Standard**.
+
+### Données publiées
+
+![Donnees publiées](./screen/tasmota-teleinfo-config-donnees.png)
+
+  - **Energie Tasmota** : Cette option publie la section **ENERGY**, publication standard de tasmota. La plupart du temps vous n'avez pas besoin de cocher cette option car elle ne prend pas en compte la moitié des données publiées par un compteur Linky.
+  - **Consommation & Production** : Cette option publie la section **METER** et **CONTRACT**. C'est l'option que vous devriez cocher par défaut. Elle permet de publier toutes les données utiles du compteur en mode consommation, production et/ou auto-consommation.
+  - **Relais virtuels** : Cette option publie la section **RELAY**. Elle permet de s'abonner à l'état des relais virtuels publiés par le compteur ou à des relais fonction de la période en cours du contrat. Elle est à utiliser avec des device ayant été programmés avec mon firmware **Relai**.
+  - **Calendrier** : Cette option publie la section **CAL**. Elle permet de publier les couleurs de contrat heure / heure pour le jour courant et le lendemain.
+
+### Politique de publication
+
+![Donnees publiées](./screen/tasmota-teleinfo-config-publication.png)
+
+Cette option vous permet de définir la fréquence de publication des données :
+  - **A chaque télémétrie** : Les données sont publiées à chaque déclenchement de la télémétrie, configurée par **Période télémétrie**.
+  - **Evolution de +-** : Les données sont publiées chaque fois que la puissance varie de la valeur configurée sur l'une des phases. C'est mon option de prédilection.
+  - **A chaque message reçu** : Les données sont publiées à chaque trame publiée par le compteur, soit toutes les 1 à 2 secondes. Cette option n'est à utiliser que dans des cas très particuliers.
+
+### Intégration
+
+![Donnees publiées](./screen/tasmota-teleinfo-config-integration.png)
+
+Ces options permettent de publier les données dans un format spécifiquement attendu par un logiciel domotique ou SGBD.
+Les données sont émises au boot après la réception de quelques messages complets depuis le compteur.
+Cela permet d'émettre des données correspondant exactement au contrat lié au compteur raccordé.
+
+  - **Home Assistant** : Toutes les données sélectionnées dans **Données publiées** sont annoncées à Home Assistant à chaque démarrage. Dans le cas particulier du Wenky, les messages d'auto-découverte ne sont pas émis au réveil s'il ne dispose pas d'une alimentation fixe via USB. Comme les données sont annoncées à HA, vous ne devriez plus avoir qu'à les sélectionner dans HA, qui s'abonnera et utilisera les données publiées. 
+
+![Home Assistant integration](./screen/tasmota-ha-integration-1.png)  ![Home Assistant integration](./screen/tasmota-ha-integration-2.png)
+
+
+  - **Homie** : Les données sont publiées dans un format spécifique reconnu par les applications domotique compatibles [**Homie**](https://homieiot.github.io/). A chaque boot, toutes les données candidates à intégration dans un client **Homie** sont émises via MQTT en mode **retain**. Dans le cas particulier du Wenky, les messages d'auto-découverte ne sont pas émis au réveil s'il ne dispose pas d'une alimentation fixe via USB.
+
+
+  - **Thingsboard** : Les données sont publiées dans un format spécifique reconnu nativement par la plateforme IoT  [**Thingsboard**](https://thingsboard.io/). Le paramétrage à appliquer coté **Tasmota** et coté **Thingsboard** pour que les données soient publiées et consommées est le suivant :
+
+![Tasmota config](./screen/tasmota-thingsboard-config.jpg)  ![Thingsboard device](./screen/thingsboard-device.jpg)  ![Thingsboard credentials](./screen/thingsboard-credentials.jpg)
+
+
+  - **Domoticz** : Les données sont publiées dans un format spécifique reconnu nativement par Domoticz. Une fois l'option sélectionnée et sauvegardée, vous pourrez définir les index Domoticz définis pour chacune des données publiées. Pour chaque donnée, un tooltip explique le type de données à définir dans Domoticz.
+
+
+  - **InfluxDB** : Les données sont publiées à travers les API InfluxDB. Une fois l'option sélectionnée et sauvegardée, vous pourrez définir les caractéristiques de votre serveur InfluxDB.
+
+### Spécificités
+
+Ces options ne sont pas nécessaires dans la plupart des cas, en particulier si vous utilisez une solution domotique. Si vous n'en avez pas un besoin express, évitez de les sélectionner.
+
+  - **Données temps réel** : Toutes les données liées à la consommation et la production sont publiée en complément sur un topic **LIVE/...** toutes les 3 secondes.
+  - **Données Teleinfo brutes** : Les données recues depuis le compteur sont publiées telles quelles en complément sur un topic **TIC/...**. Ces données étant des données brutes, elles n'ont d'autre intérêt que l'analyse des trames en cas de problème.
 
 ## Publication MQTT
 
@@ -134,44 +196,6 @@ Toutes ces publications sont activables à travers la page **Configuration Telei
 |              |   Preavis   | Niveau du prochain préavis (utilisé en Tempo & EJP)     | 
 |              |    Label    | Libellé du prochain préavis    | 
 
-## Options de configuration
-
-Ce firmware propose différentes options de configuration. Merci de bien lire ce qui suit afin d'avoir un système optimisé.
-
-### Teleinfo
-
-Ces options permettent de définir le type de compteur auquel est connecté le module. Les anciens compteurs sont tous en mode **Historique**. Les Linky sont principalement en mode **Historique** mais ceux utilisés avec les nouveaux contrats sont le plus souvent configurés en mode **Standard**.
-
-### Données publiées
-
-  - **Energie Tasmota** : Cette option publie la section **ENERGY**, publication standard de tasmota. La plupart du temps vous n'avez pas besoin de cocher cette option car elle ne prend pas en compte la moitié des données publiées par un compteur Linky.
-  - **Consommation & Production** : Cette option publie la section **METER** et **CONTRACT**. C'est l'option que vous devriez cocher par défaut. Elle permet de publier toutes les données utiles du compteur en mode consommation, production et/ou auto-consommation.
-  - **Relais virtuels** : Cette option publie la section **RELAY**. Elle permet de s'abonner à l'état des relais virtuels publiés par le compteur ou à des relais fonction de la période en cours du contrat. Elle est à utiliser avec des device ayant été programmés avec mon firmware **Relai**.
-  - **Calendrier** : Cette option publie la section **CAL**. Elle permet de publier les couleurs de contrat heure / heure pour le jour courant et le lendemain.
-
-### Politique de publication
-
-Cette option vous permet de définir la fréquence de publication des données :
-  - **A chaque télémétrie** : Les données sont publiées à chaque déclenchement de la télémétrie, configurée par **Période télémétrie**.
-  - **Evolution de +-** : Les données sont publiées chaque fois que la puissance varie de la valeur configurée sur l'une des phases. C'est mon option de prédilection.
-  - **A chaque message reçu** : Les données sont publiées à chaque trame publiée par le compteur, soit toutes les 1 à 2 secondes. Cette option n'est à utiliser que dans des cas très particuliers.
-
-### Intégration
-
-Ces options permettent de publier les données dans un format spécifiquement attendu par un logiciel domotique ou SGBD.
-  - **Home Assistant** : Toutes les données sélectionnées dans **Données publiées** sont annoncées à Home Assistant à chaque démarrage. Comme les données sont annoncées à HA, vous ne devriez plus avoir qu'à les sélectionner dans HA, qui s'abonnera et utilisera les données publiées.
-  - **Homie** : Les données sont publiées dans un format spécifique reconnu par les applications domotique compatibles Homie.
-  - **Thingsboard** : Les données sont publiées dans un format spécifique reconnu nativement par la solution domotique Thingsboard.
-  - **Domoticz** : Les données sont publiées dans un format spécifique reconnu nativement par Domoticz. Une fois l'option sélectionnée et sauvegardée, vous pourrez définir les index Domoticz définis pour chacune des données publiées. Pour chaque donnée, un tooltip explique le type de données à définir dans Domoticz.
-  - **InfluxDB** : Les données sont publiées à travers les API InfluxDB. Une fois l'option sélectionnée et sauvegardée, vous pourrez définir les caractéristiques de votre serveur InfluxDB.
-
-### Spécificités
-
-Ces options ne sont pas nécessaires dans la plupart des cas, en particulier si vous utilisez une solution domotique. Si vous n'en avez pas un besoin express, évitez de les sélectionner.
-
-  - **Données temps réel** : Toutes les données liées à la consommation et la production sont publiée en complément sur un topic **LIVE/...** toutes les 3 secondes.
-  - **Données Teleinfo brutes** : Les données recues depuis le compteur sont publiées telles quelles en complément sur un topic **TIC/...**. Ces données étant des données brutes, elles n'ont d'autre intérêt que l'analyse des trames en cas de problème.
-
 ## Commands
 
 Ce firmware propose un certain nombre de commandes **EnergyConfig** spécifiques disponibles en mode console :
@@ -200,6 +224,40 @@ Ce firmware propose un certain nombre de commandes **EnergyConfig** spécifiques
 Vous pouvez passer plusieurs commandes en même temps :
 
       EnergyConfig percent=110 nbday=8 nbweek=12
+
+### Domoticz
+
+La configuration des messages émis pour Domoticz peut être réalisée en mode console :
+
+    domo
+    HLP: commands for Teleinfo Domoticz integration
+    domo_enable <0> = enable/disable Domoticz integration (0/1)
+    domo_key <num,idx> = set key num to index idx
+             <0,index>  : index Domoticz du total Wh (hc/hp) et puissance active W pour la 1ère période du contrat (base,hc/hp,ejp,bleu)
+             <1,index>  : index Domoticz du total Wh (hc/hp) et puissance active W pour la 1ère période du contrat (blanc)
+             <2,index>  : index Domoticz du total Wh (hc/hp) et puissance active W pour la 1ère période du contrat (rouge)
+             <8,index>  : index Domoticz du total Wh (hc/hp) et puissance active W pour la production
+             <9,index>  : index Domoticz de l'alerte de publication hc/hp
+             <10,index> : index Domoticz de l'alerte de publication de la couleur actuelle (bleu, blanc, rouge)
+             <11,index> : index Domoticz de l'alerte de publication de la couleur du lendemain (bleu, blanc, rouge)
+
+### Home Assistant
+
+L'intégration Home Assistant peut être activée en mode console : 
+
+    hass 1
+
+### Homie
+
+L'intégration Homie peut être activée en mode console : 
+
+    homie 1
+ 
+### ThingsBoard
+
+L'intégration Thingsboard peut être activée en mode console : 
+
+    thingsboard 1
 
 ## Partition LittleFS
 
@@ -295,77 +353,6 @@ Les données RTE sont publiées sous des sections spécifiques sous **tele/SENSO
       "day1":{"jour":"2022-10-07","dval":2,"0":1,"1":1,"2":2,"3":1,"4":1,"5":1,"6":1,...,"23":1},
       "day2":{"jour":"2022-10-08","dval":3,"0":1,"1":1,"2":1,"3":1,"4":1,"5":3,"6":1,...,"23":1},
       "day3":{"jour":"2022-10-09","dval":2,"0":1,"1":1,"2":1,"3":2,"4":1,"5":1,"6":1,...,"23":1}}}
-
-## Intégration Domotique
-
-Il est possible de génerer des messages d'**auto-découverte** à destination de plusieurs solutions d'assistants domotiques.
-
-Ces messages sont émis au boot après la réception de quelques messages complets depuis le compteur. Cela permet d'émettre des données correspondant exactement au contrat lié au compteur raccordé.
-
-Avant d'activer l'intégration, il est important de sélectionner et sauvegarder les données que vous souhaitez publier :
-
-![Donnees publiées](./screen/tasmota-teleinfo-config-data.png)
-
-### Intégration Domoticz
-
-Ce firmware intègre l'auto-découverte à destination de [**Domoticz**](https://www.domoticz.com/)
-
-La configuration des messages émis doit être réalisée en mode console :
-
-    domo
-    HLP: commands for Teleinfo Domoticz integration
-    domo_enable <0> = enable/disable Domoticz integration (0/1)
-    domo_key <num,idx> = set key num to index idx
-             <0,index>  : index Domoticz du total Wh (hc/hp) et puissance active W pour la 1ère période du contrat (base,hc/hp,ejp,bleu)
-             <1,index>  : index Domoticz du total Wh (hc/hp) et puissance active W pour la 1ère période du contrat (blanc)
-             <2,index>  : index Domoticz du total Wh (hc/hp) et puissance active W pour la 1ère période du contrat (rouge)
-             <8,index>  : index Domoticz du total Wh (hc/hp) et puissance active W pour la production
-             <9,index>  : index Domoticz de l'alerte de publication hc/hp
-             <10,index> : index Domoticz de l'alerte de publication de la couleur actuelle (bleu, blanc, rouge)
-             <11,index> : index Domoticz de l'alerte de publication de la couleur du lendemain (bleu, blanc, rouge)
-
-
-### Intégration Home Assistant
-
-Ce firmware intègre l'auto-découverte à destination de [**Home Assistant**](https://www.home-assistant.io/)
-
-Cette intégration peut être activée via le menu **Configuration / Teleinfo** ou en mode console : 
-
-    hass 1
-
-A chaque boot, toutes les données candidates à intégration dans **Home Assistant** sont émises via MQTT en mode **retain** .
-
-Dans le cas particulier du Wenky, les messages d'auto-découverte ne sont pas émis au réveil s'il ne dispose pas d'une alimentation fixe via USB.
-
-Suite à l'émission des messages d'auto-découverte, dans Home Assistant vous devriez avoir un device ressemblant à ceci :
-
-![Home Assistant integration](./screen/tasmota-ha-integration-1.png)  ![Home Assistant integration](./screen/tasmota-ha-integration-2.png)
-
-
-### Intégration Homie
-
-Ce firmware intègre l'auto-découverte à destination des solutions utilisant le protocole [**Homie**](https://homieiot.github.io/)
-
-Cette intégration peut être activée via le menu **Configuration / Teleinfo** ou en mode console : 
-
-    homie 1
- 
-A chaque boot, toutes les données candidates à intégration dans un client **Homie** sont émises via MQTT en mode **retain**.
-
-Dans le cas particulier du Wenky, les messages d'auto-découverte ne sont pas émis au réveil s'il ne dispose pas d'une alimentation fixe via USB. Seuls les messages de publication des données sont émis.
-
-
-### Intégration ThingsBoard
-
-Ce firmware gère la publication des données à destination de la plateforme IoT  [**Thingsboard**](https://thingsboard.io/)
-
-Cette intégration peut être activée via le menu **Configuration / Teleinfo** ou en mode console : 
-
-    thingsboard 1
- 
-Voici le paramétrage à appliquer coté **Tasmota** et coté **Thingsboard** pour que les données soient publiées et consommées :
-
-![Tasmota config](./screen/tasmota-thingsboard-config.jpg)  ![Thingsboard device](./screen/thingsboard-device.jpg)  ![Thingsboard credentials](./screen/thingsboard-credentials.jpg)
 
 ## Serveur TCP
 
