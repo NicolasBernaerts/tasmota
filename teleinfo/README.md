@@ -108,7 +108,7 @@ Cette option publie la section **CAL**. Elle permet de publier les couleurs de c
 Cette option vous permet de définir la fréquence de publication des données :
   - **A chaque télémétrie** : Les données sont publiées à chaque déclenchement de la télémétrie, configurée par **Période télémétrie**.
   - **Evolution de +-** : Les données sont publiées chaque fois que la puissance varie de la valeur configurée sur l'une des phases. C'est mon option de prédilection.
-  - **A chaque message reçu** : Les données sont publiées à chaque trame publiée par le compteur, soit toutes les 1 à 2 secondes. Cette option n'est à utiliser que dans des cas très particuliers.
+  - **A chaque message reçu** : Les données sont publiées à chaque trame publiée par le compteur, soit toutes les 1 à 2 secondes. Cette option n'est à utiliser que dans des cas très particuliers car elle stresse fortement l'ESP.
 
 ### Intégration
 
