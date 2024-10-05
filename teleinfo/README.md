@@ -159,7 +159,9 @@ Les données publiées devraient apparaître automatiquement sur votre instance 
 
 ### Spécificités
 
-Ces options ne sont pas nécessaires dans la plupart des cas, en particulier si vous utilisez une solution domotique. Si vous n'en avez pas un besoin express, évitez de les sélectionner.
+Ces options ne sont pas nécessaires dans la plupart des cas, en particulier si vous utilisez une solution domotique.
+
+Si vous n'en avez pas un besoin express, évitez de les sélectionner.
 
 #### Données temps réel
 
@@ -167,7 +169,9 @@ Toutes les données liées à la consommation et la production sont publiée en 
 
 #### Données Teleinfo brutes
 
-Les données recues depuis le compteur sont publiées telles quelles en complément sur un topic **TIC/...**. Ces données étant des données brutes, elles n'ont d'autre intérêt que l'analyse des trames en cas de problème.
+Les données recues depuis le compteur sont publiées telles quelles en complément sur un topic **TIC/...**.
+
+Ces données étant des données brutes, elles n'ont d'autre intérêt que l'analyse des trames en cas de problème.
 
 ## Publication MQTT
 
