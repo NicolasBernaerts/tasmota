@@ -27,9 +27,10 @@ Ce firmware a été développé et testé sur les compteurs suivants :
   * **Emeraude** en TIC **Emeraude 2 quadrands**
 
 Il a été compilé et testé sur les ESP suivants :
-  * **ESP8266** 1Mb, 4Mb et 16Mb
+  * **ESP8266** 1Mb (Sonoff Basic R2), 4Mb et 16Mb
   * **ESP32** 4Mb et **ESP32 Denky D4** 8Mb
-  * **ESP32C3** 4Mb
+  * **ESP32C3** 4Mb (Sonoff Basic R4 par exemple)
+  * **ESP32C3 Winky** 4Mb (auto-alimenté par le compteur)
   * **ESP32C6 Winky** 4Mb (auto-alimenté par le compteur)
   * **ESP32S2** 4Mb
   * **ESP32S3** 4Mb et 16Mb
