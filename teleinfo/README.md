@@ -170,7 +170,7 @@ Les données recues depuis le compteur sont publiées telles quelles en complém
 
 ## Publication MQTT
 
-Dans le topic **../SENSOR**, les sections suivantes peuvent être publiées 
+Dans le topic **../SENSOR**, les sections suivantes seront publiées selon votre configuration : 
   * **ENERGY** : section officielle de Tasmota, qui ne contien qu'un sous ensemble de données
   * **METER** : données normalisées de consommation et production en temps réel
   * **CONTRACT** : données normalisées du contrat intégrant les compteurs de périodes en Wh
