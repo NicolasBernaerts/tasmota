@@ -153,7 +153,14 @@ Une fois l'option sélectionnée et sauvegardée, vous pourrez définir les inde
 
 #### InfluxDB
 
-Les principales données (contrat, consommation et production) sont publiées sur un serveur InfluxDB, à travers les API https.
+Les principales données sont publiées sur un serveur InfluxDB, à travers les API https :
+  * mode du contrat (historique:1, standard:2, PME/PMI:3, Emeraude:4, Jaune:5)
+  * nombre de périodes dans le contrat et index de la période en cours
+  * niveau de la période en cours (bleu:1, blanc:2, rouge:3)
+  * type de la période (hc:0, hp:1)
+  * pour chaque phase : courant, tension, puissance apparente & puissance active
+  * cosphi
+  * si le compteur est en mode production : puissance apparente, puissance active & cosphi
 
 Une fois l'option sélectionnée et sauvegardée, vous pourrez définir les caractéristiques de votre serveur InfluxDB.
 
