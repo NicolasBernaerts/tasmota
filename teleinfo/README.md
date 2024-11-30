@@ -60,7 +60,7 @@ Voici un tableau récapitulatif des fonctionnalités par famille d'ESP :
 |       Fonctionnalité        | ESP8266 1M | ESP8266 4M+ | ESP32 4M+ |
 | --------------------------- | ---------- | ----------- | --------  |
 | IP fixe                     |     x      |      x      |     x     |
-| Calcul Cosφ                 |     x      |      x      |     x     |
+| Calcul Cos φ                |     x      |      x      |     x     |
 | LED couleur contrat         |     x      |      x      |     x     |
 | Trames temps réel           |     x      |      x      |     x     |
 | Graph temps réel            |     x      |      x      |     x     |
@@ -159,8 +159,8 @@ Les principales données sont publiées sur un serveur InfluxDB, à travers les 
   * niveau de la période en cours (bleu:1, blanc:2, rouge:3)
   * type de la période (hc:0, hp:1)
   * pour chaque phase : courant, tension, puissance apparente & puissance active
-  * cosphi
-  * si le compteur est en mode production : puissance apparente, puissance active & cosphi
+  * cos φ 
+  * si le compteur est en mode production : puissance apparente, puissance active & cos φ 
 
 Une fois l'option sélectionnée et sauvegardée, vous pourrez définir les caractéristiques de votre serveur InfluxDB.
 
