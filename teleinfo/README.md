@@ -6,6 +6,8 @@ Pour la famille des **ESP32**, merci de faire systématiquement un premier flash
 
 Si votre ESP est un **Denky D4**, vous pouvez flasher directement le firmware Denky D4 en mode **OTA**.
 
+Lorsque vous flashez ce fork pour la première fois, merci de faire un **reset 6** afin de réinitialiser la configuration en ROM pour eviter tout dysfonctionnement du fait d'une ancienne configuration mal interprétée.
+
 Le **changelog** général est disponible dans le fichier **user_config_override.h**
 
 ![Homepage page](./screen/tasmota-teleinfo-homepage.png)
