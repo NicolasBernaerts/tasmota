@@ -313,6 +313,12 @@ L'intégration Thingsboard peut être activée en mode console :
 
     thingsboard 1
 
+### InfluxDB
+
+L'intégration InfluxDB peut être activée en mode console : 
+
+    influx 1
+
 ## Partition LittleFS
 
 Certaines variantes de ce firmware (ESP avec au moins 4Mo de ROM) utilisent une partition **LittleFS** pour stocker les données historisées qui servent à générer les graphs de suivi. Lorsque vous souhaitez utiliser cette fonctionnalité, vérifier que vous flashez bien l'ESP en mode série la première fois afin de modifier le partitionnement.
@@ -455,6 +461,16 @@ Typiquement, après configuration en alimentation USB, le Winky doit être progr
 
 où **xxx** représente le nombre de secondes entre 2 réveils. Un minimum de 60 (secondes) est préconisé et il faut éviter 300 qui définit un mode de fonctionnement spécifique de Tasmota. Si la super capacité n'est pas assez rechargée lors du prochain réveil, l'ESP se rendort pour un cycle supplémentaire.
 
+Voici la liste des commandes de configuration spécifiques au Winky :
+
+    winky
+    HLP: gestion du winky
+     - winky_ref <farad>   = valeur de reference de la super capa (1.5 par exemple)
+     - winky_start <volt>  = tension minimale pour démarrer le winky (4.5)
+     - winky_stop <volt>   = tension déclanchant l'arrêt du winky (3.9)
+     - winky_coeff         = raz des coefficients d'ajustement des tensions
+     - winky_meter         = raz des valeurs du linky (tension et courant max mesurés)
+  
 ## Compilation
 
 Si vous voulez compiler ce firmware vous-même, vous devez :
