@@ -427,7 +427,7 @@ La commande **tcp_help** explique toutes les possibilités :
 
 Une fois le serveur activé, la réception du flux sur un PC sous Linux est un jeu d'enfant (ici sur le port 888) :
 
-    # nc 192.168.1.10 8888
+    # nc 192.168.1.10 888
         SMAXSN-1	E220422144756	05210	W
         CCASN	E220423110000	01468	:
         CCASN-1	E220423100000	01444	Q
