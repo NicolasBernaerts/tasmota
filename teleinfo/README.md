@@ -14,13 +14,14 @@ Le **changelog** général est disponible dans le fichier **user_config_override
 
 ## Presentation
 
-Cette évolution du firmware **Tasmota 14.1** permet de :
+Cette évolution du firmware **Tasmota 14.5** permet de :
   * gérer le flux **Teleinfo** des compteurs français (**Linky**, **PME/PMI** et **Emeraude**)
   * gérer les compteurs en mode **Historique** et en mode **Standard**
   * gérer les compteurs en mode **Consommation** et/ou **Production**
   * calculer le **Cosφ** en quasi temps réel
   * publier les données pour **Domoticz**, **Home Assistant**, **Homie** et **Thingsboard**
   * s'abonner aux API RTE **Tempo**, **Pointe** et **Ecowatt**
+  * Gérer un affichage déporté Ulanzi sous Awtrix
 
 Ce firmware a été développé et testé sur les compteurs suivants :
   * **Sagem Blanc monophase** en TIC **Historique**
@@ -44,8 +45,6 @@ Ce firmware fournit également :
   * un serveur intégré **FTP** pour récupérer les fichiers historiques
   * le suivi en temps réel des trames réçues
   * un graph en temps réel des données principales (tension, puissance et Cosφ)
-  * suivi historisé de la consommation
-  * suivi historisé de la production
 
 Si votre compteur est en mode historique, la tension est forcée à 230V.
 
@@ -66,9 +65,6 @@ Voici un tableau récapitulatif des fonctionnalités par famille d'ESP :
 | LED couleur contrat         |     x      |      x      |     x     |
 | Trames temps réel           |     x      |      x      |     x     |
 | Graph temps réel            |     x      |      x      |     x     |
-| Graph historisé             |            |      x      |     x     |
-| Consommation historisée     |            |      x      |     x     |
-| Production historisée       |            |      x      |     x     |
 | Serveur TCP                 |     x      |      x      |     x     |
 | Serveur FTP                 |            |             |     x     |
 | Intégration Home Assistant  |     x      |      x      |     x     |
@@ -77,6 +73,7 @@ Voici un tableau récapitulatif des fonctionnalités par famille d'ESP :
 | Intégration Thingsboard     |     x      |      x      |     x     |
 | Intégration InfluxDB        |            |             |     x     |
 | Intégration API RTE         |            |             |     x     |
+| Pilotage afficheur Awtrix   |            |             |     x     |
 | Taille max d'une étiquette  |    32      |    32       |    112    |
 | Nombre max d'étiquettes     |    48      |    48       |    74     |
 
@@ -275,7 +272,7 @@ Vous pouvez passer plusieurs commandes en même temps :
 
 ### Domoticz
 
-La configuration des messages émis pour Domoticz peut être réalisée en mode console :
+La configuration des messages émis pour Domoticz peut être réalisée via la page de configuration **Teleinfo** ou en mode console :
 
     domo
     HLP: commands for Teleinfo Domoticz integration
@@ -297,41 +294,31 @@ La configuration des messages émis pour Domoticz peut être réalisée en mode 
 
 ### Home Assistant
 
-L'intégration Home Assistant peut être activée en mode console : 
+L'intégration Home Assistant peut être activée via la page de configuration **Teleinfo** ou en mode console : 
 
     hass 1
 
 ### Homie
 
-L'intégration Homie peut être activée en mode console : 
+L'intégration Homie peut être activée via la page de configuration **Teleinfo** ou en mode console : 
 
     homie 1
  
 ### ThingsBoard
 
-L'intégration Thingsboard peut être activée en mode console : 
+L'intégration Thingsboard peut être activée via la page de configuration **Teleinfo** ou en mode console : 
 
     thingsboard 1
 
 ### InfluxDB
 
-L'intégration InfluxDB peut être activée en mode console : 
+L'intégration InfluxDB peut être activée via la page de configuration **Teleinfo** ou en mode console : 
 
     influx 1
 
 ## Partition LittleFS
 
 Certaines variantes de ce firmware (ESP avec au moins 4Mo de ROM) utilisent une partition **LittleFS** pour stocker les données historisées qui servent à générer les graphs de suivi. Lorsque vous souhaitez utiliser cette fonctionnalité, vérifier que vous flashez bien l'ESP en mode série la première fois afin de modifier le partitionnement.
-
-Pour les versions **LittleFS**, les graphs affichent en complément la tension et la puissances crête.
-
-Avec une partition LittleFS, 4 familles de fichiers sont générées :
-  * **teleinfo-day-nn.csv** : valeurs quotidiennes enregistrées toutes les 5 mn (**00** aujourd'hui, **01** hier, ...)
-  * **teleinfo-week-nn.csv** : valeurs hebdomadaires enregistrées toutes les 30 mn (**00** semaine courante, **01** semaine précédente, ...)
-  * **teleinfo-year-yyyy.csv** : Compteurs de consommation annuels
-  * **production-year-yyyy.csv** : Compteur de production annuel
-
-Chacun de ces fichiers inclue un entête.
 
 ## Calendriers RTE : Tempo, Pointe & Ecowatt
 
@@ -435,6 +422,8 @@ Une fois le serveur activé, la réception du flux sur un PC sous Linux est un j
         STGE	003A0001	:
         MSG1	PAS DE          MESSAGE         	<
 
+Si vous souhaitez enregistrer le flux sous Windows, l'utilitaire **ncat** devrait faire le job.
+
 Le serveur étant minimaliste, il ne permet qu'une seule connexion simultanée. Toute nouvelle connexion tuera la connexion précédente.
 
 ## Serveur FTP
@@ -448,6 +437,22 @@ Les commandes sont les suivantes :
 Coté client FTP, vous devez utiliser les login / mot de passe suivants : **teleinfo** / **teleinfo**
 
 Ce serveur FTP ne peut accepter qu'une seule connexion simultanée. Vous devez donc configurer votre client FTP avec une limite de type : **simultaneous connexions = 1**. Sinon, la connexion sera en erreur.
+
+## Afficheur Awtrix
+
+Sous ESP32, ce firmware permet de gérer un afficheur déporté de type [[https://www.ulanzi.com/products/ulanzi-pixel-smart-clock-2882?ref=28e02dxl|Ulanzi]] flashé avec le firmware Open-Source [[https://blueforcer.github.io/awtrix3/#/README|awtrix]].
+
+La commande **awtrix** explique toutes les possibilités :
+
+    HLP: Commandes d'affichage Awtrix :
+      awtrix_addr <addr>  = Adresse IP du device Awtrix
+      awtrix_delai [5]    = Délai entre 2 pages (min. 2s)
+      awtrix_lumi  [0]    = Luminosité (1..100%), 0=auto
+      awtrix_inst  [1]    = Puissance instantanée
+      awtrix_cwh   [0]    = Consommation du jour
+      awtrix_pwh   [0]    = Production du jour
+      awtrix_cal   [0]    = Calendrier
+      awtrix_pmax  [1000] = Puissance produite max
 
 ## Carte Winky
 
@@ -486,12 +491,14 @@ Voici la liste exhaustive des fichiers concernés :
 | partition/**esp32_partition_xxx.csv** | Specific ESP32 partitionning files   |
 | boards/**espxxx.json** | ESP8266 and ESP32 boards description  |
 | tasmota/**user_config_override.h**  |    |
+| tasmota/include/**tasmota.h**      | Add of in-memory variables |
 | tasmota/include/**tasmota_type.h** | Redefinition of teleinfo structure |
 | tasmota/tasmota_nrg_energy/**xnrg_15_teleinfo.ino** | Teleinfo energy driver  |
 | tasmota/tasmota_drv_driver/**xdrv_01_9_webserver.ino** | Add compilation target in footer  |
 | tasmota/tasmota_drv_driver/**xdrv_94_ip_option.ino** | Fixed IP address and misc options Web configuration |
 | tasmota/tasmota_drv_driver/**xdrv_97_tcp_server.ino** | Embedded TCP stream server |
-| tasmota/tasmota_drv_energy/**xdrv_115_teleinfo.ino** | Teleinfo driver  |
+| tasmota/tasmota_drv_energy/**xdrv_110_teleinfo.ino** | Teleinfo driver  |
+| tasmota/tasmota_drv_energy/**xdrv_115_teleinfo_awtrix.ino** | Driver for Awtrix external display  |
 | tasmota/tasmota_drv_energy/**xdrv_116_integration_domoticz.ino** | Teleinfo domoticz integration  |
 | tasmota/tasmota_drv_energy/**xdrv_117_integration_hass.ino** | Teleinfo home assistant integration  |
 | tasmota/tasmota_drv_energy/**xdrv_118_integration_homie.ino** | Teleinfo homie protocol integration  |
@@ -499,9 +506,9 @@ Voici la liste exhaustive des fichiers concernés :
 | tasmota/tasmota_drv_energy/**xdrv_120_linky_relay.ino** | Management of relays according to periods and virtual relays  |
 | tasmota/tasmota_sns_sensor/**xsns_99_timezone.ino** | Timezone Web configuration |
 | tasmota/tasmota_sns_sensor/**xsns_119_rte_server.ino** | RTE Tempo, Pointe and Ecowatt data collection |
-| tasmota/tasmota_sns_sensor/**xsns_124_teleinfo_histo.ino** | Teleinfo sensor to handle historisation |
-| tasmota/tasmota_sns_sensor/**xsns_125_teleinfo_curve.ino** | Teleinfo sensor to handle curves |
-| tasmota/tasmota_sns_sensor/**xsns_126_teleinfo_winky.ino** | Handling of Winky and deep sleep mode |
+| tasmota/tasmota_sns_sensor/**xsns_123_teleinfo_winky.ino** | Handling of Winky and deep sleep mode |
+| tasmota/tasmota_sns_sensor/**xsns_124_teleinfo_graph.ino** | Teleinfo sensor to handle curves |
+| tasmota/tasmota_sns_sensor/**xsns_126_influxdb_extension** | InfluxDB publication module |
 
 Si tout se passe bien, vous devriez pouvoir compiler votre propre build.
 
