@@ -21,7 +21,7 @@ Cette évolution du firmware **Tasmota 14.5** permet de :
   * calculer le **Cosφ** en quasi temps réel
   * publier les données pour **Domoticz**, **Home Assistant**, **Homie** et **Thingsboard**
   * s'abonner aux API RTE **Tempo**, **Pointe** et **Ecowatt**
-  * Gérer un affichage déporté Ulanzi sous Awtrix
+  * gérer un afficheur déporté de type **Ulanzi** flashé sous **Awtrix**
 
 Ce firmware a été développé et testé sur les compteurs suivants :
   * **Sagem Blanc monophase** en TIC **Historique**
