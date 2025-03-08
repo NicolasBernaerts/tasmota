@@ -139,8 +139,29 @@
                          Add contract change detection on main page
                          Optimisation of serial reception to minimise errors
                          Support for Winky C3
-                         correct bug in Tempo Historique contract management
-                         
+                         Correct bug in Tempo Historique contract management
+                         Add Live publication option
+                         Add command 'data' to publish teleinfo data
+                         Add command 'tic' to publish raw TIC data
+    08/03/2025 - v14.9 - Based on Tasmota 14.5.0
+                         Synchronise time on first meter frame before NTP
+                         Add InfluxDB integration with indexes and totals
+                         Change Domoticz conso total to P1SmartMeter
+                         Publish HomeAssistant topic in mode retain
+                         Add command energyconfig skip=x (0..7) to publish LIVE topic
+                         Adaptation on Winky analog input for Tasmota 14.3 compatibility
+                         Correct bug in Linky calendar management
+                         RTE API used with RTC connexions, no need of MQTT connexion
+                         Rework of cosphi calculation algo
+                         Convert contract type to upper case before detection
+                         Correct brand new counter index bug
+                         Complete rewrite of calendar management
+                         Handle calendar for TEMPO and EJP in historic mode
+                         First step of generic TEMPO contract detection
+                         Avoid NTARF and STGE to detect period as they as out of synchro very often
+                         ESP8266 memory optimisation
+                         Add Ulanzi remote display management thru Awtrix open-source firmware
+                                                
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License aStart STGE managements published by
   the Free Software Foundation, either version 3 of the License, or
@@ -183,7 +204,7 @@
 // extension description
 #define EXTENSION_NAME    "Teleinfo"              // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts"     // author
-#define EXTENSION_VERSION "14.8-beta9"            // version
+#define EXTENSION_VERSION "14.9"                  // version
 
 // FTP server credentials
 #ifdef USE_FTP
@@ -198,11 +219,23 @@
 #define USE_TCPSERVER                             // Enable TCP server (for TIC to TCP)
 #define USE_RELAY_LINKY                           // Enable Linky virtual relay and period association to local relays
 
+//#define HTTPCLIENT_1_1_COMPATIBLE
+
 // home management integration
 #define USE_TELEINFO_DOMOTICZ                     // Domoticz integration
-#define USE_TELEINFO_HASS                         // Home Assistant auto-discovery integration
+#define USE_TELEINFO_HASS                         // Homered Assistant auto-discovery integration
 #define USE_TELEINFO_HOMIE                        // Homie protocol auto-discovery integration
 #define USE_TELEINFO_THINGSBOARD                  // Thingsboard integration
+#define USE_AWTRIX                                // Awtrix display management
+
+// teleinfo display is in French
+#define MY_LANGUAGE        fr_FR
+
+#undef WIFI_NO_SLEEP
+#define WIFI_NO_SLEEP      true                  // [SetOption127] Sets Wifi in no-sleep mode which improves responsiveness on some routers
+
+// devices specificities
+// ---------------------
 
 #undef MQTT_TOPIC
 
@@ -234,6 +267,10 @@
   #define USER_TEMPLATE "{\"NAME\":\"Winky C3\",\"GPIO\":[1,4704,1376,5632,4705,640,608,1,1,32,1,0,0,0,0,0,0,0,1,1,1,1],\"FLAG\":0,\"BASE\":1}" 
   #define MQTT_TOPIC "winky_%06X"
 
+#elif BUILD_ESP32C3
+  #define EXTENSION_BUILD "esp32c3-4m"
+  #define MQTT_TOPIC "teleinfo_%06X"
+
 #elif BUILD_ESP32_4M
   #define EXTENSION_BUILD "esp32-4m"
   #define MQTT_TOPIC "teleinfo_%06X"
@@ -251,9 +288,6 @@
   #define MQTT_TOPIC "teleinfo_%06X"
 
 #endif
-
-// teleinfo display is in French
-#define MY_LANGUAGE        fr_FR
 
 // MQTT default
 #undef MQTT_HOST
@@ -281,7 +315,7 @@
 
 #define MQTT_DATA_STRING                      // Enable use heap instead of fixed memory for TasmotaGlobal.mqtt_data
 
-//#define RULE_MAX_EVENTSZ        256           // increase rules buffer
+#undef FS_SD_MMC                              // disable SD MMC to remove warnings
 
 #undef USE_ARDUINO_OTA                        // supporTeleinfoContractUpdatet for Arduino OTA
 #undef USE_WPS                                // support for WPS as initial wifi configuration tool
@@ -307,8 +341,6 @@
 #undef USE_TIMERS                             // support for up to 16 timers
 #undef USE_TIMERS_WEB                         // support for timer webpage
 #undef USE_SUNRISE                            // support for Sunrise and sunset tools
-
-//#undef USE_UNISHOX_COMPRESSION                // Add support for string compression in Rules or Scripts
 
 #undef USE_SCRIPT                             // Add support for script (+17k code)
 
@@ -635,6 +667,9 @@
 #define USE_I2C                                // All I2C sensors and devices
 #define USE_DISPLAY                            // Add Display support
 #undef  USE_DISPLAY_TM1621_SONOFF
+
+#define USE_INFLUXDB                           // InfluxDB integration
+#define USE_WEBCLIENT_HTTPS
 
 //#undef USE_ESP32_SENSORS
 

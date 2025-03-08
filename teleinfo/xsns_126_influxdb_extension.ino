@@ -5,6 +5,8 @@
 
   Version history :
     25/09/2024 - v1.0 - Creation
+    18/02/2025 - v1.1 - Switch port number to Settings->influxdb_port
+                        Handle InfluxDB version
 
   Configuration values are stored in :
 
@@ -28,14 +30,14 @@
 #ifdef USE_INFLUXDB
 
 // declare influxdb extension
-#define XSNS_126              126
+#define XSNS_126                    126
 
 // web URL
 #define INFLUXDB_PAGE_CFG           "/influx"
 
 // Commands
-static const char kInfluxDbExtensionCommands[] PROGMEM = "" "|" "influx";
-void (* const InfluxDbExtensionCommand[])(void) PROGMEM = { &CmndInfluxDbExtensionEnable };
+static const char kInfluxDbExtensionCommands[]  PROGMEM = "Ifx" "|"    "Tic"           "|"           "Version";
+void (* const InfluxDbExtensionCommand[])(void) PROGMEM = { &CmndInfluxDbExtensionEnable, &CmndInfluxDbExtensionVersion };
 
 /**************************************\
  *               Data
@@ -130,11 +132,19 @@ void InfluxDbExtensionPublishData ()
  *          Command
 \*******************************/
 
-// Enable home assistant auto-discovery
+// Enable influxDB Teleinfo extension
 void CmndInfluxDbExtensionEnable ()
 {
   if (XdrvMailbox.data_len > 0) InfluxDbExtensionSet (XdrvMailbox.payload != 0);
   ResponseCmndNumber (influxdb_extension.enabled);
+}
+
+
+// Set InfluxDB version
+void CmndInfluxDbExtensionVersion ()
+{
+  if (XdrvMailbox.data_len > 0) Settings->influxdb_version = (uint8_t)XdrvMailbox.payload;
+  ResponseCmndNumber (Settings->influxdb_version);
 }
 
 /****************************\
@@ -150,10 +160,10 @@ void InfluxDbExtensionInit ()
   // check if all influxdb data are defined
   influxdb_extension.ready = 1;
   if (strlen (SettingsText(SET_INFLUXDB_HOST))   == 0) influxdb_extension.ready = 0;
-  if (strlen (SettingsText(SET_INFLUXDB_PORT))   == 0) influxdb_extension.ready = 0;
   if (strlen (SettingsText(SET_INFLUXDB_ORG))    == 0) influxdb_extension.ready = 0;
   if (strlen (SettingsText(SET_INFLUXDB_BUCKET)) == 0) influxdb_extension.ready = 0;
   if (strlen (SettingsText(SET_INFLUXDB_TOKEN))  == 0) influxdb_extension.ready = 0;
+  if (Settings->influxdb_port == 0)                    influxdb_extension.ready = 0;
 }
 
 // called every second
@@ -201,10 +211,11 @@ void InfluxDbExtensionWebPageConfigure ()
   {
     // retrieve parameters
     if (Webserver->hasArg (F ("idb_host"))) { WebGetArg (PSTR ("idb_host"), str_value, sizeof (str_value)); SettingsUpdateText (SET_INFLUXDB_HOST,   str_value); }
-    if (Webserver->hasArg (F ("idb_port"))) { WebGetArg (PSTR ("idb_port"), str_value, sizeof (str_value)); SettingsUpdateText (SET_INFLUXDB_PORT,   str_value); }
     if (Webserver->hasArg (F ("idb_orga"))) { WebGetArg (PSTR ("idb_orga"), str_value, sizeof (str_value)); SettingsUpdateText (SET_INFLUXDB_ORG,    str_value); }
     if (Webserver->hasArg (F ("idb_bukt"))) { WebGetArg (PSTR ("idb_bukt"), str_value, sizeof (str_value)); SettingsUpdateText (SET_INFLUXDB_BUCKET, str_value); }
     if (Webserver->hasArg (F ("idb_tokn"))) { WebGetArg (PSTR ("idb_tokn"), str_value, sizeof (str_value)); SettingsUpdateText (SET_INFLUXDB_TOKEN,  str_value); }
+    if (Webserver->hasArg (F ("idb_port"))) { WebGetArg (PSTR ("idb_port"), str_value, sizeof (str_value)); Settings->influxdb_port = (uint16_t)atoi (str_value); }
+    if (Webserver->hasArg (F ("idb_ver")))  { WebGetArg (PSTR ("idb_ver"),  str_value, sizeof (str_value)); Settings->influxdb_version = (uint8_t)atoi (str_value); }
 
     // ask for restart
     WebRestart (1);
@@ -221,13 +232,13 @@ void InfluxDbExtensionWebPageConfigure ()
   WSContentSend_P (PSTR ("legend {font-weight:bold;margin:0px;padding:5px;color:#888;background:transparent;}\n")); 
   WSContentSend_P (PSTR ("legend:after {content:'';display:block;height:1px;margin:15px 0px;}\n"));
   WSContentSend_P (PSTR ("div.main {padding:0px;margin-top:-25px;}\n"));
-  WSContentSend_P (PSTR ("input,select {margin-bottom:10px;text-align:center;border:none;}\n"));
+  WSContentSend_P (PSTR ("input,select {margin-bottom:10px;text-align:center;border:none;border-radius:4px;}\n"));
   WSContentSend_P (PSTR ("input[type='text'] {text-align:left;}\n"));
   WSContentSend_P (PSTR ("span {float:left;padding-top:4px;}\n"));
   WSContentSend_P (PSTR ("span.hval {width:70%%;}\n"));
-  WSContentSend_P (PSTR ("span.htxt {width:35%%;}\n"));
+  WSContentSend_P (PSTR ("span.htxt {width:100%%;}\n"));
   WSContentSend_P (PSTR ("span.val {width:30%%;padding:0px;}\n"));
-  WSContentSend_P (PSTR ("span.sel {width:65%%;padding:0px;}\n"));
+  WSContentSend_P (PSTR ("span.sel {width:100%%;padding:0px;}\n"));
   WSContentSend_P (PSTR ("</style>\n"));
 
   // form
@@ -236,11 +247,12 @@ void InfluxDbExtensionWebPageConfigure ()
   WSContentSend_P (PSTR ("<fieldset><legend>InfluxDB Server</legend>\n"));
   WSContentSend_P (PSTR ("<div class='main'>\n"));
 
-  WSContentSend_P (PSTR ("<p class='dat'><span class='htxt'>%s</span><span class='sel'><input type='text' name='idb_%s' value='%s'></span></p>\n"), PSTR ("Host"), PSTR ("host"), SettingsText (SET_INFLUXDB_HOST));
-  WSContentSend_P (PSTR ("<p class='dat'><span class='hval'>%s</span><span class='val'><input type='number' name='idb_%s' min='0' max='65535' step='1' value='%s'></span></p>\n"), PSTR ("Port"), PSTR ("port"), SettingsText (SET_INFLUXDB_PORT));
-  WSContentSend_P (PSTR ("<p class='dat'><span class='htxt'>%s</span><span class='sel'><input type='text' name='idb_%s' value='%s'></span></p>\n"), PSTR ("Organization"), PSTR ("orga"), SettingsText (SET_INFLUXDB_ORG));
-  WSContentSend_P (PSTR ("<p class='dat'><span class='htxt'>%s</span><span class='sel'><input type='text' name='idb_%s' value='%s'></span></p>\n"), PSTR ("Bucket"), PSTR ("bukt"), SettingsText (SET_INFLUXDB_BUCKET));
-  WSContentSend_P (PSTR ("<p class='dat'><span class='htxt'>%s</span><span class='sel'><input type='text' name='idb_%s' value='%s'></span></p>\n"), PSTR ("Token"), PSTR ("tokn"), SettingsText (SET_INFLUXDB_TOKEN));
+  WSContentSend_P (PSTR ("<p class='dat'><span class='hval'>%s</span><span class='val'><input type='number' name='idb_%s' min=1 max=2 step=1 value=%u></span></p>\n"),     PSTR ("Version"),     PSTR ("ver"),  Settings->influxdb_version);
+  WSContentSend_P (PSTR ("<p class='dat'><span class='hval'>%s</span><span class='val'><input type='number' name='idb_%s' min=1 max=65535 step=1 value=%u></span></p>\n"), PSTR ("Port"),        PSTR ("port"), Settings->influxdb_port);
+  WSContentSend_P (PSTR ("<p class='dat'><span class='htxt'>%s</span><span class='sel'><input type='text' name='idb_%s' value='%s'></span></p>\n"),                        PSTR ("Host"),        PSTR ("host"), SettingsText (SET_INFLUXDB_HOST));
+  WSContentSend_P (PSTR ("<p class='dat'><span class='htxt'>%s</span><span class='sel'><input type='text' name='idb_%s' value='%s'></span></p>\n"),                        PSTR ("User/Orga"),   PSTR ("orga"), SettingsText (SET_INFLUXDB_ORG));
+  WSContentSend_P (PSTR ("<p class='dat'><span class='htxt'>%s</span><span class='sel'><input type='text' name='idb_%s' value='%s'></span></p>\n"),                        PSTR ("DB/Bucket"),   PSTR ("bukt"), SettingsText (SET_INFLUXDB_BUCKET));
+  WSContentSend_P (PSTR ("<p class='dat'><span class='htxt'>%s</span><span class='sel'><input type='text' name='idb_%s' value='%s'></span></p>\n"),                        PSTR ("Passw/Token"), PSTR ("tokn"), SettingsText (SET_INFLUXDB_TOKEN));
 
   WSContentSend_P (PSTR ("</div>\n"));
   WSContentSend_P (PSTR ("</fieldset>\n"));

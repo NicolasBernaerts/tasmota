@@ -144,7 +144,7 @@ void HomieIntegrationSet (const bool enabled)
   homie_integration.enabled = enabled;
 
   // if disabled, set offline
-  if (!enabled) HomieIntegrationPublishData (TIC_PUB_DISCONNECT);
+  if (!enabled) HomieIntegrationPublishStage (TIC_PUB_DISCONNECT);
 
   // reset publication flags
   homie_integration.stage     = TIC_PUB_CONNECT; 
@@ -202,7 +202,7 @@ void HomieIntegrationEvery250ms ()
   if (!MqttIsConnected ()) return;
 
   // publish current data
-  result = HomieIntegrationPublish (homie_integration.stage, homie_integration.sub_stage, homie_integration.sub_step);
+  result = HomieIntegrationPublishSubStage (homie_integration.stage, homie_integration.sub_stage, homie_integration.sub_step);
 
   // if publication done, increase step within stage, else increase stage
   if (result) homie_integration.sub_step++;
@@ -237,7 +237,7 @@ void HomieIntegrationEvery250ms ()
 }
 
 // publish current message (return true if message fully published)
-bool HomieIntegrationPublishData (const uint8_t stage)
+bool HomieIntegrationPublishStage (const uint8_t stage)
 {
   // check parameter
   if (stage >= TIC_PUB_MAX) return false;
@@ -249,7 +249,7 @@ bool HomieIntegrationPublishData (const uint8_t stage)
   if (homie_integration.arr_data[stage])
   {
     // publish current index
-    HomieIntegrationPublish (stage, homie_integration.sub_stage, 0);
+    HomieIntegrationPublishSubStage (stage, homie_integration.sub_stage, 0);
 
     // decide if current data is fully published
     if ((stage == TIC_PUB_RELAY_DATA) || (stage == TIC_PUB_TOTAL_INDEX)) homie_integration.sub_stage++;
@@ -266,7 +266,7 @@ bool HomieIntegrationPublishData (const uint8_t stage)
 // publish all pending messages
 void HomieIntegrationPublishAllData ()
 {
-  // check publication validity
+  // if not enabled, ignore
   if (!homie_integration.enabled) return;
 
   // loop to publish next available value
@@ -274,15 +274,13 @@ void HomieIntegrationPublishAllData ()
   homie_integration.data  = 0;
   while (homie_integration.data < TIC_PUB_MAX)
   {
-    if (HomieIntegrationPublishData (homie_integration.data)) homie_integration.data++;
+    if (HomieIntegrationPublishStage (homie_integration.data)) homie_integration.data++;
   }
 }
 
 // trigger publication
 void HomieIntegrationEvery100ms ()
 {
-  uint8_t index = 0;
-
   // check publication validity
   if (!homie_integration.enabled) return;
   if (homie_integration.data == UINT8_MAX) return;
@@ -291,7 +289,7 @@ void HomieIntegrationEvery100ms ()
   if (homie_integration.stage != UINT8_MAX) return;
 
   // publish current data
-  if (HomieIntegrationPublishData (homie_integration.data)) homie_integration.data++;
+  if (HomieIntegrationPublishStage (homie_integration.data)) homie_integration.data++;
   if (homie_integration.data >= TIC_PUB_MAX) homie_integration.data = UINT8_MAX;
 }
 
@@ -299,7 +297,7 @@ void HomieIntegrationEvery100ms ()
  *           JSON publication
 \***************************************/
 
-void HomieIntegrationTriggerMeterProdTotal ()
+void HomieIntegrationDataConsoProd ()
 {
   uint8_t index;
 
@@ -329,15 +327,9 @@ void HomieIntegrationTriggerMeterProdTotal ()
     homie_integration.arr_data[TIC_PUB_TOTAL_INDEX] = 1;
   }
   if (teleinfo_prod.total_wh > 0)  homie_integration.arr_data[TIC_PUB_TOTAL_PROD] = 1;
-
 }
 
-void HomieIntegrationTriggerRelay ()
-{
-  homie_integration.arr_data[TIC_PUB_RELAY_DATA] = 1;
-}
-
-void HomieIntegrationTriggerCalendar ()
+void HomieIntegrationDataCalendar ()
 {
   uint8_t index;
 
@@ -348,8 +340,13 @@ void HomieIntegrationTriggerCalendar ()
   for (index = TIC_PUB_CALENDAR_PERIOD; index <= TIC_PUB_CALENDAR_TOMRW; index++) homie_integration.arr_data[index] = 1;
 }
 
+void HomieIntegrationDataRelay ()
+{
+  homie_integration.arr_data[TIC_PUB_RELAY_DATA] = 1;
+}
+
 // publish homie topic (value if index = 0)
-bool HomieIntegrationPublish (const uint8_t stage, const uint8_t index, const uint8_t data)
+bool HomieIntegrationPublishSubStage (const uint8_t stage, const uint8_t index, const uint8_t data)
 {
   uint8_t     count, length;
   long        value;
@@ -363,7 +360,7 @@ bool HomieIntegrationPublish (const uint8_t stage, const uint8_t index, const ui
   // check parameters
   if (stage == UINT8_MAX) return false;
   if ((stage == TIC_PUB_RELAY_DATA) && (index >= 8)) return false;
-  if ((stage == TIC_PUB_TOTAL_INDEX) && (index >= TIC_PERIOD_MAX)) return false;
+  if ((stage == TIC_PUB_TOTAL_INDEX) && (index >= TIC_INDEX_MAX)) return false;
 
   // init
   pstr_url   = nullptr;
@@ -506,14 +503,14 @@ bool HomieIntegrationPublish (const uint8_t stage, const uint8_t index, const ui
   {
     // contract
     case TIC_PUB_CONTRACT_NAME: TeleinfoContractGetName (str_text, sizeof (str_text)); Response_P (PSTR ("%s"), str_text); break;
-    case TIC_PUB_CONTRACT_SERIAL: lltoa (teleinfo_contract.ident, str_text, 10); Response_P (PSTR ("%s"), str_text); break;
+    case TIC_PUB_CONTRACT_SERIAL: lltoa (teleinfo_meter.ident, str_text, 10); Response_P (PSTR ("%s"), str_text); break;
 
     // calendar
     case TIC_PUB_CALENDAR_PERIOD: TeleinfoPeriodGetLabel (str_text, sizeof (str_text)); Response_P (PSTR ("%s"), str_text); break;
-    case TIC_PUB_CALENDAR_COLOR:  GetTextIndexed (str_text, sizeof (str_text), TeleinfoPeriodGetLevel (), kTeleinfoPeriodLabel); Response_P (PSTR ("%s"), str_text); break;
-    case TIC_PUB_CALENDAR_HOUR:   GetTextIndexed (str_text, sizeof (str_text), TeleinfoPeriodGetHP (),    kTeleinfoPeriodHour);  Response_P (PSTR ("%s"), str_text); break;
-    case TIC_PUB_CALENDAR_TODAY:  GetTextIndexed (str_text, sizeof (str_text), TeleinfoDriverCalendarGetLevel (TIC_DAY_TODAY,    12, true), kTeleinfoPeriodLabel); Response_P (PSTR ("%s"), str_text); break;
-    case TIC_PUB_CALENDAR_TOMRW:  GetTextIndexed (str_text, sizeof (str_text), TeleinfoDriverCalendarGetLevel (TIC_DAY_TOMORROW, 12, true), kTeleinfoPeriodLabel); Response_P (PSTR ("%s"), str_text); break;
+    case TIC_PUB_CALENDAR_COLOR:  GetTextIndexed (str_text, sizeof (str_text), TeleinfoPeriodGetLevel (), kTeleinfoLevelLabel); Response_P (PSTR ("%s"), str_text); break;
+    case TIC_PUB_CALENDAR_HOUR:   GetTextIndexed (str_text, sizeof (str_text), TeleinfoPeriodGetHP (), kTeleinfoHourLabel);  Response_P (PSTR ("%s"), str_text); break;
+    case TIC_PUB_CALENDAR_TODAY:  GetTextIndexed (str_text, sizeof (str_text), TeleinfoDriverCalendarGetLevel (TIC_DAY_TODAY, 12 * 2, true), kTeleinfoLevelLabel); Response_P (PSTR ("%s"), str_text); break;
+    case TIC_PUB_CALENDAR_TOMRW:  GetTextIndexed (str_text, sizeof (str_text), TeleinfoDriverCalendarGetLevel (TIC_DAY_TMROW, 12 * 2, true), kTeleinfoLevelLabel); Response_P (PSTR ("%s"), str_text); break;
 
     // production
     case TIC_PUB_PROD_YTDAY: Response_P (PSTR ("%d"), teleinfo_prod.yesterday_wh); break;

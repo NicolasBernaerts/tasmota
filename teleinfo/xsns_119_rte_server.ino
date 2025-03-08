@@ -16,6 +16,7 @@
     19/12/2023 - v3.2 - Add Pointe calendar
     05/02/2024 - v3.3 - Switch to Ecowatt v5 only
     25/02/2024 - v3.4 - Publish topics sequentially to avoid reception errors
+    10/11/2024 - v3.5 - Rework around HTTPs connexions
 
   This module connects to french RTE server to retrieve Ecowatt, Tempo and Pointe electricity production forecast.
 
@@ -65,11 +66,11 @@
 #define XSNS_119                    119
 
 #include <ArduinoJson.h>
-#include <WiFiClientSecureLightBearSSL.h>
+//#include <WiFiClientSecureLightBearSSL.h>
 
 // global constant
 #define RTE_HTTP_TIMEOUT            5000       // HTTP connexion timeout (ms)
-#define RTE_TOKEN_RETRY             300        // token retry timeout (sec.)
+#define RTE_TOKEN_RETRY             30         // token retry timeout (sec.)
 
 // ecowatt constant
 #define RTE_ECOWATT_UPDATE_JSON     1800       // publish JSON every 30 mn
@@ -124,7 +125,7 @@ static const char kPointeCommands[] PROGMEM = "pointe_" "|" D_CMND_RTE_ENABLE "|
 void (* const PointeCommand[])(void) PROGMEM = { &CmndPointeEnable, &CmndPointeDisplay, &CmndPointeUpdate, &CmndPointePublish };
 
 // https stream status
-enum RteHttpsUpdate { RTE_UPDATE_NONE, RTE_UPDATE_TOKEN_BEGIN, RTE_UPDATE_TOKEN_GET, RTE_UPDATE_TOKEN_END, RTE_UPDATE_TEMPO_BEGIN, RTE_UPDATE_TEMPO_GET, RTE_UPDATE_TEMPO_END, RTE_UPDATE_ECOWATT_BEGIN, RTE_UPDATE_ECOWATT_GET, RTE_UPDATE_ECOWATT_END, RTE_UPDATE_POINTE_BEGIN, RTE_UPDATE_POINTE_GET, RTE_UPDATE_POINTE_END, RTE_UPDATE_MAX};
+enum RteHttpsUpdate { RTE_UPDATE_NONE, RTE_UPDATE_TOKEN, RTE_UPDATE_TEMPO, RTE_UPDATE_ECOWATT, RTE_UPDATE_POINTE, RTE_UPDATE_MAX};
 
 // config
 enum RteConfigKey { RTE_CONFIG_KEY, RTE_CONFIG_SANDBOX, RTE_CONFIG_ECOWATT, RTE_CONFIG_ECOWATT_DISPLAY, RTE_CONFIG_TEMPO, RTE_CONFIG_TEMPO_DISPLAY, RTE_CONFIG_POINTE, RTE_CONFIG_POINTE_DISPLAY, RTE_CONFIG_MAX };                   // configuration parameters
@@ -137,14 +138,14 @@ enum RteGlobalLevel { RTE_LEVEL_UNKNOWN, RTE_LEVEL_BLUE, RTE_LEVEL_WHITE, RTE_LE
 // tempo data
 enum TempoLevel  { RTE_TEMPO_LEVEL_UNKNOWN, RTE_TEMPO_LEVEL_BLUE, RTE_TEMPO_LEVEL_WHITE, RTE_TEMPO_LEVEL_RED, RTE_TEMPO_LEVEL_MAX };
 static const char kRteTempoStream[] PROGMEM = "|BLUE|WHITE|RED";
-static const char kRteTempoJSON[]   PROGMEM = "undef|blue|white|red";
+static const char kRteTempoJSON[]   PROGMEM = "Inconnu|Bleu|Blanc|Rouge";
 static const char kRteTempoColor[]  PROGMEM = "#252525|#06b|#ccc|#b00";
 static const char kRteTempoDot[]    PROGMEM = "⚪|⚪|⚫|⚪";
 static const char kRteTempoIcon[]   PROGMEM = "❔|🟦|⬜|🟥|❔|🔵|⚪|🔴";
 
 // pointe data
 enum PointeLevel  { RTE_POINTE_LEVEL_UNKNOWN, RTE_POINTE_LEVEL_BLUE, RTE_POINTE_LEVEL_RED, RTE_POINTE_LEVEL_MAX };
-static const char kRtePointeJSON[]  PROGMEM = "undef|blue|red";
+static const char kRtePointeJSON[]  PROGMEM = "Inconnu|Bleu|Blanc";
 static const char kRtePointeColor[] PROGMEM = "#252525|#06b|#900";
 static const char kRtePointeIcon[]  PROGMEM = "❔|🟦|🟥";
 
@@ -239,9 +240,6 @@ const char ecowatt_root_certificate[] PROGMEM = \
 "WD9f\n" \
 "-----END CERTIFICATE-----\n";
 */
-
-BearSSL::WiFiClientSecure_light  rte_wifi (4096, 1024);         // bear ssl client
-HTTPClient                       rte_http;                      // https client
 
 /************************************\
  *        RTE global commands
@@ -467,7 +465,7 @@ void RteLoadConfig ()
       index = file.readBytesUntil ('\n', str_line, sizeof (str_line) - 1);
       if (index >= 0) str_line[index] = 0;
       pstr_key   = strtok (str_line, "=");
-      pstr_value = strtok (nullptr,  "\n");
+      pstr_value = strtok (nullptr, "\n");
 
       // if key and value are defined, look for config keys
       if ((pstr_key != nullptr) && (pstr_value != nullptr))
@@ -514,7 +512,7 @@ void RteLoadConfig ()
 // save configuration
 void RteSaveConfig () 
 {
-  uint8_t index;
+  uint8_t index, value;
   char    str_number[4];
   char    str_line[128];
   File    file;
@@ -525,47 +523,29 @@ void RteSaveConfig ()
   // loop to write config
   for (index = 0; index < RTE_CONFIG_MAX; index ++)
   {
+    value = UINT8_MAX;
     if (GetTextIndexed (str_line, sizeof (str_line), index, kEcowattConfigKey) != nullptr)
     {
       // generate key=value
-      strcat (str_line, "=");
+      strcat_P (str_line, PSTR ("="));
       switch (index)
         {
-          case RTE_CONFIG_KEY:
-            strcat (str_line, rte_config.str_private_key);
-            break;
-         case RTE_CONFIG_SANDBOX:
-            if (rte_config.sandbox) strcat (str_line, "1");
-              else strcat (str_line, "0");
-            break;
-         case RTE_CONFIG_ECOWATT:
-            if (rte_config.ecowatt_enable) strcat (str_line, "1");
-              else strcat (str_line, "0");
-            break;
-         case RTE_CONFIG_ECOWATT_DISPLAY:
-            if (rte_config.ecowatt_display) strcat (str_line, "1");
-              else strcat (str_line, "0");
-            break;
-         case RTE_CONFIG_TEMPO:
-            if (rte_config.tempo_enable) strcat (str_line, "1");
-              else strcat (str_line, "0");
-            break;
-         case RTE_CONFIG_TEMPO_DISPLAY:
-            if (rte_config.tempo_display) strcat (str_line, "1");
-              else strcat (str_line, "0");
-            break;
-         case RTE_CONFIG_POINTE:
-            if (rte_config.pointe_enable) strcat (str_line, "1");
-              else strcat (str_line, "0");
-            break;
-         case RTE_CONFIG_POINTE_DISPLAY:
-            if (rte_config.pointe_display) strcat (str_line, "1");
-              else strcat (str_line, "0");
-            break;
+          case RTE_CONFIG_KEY:             strcat (str_line, rte_config.str_private_key); break;
+          case RTE_CONFIG_SANDBOX:         value = rte_config.sandbox;                    break;
+          case RTE_CONFIG_ECOWATT:         value = rte_config.ecowatt_enable;             break;
+          case RTE_CONFIG_ECOWATT_DISPLAY: value = rte_config.ecowatt_display;            break;
+          case RTE_CONFIG_TEMPO:           value = rte_config.tempo_enable;               break;
+          case RTE_CONFIG_TEMPO_DISPLAY:   value = rte_config.tempo_display;              break;
+          case RTE_CONFIG_POINTE:          value = rte_config.pointe_enable;              break;
+          case RTE_CONFIG_POINTE_DISPLAY:  value = rte_config.pointe_display;             break;
         }
 
+      // if needed, append value
+      if (value != UINT8_MAX) sprintf_P (str_number, PSTR ("%u\n"), value);
+        else strcpy_P (str_number, PSTR ("\n"));
+      strcat (str_line, str_number); 
+
       // write to file
-      strcat (str_line, "\n");
       file.print (str_line);
     }
   }
@@ -573,6 +553,12 @@ void RteSaveConfig ()
   // close file
   file.close ();
 }
+
+bool RteIsEnabled ()
+{
+  return (rte_config.tempo_enable || rte_config.pointe_enable || rte_config.ecowatt_enable);
+}
+
 
 /***************************************\
  *           JSON publication
@@ -676,7 +662,7 @@ void RtePublishEcowattJson ()
   
   // publish message
   ResponseJsonEndEnd ();
-  MqttPublishPrefixTopicRulesProcess_P (TELE, PSTR("RTE"), false);
+  MqttPublishPrefixTopicRulesProcess_P (TELE, PSTR ("RTE"), false);
 
   // plan next update
   ecowatt_status.json_publish = 0;
@@ -687,112 +673,90 @@ void RtePublishEcowattJson ()
  *        Token management
 \***********************************/
 
-// plan token retry
-void RteStreamTokenRetry ()
-{
-  rte_update.step         = RTE_UPDATE_NONE;
-  rte_update.time_token   = LocalTime () + RTE_TOKEN_RETRY;
-  rte_update.time_tempo   = max (rte_update.time_tempo, rte_update.time_token + 15);
-  rte_update.time_pointe  = max (rte_update.time_pointe, rte_update.time_token + 30);
-  rte_update.time_ecowatt = max (rte_update.time_ecowatt, rte_update.time_token + 30);
-}
-
 // token connexion
-bool RteStreamTokenBegin ()
+bool RteStreamToken ()
 {
-  bool is_ok;
-  char str_auth[128];
+  bool     is_ok;
+  uint32_t time_now, token_validity;
+  int      http_code;
+  char     str_auth[128];
+  DynamicJsonDocument json_result(192);
+  HTTPClientLight*    phttp;
 
   // check private key
   is_ok = (strlen (rte_config.str_private_key) > 0);
-  if (!is_ok) AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Token - Private key missing"));
+  if (!is_ok)
+  {
+    AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Token - Private key missing"));
+    return false;
+  }
 
-  // prepare connexion
+  // create connexion
+  phttp = new HTTPClientLight ();
+
+  // start connexion
+  is_ok = (phttp != nullptr);
   if (is_ok)
   {
     // declare connexion
-    is_ok = rte_http.begin (rte_wifi, RTE_URL_OAUTH2);
-
-   // connexion report
-    if (is_ok) AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Token - Connexion done [%s]"), RTE_URL_OAUTH2);
-    else
-    {
-      AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Token - Connexion refused [%s]"), RTE_URL_OAUTH2);
-      rte_http.end ();
-      rte_wifi.stop ();
-    }
+    is_ok = phttp->begin (RTE_URL_OAUTH2);
+    if (is_ok) AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Token - Connexion accepted to %s"), RTE_URL_OAUTH2);
+      else AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Token - Connexion failed to %s"), RTE_URL_OAUTH2);
   }
+  else AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Token - Connexion creation failed"));
 
-  // set headers
+  // set connexion
   if (is_ok)
   {
     // set authorisation
-    strcpy (str_auth, "Basic ");
+    strcpy_P (str_auth, PSTR ("Basic "));
     strlcat (str_auth, rte_config.str_private_key, sizeof (str_auth) - 1);
 
-    // set headers
-    rte_http.addHeader ("Authorization", str_auth, false, true);
-    rte_http.addHeader ("Content-Type", "application/x-www-form-urlencoded", false, true);
+    // set timeout and headers
+    phttp->setTimeout (RTE_HTTP_TIMEOUT);
+    phttp->addHeader (F ("Authorization"), str_auth, false, true);
+    phttp->addHeader (F ("Accept"), F ("application/json"), false, true);
 
-    // set http timeout
-    rte_http.setTimeout (RTE_HTTP_TIMEOUT);
+    // connexion
+    http_code = phttp->POST (nullptr, 0);
+    yield ();
+    
+    is_ok = ((http_code == HTTP_CODE_OK) || (http_code == HTTP_CODE_MOVED_PERMANENTLY));
+    if (is_ok) AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Token - Success [%d]"), http_code);
+      else AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Token - Error %s (%d)"), phttp->errorToString (http_code).c_str (), http_code);
   }
 
-  return is_ok;
-}
-
-// start token reception
-bool RteStreamTokenGet ()
-{
-  bool is_ok;
-  int  http_code;
-
-  // connexion
-  http_code = rte_http.POST (nullptr, 0);
-
-  // check if connexion failed
-  is_ok = ((http_code == HTTP_CODE_OK) || (http_code == HTTP_CODE_MOVED_PERMANENTLY));
-  if (is_ok) AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Token - Success [%d]"), http_code);
-  else
+  // process received data
+  if (is_ok)
   {
-    AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Token - Error %s [%d]"), rte_http.errorToString (http_code).c_str(), http_code);
-    rte_http.end ();
-    rte_wifi.stop ();
+    // current time
+    time_now = LocalTime ();
+
+    // extract token from JSON
+    deserializeJson (json_result, phttp->getString ().c_str ());
+
+    // get token value
+    strlcpy (rte_update.str_token, json_result[F ("access_token")].as<const char*> (), sizeof (rte_update.str_token));
+
+    // get token validity
+    token_validity = json_result[F ("expires_in")].as<unsigned int> ();
+
+    // set next token and next signal update
+    rte_update.time_token   = time_now + token_validity - 10;
+    rte_update.time_tempo   = max (rte_update.time_tempo, time_now + 15);
+    rte_update.time_pointe  = max (rte_update.time_pointe, time_now + 30);
+    rte_update.time_ecowatt = max (rte_update.time_ecowatt, time_now + 30);
+
+    // log
+    AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Token valid for %u seconds [%s]"), token_validity, rte_update.str_token);
   }
-
-  return is_ok;
-}
-
-// end of token reception
-bool RteStreamTokenEnd ()
-{
-  uint32_t time_now, token_validity;
-  DynamicJsonDocument json_result(192);
-
-  // current time
-  time_now = LocalTime ();
-
-  // extract token from JSON
-  deserializeJson (json_result, rte_http.getString ().c_str ());
-
-  // get token value
-  strlcpy (rte_update.str_token, json_result["access_token"].as<const char*> (), sizeof (rte_update.str_token));
-
-  // get token validity
-  token_validity = json_result["expires_in"].as<unsigned int> ();
-
-  // set next token and next signal update
-  rte_update.time_token  = time_now + token_validity - 10;
-  rte_update.time_tempo   = max (rte_update.time_tempo, time_now + 15);
-  rte_update.time_pointe  = max (rte_update.time_pointe, time_now + 30);
-  rte_update.time_ecowatt = max (rte_update.time_ecowatt, time_now + 30);
-
-  // log
-  AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Token valid for %u seconds [%s]"), token_validity, rte_update.str_token);
 
   // end connexion
-  rte_http.end ();
-  rte_wifi.stop ();
+  if (phttp)
+  {
+    phttp->end ();
+    delete phttp;
+  }
 
   return (strlen (rte_update.str_token) > 0);
 }
@@ -828,152 +792,133 @@ uint8_t RteEcowattGetGlobalLevel (const uint8_t day, const uint8_t slot)
   return result;
 }
 
-// plan ecowatt retry
-void RteEcowattStreamRetry ()
-{
-  rte_update.step        = RTE_UPDATE_NONE;
-  rte_update.time_ecowatt = LocalTime () + RTE_ECOWATT_RETRY;
-}
-
 // start of signal reception
-bool RteEcowattStreamBegin ()
+bool RteEcowattStream ()
 {
-  bool is_ok;
+  bool        is_ok;
+  uint8_t     slot, value;
+  uint16_t    index, index_array, size;
+  uint32_t    day_time;
+  int         http_code;
+  char        str_day[12];
+  char        str_text[256];
   const char* pstr_url;
-  char str_text[256];
+  TIME_T      day_dst;
+  JsonArray           arr_day, arr_slot;
+  DynamicJsonDocument json_result(8192);
+  HTTPClientLight*    phttp;
 
   // check token
   is_ok = (strlen (rte_update.str_token) > 0);
-  if (!is_ok) AddLog (LOG_LEVEL_ERROR, PSTR ("RTE: Ecowatt - Token missing"));
+  if (!is_ok)
+  {
+    AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Ecowatt - Token missing"));
+    return false;
+  }
 
-  // prepare connexion
-  if (is_ok) 
+  // create connexion
+  phttp = new HTTPClientLight ();
+
+  // start connexion
+  is_ok = (phttp != nullptr);
+  if (is_ok)
   {
     // connexion
     if (rte_config.sandbox) pstr_url = RTE_URL_ECOWATT_SANDBOX;
       else pstr_url = RTE_URL_ECOWATT_DATA;
-    is_ok = rte_http.begin (rte_wifi, pstr_url);
+    is_ok = phttp->begin (pstr_url);
 
-   // connexion report
-    if (is_ok) AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Ecowatt - Connexion done [%s]"), pstr_url);
-    else
-    {
-      AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Ecowatt - Connexion refused [%s]"), pstr_url);
-      rte_http.end ();
-      rte_wifi.stop ();
-    }
+    // connexion report
+    if (is_ok) AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Ecowatt - Connexion done [%s]"), pstr_url);
+      else AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Ecowatt - Connexion refused [%s]"), pstr_url);
   }
+  else AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Ecowatt - Connexion creation failed"));
 
-  // set headers
+  // connexion
   if (is_ok)
   {
     // set authorisation
-    strcpy (str_text, "Bearer ");
+    strcpy_P (str_text, PSTR ("Bearer "));
     strlcat (str_text, rte_update.str_token, sizeof (str_text) - 1);
 
-    // set headers
-    rte_http.addHeader ("Authorization", str_text, false, true);
-    rte_http.addHeader ("Content-Type", "application/x-www-form-urlencoded", false, true);
+    // set timeout and headers
+    phttp->setTimeout (RTE_HTTP_TIMEOUT);
+    phttp->addHeader (F ("Authorization"), str_text, false, true);
+    phttp->addHeader (F ("Accept"), F ("application/json"), false, true);
 
-    // set http timeout
-    rte_http.setTimeout (RTE_HTTP_TIMEOUT);
+    // connexion
+    http_code = phttp->GET ();
+    yield ();
+
+    // check if connexion failed
+    is_ok = ((http_code == HTTP_CODE_OK) || (http_code == HTTP_CODE_MOVED_PERMANENTLY));
+    if (is_ok) AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Ecowatt - Success [%d]"), http_code);
+      else AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Ecowatt - Error %s [%d]"), phttp->errorToString (http_code).c_str(), http_code);
   }
 
-  return is_ok;
-}
-
-// start of signal reception
-bool RteEcowattStreamGet ()
-{
-  bool is_ok;
-  int  http_code;
-
-  // connexion
-  http_code = rte_http.GET ();
-
-  // check if connexion failed
-  is_ok = ((http_code == HTTP_CODE_OK) || (http_code == HTTP_CODE_MOVED_PERMANENTLY));
-  if (is_ok) AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Ecowatt - Success [%d]"), http_code);
-  else
+  // process received data
+  if (is_ok)
   {
-    AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Ecowatt - Error %s [%d]"), rte_http.errorToString (http_code).c_str(), http_code);
-    rte_http.end ();
-    rte_wifi.stop ();
-  }
+    // extract token from JSON
+    deserializeJson (json_result, phttp->getString ().c_str ());
 
-  return is_ok;
-}
+    // check array Size
+    arr_day = json_result[F ("signals")].as<JsonArray>();
+    size = arr_day.size ();
 
-// handle end of signals page reception
-bool RteEcowattStreamEnd ()
-{
-  uint8_t  slot, value;
-  uint16_t index, index_array, size;
-  char     str_day[12];
-  char     str_list[24];
-  uint32_t day_time;
-  TIME_T   day_dst;
-  JsonArray           arr_day, arr_slot;
-  DynamicJsonDocument json_result(8192);
-
-  // get week days list
-  strcpy (str_list, D_DAY3LIST);
-
-  // extract token from JSON
-  deserializeJson (json_result, rte_http.getString ().c_str ());
-
-  // check array Size
-  arr_day = json_result["signals"].as<JsonArray>();
-  size = arr_day.size ();
-
-  // loop thru all 4 days to get today's and tomorrow's index
-  if (size <= RTE_ECOWATT_DAY_MAX) for (index = 0; index < size; index ++)
-  {
-    // if sandbox, shift array index to avoid current day fully ok
-    if (rte_config.sandbox) index_array = (index + RTE_ECOWATT_DAY_MAX - 1) % RTE_ECOWATT_DAY_MAX;
-      else index_array = index;
-
-    // get global status
-    ecowatt_status.arr_day[index_array].dvalue = arr_day[index]["dvalue"].as<unsigned int>();
-
-    // get date and convert from yyyy-mm-dd to dd.mm.yyyy
-    strlcpy (str_day, arr_day[index]["jour"], sizeof (str_day));
-    str_day[4] = str_day[7] = str_day[10] = 0;
-    day_dst.year = atoi (str_day) - 1970;
-    day_dst.month = atoi (str_day + 5);
-    day_dst.day_of_month = atoi (str_day + 8);
-    day_dst.day_of_week = 0;
-    day_time = MakeTime (day_dst);
-    BreakTime (day_time, day_dst);
-    if (day_dst.day_of_week < 8) strlcpy (str_day, str_list + 3 * (day_dst.day_of_week - 1), 4);
-      else strcpy (str_day, "");
-
-    // update current slot
-    strlcpy (ecowatt_status.arr_day[index_array].str_day_of_week, str_day, sizeof (ecowatt_status.arr_day[index_array].str_day_of_week));
-    ecowatt_status.arr_day[index_array].day_of_month = day_dst.day_of_month;
-    ecowatt_status.arr_day[index_array].month        = day_dst.month;
-
-    // loop to populate the slots
-    arr_slot = arr_day[index]["values"].as<JsonArray>();
-    for (slot = 0; slot < 24; slot ++)
+    // loop thru all 4 days to get today's and tomorrow's index
+    if (size <= RTE_ECOWATT_DAY_MAX) for (index = 0; index < size; index ++)
     {
-      value = arr_slot[slot]["hvalue"].as<unsigned int>();
-      if (value >= RTE_ECOWATT_LEVEL_MAX) value = RTE_ECOWATT_LEVEL_NORMAL;
-      ecowatt_status.arr_day[index_array].arr_hvalue[slot] = value;
+      // if sandbox, shift array index to avoid current day fully ok
+      if (rte_config.sandbox) index_array = (index + RTE_ECOWATT_DAY_MAX - 1) % RTE_ECOWATT_DAY_MAX;
+        else index_array = index;
+
+      // get global status
+      ecowatt_status.arr_day[index_array].dvalue = arr_day[index][F ("dvalue")].as<unsigned int>();
+
+      // get date and convert from yyyy-mm-dd to dd.mm.yyyy
+      strcpy (str_text, D_DAY3LIST);
+      strlcpy (str_day, arr_day[index][F ("jour")], sizeof (str_day));
+      str_day[4] = str_day[7] = str_day[10] = 0;
+      day_dst.year = atoi (str_day) - 1970;
+      day_dst.month = atoi (str_day + 5);
+      day_dst.day_of_month = atoi (str_day + 8);
+      day_dst.day_of_week = 0;
+      day_time = MakeTime (day_dst);
+      BreakTime (day_time, day_dst);
+      if (day_dst.day_of_week < 8) strlcpy (str_day, str_text + 3 * (day_dst.day_of_week - 1), 4);
+        else strcpy (str_day, "");
+
+      // update current slot
+      strlcpy (ecowatt_status.arr_day[index_array].str_day_of_week, str_day, sizeof (ecowatt_status.arr_day[index_array].str_day_of_week));
+      ecowatt_status.arr_day[index_array].day_of_month = day_dst.day_of_month;
+      ecowatt_status.arr_day[index_array].month        = day_dst.month;
+
+      // loop to populate the slots
+      arr_slot = arr_day[index][F ("values")].as<JsonArray>();
+      for (slot = 0; slot < 24; slot ++)
+      {
+        value = arr_slot[slot][F ("hvalue")].as<unsigned int>();
+        if (value >= RTE_ECOWATT_LEVEL_MAX) value = RTE_ECOWATT_LEVEL_NORMAL;
+        ecowatt_status.arr_day[index_array].arr_hvalue[slot] = value;
+      }
     }
+
+    // set signal next update
+    rte_update.time_ecowatt = LocalTime () + RTE_ECOWATT_RENEW;
+
+    // log
+    AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Ecowatt - Update till %02u/%02u"), ecowatt_status.arr_day[index_array].day_of_month, ecowatt_status.arr_day[index_array].month);
   }
-
-  // set signal next update
-  rte_update.time_ecowatt = LocalTime () + RTE_ECOWATT_RENEW;
-
-  // log
-  AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Ecowatt - Update till %02u/%02u"), ecowatt_status.arr_day[index_array].day_of_month, ecowatt_status.arr_day[index_array].month);
 
   // end connexion
-  rte_http.end ();
-  rte_wifi.stop ();
+  if (phttp)
+  {
+    phttp->end ();
+    delete phttp;
+  }
 
-  return true;
+  return is_ok;
 }
 
 /***********************************\
@@ -1040,28 +985,33 @@ void RteTempoGetIcon (const uint8_t day, const uint8_t hour, char* pstr_icon, co
   GetTextIndexed (pstr_icon, size_icon, index, kRteTempoIcon); 
 }
 
-// plan ecowatt retry
-void RteTempoStreamRetry ()
-{
-  rte_update.step       = RTE_UPDATE_NONE;
-  rte_update.time_tempo = LocalTime () + RTE_TEMPO_RETRY;
-}
-
 // start of signal reception
-bool RteTempoStreamBegin ()
+bool RteTempoStream ()
 {
   bool     is_ok;
+  int      http_code;
   int32_t  tz_offset;
+  uint16_t size;
   uint32_t current_time;
-  TIME_T   start_dst, stop_dst;
-//  char     str_offset[8];
   char     str_text[256];
+  TIME_T   start_dst, stop_dst;
+  JsonArray           arr_day;
+  DynamicJsonDocument json_result(1024);
+  HTTPClientLight*    phttp;
 
   // check token
   is_ok = (strlen (rte_update.str_token) > 0);
-  if (!is_ok) AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Tempo - Token missing"));
+  if (!is_ok)
+  {
+    AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Tempo - Token missing"));
+    return false;
+  }
 
-  // prepare connexion
+  // create connexion
+  phttp = new HTTPClientLight ();
+
+  // start connexion
+  is_ok = (phttp != nullptr);
   if (is_ok) 
   {
     // calculate time window
@@ -1074,105 +1024,83 @@ bool RteTempoStreamBegin ()
 
     // generate URL
     sprintf_P (str_text, PSTR ("%s?start_date=%04u-%02u-%02uT00:00:00+%02d:00&end_date=%04u-%02u-%02uT00:00:00+%02d:00"), RTE_URL_TEMPO_DATA, 1970 + start_dst.year, start_dst.month, start_dst.day_of_month, tz_offset, 1970 + stop_dst.year, stop_dst.month, stop_dst.day_of_month, tz_offset);
-    AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Tempo - URL %s"), str_text);
+    AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Tempo - URL %s"), str_text);
 
     // connexion
-    is_ok = rte_http.begin (rte_wifi, str_text);
+    is_ok = phttp->begin (str_text);
 
     // connexion report
-    if (is_ok) AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Tempo - Connexion done [%s]"), str_text);
-    else
-    {
-      AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Tempo - Connexion refused [%s]"), str_text);
-      rte_http.end ();
-      rte_wifi.stop ();
-    }
+    if (is_ok) AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Tempo - Connexion done [%s]"), str_text);
+      else AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Tempo - Connexion refused [%s]"), str_text);
   }
+  else AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Tempo - Connexion creation failed"));
 
-  // set headers
+  // set headers and call URL
   if (is_ok)
   {
     // set authorisation
-    strcpy (str_text, "Bearer ");
+    strcpy_P (str_text, PSTR ("Bearer "));
     strlcat (str_text, rte_update.str_token, sizeof (str_text) - 1);
 
-    // set headers
-    rte_http.addHeader ("Authorization", str_text, false, true);
-    rte_http.addHeader ("Content-Type", "application/x-www-form-urlencoded", false, true);
+    // set timeout and headers
+    phttp->setTimeout (RTE_HTTP_TIMEOUT);
+    phttp->addHeader (F ("Authorization"), str_text, false, true);
+    phttp->addHeader (F ("Accept"), F ("application/json"), false, true);
 
-    // set http timeout
-    rte_http.setTimeout (RTE_HTTP_TIMEOUT);
+    // connexion
+    http_code = phttp->GET ();
+    yield ();
+
+    // check if connexion failed
+    is_ok = ((http_code == HTTP_CODE_OK) || (http_code == HTTP_CODE_MOVED_PERMANENTLY));
+    if (is_ok) AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Tempo - Success [%d]"), http_code);
+    else AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Tempo - Error %s [%d]"), phttp->errorToString (http_code).c_str (), http_code);
   }
 
-  return is_ok;
-}
-
-// start of signal reception
-bool RteTempoStreamGet ()
-{
-  bool is_ok;
-  int  http_code;
-
-  // connexion
-  http_code = rte_http.GET ();
-
-  // check if connexion failed
-  is_ok = ((http_code == HTTP_CODE_OK) || (http_code == HTTP_CODE_MOVED_PERMANENTLY));
-  if (is_ok) AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Tempo - Success [%d]"), http_code);
-  else
+  // process received data
+  if (is_ok)
   {
-    AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Tempo - Error %s [%d]"), rte_http.errorToString (http_code).c_str(), http_code);
-    rte_http.end ();
-    rte_wifi.stop ();
+    // extract token from JSON
+    deserializeJson (json_result, phttp->getString ().c_str ());
+
+    // check array Size
+    arr_day = json_result["tempo_like_calendars"]["values"].as<JsonArray>();
+    size = arr_day.size ();
+
+    // if tomorrow is not available
+    if (size == 2)
+    {
+      tempo_status.arr_day[RTE_DAY_TOMORROW]  = RTE_TEMPO_LEVEL_UNKNOWN;
+      tempo_status.arr_day[RTE_DAY_TODAY]     = GetCommandCode (str_text, sizeof (str_text), arr_day[0][F ("value")], kRteTempoStream);
+      tempo_status.arr_day[RTE_DAY_YESTERDAY] = GetCommandCode (str_text, sizeof (str_text), arr_day[1][F ("value")], kRteTempoStream);
+    }
+
+    // else tomorrow is available
+    else if (size == 3)
+    {
+      tempo_status.arr_day[RTE_DAY_TOMORROW]  = GetCommandCode (str_text, sizeof (str_text), arr_day[0][F ("value")], kRteTempoStream);
+      tempo_status.arr_day[RTE_DAY_TODAY]     = GetCommandCode (str_text, sizeof (str_text), arr_day[1][F ("value")], kRteTempoStream);
+      tempo_status.arr_day[RTE_DAY_YESTERDAY] = GetCommandCode (str_text, sizeof (str_text), arr_day[2][F ("value")], kRteTempoStream);
+    }
+
+    // set signal next update
+    if (tempo_status.arr_day[RTE_DAY_TOMORROW] == RTE_TEMPO_LEVEL_UNKNOWN) rte_update.time_tempo = LocalTime () + RTE_TEMPO_RENEW_UNKNOWN;
+      else rte_update.time_tempo = LocalTime () + RTE_TEMPO_RENEW_KNOWN;
+
+    // log
+    AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Tempo - Update done (%d-%d-%d)"), tempo_status.arr_day[RTE_DAY_YESTERDAY], tempo_status.arr_day[RTE_DAY_TODAY], tempo_status.arr_day[RTE_DAY_TOMORROW]);
   }
-
-  return is_ok;
-}
-
-// handle end of signals page reception
-bool RteTempoStreamEnd ()
-{
-  uint16_t  size;
-  char      str_color[16];
-  JsonArray arr_day;
-  DynamicJsonDocument json_result(1024);
-
-  // extract token from JSON
-  deserializeJson (json_result, rte_http.getString ().c_str ());
-
-  // check array Size
-  arr_day = json_result["tempo_like_calendars"]["values"].as<JsonArray>();
-  size = arr_day.size ();
-
-  // if tomorrow is not available
-  if (size == 2)
-  {
-    tempo_status.arr_day[RTE_DAY_TOMORROW]  = RTE_TEMPO_LEVEL_UNKNOWN;
-    tempo_status.arr_day[RTE_DAY_TODAY]     = GetCommandCode (str_color, sizeof (str_color), arr_day[0]["value"], kRteTempoStream);
-    tempo_status.arr_day[RTE_DAY_YESTERDAY] = GetCommandCode (str_color, sizeof (str_color), arr_day[1]["value"], kRteTempoStream);
-  }
-
-  // else tomorrow is available
-  else if (size == 3)
-  {
-    tempo_status.arr_day[RTE_DAY_TOMORROW]  = GetCommandCode (str_color, sizeof (str_color), arr_day[0]["value"], kRteTempoStream);
-    tempo_status.arr_day[RTE_DAY_TODAY]     = GetCommandCode (str_color, sizeof (str_color), arr_day[1]["value"], kRteTempoStream);
-    tempo_status.arr_day[RTE_DAY_YESTERDAY] = GetCommandCode (str_color, sizeof (str_color), arr_day[2]["value"], kRteTempoStream);
-  }
-
-  // set signal next update
-  if (tempo_status.arr_day[RTE_DAY_TOMORROW] == RTE_TEMPO_LEVEL_UNKNOWN) rte_update.time_tempo = LocalTime () + RTE_TEMPO_RENEW_UNKNOWN;
-    else rte_update.time_tempo = LocalTime () + RTE_TEMPO_RENEW_KNOWN;
-
-  // log
-  AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Tempo - Update done (%d-%d-%d)"), tempo_status.arr_day[RTE_DAY_YESTERDAY], tempo_status.arr_day[RTE_DAY_TODAY], tempo_status.arr_day[RTE_DAY_TOMORROW]);
 
   // end connexion
-  rte_http.end ();
-  rte_wifi.stop ();
+  if (phttp)
+  {
+    phttp->end ();
+    delete phttp;
+  }
 
-  return true;
+  return is_ok;
 }
+
 
 /***********************************\
  *          Pointe management
@@ -1218,119 +1146,101 @@ uint8_t RtePointeGetLevel (const uint8_t day, const uint8_t slot)
   return level;
 }
 
-// plan pointe retry
-void RtePointeStreamRetry ()
-{
-  rte_update.step       = RTE_UPDATE_NONE;
-  rte_update.time_tempo = LocalTime () + RTE_POINTE_RETRY;
-}
-
 // start of pointe period reception
-bool RtePointeStreamBegin ()
+bool RtePointeStream ()
 {
-  bool is_ok;
-  char str_text[256];
+  bool     is_ok;
+  int      http_code;
+  uint16_t size;
+  char     str_text[256];
+  JsonArray           arr_day;
+  DynamicJsonDocument json_result(2048);
+  HTTPClientLight*    phttp;
 
   // check token
   is_ok = (strlen (rte_update.str_token) > 0);
-  if (!is_ok) AddLog (LOG_LEVEL_ERROR, PSTR ("RTE: Pointe - Token missing"));
+  if (!is_ok)
+  {
+    AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Pointe - Token missing"));
+    return false;
+  }
 
-  // prepare connexion
+  // create connexion
+  phttp = new HTTPClientLight ();
+
+  // start connexion
+  is_ok = (phttp != nullptr);
   if (is_ok) 
   {
     // connexion
     sprintf (str_text, "%s", RTE_URL_POINTE_DATA);
-    is_ok = rte_http.begin (rte_wifi, str_text);
+    is_ok = phttp->begin (str_text);
 
     // connexion report
-    if (is_ok) AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Pointe - Connexion done [%s]"), str_text);
-    else
-    {
-      AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Pointe - Connexion refused [%s]"), str_text);
-      rte_http.end ();
-      rte_wifi.stop ();
-    }
+    if (is_ok) AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Pointe - Connexion done [%s]"), str_text);
+    else AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Pointe - Connexion refused [%s]"), str_text);
   }
+  else AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Pointe - Connexion creation failed"));
 
   // set headers
   if (is_ok)
   {
     // set authorisation
-    strcpy (str_text, "Bearer ");
+    strcpy_P (str_text, PSTR ("Bearer "));
     strlcat (str_text, rte_update.str_token, sizeof (str_text) - 1);
 
-    // set headers
-    rte_http.addHeader ("Authorization", str_text, false, true);
-    rte_http.addHeader ("Content-Type", "application/x-www-form-urlencoded", false, true);
+    // set timeout and headers
+    phttp->setTimeout (RTE_HTTP_TIMEOUT);
+    phttp->addHeader (F ("Authorization"), str_text, false, true);
+    phttp->addHeader (F ("Accept"), F ("application/json"), false, true);
 
-    // set http timeout
-    rte_http.setTimeout (RTE_HTTP_TIMEOUT);
+    // connexion
+    http_code = phttp->GET ();
+    yield ();
+
+    // check if connexion failed
+    is_ok = ((http_code == HTTP_CODE_OK) || (http_code == HTTP_CODE_MOVED_PERMANENTLY));
+    if (is_ok) AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Pointe - Success [%d]"), http_code);
+    else AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Pointe - Error %s [%d]"), phttp->errorToString (http_code).c_str (), http_code);
   }
 
-  return is_ok;
-}
-
-// start of pointe period data reception
-bool RtePointeStreamGet ()
-{
-  bool is_ok;
-  int  http_code;
-
-  // connexion
-  http_code = rte_http.GET ();
-
-  // check if connexion failed
-  is_ok = ((http_code == HTTP_CODE_OK) || (http_code == HTTP_CODE_MOVED_PERMANENTLY));
-  if (is_ok) AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Pointe - Success [%d]"), http_code);
-  else
+  // process received data
+  if (is_ok)
   {
-    AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Pointe - Error %s [%d]"), rte_http.errorToString (http_code).c_str(), http_code);
-    rte_http.end ();
-    rte_wifi.stop ();
+    // extract token from JSON
+    deserializeJson (json_result, phttp->getString ().c_str ());
+
+    // check array size
+    arr_day = json_result[F ("signals")][0][F ("signaled_dates")].as<JsonArray>();
+    size = arr_day.size ();
+
+    // if both days are available
+    if (size == 2)
+    {
+      // set tomorrow
+      pointe_status.arr_day[RTE_DAY_TOMORROW] = 1 + arr_day[0][F ("aoe_signals")].as<unsigned int>();
+      if (pointe_status.arr_day[RTE_DAY_TOMORROW] > RTE_POINTE_LEVEL_RED) pointe_status.arr_day[RTE_DAY_TOMORROW] = RTE_POINTE_LEVEL_RED;
+
+      // set today
+      pointe_status.arr_day[RTE_DAY_TODAY] = 1 + arr_day[1][F ("aoe_signals")].as<unsigned int>();
+      if (pointe_status.arr_day[RTE_DAY_TODAY] > RTE_POINTE_LEVEL_RED) pointe_status.arr_day[RTE_DAY_TODAY] = RTE_POINTE_LEVEL_RED;
+    }
+
+    // set signal next update
+    rte_update.time_pointe = LocalTime () + RTE_POINTE_RENEW;
+
+    // log
+    AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Pointe - Update done (%d-%d-%d)"), pointe_status.arr_day[RTE_DAY_YESTERDAY], pointe_status.arr_day[RTE_DAY_TODAY], pointe_status.arr_day[RTE_DAY_TOMORROW]);
   }
-
-  return is_ok;
-}
-
-// handle end of signals page reception
-bool RtePointeStreamEnd ()
-{
-  uint8_t   index;
-  uint16_t  size;
-  char      str_color[16];
-  JsonArray arr_day;
-  DynamicJsonDocument json_result(2048);
-
-  // extract token from JSON
-  deserializeJson (json_result, rte_http.getString ().c_str ());
-
-  // check array size
-  arr_day = json_result["signals"][0]["signaled_dates"].as<JsonArray>();
-  size = arr_day.size ();
-
-  // if both days are available
-  if (size == 2)
-  {
-    // set tomorrow
-    pointe_status.arr_day[RTE_DAY_TOMORROW] = 1 + arr_day[0]["aoe_signals"].as<unsigned int>();
-    if (pointe_status.arr_day[RTE_DAY_TOMORROW] > RTE_POINTE_LEVEL_RED) pointe_status.arr_day[RTE_DAY_TOMORROW] = RTE_POINTE_LEVEL_RED;
-
-    // set today
-    pointe_status.arr_day[RTE_DAY_TODAY] = 1 + arr_day[1]["aoe_signals"].as<unsigned int>();
-    if (pointe_status.arr_day[RTE_DAY_TODAY] > RTE_POINTE_LEVEL_RED) pointe_status.arr_day[RTE_DAY_TODAY] = RTE_POINTE_LEVEL_RED;
-  }
-
-  // set signal next update
-  rte_update.time_pointe = LocalTime () + RTE_POINTE_RENEW;
-
-  // log
-  AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Pointe - Update done (%d-%d-%d)"), pointe_status.arr_day[RTE_DAY_YESTERDAY], pointe_status.arr_day[RTE_DAY_TODAY], pointe_status.arr_day[RTE_DAY_TOMORROW]);
 
   // end connexion
-  rte_http.end ();
-  rte_wifi.stop ();
+  if (phttp)
+  {
+    phttp->end ();
+    delete phttp;
+  }
 
-  return true;
+  return is_ok;
 }
 
 /***********************************************************\
@@ -1372,9 +1282,6 @@ void RteInit ()
     for (slot = 0; slot < 24; slot ++) ecowatt_status.arr_day[index].arr_hvalue[slot] = RTE_ECOWATT_LEVEL_NORMAL;
   }
 
-  // set insecure mode to access RTE server
-  rte_wifi.setInsecure ();
-
   // log help command
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Run rte to get help on RTE modules"));
 }
@@ -1389,152 +1296,80 @@ void RteEverySecond ()
   // check parameters
   if (!RtcTime.valid) return;
 
+  // if first update, ask for token update
+  time_now = LocalTime ();
+  if ((rte_update.time_token == UINT32_MAX) && (rte_config.tempo_enable || rte_config.pointe_enable || rte_config.ecowatt_enable)) rte_update.time_token = time_now;
+
   // if needed, plan initial ecowatt and tempo updates
-  if (rte_config.tempo_enable && (rte_update.time_tempo == UINT32_MAX)) rte_update.time_tempo = time_now + 15;
-  if (rte_config.pointe_enable && (rte_update.time_pointe == UINT32_MAX)) rte_update.time_pointe = time_now + 30;
-  if (rte_config.ecowatt_enable && (rte_update.time_ecowatt == UINT32_MAX)) rte_update.time_ecowatt = time_now + 45;
+  if (rte_config.tempo_enable && (rte_update.time_tempo == UINT32_MAX)) rte_update.time_tempo = time_now + 5;
+  if (rte_config.pointe_enable && (rte_update.time_pointe == UINT32_MAX)) rte_update.time_pointe = time_now + 10;
+  if (rte_config.ecowatt_enable && (rte_update.time_ecowatt == UINT32_MAX)) rte_update.time_ecowatt = time_now + 15;
 
   //   Stream recetion
   // --------------------
-  time_now = LocalTime ();
+
   switch (rte_update.step)
   {
     // no current stream operation
     case RTE_UPDATE_NONE:
-      // if first update, ask for token update
-      if ((rte_update.time_token == UINT32_MAX) && (rte_config.tempo_enable || rte_config.pointe_enable || rte_config.ecowatt_enable)) rte_update.time_token = time_now;
-
       // priority 1 : check for need of token update
-      if (rte_update.time_token <= time_now) rte_update.step = RTE_UPDATE_TOKEN_BEGIN;
+      if (rte_update.time_token <= time_now) rte_update.step = RTE_UPDATE_TOKEN;
 
       // else, priority 2 : check for need of tempo update
-      else if (rte_config.tempo_enable && (rte_update.time_tempo <= time_now)) rte_update.step = RTE_UPDATE_TEMPO_BEGIN;
+      else if (rte_config.tempo_enable && (rte_update.time_tempo <= time_now)) rte_update.step = RTE_UPDATE_TEMPO;
 
       // else, priority 3 : check for need of pointe update
-      else if (rte_config.pointe_enable && (rte_update.time_pointe <= time_now)) rte_update.step = RTE_UPDATE_POINTE_BEGIN;
+      else if (rte_config.pointe_enable && (rte_update.time_pointe <= time_now)) rte_update.step = RTE_UPDATE_POINTE;
 
       // else, priority 4 : check for need of ecowatt update
-      else if (rte_config.ecowatt_enable && (rte_update.time_ecowatt <= time_now)) rte_update.step = RTE_UPDATE_ECOWATT_BEGIN;
+      else if (rte_config.ecowatt_enable && (rte_update.time_ecowatt <= time_now)) rte_update.step = RTE_UPDATE_ECOWATT;
       break;
 
     // begin token reception
-    case RTE_UPDATE_TOKEN_BEGIN:
+    case RTE_UPDATE_TOKEN:
       // init token update
-      result = RteStreamTokenBegin ();
+      result = RteStreamToken ();
+      rte_update.step = RTE_UPDATE_NONE; 
       
-      // if success, set next step else plan retry
-      if (result) rte_update.step = RTE_UPDATE_TOKEN_GET; 
-        else RteStreamTokenRetry ();
-      break;
-
-    // start token reception
-    case RTE_UPDATE_TOKEN_GET:
-      // init token update
-      result = RteStreamTokenGet ();
-      
-      // if success, set next step else plan retry
-      if (result) rte_update.step = RTE_UPDATE_TOKEN_END;
-        else RteStreamTokenRetry ();
-      break;
-
-    // handle end of token reception
-    case RTE_UPDATE_TOKEN_END:
-      // manage received data
-      result = RteStreamTokenEnd ();
-
-      // if token is received, reset operation and plan next signal update else plan retry
-      if (result) rte_update.step = RTE_UPDATE_NONE;
-        else RteStreamTokenRetry ();
+      // if failure, plan retry
+      if (!result)
+      {
+        rte_update.time_token   = LocalTime () + RTE_TOKEN_RETRY;
+        rte_update.time_tempo   = max (rte_update.time_tempo, rte_update.time_token + 5);
+        rte_update.time_pointe  = max (rte_update.time_pointe, rte_update.time_token + 10);
+        rte_update.time_ecowatt = max (rte_update.time_ecowatt, rte_update.time_token + 15);
+      }
       break;
 
     // init ecowatt reception
-    case RTE_UPDATE_ECOWATT_BEGIN:
+    case RTE_UPDATE_ECOWATT:
       // init ecowatt update
-      result = RteEcowattStreamBegin ();
+      result = RteEcowattStream ();
+      rte_update.step = RTE_UPDATE_NONE; 
       
-      // if success, set next step else plan retry
-      if (result) rte_update.step = RTE_UPDATE_ECOWATT_GET; 
-        else RteEcowattStreamRetry ();
+      // if failure, plan retry
+      if (!result) rte_update.time_ecowatt = LocalTime () + RTE_ECOWATT_RETRY;
       break;
 
-    // start ecowatt reception
-    case RTE_UPDATE_ECOWATT_GET:
-      // ecowatt reception
-      result = RteEcowattStreamGet ();
-      
-      // if success, set next step else plan retry
-      if (result) rte_update.step = RTE_UPDATE_ECOWATT_END;
-        else RteEcowattStreamRetry ();
-      break;
-
-    // end of ecowatt reception
-    case RTE_UPDATE_ECOWATT_END:
-      // manage received data
-      result = RteEcowattStreamEnd ();
-
-      // if ecowatt not received, plan retry
-      if (result) rte_update.step = RTE_UPDATE_NONE;
-        else RteEcowattStreamRetry ();
-      break;
 
     // init tempo reception
-    case RTE_UPDATE_TEMPO_BEGIN:
+    case RTE_UPDATE_TEMPO:
       // init tempo update
-      result = RteTempoStreamBegin ();
+      result = RteTempoStream ();
+      rte_update.step = RTE_UPDATE_NONE; 
       
-      // if success, set next step else plan retry
-      if (result) rte_update.step = RTE_UPDATE_TEMPO_GET; 
-        else RteTempoStreamRetry ();
+      // if failure, plan retry
+      if (!result) rte_update.time_tempo = LocalTime () + RTE_TEMPO_RETRY;
       break;
-
-    // start tempo reception
-    case RTE_UPDATE_TEMPO_GET:
-      // init tempo reception
-      result = RteTempoStreamGet ();
       
-      // if success, set next step else plan retry
-      if (result) rte_update.step = RTE_UPDATE_TEMPO_END;
-        else RteTempoStreamRetry ();
-      break;
-
-    // end of tempo reception
-    case RTE_UPDATE_TEMPO_END:
-      // manage received data
-      result = RteTempoStreamEnd ();
-
-      // if tempo not received, plan retry
-      if (result) rte_update.step = RTE_UPDATE_NONE;
-        else RteTempoStreamRetry ();
-      break;
-
     // init pointe period reception
-    case RTE_UPDATE_POINTE_BEGIN:
+    case RTE_UPDATE_POINTE:
       // init tempo update
-      result = RtePointeStreamBegin ();
+      result = RtePointeStream ();
+      rte_update.step = RTE_UPDATE_NONE; 
       
-      // if success, set next step else plan retry
-      if (result) rte_update.step = RTE_UPDATE_POINTE_GET; 
-        else RtePointeStreamRetry ();
-      break;
-
-    // start pointe period reception
-    case RTE_UPDATE_POINTE_GET:
-      // init tempo reception
-      result = RtePointeStreamGet ();
-      
-      // if success, set next step else plan retry
-      if (result) rte_update.step = RTE_UPDATE_POINTE_END;
-        else RtePointeStreamRetry ();
-      break;
-
-    // end of pointe period reception
-    case RTE_UPDATE_POINTE_END:
-      // manage received data
-      result = RtePointeStreamEnd ();
-
-      // if tempo not received, plan retry
-      if (result) rte_update.step = RTE_UPDATE_NONE;
-        else RtePointeStreamRetry ();
+      // if failure, plan retry
+      if (!result) rte_update.time_tempo = LocalTime () + RTE_POINTE_RETRY;
       break;
   }
 
@@ -1642,15 +1477,77 @@ void RteMidnigth ()
 }
 
 // Handle MQTT teleperiod
+void RtePublishSensor ()
+{
+  int   index;
+  int   length = 0;
+  char  last   = 0;
+  const char *pstr_response;
+  char  str_value[8];
+
+  // tempo
+  if (rte_config.tempo_enable)
+  {
+    // check need of ',' according to previous data
+    pstr_response = ResponseData ();
+    if (pstr_response != nullptr) length = strlen (pstr_response) - 1;
+    if (length >= 0) last = pstr_response[length];
+    if ((last != 0) && (last != '{') && (last != ',')) ResponseAppend_P (PSTR (","));
+
+    ResponseAppend_P (PSTR ("\"TEMPO\":{"));
+
+    // tempo today
+    index = RteTempoGetGlobalLevel (RTE_DAY_TODAY, 12);
+    GetTextIndexed (str_value, sizeof (str_value), index, kRteTempoJSON);
+    ResponseAppend_P (PSTR ("\"tday\":\"%s\""), str_value);
+
+    // tempo tomorrow
+    index = RteTempoGetGlobalLevel (RTE_DAY_TOMORROW, 12);
+    GetTextIndexed (str_value, sizeof (str_value), index, kRteTempoJSON);
+    ResponseAppend_P (PSTR (",\"tmrw\":\"%s\""), str_value);
+
+    ResponseJsonEnd ();
+  }
+
+  // pointe
+  if (rte_config.pointe_enable)
+  {
+    // check need of ',' according to previous data
+    pstr_response = ResponseData ();
+    if (pstr_response != nullptr) length = strlen (pstr_response) - 1;
+    if (length >= 0) last = pstr_response[length];
+    if ((last != 0) && (last != '{') && (last != ',')) ResponseAppend_P (PSTR (","));
+
+    ResponseAppend_P (PSTR ("\"POINTE\":{"));
+
+    // pointe today
+    index = RtePointeGetGlobalLevel (RTE_DAY_TODAY, 12);
+    GetTextIndexed (str_value, sizeof (str_value), index, kRtePointeJSON);
+    ResponseAppend_P (PSTR ("\"tday\":\"%s\""), str_value);
+
+    // pointe tomorrow
+    index = RtePointeGetGlobalLevel (RTE_DAY_TOMORROW, 12);
+    GetTextIndexed (str_value, sizeof (str_value), index, kRtePointeJSON);
+    ResponseAppend_P (PSTR (",\"tmrw\":\"%s\""), str_value);
+
+    ResponseJsonEnd ();
+  }
+}
+
+// Handle MQTT teleperiod
 void RteTeleperiod ()
 {
   // check parameter
   if (TasmotaGlobal.tele_period > 0) return;
 
-  // publish JSON
-  if (rte_config.tempo_enable) tempo_status.json_publish = true;
-  if (rte_config.pointe_enable) pointe_status.json_publish = true;
+  // ecowatt, ask to publish full topic
   if (rte_config.ecowatt_enable) ecowatt_status.json_publish = true;
+
+  // tempo, ask to publish full topic
+  if (rte_config.tempo_enable) tempo_status.json_publish = true;
+
+  // pointe, ask to publish full topic
+  if (rte_config.pointe_enable) pointe_status.json_publish = true;
 }
 
 /***********************************************\
@@ -1692,10 +1589,10 @@ void RteWebSensor ()
     WSContentSend_P (PSTR ("<div style='width:60%%;padding:4px 0px 8px 0px;text-align:right;font-size:10px;font-style:italic;'>"));
 
     // set display message
-    if (strlen (rte_config.str_private_key) == 0) WSContentSend_P (PSTR ("clé privée RTE manquante"));
-    else if (rte_update.time_token == UINT32_MAX) WSContentSend_P (PSTR ("initialisation"));
+    if (strlen (rte_config.str_private_key) == 0)   WSContentSend_P (PSTR ("clé privée RTE manquante"));
+    else if (rte_update.time_token == UINT32_MAX)   WSContentSend_P (PSTR ("initialisation"));
     else if (rte_update.time_tempo < time_now + 10) WSContentSend_P (PSTR ("maj imminente"));
-    else if (rte_update.time_tempo != UINT32_MAX) WSContentSend_P (PSTR ("maj dans %d mn"), 1 + (rte_update.time_tempo - time_now) / 60);
+    else if (rte_update.time_tempo != UINT32_MAX)   WSContentSend_P (PSTR ("maj dans %d mn"), 1 + (rte_update.time_tempo - time_now) / 60);
 
     // end of title display
     WSContentSend_P (PSTR ("</div>\n"));
@@ -1742,7 +1639,7 @@ void RteWebSensor ()
           // current hour dot and hourly segment end
           if ((index == RTE_DAY_TODAY) && (slot == dst_now.hour))
           {
-            GetTextIndexed (str_text, sizeof (str_text), tempo_status.arr_day[day], kRteTempoDot);  
+            GetTextIndexed (str_text, sizeof (str_text), level, kRteTempoDot);  
             WSContentSend_P (PSTR ("font-size:9px;'>%s</div>\n"), str_text);
           }
           else WSContentSend_P (PSTR ("'></div>\n"));
@@ -1779,10 +1676,10 @@ void RteWebSensor ()
     WSContentSend_P (PSTR ("<div style='width:60%%;padding:4px 0px 8px 0px;text-align:right;font-size:10px;font-style:italic;'>"));
 
     // set display message
-    if (strlen (rte_config.str_private_key) == 0) WSContentSend_P (PSTR ("clé privée RTE manquante"));
-    else if (rte_update.time_token == UINT32_MAX) WSContentSend_P (PSTR ("initialisation"));
+    if (strlen (rte_config.str_private_key) == 0)    WSContentSend_P (PSTR ("clé privée RTE manquante"));
+    else if (rte_update.time_token == UINT32_MAX)    WSContentSend_P (PSTR ("initialisation"));
     else if (rte_update.time_pointe < time_now + 10) WSContentSend_P (PSTR ("maj imminente"));
-    else if (rte_update.time_pointe != UINT32_MAX) WSContentSend_P (PSTR ("maj dans %d mn"), 1 + (rte_update.time_pointe - time_now) / 60);
+    else if (rte_update.time_pointe != UINT32_MAX)   WSContentSend_P (PSTR ("maj dans %d mn"), 1 + (rte_update.time_pointe - time_now) / 60);
 
     // end of title display
     WSContentSend_P (PSTR ("</div>\n"));
@@ -1860,10 +1757,10 @@ void RteWebSensor ()
     WSContentSend_P (PSTR ("<div style='width:60%%;padding:4px 0px 8px 0px;text-align:right;font-size:10px;font-style:italic;'>"));
 
     // set display message
-    if (strlen (rte_config.str_private_key) == 0) WSContentSend_P (PSTR ("clé privée RTE manquante"));
-    else if (rte_update.time_token == UINT32_MAX) WSContentSend_P (PSTR ("initialisation"));
+    if (strlen (rte_config.str_private_key) == 0)     WSContentSend_P (PSTR ("clé privée RTE manquante"));
+    else if (rte_update.time_token == UINT32_MAX)     WSContentSend_P (PSTR ("initialisation"));
     else if (rte_update.time_ecowatt < time_now + 10) WSContentSend_P (PSTR ("maj imminente"));
-    else if (rte_update.time_ecowatt != UINT32_MAX) WSContentSend_P (PSTR ("maj dans %d mn"), 1 + (rte_update.time_ecowatt - time_now) / 60);
+    else if (rte_update.time_ecowatt != UINT32_MAX)   WSContentSend_P (PSTR ("maj dans %d mn"), 1 + (rte_update.time_ecowatt - time_now) / 60);
 
     // end of title display
     WSContentSend_P (PSTR ("</div>\n"));
@@ -1940,7 +1837,7 @@ bool Xsns119 (uint32_t function)
   bool result = false;
 
   // main callback switch
-  switch (function)
+  if (!teleinfo_config.battery) switch (function)
   { 
     case FUNC_MODULE_INIT:
       RteModuleInit ();

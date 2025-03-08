@@ -131,6 +131,9 @@ void ThingsboardIntegrationPublishData ()
   char    str_value[32];
   char    str_text[32];
 
+  // if not enabled, ignore
+  if (!thingsboard_integration.enabled) return;
+
   ResponseClear ();
   ResponseAppend_P (PSTR ("{"));
 
@@ -158,14 +161,14 @@ void ThingsboardIntegrationPublishData ()
       ResponseAppend_P (PSTR (",\"P%u\":%d,\"W%u\":%d"), value, teleinfo_conso.phase[phase].papp, value, teleinfo_conso.phase[phase].pact);
 
       // cos phi
-      if (teleinfo_conso.cosphi.nb_measure > 1) ResponseAppend_P (PSTR (",\"C%u\":%d.%02d"), value, teleinfo_conso.phase[phase].cosphi / 1000, teleinfo_conso.phase[phase].cosphi % 1000 / 10);
+      if (teleinfo_conso.cosphi.quantity > 1) ResponseAppend_P (PSTR (",\"C%u\":%d.%02d"), value, teleinfo_conso.phase[phase].cosphi / 1000, teleinfo_conso.phase[phase].cosphi % 1000 / 10);
     } 
 
     // conso : global values
     ResponseAppend_P (PSTR (",\"U\":%d,\"I\":%d.%02d,\"P\":%d,\"W\":%d"), voltage / (long)teleinfo_contract.phase, current / 1000, current % 1000 / 10, power_app, power_act);
 
     // conso : cosphi
-    if (teleinfo_conso.cosphi.nb_measure > 1) ResponseAppend_P (PSTR (",\"C\":%d.%02d"), teleinfo_conso.cosphi.value / 1000, teleinfo_conso.cosphi.value % 1000 / 10);
+    if (teleinfo_conso.cosphi.quantity > 1) ResponseAppend_P (PSTR (",\"C\":%d.%02d"), teleinfo_conso.cosphi.value / 1000, teleinfo_conso.cosphi.value % 1000 / 10);
   }
   
   // production 
@@ -175,11 +178,11 @@ void ThingsboardIntegrationPublishData ()
     ResponseAppend_P (PSTR (",\"PP\":%d,\"PW\":%d"), teleinfo_prod.papp, teleinfo_prod.pact);
 
     // prod : cosphi
-    if (teleinfo_prod.cosphi.nb_measure > 1) ResponseAppend_P (PSTR (",\"PC\":%d.%02d"), teleinfo_prod.cosphi.value / 1000, teleinfo_prod.cosphi.value % 1000 / 10);
+    if (teleinfo_prod.cosphi.quantity > 1) ResponseAppend_P (PSTR (",\"PC\":%d.%02d"), teleinfo_prod.cosphi.value / 1000, teleinfo_prod.cosphi.value % 1000 / 10);
   } 
 
   // meter serial number
-  lltoa (teleinfo_contract.ident, str_value, 10);
+  lltoa (teleinfo_meter.ident, str_value, 10);
   ResponseAppend_P (PSTR (",\"SERIAL\":%s"), str_value);
 
   // contract name
@@ -192,12 +195,12 @@ void ThingsboardIntegrationPublishData ()
 
   // contract color
   index = TeleinfoPeriodGetLevel ();
-  GetTextIndexed (str_value, sizeof (str_value), index, kTeleinfoPeriodLabel);
+  GetTextIndexed (str_value, sizeof (str_value), index, kTeleinfoLevelLabel);
   ResponseAppend_P (PSTR (",\"COLOR\":\"%s\""), str_value);
 
   // contract hour type
   index = TeleinfoPeriodGetHP ();
-  GetTextIndexed (str_value, sizeof (str_value), index, kTeleinfoPeriodHour);
+  GetTextIndexed (str_value, sizeof (str_value), index, kTeleinfoHourLabel);
   ResponseAppend_P (PSTR (",\"HOUR\":\"%s\""), str_value);
 
   // total conso counter
@@ -271,13 +274,13 @@ void ThingsboardIntegrationPublishAttribute ()
 \***************************************/
 
 // ask for data publication
-void ThingsboardIntegrationTriggerData ()
+void ThingsboardIntegrationData ()
 {
   thingsboard_integration.pub_data = 1;
 }
 
 // ask for attributes publication
-void ThingsboardIntegrationTriggerAttribute ()
+void ThingsboardIntegrationAttribute ()
 {
   thingsboard_integration.pub_attr = 1;
 }
