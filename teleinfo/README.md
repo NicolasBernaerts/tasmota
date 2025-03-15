@@ -10,6 +10,8 @@ Lorsque vous flashez ce fork pour la première fois, merci de faire un **reset 6
 
 Le **changelog** général est disponible dans le fichier **user_config_override.h**
 
+⚠️ Cette version 14.9 n'intègre plus les données d'historiques si sont en cours de refonte. Si vous souhaitez utiliser les données historisées, évitez cette mise à jour et restez en v14.8.
+
 ![Homepage page](./screen/tasmota-teleinfo-homepage.png)
 
 ## Presentation
