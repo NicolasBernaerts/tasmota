@@ -161,6 +161,7 @@
                          Avoid NTARF and STGE to detect period as they as out of synchro very often
                          ESP8266 memory optimisation
                          Add Ulanzi remote display management thru Awtrix open-source firmware
+    16/03/2025 - v14.10  Correct bug in contract auto-discovery
                                                 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License aStart STGE managements published by
@@ -204,7 +205,7 @@
 // extension description
 #define EXTENSION_NAME    "Teleinfo"              // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts"     // author
-#define EXTENSION_VERSION "14.9"                  // version
+#define EXTENSION_VERSION "14.10"                 // version
 
 // FTP server credentials
 #ifdef USE_FTP
@@ -584,6 +585,7 @@
 #undef USE_BL09XX                               // Add support for various BL09XX Energy monitor as used in Blitzwolf SHP-10 or Sonoff Dual R3 v2 (+1k6 code)
 
 #define USE_TELEINFO                             // Add support for Teleinfo via serial RX interface (+5k2 code, +168 RAM + SmartMeter LinkedList Values RAM)
+//#undef USE_TELEINFO                             // Add support for Teleinfo via serial RX interface (+5k2 code, +168 RAM + SmartMeter LinkedList Values RAM)
 
 #undef USE_IEM3000                              // Add support for Schneider Electric iEM3000-Modbus series energy monitor (+0k8 code)
 #undef USE_WE517                                // Add support for Orno WE517-Modbus energy monitor (+1k code)

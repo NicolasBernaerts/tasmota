@@ -60,6 +60,7 @@
 \**********************************************************/
 
 #ifdef ESP32
+#ifdef USE_TELEINFO
 #ifdef USE_UFILESYS
 #ifdef USE_RTE_SERVER
 
@@ -92,17 +93,16 @@
 #define D_RTE_CFG                   "/rte.cfg"
 
 // commands
-#define D_CMND_RTE_HELP             "help"
-#define D_CMND_RTE_KEY              "key"
-#define D_CMND_RTE_TOKEN            "token"
+#define D_CMND_RTE                  "rte"
 #define D_CMND_RTE_ECOWATT          "ecowatt"
 #define D_CMND_RTE_TEMPO            "tempo"
 #define D_CMND_RTE_POINTE           "pointe"
-#define D_CMND_RTE_ENABLE           "enable"
-#define D_CMND_RTE_DISPLAY          "display"
-#define D_CMND_RTE_SANDBOX          "sandbox"
-#define D_CMND_RTE_UPDATE           "update"
-#define D_CMND_RTE_PUBLISH          "publish"
+#define D_CMND_RTE_KEY              "key"
+#define D_CMND_RTE_TOKEN            "token"
+#define D_CMND_RTE_DISPLAY          "dis"
+#define D_CMND_RTE_SANDBOX          "sand"
+#define D_CMND_RTE_UPDATE           "upd"
+#define D_CMND_RTE_PUBLISH          "pub"
 
 // URL
 static const char RTE_URL_OAUTH2[]          PROGMEM = "https://digital.iservices.rte-france.com/token/oauth/";
@@ -112,17 +112,17 @@ static const char RTE_URL_TEMPO_DATA[]      PROGMEM = "https://digital.iservices
 static const char RTE_URL_POINTE_DATA[]     PROGMEM = "https://digital.iservices.rte-france.com/open_api/demand_response_signal/v2/signals";
 
 // Commands
-static const char kRteCommands[] PROGMEM = "rte" "|" "|_" D_CMND_RTE_KEY "|_" D_CMND_RTE_TOKEN "|_" D_CMND_RTE_SANDBOX;
-void (* const RteCommand[])(void) PROGMEM = { &CmndRteHelp, &CmndRteKey, &CmndRteToken, &CmndRteSandbox };
+static const char kRteCommands[]  PROGMEM = D_CMND_RTE "|" "|_" D_CMND_RTE_KEY "|_" D_CMND_RTE_TOKEN "|_" D_CMND_RTE_SANDBOX;
+void (* const RteCommand[])(void) PROGMEM = { &CmndRteHelp  ,     &CmndRteKey   ,     &CmndRteToken   ,    &CmndRteSandbox };
 
-static const char kEcowattCommands[] PROGMEM = "eco_" "|" D_CMND_RTE_ENABLE "|" D_CMND_RTE_DISPLAY "|" D_CMND_RTE_UPDATE "|" D_CMND_RTE_PUBLISH;
-void (* const EcowattCommand[])(void) PROGMEM = { &CmndEcowattEnable, &CmndEcowattDisplay, &CmndEcowattUpdate, &CmndEcowattPublish };
+static const char kEcowattCommands[]  PROGMEM = D_CMND_RTE_ECOWATT "|" "|_" D_CMND_RTE_DISPLAY "|_" D_CMND_RTE_UPDATE "|_" D_CMND_RTE_PUBLISH;
+void (* const EcowattCommand[])(void) PROGMEM = { &CmndEcowattEnable    ,  &CmndEcowattDisplay  ,  &CmndEcowattUpdate  ,  &CmndEcowattPublish };
 
-static const char kTempoCommands[] PROGMEM = "tempo_" "|" D_CMND_RTE_ENABLE "|" D_CMND_RTE_DISPLAY "|" D_CMND_RTE_UPDATE "|" D_CMND_RTE_PUBLISH;
-void (* const TempoCommand[])(void) PROGMEM = { &CmndTempoEnable, &CmndTempoDisplay, &CmndTempoUpdate, &CmndTempoPublish };
+static const char kTempoCommands[]  PROGMEM = D_CMND_RTE_TEMPO "|" "|_" D_CMND_RTE_DISPLAY "|_" D_CMND_RTE_UPDATE "|_" D_CMND_RTE_PUBLISH;
+void (* const TempoCommand[])(void) PROGMEM = {  &CmndTempoEnable   ,   &CmndTempoDisplay   ,    &CmndTempoUpdate  ,   &CmndTempoPublish };
 
-static const char kPointeCommands[] PROGMEM = "pointe_" "|" D_CMND_RTE_ENABLE "|" D_CMND_RTE_DISPLAY "|" D_CMND_RTE_UPDATE "|" D_CMND_RTE_PUBLISH;
-void (* const PointeCommand[])(void) PROGMEM = { &CmndPointeEnable, &CmndPointeDisplay, &CmndPointeUpdate, &CmndPointePublish };
+static const char kPointeCommands[]  PROGMEM = D_CMND_RTE_POINTE "|" "|_" D_CMND_RTE_DISPLAY "|_" D_CMND_RTE_UPDATE "|_" D_CMND_RTE_PUBLISH;
+void (* const PointeCommand[])(void) PROGMEM = { &CmndPointeEnable    ,   &CmndPointeDisplay  ,   &CmndPointeUpdate  ,   &CmndPointePublish };
 
 // https stream status
 enum RteHttpsUpdate { RTE_UPDATE_NONE, RTE_UPDATE_TOKEN, RTE_UPDATE_TEMPO, RTE_UPDATE_ECOWATT, RTE_UPDATE_POINTE, RTE_UPDATE_MAX};
@@ -250,24 +250,24 @@ void CmndRteHelp ()
 {
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: commands about RTE server"));
   AddLog (LOG_LEVEL_INFO, PSTR (" RTE global commands :"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - rte_key <key>        = set RTE base64 private key"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - rte_token            = display current token"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - rte_sandbox <0/1>    = set sandbox mode <%u>"), rte_config.sandbox);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - rte_key <key>     = set RTE base64 private key"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - rte_token         = display current token"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - rte_sand <0/1>    = set sandbox mode (%u)"), rte_config.sandbox);
   AddLog (LOG_LEVEL_INFO, PSTR (" Tempo commands :"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - tempo_enable <0/1>   = enable tempo server <%u>"), rte_config.tempo_enable);
-  AddLog (LOG_LEVEL_INFO, PSTR (" - tempo_display <0/1>  = display tempo calendar <%u>"), rte_config.tempo_display);
-  AddLog (LOG_LEVEL_INFO, PSTR (" - tempo_update         = update tempo from RTE server"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - tempo_publish        = publish tempo data"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - tempo <0/1>       = enable tempo server (%u)"), rte_config.tempo_enable);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - tempo_dis <0/1>   = display tempo calendar (%u)"), rte_config.tempo_display);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - tempo_upd         = update tempo from RTE server"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - tempo_pub         = publish tempo data"));
   AddLog (LOG_LEVEL_INFO, PSTR (" Pointe commands :"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - pointe_enable <0/1>  = enable pointe period server <%u>"), rte_config.pointe_enable);
-  AddLog (LOG_LEVEL_INFO, PSTR (" - pointe_display <0/1> = display pointe calendar <%u>"), rte_config.pointe_display);
-  AddLog (LOG_LEVEL_INFO, PSTR (" - pointe_update        = update period from RTE server"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - pointe_publish       = publish pointe period data"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - pointe <0/1>      = enable pointe period server (%u)"), rte_config.pointe_enable);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - pointe_dis <0/1>  = display pointe calendar (%u)"), rte_config.pointe_display);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - pointe_upd        = update period from RTE server"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - pointe_pub        = publish pointe period data"));
   AddLog (LOG_LEVEL_INFO, PSTR (" Ecowatt commands :"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - eco_enable <0/1>     = enable ecowatt server <%u>"), rte_config.ecowatt_enable);
-  AddLog (LOG_LEVEL_INFO, PSTR (" - eco_display <0/1>    = display ecowatt calendar <%u>"), rte_config.ecowatt_display);
-  AddLog (LOG_LEVEL_INFO, PSTR (" - eco_update           = update ecowatt from RTE server"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - eco_publish          = publish ecowatt data"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - ecowatt <0/1>     = enable ecowatt server (%u)"), rte_config.ecowatt_enable);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - ecowatt_dis <0/1> = display ecowatt calendar (%u)"), rte_config.ecowatt_display);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - ecowatt_upd       = update ecowatt from RTE server"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - ecowatt_pub       = publish ecowatt data"));
   ResponseCmndDone ();
 }
 
@@ -568,6 +568,7 @@ bool RteIsEnabled ()
 void RtePublishTempoJson ()
 {
   uint8_t level, period;
+  TIME_T  time_dst;
   char    str_label[8];
   char    str_icon[8];
 
@@ -1873,4 +1874,5 @@ bool Xsns119 (uint32_t function)
 
 #endif    // USE_RTE_SERVER
 #endif    // USE_UFILESYS
+#endif    // USE_TELEINFO
 #endif    // ESP32

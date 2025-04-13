@@ -87,10 +87,10 @@ static const char PSTR_HASS_PUB_TOTAL_CONSO[]      PROGMEM = "Total Conso"      
 static const char PSTR_HASS_PUB_TOTAL_PERIOD[]     PROGMEM = "Index %s"               "|CONTRACT_%u"    "|['CONTRACT']['%s']" "|counter"           "|energy" "|total" "|Wh";
 
 #ifdef USE_RTE_SERVER
-static const char PSTR_HASS_PUB_RTE_TEMPO_TODAY[]  PROGMEM = "Tempo Aujourdhui"      "|TEMPO_TDAY"      "|.TEMPO.tday"      "|calendar" "|" "|" "|";
-static const char PSTR_HASS_PUB_RTE_TEMPO_TOMRW[]  PROGMEM = "Tempo Demain"          "|TEMPO_TMRW"      "|.TEMPO.tmrw"      "|calendar" "|" "|" "|";
-static const char PSTR_HASS_PUB_RTE_POINTE_TODAY[] PROGMEM = "Pointe Aujourdhui"     "|POINTE_TDAY"     "|.POINTE.tday"     "|calendar" "|" "|" "|";
-static const char PSTR_HASS_PUB_RTE_POINTE_TOMRW[] PROGMEM = "Pointe Demain"         "|POINTE_TMRW"     "|.POINTE.tmrw"     "|calendar" "|" "|" "|";
+static const char PSTR_HASS_PUB_RTE_TEMPO_TODAY[]  PROGMEM = "RTE Tempo Aujourdhui"   "|TEMPO_TDAY"      "|.TEMPO.tday"      "|calendar" "|" "|" "|";
+static const char PSTR_HASS_PUB_RTE_TEMPO_TOMRW[]  PROGMEM = "RTE Tempo Demain"       "|TEMPO_TMRW"      "|.TEMPO.tmrw"      "|calendar" "|" "|" "|";
+static const char PSTR_HASS_PUB_RTE_POINTE_TODAY[] PROGMEM = "RTE Pointe Aujourdhui"  "|POINTE_TDAY"     "|.POINTE.tday"     "|calendar" "|" "|" "|";
+static const char PSTR_HASS_PUB_RTE_POINTE_TOMRW[] PROGMEM = "RTE Pointe Demain"      "|POINTE_TMRW"     "|.POINTE.tmrw"     "|calendar" "|" "|" "|";
 #endif  // RTE_SERVER
 
 static const char kTicHassVersion[]                PROGMEM = EXTENSION_VERSION;

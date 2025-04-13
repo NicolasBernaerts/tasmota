@@ -10,6 +10,7 @@
     12/10/2024 - v1.2 - Force deepsleeptime to default if undefined
                         Add meter current supply calculation
                         add super capa capacitance calculation
+    22/03/2025 - v1.3 - add max received message before sleep
 
   Configuration values are stored in :
     - Settings->knx_GA_addr[0..2] : multiplicator
@@ -18,6 +19,7 @@
     - Settings->knx_GA_addr[5]    : reference capacity (mF)
     - Settings->knx_GA_addr[6]    : meter average current (mA)
     - Settings->knx_GA_addr[7]    : meter max voltage (mV)
+    - Settings->knx_GA_addr[8]    : Maximum number of message before sleep (0 no max.)
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -72,8 +74,8 @@
 \***************************************/
 
 // Commands
-static const char kCapaCommands[]  PROGMEM =      "winky|"        "|_ref"       "|_start"        "|_stop"        "|_coeff"        "|_meter" ;
-void (* const CapaCommand[])(void) PROGMEM = { &CmndWinkyHelp, &CmndWinkyRef, &CmndWinkyStart, &CmndWinkyStop, &CmndWinkyCoeff, &CmndWinkyMeter };
+static const char kCapaCommands[]  PROGMEM =      "winky|"        "|_ref"       "|_start"        "|_stop"        "|_coeff"        "|_meter"         "|_sleep"       "|_max";
+void (* const CapaCommand[])(void) PROGMEM = { &CmndWinkyHelp, &CmndWinkyRef, &CmndWinkyStart, &CmndWinkyStop, &CmndWinkyCoeff, &CmndWinkyMeter, &CmndWinkySleep, &CmndWinkyMax };
 
 // timings (ms)
 //  - WINKY_TIME_BOOT : timestamp at boot time
@@ -90,11 +92,6 @@ enum TeleinfoWinkyTime  { WINKY_TIME_BOOT, WINKY_TIME_NET, WINKY_TIME_RTC, WINKY
 //  - WINKY_VCAP_MEASURE : capa voltage at beginning of capacitor measure
 enum TeleinfoWinkyVolt  { WINKY_VCAP_START, WINKY_VCAP_STOP, WINKY_VCAP_BOOT, WINKY_VCAP_MEASURE, WINKY_VCAP_MAX };
 
-// capacitor capacitance (mF)
-//  - WINKY_CAPA_REF     : reference capacitance
-//  - WINKY_CAPA_CALC    : calculated capacitance
-//enum TeleinfoWinkyCapa  { WINKY_CAPA_REF, WINKY_CAPA_CALC, WINKY_CAPA_MAX };
-
 // possible sources
 enum  TeleinfoWinkySource                   { WINKY_SOURCE_USB, WINKY_SOURCE_CAPA, WINKY_SOURCE_LINKY, WINKY_SOURCE_MAX };                                // list of sources
 const char kTeleinfoWinkySource[] PROGMEM   =       "USB"    "|"      "Capa"    "|"     "Linky";                                                          // label of sources
@@ -108,6 +105,8 @@ const char kTeleinfoWinkyColor[] PROGMEM    =       "red"        "|"     "orange
 \***************************************/
 
 static struct {
+  uint8_t  suspend       = 0;                     // flag set if suspending soon
+  long     max_message   = 0;                     // maximum of messsage before going to deepsleep
   uint8_t  nb_source     = 0;                     // number of voltage sources
   uint32_t capa_ref      = 0;                     // reference capacitor value (mF)
   uint32_t capa_calc     = 0;                     // calculated capacitor value (mF)
@@ -128,12 +127,39 @@ static struct {
 void CmndWinkyHelp ()
 {
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: gestion du winky"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - winky_ref <farad>   = valeur de reference de la super capa"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - winky_start <volt>  = tension minimale pour démarrer le winky"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - winky_stop <volt>   = tension déclanchant l'arrêt du winky"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - winky_coeff         = raz des coefficients d'ajustement des tensions"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - winky_sleep         = duree du deepsleep en sec. [%u]"), Settings->deepsleep);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - winky_max           = nbre de messages recus avant deepsleep [%u]"), teleinfo_winky.max_message);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - winky_ref <farad>   = valeur de la super capa en F [%u.%u]"), teleinfo_winky.capa_ref / 1000, teleinfo_winky.capa_ref % 1000 / 100);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - winky_start <volt>  = tension min. pour démarrer le winky [%u.%u]"), teleinfo_winky.arr_vcap[WINKY_VCAP_START] / 1000, teleinfo_winky.arr_vcap[WINKY_VCAP_START] % 1000 / 100);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - winky_stop <volt>   = tension min. pour l'arrêt du winky [%u.%u]"), teleinfo_winky.arr_vcap[WINKY_VCAP_STOP] / 1000, teleinfo_winky.arr_vcap[WINKY_VCAP_STOP] % 1000 / 100);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - winky_coeff         = raz des coefficients d'ajustement de tensions"));
   AddLog (LOG_LEVEL_INFO, PSTR (" - winky_meter         = raz des valeurs du linky"));
   ResponseCmndDone ();
+}
+
+// Set deepsleep time in seconds
+void CmndWinkySleep ()
+{
+  // set limits
+  if (XdrvMailbox.payload <= 0) XdrvMailbox.payload = 0;
+  else if (XdrvMailbox.payload < 30) XdrvMailbox.payload = 30;
+  else if (XdrvMailbox.payload == 300) XdrvMailbox.payload = 299;
+  
+  // set deepsleep
+  CmndDeepsleepTime ();
+  SettingsSave (0);
+}
+
+// Set maximum number of messages before deepsleep
+void CmndWinkyMax ()
+{
+  // set value
+  teleinfo_winky.max_message = (long)XdrvMailbox.payload;
+  Settings->knx_GA_addr[8]   = (uint16_t)XdrvMailbox.payload;
+  SettingsSave (0);
+  
+  // display value
+  ResponseCmndNumber (teleinfo_winky.max_message);
 }
 
 // Set reference of super capa
@@ -270,6 +296,7 @@ void TeleinfoWinkyLoadConfiguration ()
   // load meter data
   teleinfo_winky.meter_current = (uint32_t)Settings->knx_GA_addr[6];
   teleinfo_winky.meter_volt    = (uint32_t)Settings->knx_GA_addr[7];
+  teleinfo_winky.max_message   = (long)Settings->knx_GA_addr[8];
 }
 
 // save multipliers to settings
@@ -440,7 +467,7 @@ void TeleinfoWinkyPublish ()
   IPAddress   ip_addr;
 
   // if called before suspend phase, ignore
-  if (!teleinfo_meter.suspend) return;
+  if (!teleinfo_winky.suspend) return;
 
   // calculate delays
   if (teleinfo_winky.arr_time[WINKY_TIME_NET] == UINT32_MAX) delay_net = 0;
@@ -524,7 +551,7 @@ void TeleinfoWinkyEvery100ms ()
 // called 4 times per second to check capa level
 void TeleinfoWinkyEvery250ms ()
 {
-  bool     volt_ok, cosphi_ok, uptime_ok;
+  bool     volt_ok, cosphi_ok, uptime_ok, max_reached;
   uint32_t uptime;
 
   //  voltage calculation
@@ -568,11 +595,15 @@ void TeleinfoWinkyEvery250ms ()
     // check cosphi calculation quantity
     cosphi_ok = ((teleinfo_conso.cosphi.quantity >= TIC_COSPHI_SAMPLE) || (teleinfo_prod.cosphi.quantity >= TIC_COSPHI_SAMPLE));
 
-    // if voltage is low, uptime to long or cosphi ratio reached, start suspend
-    if (!volt_ok || !uptime_ok || cosphi_ok)
+    // check if maximum message reception is reached
+    if (teleinfo_winky.max_message == 0) max_reached = false;
+      else max_reached = (teleinfo_meter.nb_message >= teleinfo_winky.max_message);
+
+    // if voltage is low, uptime to long, cosphi ratio reached or max received message reached, start suspend
+    if (!volt_ok || !uptime_ok || cosphi_ok || max_reached)
     {
       // start suspend phase
-      teleinfo_meter.suspend = 1;
+      teleinfo_winky.suspend = 1;
 
       // publish dynamic data
       TeleinfoDriverPublishAllData (false);
@@ -637,7 +668,7 @@ void TeleinfoWinkyApiInfluxDb ()
   char     str_line[96];
 
   // if called before suspend phase, ignore
-  if (!teleinfo_meter.suspend) return;
+  if (!teleinfo_winky.suspend) return;
 
   // number of received messages
   snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u\n"), PSTR ("winky"), TasmotaGlobal.hostname, PSTR ("nb-msg"), teleinfo_meter.nb_message);

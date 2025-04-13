@@ -68,7 +68,7 @@
 
 // TIC reception
 #define TIC_LINE_SIZE               128       // maximum size of a received TIC line
-#define TIC_CODE_SIZE               16        // maximum size of a period code
+#define TIC_CODE_SIZE               20        // maximum size of a period code
 #define TIC_KEY_MAX                 12        // maximum size of a TIC etiquette
 
 #ifdef ESP32
@@ -101,30 +101,9 @@
 #define TIC_MESSAGE_DELAY           500       // delay between messages (to avoid serial reception errors)
 
 #define TIC_COSPHI_DEFAULT          850       // default start value for cosphi
+#define TIC_COSPHI_MIN              4         // minimum cosphi calculation before publication
 #define TIC_COSPHI_SAMPLE           12        // number of samples to calculate cosphi (minimum = 4)
-#define TIC_COSPHI_PAGE             20         // number of previous cosphi values
-
-// graph default and boundaries
-#define TIC_GRAPH_INC_VOLTAGE       5
-#define TIC_GRAPH_MIN_VOLTAGE       235
-#define TIC_GRAPH_DEF_VOLTAGE       240       // default voltage maximum in graph
-#define TIC_GRAPH_MAX_VOLTAGE       265
-#define TIC_GRAPH_INC_POWER         3000
-#define TIC_GRAPH_MIN_POWER         3000
-#define TIC_GRAPH_DEF_POWER         6000      // default power maximum consumption in graph
-#define TIC_GRAPH_MAX_POWER         150000
-#define TIC_GRAPH_INC_WH_HOUR       2
-#define TIC_GRAPH_MIN_WH_HOUR       2
-#define TIC_GRAPH_DEF_WH_HOUR       2         // default max hourly active power consumption in year graph
-#define TIC_GRAPH_MAX_WH_HOUR       50
-#define TIC_GRAPH_INC_WH_DAY        10
-#define TIC_GRAPH_MIN_WH_DAY        10
-#define TIC_GRAPH_DEF_WH_DAY        10         // default max daily active power consumption in year graph
-#define TIC_GRAPH_MAX_WH_DAY        200
-#define TIC_GRAPH_INC_WH_MONTH      100
-#define TIC_GRAPH_MIN_WH_MONTH      100
-#define TIC_GRAPH_DEF_WH_MONTH      100       // default max monthly active power consumption in year graph
-#define TIC_GRAPH_MAX_WH_MONTH      50000
+#define TIC_COSPHI_PAGE             20        // number of previous cosphi values
 
 // timeout and delays
 #define TELEINFO_RECEPTION_TIMEOUT  3000      // timeout for TIC frame reception (in ms)
@@ -162,11 +141,11 @@
 #define CMND_TIC_INFLUXDB           "influx"
 
 // configuration file
-#define CMND_TIC_MAX_V              "maxv"
-#define CMND_TIC_MAX_VA             "maxva"
-#define CMND_TIC_MAX_KWH_HOUR       "maxhour"
-#define CMND_TIC_MAX_KWH_DAY        "maxday"
-#define CMND_TIC_MAX_KWH_MONTH      "maxmonth"
+//#define CMND_TIC_MAX_V              "maxv"
+//#define CMND_TIC_MAX_VA             "maxva"
+//#define CMND_TIC_MAX_KWH_HOUR       "maxhour"
+//#define CMND_TIC_MAX_KWH_DAY        "maxday"
+//#define CMND_TIC_MAX_KWH_MONTH      "maxmonth"
 
 #define CMND_TIC_TODAY_CONSO        "tday-conso"
 #define CMND_TIC_TODAY_PROD         "tday-prod"
@@ -209,8 +188,10 @@
 #define TIC_BRIGHT_DEFAULT          50        // default LED brightness
 
 // EnergyConfig commands
-const char kTeleinfoEnergyCommands[] PROGMEM =    "historique"   "|"   "standard"   "|"   "noraw"   "|"   "full"   "|"   "period"   "|"   "live"   "|"   "skip"   "|"   "bright"   "|"   "percent"   "|"   "stats"   "|"   "error"   "|"   "reset"   "|"    "automode"  "|"   "calraz"   "|"   "calhexa"   "|"    "trigger"   "|" CMND_TIC_POLICY "|" CMND_TIC_METER "|" CMND_TIC_CALENDAR "|" CMND_TIC_RELAY "|" CMND_TIC_MAX_V "|" CMND_TIC_MAX_VA "|" CMND_TIC_MAX_KWH_HOUR "|" CMND_TIC_MAX_KWH_DAY "|" CMND_TIC_MAX_KWH_MONTH;
-enum TeleinfoEnergyCommand                   { TIC_CMND_HISTORIQUE, TIC_CMND_STANDARD, TIC_CMND_NORAW, TIC_CMND_FULL, TIC_CMND_PERIOD, TIC_CMND_LIVE, TIC_CMND_SKIP, TIC_CMND_BRIGHT, TIC_CMND_PERCENT, TIC_CMND_STATS, TIC_CMND_ERROR, TIC_CMND_RESET, TIC_CMND_AUTOMODE, TIC_CMND_CALRAZ, TIC_CMND_CALHEXA,  TIC_CMND_TRIGGER,  TIC_CMND_POLICY  ,  TIC_CMND_METER  ,  TIC_CMND_CALENDAR  ,  TIC_CMND_RELAY  ,  TIC_CMND_MAX_V  ,  TIC_CMND_MAX_VA  ,  TIC_CMND_MAX_KWH_HOUR  ,  TIC_CMND_MAX_KWH_DAY  ,  TIC_CMND_MAX_KWH_MONTH };
+//const char kTeleinfoEnergyCommands[] PROGMEM =    "historique"   "|"   "standard"   "|"   "noraw"   "|"   "full"   "|"   "period"   "|"   "live"   "|"   "skip"   "|"   "bright"   "|"   "percent"   "|"   "stats"   "|"   "error"   "|"   "reset"   "|"    "automode"  "|"   "calraz"   "|"   "calhexa"   "|"    "trigger"   "|" CMND_TIC_POLICY "|" CMND_TIC_METER "|" CMND_TIC_CALENDAR "|" CMND_TIC_RELAY "|" CMND_TIC_MAX_V "|" CMND_TIC_MAX_VA "|" CMND_TIC_MAX_KWH_HOUR "|" CMND_TIC_MAX_KWH_DAY "|" CMND_TIC_MAX_KWH_MONTH;
+//enum TeleinfoEnergyCommand                   { TIC_CMND_HISTORIQUE, TIC_CMND_STANDARD, TIC_CMND_NORAW, TIC_CMND_FULL, TIC_CMND_PERIOD, TIC_CMND_LIVE, TIC_CMND_SKIP, TIC_CMND_BRIGHT, TIC_CMND_PERCENT, TIC_CMND_STATS, TIC_CMND_ERROR, TIC_CMND_RESET, TIC_CMND_AUTOMODE, TIC_CMND_CALRAZ, TIC_CMND_CALHEXA,  TIC_CMND_TRIGGER,  TIC_CMND_POLICY  ,  TIC_CMND_METER  ,  TIC_CMND_CALENDAR  ,  TIC_CMND_RELAY  ,  TIC_CMND_MAX_V  ,  TIC_CMND_MAX_VA  ,  TIC_CMND_MAX_KWH_HOUR  ,  TIC_CMND_MAX_KWH_DAY  ,  TIC_CMND_MAX_KWH_MONTH };
+const char kTeleinfoEnergyCommands[] PROGMEM =    "historique"   "|"   "standard"   "|"   "noraw"   "|"   "full"   "|"   "period"   "|"   "live"   "|"   "skip"   "|"   "bright"   "|"   "percent"   "|"   "stats"   "|"   "error"   "|"   "reset"   "|"    "automode"  "|"   "calraz"   "|"   "calhexa"   "|"    "trigger"   "|" CMND_TIC_POLICY "|" CMND_TIC_METER "|" CMND_TIC_CALENDAR "|" CMND_TIC_RELAY;
+enum TeleinfoEnergyCommand                   { TIC_CMND_HISTORIQUE, TIC_CMND_STANDARD, TIC_CMND_NORAW, TIC_CMND_FULL, TIC_CMND_PERIOD, TIC_CMND_LIVE, TIC_CMND_SKIP, TIC_CMND_BRIGHT, TIC_CMND_PERCENT, TIC_CMND_STATS, TIC_CMND_ERROR, TIC_CMND_RESET, TIC_CMND_AUTOMODE, TIC_CMND_CALRAZ, TIC_CMND_CALHEXA,  TIC_CMND_TRIGGER,  TIC_CMND_POLICY  ,  TIC_CMND_METER  ,  TIC_CMND_CALENDAR  ,  TIC_CMND_RELAY};
 
 // Data publication commands
 static const char kTeleinfoDriverCommands[]  PROGMEM =          "|tic";
@@ -221,9 +202,12 @@ enum TeleinfoMessagePolicy { TIC_POLICY_TELEMETRY, TIC_POLICY_DELTA, TIC_POLICY_
 const char kTeleinfoMessagePolicy[] PROGMEM = "A chaque Télémétrie|Evolution de ±|A chaque message reçu";
 
 // config : param
-enum TeleinfoConfigKey                          { TIC_CONFIG_BRIGHT , TIC_CONFIG_MAX_HOUR     , TIC_CONFIG_MAX_DAY     , TIC_CONFIG_MAX_MONTH     , TIC_CONFIG_TODAY_CONSO , TIC_CONFIG_TODAY_PROD , TIC_CONFIG_YESTERDAY_CONSO , TIC_CONFIG_YESTERDAY_PROD, TIC_CONFIG_MAX };    // config parameters
-const long arrTeleinfoConfigDefault[] PROGMEM = { TIC_BRIGHT_DEFAULT, TIC_GRAPH_DEF_WH_HOUR   , TIC_GRAPH_DEF_WH_DAY   , TIC_GRAPH_DEF_WH_MONTH   , 0                      , 0                     , 0                          , 0 };                                            // config default values
-const char kTeleinfoConfigKey[]       PROGMEM =    CMND_TIC_BRIGHT "|" CMND_TIC_MAX_KWH_HOUR "|" CMND_TIC_MAX_KWH_DAY "|" CMND_TIC_MAX_KWH_MONTH "|" CMND_TIC_TODAY_CONSO "|" CMND_TIC_TODAY_PROD "|" CMND_TIC_YESTERDAY_CONSO "|" CMND_TIC_YESTERDAY_PROD;                       // config keys
+//enum TeleinfoConfigKey                          { TIC_CONFIG_BRIGHT , TIC_CONFIG_MAX_HOUR     , TIC_CONFIG_MAX_DAY     , TIC_CONFIG_MAX_MONTH     , TIC_CONFIG_TODAY_CONSO , TIC_CONFIG_TODAY_PROD , TIC_CONFIG_YESTERDAY_CONSO , TIC_CONFIG_YESTERDAY_PROD, TIC_CONFIG_MAX };    // config parameters
+//const long arrTeleinfoConfigDefault[] PROGMEM = { TIC_BRIGHT_DEFAULT, TIC_GRAPH_DEF_WH_HOUR   , TIC_GRAPH_DEF_WH_DAY   , TIC_GRAPH_DEF_WH_MONTH   , 0                      , 0                     , 0                          , 0 };                                            // config default values
+//const char kTeleinfoConfigKey[]       PROGMEM =    CMND_TIC_BRIGHT "|" CMND_TIC_MAX_KWH_HOUR "|" CMND_TIC_MAX_KWH_DAY "|" CMND_TIC_MAX_KWH_MONTH "|" CMND_TIC_TODAY_CONSO "|" CMND_TIC_TODAY_PROD "|" CMND_TIC_YESTERDAY_CONSO "|" CMND_TIC_YESTERDAY_PROD;                       // config keys
+enum TeleinfoConfigKey                          { TIC_CONFIG_BRIGHT , TIC_CONFIG_TODAY_CONSO , TIC_CONFIG_TODAY_PROD , TIC_CONFIG_YESTERDAY_CONSO , TIC_CONFIG_YESTERDAY_PROD, TIC_CONFIG_MAX };    // config parameters
+const long arrTeleinfoConfigDefault[] PROGMEM = { TIC_BRIGHT_DEFAULT, 0                      , 0                     , 0                          , 0 };                                            // config default values
+const char kTeleinfoConfigKey[]       PROGMEM =    CMND_TIC_BRIGHT "|" CMND_TIC_TODAY_CONSO "|" CMND_TIC_TODAY_PROD "|" CMND_TIC_YESTERDAY_CONSO "|" CMND_TIC_YESTERDAY_PROD;                       // config keys
 
 // config : contract
 enum TeleinfoContractKey { TIC_CONTRACT_INDEX, TIC_CONTRACT_NAME, TIC_CONTRACT_PERIOD, TIC_CONTRACT_MAX };                                                                                                                                 // contract parameters
@@ -260,10 +244,13 @@ const char kTeleinfoHourLabel[] PROGMEM = "Creuse|Pleine";
 
 // contract periods
 enum TeleinfoLevel  { TIC_LEVEL_NONE, TIC_LEVEL_BLUE, TIC_LEVEL_WHITE, TIC_LEVEL_RED, TIC_LEVEL_MAX };
-const char kTeleinfoLevelLabel[]  PROGMEM = "Inconnu|Bleu|Blanc|Rouge";
-const char kTeleinfoLevelDot[]    PROGMEM = "🟢|🔵|⚪|🔴";
-const char kTeleinfoLevelCalDot[] PROGMEM = "⚪|⚪|⚫|⚪";
-const char kTeleinfoLevelCalRGB[] PROGMEM = "#252525|#06b|#ccc|#b00";
+const char kTeleinfoLevelLabel[]       PROGMEM = "Inconnu|Bleu|Blanc|Rouge";
+const char kTeleinfoLevelDot[]         PROGMEM = "🟢|🔵|⚪|🔴";
+const char kTeleinfoLevelCalDot[]      PROGMEM = "⚪|⚪|⚫|⚪";
+const char kTeleinfoLevelCalRGB[]      PROGMEM = "#946|#06b|#ddd|#b00";         // calendar color for period levels
+const char kTeleinfoLevelCalText[]     PROGMEM = "#fff|#fff|#000|#fff";         // calendar color for period text
+const char kTeleinfoLevelCalProd[]     PROGMEM = "#dd3";                        // production color (yellow)
+const char kTeleinfoLevelCalProdText[] PROGMEM = "#000";                        // production color text
 
 // preavis levels
 enum TeleinfoPreavisLevel {TIC_PREAVIS_NONE, TIC_PREAVIS_WARNING, TIC_PREAVIS_ALERT, TIC_PREAVIS_DANGER, TIC_PREAVIS_MAX};
@@ -299,8 +286,9 @@ const char kTicEtiquetteUnknown[]  PROGMEM =                 "|ADCO"       "|ADS
 
 enum TicEtiquetteHisto                     { TIC_HIS_NONE = TIC_UKN_MAX, TIC_HIS_ADCO, TIC_HIS_OPTARIF, TIC_HIS_ISOUSC, TIC_HIS_BASE, TIC_HIS_HCHC, TIC_HIS_HCHP, TIC_HIS_EJPHN, TIC_HIS_EJPHPM, TIC_HIS_BBRHCJB, TIC_HIS_BBRHPJB, TIC_HIS_BBRHCJW, TIC_HIS_BBRHPJW, TIC_HIS_BBRHCJR, TIC_HIS_BBRHPJR,  TIC_HIS_PEJP, TIC_HIS_PTEC, TIC_HIS_IINST, TIC_HIS_IINST1, TIC_HIS_IINST2, TIC_HIS_IINST3, TIC_HIS_ADPS, TIC_HIS_PAPP, TIC_HIS_DEMAIN, TIC_HIS_ADIR1, TIC_HIS_ADIR2, TIC_HIS_ADIR3, TIC_HIS_MAX };
 const char kTicEtiquetteHisto[]    PROGMEM =                               "|ADCO"       "|OPTARIF"       "|ISOUSC"       "|BASE"       "|HCHC"       "|HCHP"       "|EJPHN"       "|EJPHPM"      "|BBRHCJB"       "|BBRHPJB"        "|BBRHCJW"       "|BBRHPJW"       "|BBRHCJR"       "|BBRHPJR"       "|PEJP"        "|PTEC"       "|IINST"       "|IINST1"       "|IINST2"       "|IINST3"       "|ADPS"      "|PAPP"         "|DEMAIN"        "|ADIR1"       "|ADIR2"       "|ADIR3";
-enum TicEtiquetteStandard                  { TIC_STD_NONE = TIC_HIS_MAX, TIC_STD_ADSC,  TIC_STD_DATE, TIC_STD_NGTF, TIC_STD_LTARF, TIC_STD_EAST, TIC_STD_EASF01, TIC_STD_EASF02, TIC_STD_EASF03, TIC_STD_EASF04, TIC_STD_EASF05, TIC_STD_EASF06, TIC_STD_EASF07, TIC_STD_EASF08, TIC_STD_EASF09, TIC_STD_EASF10, TIC_STD_EAIT, TIC_STD_IRMS1, TIC_STD_IRMS2, TIC_STD_IRMS3, TIC_STD_URMS1, TIC_STD_URMS2, TIC_STD_URMS3, TIC_STD_PREF, TIC_STD_PCOUP, TIC_STD_SINSTS, TIC_STD_SINSTS1, TIC_STD_SINSTS2, TIC_STD_SINSTS3, TIC_STD_SINSTI, TIC_STD_UMOY1, TIC_STD_UMOY2, TIC_STD_UMOY3, TIC_STD_STGE, TIC_STD_DPM1, TIC_STD_DPM2, TIC_STD_DPM3, TIC_STD_FPM1, TIC_STD_FPM2, TIC_STD_FPM3, TIC_STD_RELAIS, TIC_STD_PJOURF1, TIC_STD_PPOINTE, TIC_STD_MAX };
-const char kTicEtiquetteStandard[] PROGMEM =                               "|ADSC"        "|DATE"       "|NGTF"       "|LTARF"       "|EAST"       "|EASF01"       "|EASF02"       "|EASF03"       "|EASF04"       "|EASF05"       "|EASF06"       "|EASF07"       "|EASF08"       "|EASF09"       "|EASF10"       "|EAIT"       "|IRMS1"       "|IRMS2"       "|IRMS3"       "|URMS1"        "|URMS2"      "|URMS3"       "|PREF"       "|PCOUP"       "|SINSTS"       "|SINSTS1"       "|SINSTS2"       "|SINSTS3"       "|SINSTI"       "|UMOY1"       "|UMOY2"       "|UMOY3"       "|STGE"       "|DPM1"       "|DPM2"       "|DPM3"       "|FPM1"       "|FPM2"       "|FPM3"       "|RELAIS"        "|PJOURF+1"      "|PPOINTE";
+
+enum TicEtiquetteStandard                  { TIC_STD_NONE = TIC_HIS_MAX, TIC_STD_ADSC,  TIC_STD_DATE, TIC_STD_NGTF, TIC_STD_LTARF, TIC_STD_NTARF, TIC_STD_EAST, TIC_STD_EASF01, TIC_STD_EASF02, TIC_STD_EASF03, TIC_STD_EASF04, TIC_STD_EASF05, TIC_STD_EASF06, TIC_STD_EASF07, TIC_STD_EASF08, TIC_STD_EASF09, TIC_STD_EASF10, TIC_STD_EAIT, TIC_STD_IRMS1, TIC_STD_IRMS2, TIC_STD_IRMS3, TIC_STD_URMS1, TIC_STD_URMS2, TIC_STD_URMS3, TIC_STD_PREF, TIC_STD_PCOUP, TIC_STD_SINSTS, TIC_STD_SINSTS1, TIC_STD_SINSTS2, TIC_STD_SINSTS3, TIC_STD_SINSTI, TIC_STD_UMOY1, TIC_STD_UMOY2, TIC_STD_UMOY3, TIC_STD_STGE, TIC_STD_DPM1, TIC_STD_DPM2, TIC_STD_DPM3, TIC_STD_FPM1, TIC_STD_FPM2, TIC_STD_FPM3, TIC_STD_RELAIS, TIC_STD_PJOURF1, TIC_STD_PPOINTE, TIC_STD_MAX };
+const char kTicEtiquetteStandard[] PROGMEM =                               "|ADSC"        "|DATE"       "|NGTF"       "|LTARF"       "|NTARF"       "|EAST"       "|EASF01"       "|EASF02"       "|EASF03"       "|EASF04"       "|EASF05"       "|EASF06"       "|EASF07"       "|EASF08"       "|EASF09"       "|EASF10"       "|EAIT"       "|IRMS1"       "|IRMS2"       "|IRMS3"       "|URMS1"        "|URMS2"      "|URMS3"       "|PREF"       "|PCOUP"       "|SINSTS"       "|SINSTS1"       "|SINSTS2"       "|SINSTS3"       "|SINSTI"       "|UMOY1"       "|UMOY2"       "|UMOY3"       "|STGE"       "|DPM1"       "|DPM2"       "|DPM3"       "|FPM1"       "|FPM2"       "|FPM3"       "|RELAIS"        "|PJOURF+1"      "|PPOINTE";
 
 enum TicEtiquettePmePmi                    { TIC_PME_NONE = TIC_STD_MAX, TIC_PME_ADS, TIC_PME_MESURES1, TIC_PME_DATE,  TIC_PME_EAS,  TIC_PME_EAPPS, TIC_PME_PTCOUR1, TIC_PME_EAPS, TIC_PME_PS, TIC_PME_PREAVIS, TIC_PME_MAX };
 const char kTicEtiquettePmePmi[]   PROGMEM =                               "|ADS"       "|MESURES1"       "|DATE"        "|EA_s"       "|EAPP_s"      "|PTCOUR1"       "|EAP_s"      "|PS"      "|PREAVIS";
@@ -454,11 +442,11 @@ static struct {
   uint8_t  relay        = 1;                            // publish RELAY section
   uint8_t  contract     = 1;                            // publish CONTRACT section
   uint8_t  error        = 0;                            // force display of errors on home page 
-  uint8_t  cal_hexa     = 0;                            // flag to set format of period profiles as hexa
+  uint8_t  cal_hexa     = 1;                            // flag to set format of period profiles as hexa
   uint8_t  led_period   = 0;                            // adjust LED color according to period color 
   long     prod_trigger = 0;                            // average production power to trigger production relay 
-  long     max_volt     = TIC_GRAPH_DEF_VOLTAGE;        // maximum voltage on graph
-  long     max_power    = TIC_GRAPH_DEF_POWER;          // maximum power on graph
+//  long     max_volt     = TIC_GRAPH_DEF_VOLTAGE;        // maximum voltage on graph
+//  long     max_power    = TIC_GRAPH_DEF_POWER;          // maximum power on graph
   long     param[TIC_CONFIG_MAX];                       // generic params
 } teleinfo_config;
 
@@ -565,7 +553,6 @@ static struct {
   uint8_t   model      = 0;                     // model of the meter
   uint8_t   serial     = TIC_SERIAL_INIT;       // serial port status
   uint8_t   reception  = TIC_RECEPTION_NONE;    // reception phase
-  uint8_t   suspend    = 0;                     // flag set if suspending soon
   uint8_t   use_sinsts = 0;                     // flag to use sinsts etiquette for papp
   uint8_t   new_speed  = 0;                     // flag set if reception speed will change
   uint8_t   day        = 0;                     // current day of month
@@ -888,8 +875,11 @@ void TeleinfoDriverPublishAllData (const bool append)
   }
 
   // data
-  if (teleinfo_config.meter)    TeleinfoDriverPublishConsoProd (true);
-  if (teleinfo_config.meter)    TeleinfoDriverPublishContract ();
+  if (teleinfo_config.meter)
+  {
+    TeleinfoDriverPublishConsoProd (true);
+    TeleinfoDriverPublishContract ();
+  }
   if (teleinfo_config.relay)    TeleinfoDriverPublishRelay ();
   if (teleinfo_config.calendar) TeleinfoDriverPublishCalendar (append);
   TeleinfoDriverPublishAlert ();
@@ -993,7 +983,6 @@ void TeleinfoDriverPublishAlert ()
 // Append METER and PROD to JSON
 void TeleinfoDriverPublishConsoProd (const bool append)
 {
-  bool        publish;
   uint8_t     phase, value;
   int         length = 0;
   long        voltage, current, power_app, power_act;
@@ -1037,8 +1026,7 @@ void TeleinfoDriverPublishConsoProd (const bool append)
     ResponseAppend_P (PSTR (",\"U\":%d,\"I\":%d.%02d,\"P\":%d,\"W\":%d"), voltage / (long)teleinfo_contract.phase, current / 1000, current % 1000 / 10, power_app, power_act);
 
     // conso : cosphi
-    publish = (teleinfo_meter.suspend || (teleinfo_conso.cosphi.quantity >= TIC_COSPHI_SAMPLE));
-    if (publish) ResponseAppend_P (PSTR (",\"C\":%d.%02d"), teleinfo_conso.cosphi.value / 1000, teleinfo_conso.cosphi.value % 1000 / 10);
+    if (teleinfo_conso.cosphi.quantity >= TIC_COSPHI_MIN) ResponseAppend_P (PSTR (",\"C\":%d.%02d"), teleinfo_conso.cosphi.value / 1000, teleinfo_conso.cosphi.value % 1000 / 10);
 
     // conso : if not on battery, publish total of yesterday and today
     if (!teleinfo_config.battery)
@@ -1055,8 +1043,7 @@ void TeleinfoDriverPublishConsoProd (const bool append)
     ResponseAppend_P (PSTR (",\"PP\":%d,\"PW\":%d"), teleinfo_prod.papp, teleinfo_prod.pact);
 
     // prod : cosphi
-    publish = (teleinfo_meter.suspend || (teleinfo_prod.cosphi.quantity >= TIC_COSPHI_SAMPLE));
-    if (publish) ResponseAppend_P (PSTR (",\"PC\":%d.%02d"), teleinfo_prod.cosphi.value / 1000, teleinfo_prod.cosphi.value % 1000 / 10);
+    if (teleinfo_prod.cosphi.quantity >= TIC_COSPHI_MIN) ResponseAppend_P (PSTR (",\"PC\":%d.%02d"), teleinfo_prod.cosphi.value / 1000, teleinfo_prod.cosphi.value % 1000 / 10);
 
     // prod : average power
     ResponseAppend_P (PSTR (",\"PAVG\":%d"), (long)teleinfo_prod.pact_avg);
@@ -1815,6 +1802,7 @@ void TeleinfoDriverWebSensor ()
   WSContentSend_P (PSTR ("div.tic span{font-size:10px;font-weight:normal;margin-left:10px;padding:0px 4px;color:black;background:#aaa;border-radius:4px;}\n"));
   
   WSContentSend_P (PSTR ("table hr{display:none;}\n"));
+  WSContentSend_P (PSTR ("button#o1{display:none;}\n"));
   WSContentSend_P (PSTR ("</style>\n"));
 
   // set reception status
@@ -1862,19 +1850,37 @@ void TeleinfoDriverWebSensor ()
     GetTextIndexed (str_color, sizeof (str_color), teleinfo_contract.mode, kTeleinfoModeIcon);
 
     // header
-    WSContentSend_P (PSTR ("<div class='tic' style='margin:-2px 0px 4px 0px;font-size:16px;'>\n"));
+    WSContentSend_P (PSTR ("<div class='tic' style='margin:-2px 0px 4px 0px;font-size:15px;'>\n"));
     WSContentSend_P (PSTR ("<div class='tich'>%s</div>\n"), str_color);
-    WSContentSend_P (PSTR ("<div style='width:44%%;text-align:left;font-weight:bold;'>%s</div>\n"), str_text);
+    WSContentSend_P (PSTR ("<div style='width:54%%;text-align:left;font-weight:bold;'>%s</div>\n"), str_text);
     if (teleinfo_contract.phase > 1) sprintf_P (str_text, PSTR ("%ux"), teleinfo_contract.phase);
       else str_text[0] = 0;
-    if (teleinfo_contract.index != UINT8_MAX) WSContentSend_P (PSTR ("<div style='width:28%%;text-align:right;font-weight:bold;'>%s%d</div>\n"), str_text, teleinfo_contract.ssousc / 1000);
+    if (teleinfo_contract.index != UINT8_MAX) WSContentSend_P (PSTR ("<div style='width:18%%;text-align:right;font-weight:bold;'>%s%d</div>\n"), str_text, teleinfo_contract.ssousc / 1000);
     if (teleinfo_contract.unit == TIC_UNIT_KVA) strcpy_P (str_text, PSTR ("kVA")); 
       else if (teleinfo_contract.unit == TIC_UNIT_KW) strcpy_P (str_text, PSTR ("kW"));
       else str_text[0] = 0;
     WSContentSend_P (PSTR ("<div class='tics'></div><div style='width:10%%;text-align:left;'>%s</div>\n"), str_text);
     WSContentSend_P (PSTR ("</div>\n"));
 
-    // contract
+    // production
+    if (teleinfo_prod.total_wh != 0)
+    {
+      WSContentSend_P (PSTR ("<div class='tic'>"));
+
+      // period name
+      WSContentSend_P (PSTR ("<div class='tich'></div>"));
+      if (teleinfo_prod.papp == 0) WSContentSend_P (PSTR ("<div style='width:36%%;'>Production</div>"));
+        else WSContentSend_P (PSTR ("<div style='width:36%%;color:%s;background-color:%s;border-radius:6px;'>Production</div>"), kTeleinfoLevelCalProdText, kTeleinfoLevelCalProd);
+
+      // counter value
+      lltoa (teleinfo_prod.total_wh / 1000, str_text, 10);
+      value = (long)(teleinfo_prod.total_wh % 1000);
+      WSContentSend_P (PSTR ("<div style='width:36%%;text-align:right;'>%s.%03d</div>"), str_text, value);
+      WSContentSend_P (PSTR ("<div class='tics'></div><div class='ticu'>kWh</div>"));
+      WSContentSend_P (PSTR ("</div>\n"));
+      }
+    
+    // conso periods
     for (index = 0; index < teleinfo_contract.period_qty; index++)
     {
       if (teleinfo_conso.index_wh[index] > 0)
@@ -1907,24 +1913,6 @@ void TeleinfoDriverWebSensor ()
         WSContentSend_P (PSTR ("</div>\n"));
       }
     }
-
-    // production total
-    if (teleinfo_prod.total_wh != 0)
-    {
-      WSContentSend_P (PSTR ("<div class='tic'>"));
-
-      // period name
-      WSContentSend_P (PSTR ("<div class='tich'></div>"));
-      if (teleinfo_prod.papp == 0) WSContentSend_P (PSTR ("<div style='width:36%%;'>Production</div>"));
-        else WSContentSend_P (PSTR ("<div style='width:36%%;background-color:#080;border-radius:6px;'>Production</div>"));
-
-      // counter value
-      lltoa (teleinfo_prod.total_wh / 1000, str_text, 10);
-      value = (long)(teleinfo_prod.total_wh % 1000);
-      WSContentSend_P (PSTR ("<div style='width:36%%;text-align:right;'>%s.%03d</div>"), str_text, value);
-      WSContentSend_P (PSTR ("<div class='tics'></div><div class='ticu'>kWh</div>"));
-      WSContentSend_P (PSTR ("</div>\n"));
-     }
 
     //   consommation
     // ----------------

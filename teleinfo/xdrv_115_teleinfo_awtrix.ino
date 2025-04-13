@@ -32,6 +32,7 @@
 */
 
 #ifdef ESP32
+#ifdef USE_TELEINFO
 #ifdef USE_AWTRIX
 
 #define XDRV_115                        115
@@ -768,4 +769,5 @@ bool Xdrv115 (uint32_t function)
 }
 
 #endif      // USE_AWTRIX
+#endif      // USE_TELEINFO
 #endif      // ESP32

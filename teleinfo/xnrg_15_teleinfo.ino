@@ -184,7 +184,7 @@ bool TeleinfoHandleCommand ()
       AddLog (LOG_LEVEL_INFO, PSTR ("  skip=%u         emet les topic TIC/LIVE toutes les xx trames"), teleinfo_config.skip);
       AddLog (LOG_LEVEL_INFO, PSTR ("  error=%u        affiche les compteurs d'erreurs [0/1]"), teleinfo_config.error);
       AddLog (LOG_LEVEL_INFO, PSTR ("  percent=%u    puissance maximale acceptable (%% du contrat)"), teleinfo_config.percent);
-      AddLog (LOG_LEVEL_INFO, PSTR ("  trigger=%d    puissance déclenchant le relai de production (W)"), teleinfo_config.prod_trigger);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  trigger=%d      puissance déclenchant le relai de production (W)"), teleinfo_config.prod_trigger);
 
       // publishing policy
       str_line[0] = 0;
@@ -204,13 +204,13 @@ bool TeleinfoHandleCommand ()
       AddLog (LOG_LEVEL_INFO, PSTR ("  period=%u       affichage couleur periode en cours [0/1]"), teleinfo_config.led_period);
       AddLog (LOG_LEVEL_INFO, PSTR ("  bright=%u      luminosite d'affichage LED [0..100]"), teleinfo_config.param[TIC_CONFIG_BRIGHT]);
 
-#ifdef USE_TELEINFO_GRAPH
-      AddLog (LOG_LEVEL_INFO, PSTR ("  maxv=%u       graph : tension max (V)"), teleinfo_config.max_volt);
-      AddLog (LOG_LEVEL_INFO, PSTR ("  maxva=%u     graph : puissance max (VA or W)"), teleinfo_config.max_power);
-      AddLog (LOG_LEVEL_INFO, PSTR ("  maxhour=%d      graph : total horaire max (Wh)"), teleinfo_config.param[TIC_CONFIG_MAX_HOUR]);
-      AddLog (LOG_LEVEL_INFO, PSTR ("  maxday=%d      graph : total quotidien max (Wh)"), teleinfo_config.param[TIC_CONFIG_MAX_DAY]);
-      AddLog (LOG_LEVEL_INFO, PSTR ("  maxmonth=%d   graph : total mensuel max (Wh)"), teleinfo_config.param[TIC_CONFIG_MAX_MONTH]);
-#endif    // USE_TELEINFO_GRAPH
+//#ifdef USE_TELEINFO_GRAPH
+//      AddLog (LOG_LEVEL_INFO, PSTR ("  maxv=%u       graph : tension max (V)"), teleinfo_config.max_volt);
+//      AddLog (LOG_LEVEL_INFO, PSTR ("  maxva=%u     graph : puissance max (VA or W)"), teleinfo_config.max_power);
+//      AddLog (LOG_LEVEL_INFO, PSTR ("  maxhour=%d      graph : total horaire max (Wh)"), teleinfo_config.param[TIC_CONFIG_MAX_HOUR]);
+//      AddLog (LOG_LEVEL_INFO, PSTR ("  maxday=%d      graph : total quotidien max (Wh)"), teleinfo_config.param[TIC_CONFIG_MAX_DAY]);
+//      AddLog (LOG_LEVEL_INFO, PSTR ("  maxmonth=%d   graph : total mensuel max (Wh)"), teleinfo_config.param[TIC_CONFIG_MAX_MONTH]);
+//#endif    // USE_TELEINFO_GRAPH
     }
 
     // else some configuration params are given
@@ -404,6 +404,7 @@ bool TeleinfoExecuteCommand (const char* pstr_command, const char* pstr_param)
       AddLog (LOG_LEVEL_INFO, PSTR ("TIC: relay=%u"), teleinfo_config.relay);
       break;
 
+      /*
 #ifdef USE_TELEINFO_GRAPH
     case TIC_CMND_MAX_V:
       modified = ((value >= TIC_GRAPH_MIN_VOLTAGE) && (value <= TIC_GRAPH_MAX_VOLTAGE) && (teleinfo_config.max_volt != value));
@@ -435,6 +436,8 @@ bool TeleinfoExecuteCommand (const char* pstr_command, const char* pstr_param)
       AddLog (LOG_LEVEL_INFO, PSTR ("TIC: maxmonth=%d"), teleinfo_config.param[TIC_CONFIG_MAX_MONTH]);
       break;
 #endif    // USE_TELEINFO_GRAPH
+*/
+
   }
 
   // if needed, restart
@@ -595,8 +598,6 @@ void TeleinfoConfigLoad ()
   teleinfo_config.live         = Settings->teleinfo.live;
   teleinfo_config.skip         = Settings->teleinfo.skip;
   teleinfo_config.cal_hexa     = Settings->teleinfo.cal_hexa;
-  teleinfo_config.max_volt     = TIC_GRAPH_MIN_VOLTAGE + (long)Settings->teleinfo.adjust_v * 5;
-  teleinfo_config.max_power    = TIC_GRAPH_MIN_POWER + (long)Settings->teleinfo.adjust_va * 3000;
   teleinfo_config.prod_trigger = 50 * (long)Settings->rf_code[16][6];
 
   // validate boundaries
@@ -696,8 +697,6 @@ void TeleinfoConfigSave (const bool save2rom)
   Settings->teleinfo.live       = teleinfo_config.live;
   Settings->teleinfo.skip       = teleinfo_config.skip;
   Settings->teleinfo.cal_hexa   = teleinfo_config.cal_hexa;
-  Settings->teleinfo.adjust_v   = (teleinfo_config.max_volt - TIC_GRAPH_MIN_VOLTAGE) / 5;
-  Settings->teleinfo.adjust_va  = (teleinfo_config.max_power - TIC_GRAPH_MIN_POWER) / 3000;
   Settings->rf_code[16][6]      = (uint8_t)(teleinfo_config.prod_trigger / 50);
 
   // update today and yesterday conso/prod
@@ -1270,12 +1269,6 @@ void TeleinfoAnalyseSTGE (const char* pstr_donnee)
   if (TeleinfoDriverMeterReady () && (teleinfo_message.stge.over_load != value)) teleinfo_meter.json.data = 1;
   teleinfo_message.stge.over_load = value;
 
-  // get today's color
-//  teleinfo_message.stge.color_today = (uint8_t)((stge >> 24) & 0x03);
-
-  // get tomorrow's color
-//  teleinfo_message.stge.color_tmrow = (uint8_t)((stge >> 26) & 0x03);
-
   // get preavis pointe mobile signal
   teleinfo_message.stge.preavis = (uint8_t)((stge >> 28) & 0x03);
   if (teleinfo_message.stge.preavis != 0) TeleinfoSetPreavis (TIC_PREAVIS_WARNING, "PM");
@@ -1647,8 +1640,10 @@ void TeleinfoCalendarMidnight ()
   char str_text[16];
 
   // shift tomorrow and day after tomorrow
-  memcpy (&teleinfo_calendar[TIC_DAY_TODAY], &teleinfo_calendar[TIC_DAY_TMROW], sizeof (tic_cal_day));
-  memcpy (&teleinfo_calendar[TIC_DAY_TMROW], &teleinfo_calendar[TIC_DAY_AFTER], sizeof (tic_cal_day));
+  teleinfo_calendar[TIC_DAY_TODAY] = teleinfo_calendar[TIC_DAY_TMROW];
+  teleinfo_calendar[TIC_DAY_TMROW] = teleinfo_calendar[TIC_DAY_AFTER];
+//  memcpy (&teleinfo_calendar[TIC_DAY_TODAY], &teleinfo_calendar[TIC_DAY_TMROW], sizeof (tic_cal_day));
+//  memcpy (&teleinfo_calendar[TIC_DAY_TMROW], &teleinfo_calendar[TIC_DAY_AFTER], sizeof (tic_cal_day));
 
   // init day after
   TeleinfoCalendarReset (TIC_DAY_AFTER);
@@ -1683,7 +1678,7 @@ void TeleinfoCalendarPointeEnd (const uint8_t index, const char *pstr_horodatage
   teleinfo_message.arr_pointe[index].stop = TeleinfoCalendarGetDay (pstr_horodatage, true);
 }
 
-// set default profil if not defined
+// set default profile if not defined
 void TeleinfoCalendarDefaultProfile (char *pstr_donnee)
 {
   bool    update;
@@ -1699,14 +1694,11 @@ void TeleinfoCalendarDefaultProfile (char *pstr_donnee)
   // check if a day calendar needs to be updated
   update = false;
   for (day = TIC_DAY_TODAY; day < TIC_DAY_MAX; day ++) update |= (teleinfo_calendar[day].level == TIC_LEVEL_NONE);
-  if (! update) return;
-
-  // init data
-  memset (&arr_slot, 0, TIC_DAY_SLOT_MAX); 
+  if (!update) return;
 
   // loop thru segments to load daily calendar
   level = TIC_LEVEL_NONE;
-  for (slot = 0; slot < TIC_DAY_SLOT_MAX; slot ++) arr_slot[slot] = UINT8_MAX;
+  memset (&arr_slot, UINT8_MAX, TIC_DAY_SLOT_MAX);
   while ((strlen (pstr_donnee) >= 8) && isdigit (pstr_donnee[0]))
   {
     // extract data and populate slot
@@ -1724,7 +1716,7 @@ void TeleinfoCalendarDefaultProfile (char *pstr_donnee)
 
   // loop thru days : if day's calendar not set, set default one
   for (day = TIC_DAY_TODAY; day < TIC_DAY_MAX; day ++)
-    if (teleinfo_calendar[day].level == TIC_LEVEL_NONE)
+    if ((teleinfo_calendar[day].level == TIC_LEVEL_NONE) && (level != TIC_LEVEL_NONE))
     {
       teleinfo_calendar[day].level = level;
       for (slot = 0; slot < TIC_DAY_SLOT_MAX; slot ++) 
@@ -1753,7 +1745,7 @@ void TeleinfoCalendarPointeProfile (const char *pstr_donnee)
   for (index = 0; index < TIC_POINTE_MAX; index ++) 
     if ((teleinfo_message.arr_pointe[index].start > teleinfo_meter.date) && (teleinfo_message.arr_pointe[index].start < date))
     {
-      date = teleinfo_message.arr_pointe[index].start;
+      date   = teleinfo_message.arr_pointe[index].start;
       pointe = index;
     }
   if (pointe >= TIC_POINTE_MAX) return;
@@ -1850,7 +1842,7 @@ void TeleinfoTimestampFromDate (const char* pstr_donnee)
     RtcSetTimeOfDay (Rtc.local_time);
 
     // set RtcTime
-    BreakNanoTime(Rtc.local_time, 0, RtcTime);
+    BreakNanoTime (Rtc.local_time, 0, RtcTime);
     RtcTime.year += 1970;
     RtcTime.valid = 1;
 
@@ -1907,9 +1899,9 @@ bool TeleinfoContractUpdate ()
   {
     // handle specificity of Historique Tempo where last char is dynamic (BBRx)
     str_contract = teleinfo_message.str_contract;
-    str_contract.toUpperCase ();
-    strlcpy (str_text, str_contract.c_str (), 4);
-    if (strcmp (str_text, "BBR") == 0) str_contract = str_text;
+//    str_contract.toUpperCase ();
+//    strlcpy (str_text, str_contract.c_str (), 4);
+//    if (strcmp (str_text, "BBR") == 0) str_contract = str_text;
 
     // look for known contract
     index = GetCommandCode (str_text, sizeof (str_text), str_contract.c_str (), kTicContractCode);
@@ -1971,7 +1963,7 @@ uint8_t TeleinfoPeriodDetectHcHp (const char* pstr_name)
 
 uint8_t TeleinfoPeriodDetectLevel (const char* pstr_name)
 {
-  uint8_t level = TIC_LEVEL_NONE;
+  uint8_t level = TIC_LEVEL_BLUE;       // by default, blue period
 
   if (strstr_P (pstr_name, PSTR ("NORMAL"))        != nullptr) level = TIC_LEVEL_BLUE;
     else if (strstr_P (pstr_name, PSTR ("BLEU"))   != nullptr) level = TIC_LEVEL_BLUE;
@@ -2001,61 +1993,57 @@ void TeleinfoPeriodUpdate ()
   for (index = 0; index < TIC_INDEX_MAX; index ++)
     if (teleinfo_contract.arr_period[index].str_code == teleinfo_message.str_period) period = index;
 
+  // if not found and dealing with generic TEMPO contract, set period according to standard Tempo periods
+  if ((period == UINT8_MAX) && (teleinfo_contract.index == TIC_C_STD_TEMPO) && (level > TIC_LEVEL_NONE)) period = 2 * level - 2 + hchp;
+
+  // if period not detected, set to messsage period
+  if (period == UINT8_MAX) period = teleinfo_message.period;
+
+  // if still ne priod index, ignore
+  if (period == UINT8_MAX) return;
+
   // detect period specs
   hchp  = TeleinfoPeriodDetectHcHp  (teleinfo_message.str_period);
   level = TeleinfoPeriodDetectLevel (teleinfo_message.str_period);
-
-  // if not found and dealing with generic TEMPO contract, try to detect period
-  if ((period == UINT8_MAX) && (teleinfo_contract.index == TIC_C_STD_TEMPO) && (level > TIC_LEVEL_NONE)) period = 2 * level - 2 + hchp;
-
-  // if period not detected, ignore
-  if (period == UINT8_MAX) return;
-
-  // update period and today's slot
-  teleinfo_message.period = period;
+  
+  // update today's slot
   TeleinfoCalendarSetDailyCalendar (TIC_DAY_TODAY, period);
 
   // if contract period and message period are identical, ignore
-  if (teleinfo_contract.period == teleinfo_message.period) return;
+  if (teleinfo_contract.period == period) return;
 
   // check for an unknown period index
-  new_period = (teleinfo_contract.arr_period[teleinfo_message.period].valid == 0) ;
+  new_period = (teleinfo_contract.arr_period[period].valid == 0) ;
 
   // update contract current period
-  teleinfo_contract.period = teleinfo_message.period;
+  teleinfo_contract.period = period;
   strcpy (teleinfo_contract.str_period, teleinfo_message.str_period);
 
   // if a new period is detected, update contract period
   if (new_period)
   {
     // update contract period validity, code and label
-    teleinfo_contract.arr_period[teleinfo_message.period].valid     = 1;
-    teleinfo_contract.arr_period[teleinfo_message.period].str_code  = teleinfo_message.str_period;
-    teleinfo_contract.arr_period[teleinfo_message.period].str_label = teleinfo_message.str_period;
+    teleinfo_contract.arr_period[period].valid     = 1;
+    teleinfo_contract.arr_period[period].str_code  = teleinfo_message.str_period;
+    teleinfo_contract.arr_period[period].str_label = teleinfo_message.str_period;
 
     // update cpntract period level, hchp and period quantity
-    teleinfo_contract.arr_period[teleinfo_message.period].hchp  = hchp;
-    teleinfo_contract.arr_period[teleinfo_message.period].level = level;
-    teleinfo_contract.period_qty = max (teleinfo_contract.period_qty, (uint8_t)(teleinfo_message.period + 1));
+    teleinfo_contract.arr_period[period].hchp  = hchp;
+    teleinfo_contract.arr_period[period].level = level;
+    teleinfo_contract.period_qty = max (teleinfo_contract.period_qty, (uint8_t)(period + 1));
 
     // publish updated calendar
     if (teleinfo_config.calendar) teleinfo_meter.json.data = 1;
 
     // log
-    AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Nouvelle période %s (index %u, level %u, hchp %u), %u périodes connues"), teleinfo_message.str_period, teleinfo_message.period + 1, level, hchp, teleinfo_contract.period_qty);
+    AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Nouvelle période %s (index %u, level %u, hchp %u), %u périodes connues"), teleinfo_message.str_period, period + 1, level, hchp, teleinfo_contract.period_qty);
 
     // save new period
     TeleinfoConfigSave (false);
   }
 
   // else log period change
-  else 
-  {
-    level = teleinfo_contract.arr_period[teleinfo_contract.period].level;
-    hchp  = teleinfo_contract.arr_period[teleinfo_contract.period].hchp;
-    count = teleinfo_contract.period + 1;
-    AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Changement de période %s (index %u, level %u, hchp %u)"), teleinfo_contract.str_period, count, level, hchp);
-  }
+  else  AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Changement de période %s (index %u, level %u, hchp %u)"), teleinfo_contract.str_period, period + 1, teleinfo_contract.arr_period[period].level, teleinfo_contract.arr_period[period].hchp);
 }
 
 // update periods from a description string (return quantity of periods)
@@ -2485,14 +2473,13 @@ void TeleinfoReceptionMessageStart ()
   teleinfo_message.injection = 0;
   teleinfo_message.str_line[0] = 0;
 
-  // init calendar data
-//  teleinfo_message.date = 0;                                                                                                  // current date with slot
-//  teleinfo_message.slot = UINT8_MAX;                                                                                          // current slot
+  // init calendar data                                                                                          // current slot
   for (index = 0; index < TIC_POINTE_MAX; index ++) memset (&teleinfo_message.arr_pointe[index], 0, sizeof (tic_pointe));     // pointe dates
   teleinfo_message.stge.pointe  = 0;
   teleinfo_message.stge.preavis = 0;
 
   // init contract data
+  teleinfo_message.period = UINT8_MAX;
   teleinfo_message.str_period[0] = 0;
   strlcpy (teleinfo_message.str_contract, teleinfo_contract.str_code, sizeof (teleinfo_message.str_contract));
 
@@ -3166,6 +3153,12 @@ void TeleinfoReceptionLineStop ()
         teleinfo_message.injection = 1;
         break;
 
+      // period index
+      case TIC_STD_NTARF:
+        value = atol (str_donnee);
+        if (value > 0) teleinfo_message.period = (uint8_t)value - 1;
+        break;
+
       // period name
       case TIC_HIS_PTEC:
       case TIC_STD_LTARF:
@@ -3696,12 +3689,14 @@ void TeleinfoEnergyEverySecond ()
 {
   uint8_t  phase;
   uint32_t time_now;
+  TIME_T   time_dst;
 
   // check time validity
   if (!RtcTime.valid) return;
 
   // get current time
   time_now = LocalTime ();
+  BreakTime (time_now, time_dst);
 
   //   Serial speed auto-detection
   // -------------------------------
@@ -3721,21 +3716,21 @@ void TeleinfoEnergyEverySecond ()
 
 #ifndef USE_WINKY
   // update totals every 30 seconds
-  if (RtcTime.second % 30 == 0) EnergyUpdateToday ();
+  if (time_dst.second % 30 == 0) EnergyUpdateToday ();
 #endif    // USE_WINKY 
 
   //   Midnight day change
   // -----------------------
 
   // if day change, update daily counters and rotate daily calendars
-  if (teleinfo_meter.day == 0) teleinfo_meter.day = RtcTime.day_of_month;
-  if (teleinfo_meter.day != RtcTime.day_of_month)
+  if (teleinfo_meter.day == 0) teleinfo_meter.day = time_dst.day_of_month;
+  if (teleinfo_meter.day != time_dst.day_of_month)
   {
     TeleinfoTotalMidnight ();
     TeleinfoCalendarMidnight ();
-    AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Midnight shift (%u->%u)"), teleinfo_meter.day, RtcTime.day_of_month);
+    AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Midnight shift (%u->%u)"), teleinfo_meter.day, time_dst.day_of_month);
   }
-  teleinfo_meter.day = RtcTime.day_of_month;
+  teleinfo_meter.day = time_dst.day_of_month;
 
   //   Reset Preavis & Pointe data
   // -------------------------------
