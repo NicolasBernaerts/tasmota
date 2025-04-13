@@ -10,7 +10,7 @@ Lorsque vous flashez ce fork pour la première fois, merci de faire un **reset 6
 
 Le **changelog** général est disponible dans le fichier **user_config_override.h**
 
-⚠️ Cette version 14.9 n'intègre plus les données d'historiques si sont en cours de refonte. Si vous souhaitez utiliser les données historisées, évitez cette mise à jour et restez en v14.8.
+⚠️ Cette version 14.10 intègre une refonte complète des données historiques qui gère maintenant la production et les différentes périodes (Tempo par exemple). Le nouveau format de fichier est différent du format précédent. Après mise à jour de cette version, vous ne pourrez plus visualiser les anciennes données historisées. Elles seront toujours disponible dans le fichier CSV sur le FS.
 
 ![Homepage page](./screen/tasmota-teleinfo-homepage.png)
 
@@ -47,6 +47,7 @@ Ce firmware fournit également :
   * un serveur intégré **FTP** pour récupérer les fichiers historiques
   * le suivi en temps réel des trames réçues
   * un graph en temps réel des données principales (tension, puissance et Cosφ)
+  * un historique de la production et de la consommation par période
 
 Si votre compteur est en mode historique, la tension est forcée à 230V.
 
@@ -67,6 +68,7 @@ Voici un tableau récapitulatif des fonctionnalités par famille d'ESP :
 | LED couleur contrat         |     x      |      x      |     x     |
 | Trames temps réel           |     x      |      x      |     x     |
 | Graph temps réel            |     x      |      x      |     x     |
+| Historique de conso/prod    |            |      x      |     x     |
 | Serveur TCP                 |     x      |      x      |     x     |
 | Serveur FTP                 |            |             |     x     |
 | Intégration Home Assistant  |     x      |      x      |     x     |
@@ -300,6 +302,8 @@ L'intégration Home Assistant peut être activée via la page de configuration *
 
     hass 1
 
+La publication de déclaration pour Home Asisstant est réalisée en mode **retain**.
+
 ### Homie
 
 L'intégration Homie peut être activée via la page de configuration **Teleinfo** ou en mode console : 
@@ -472,6 +476,8 @@ Voici la liste des commandes de configuration spécifiques au Winky :
 
     winky
     HLP: gestion du winky
+     - winky_sleep <sec>   = duree du deepsleep en sec.
+     - winky_max <nb>      = nbre de messages recus avant deepsleep
      - winky_ref <farad>   = valeur de reference de la super capa (1.5 par exemple)
      - winky_start <volt>  = tension minimale pour démarrer le winky (4.5)
      - winky_stop <volt>   = tension déclanchant l'arrêt du winky (3.9)
