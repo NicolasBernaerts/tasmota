@@ -567,4 +567,4 @@ If you want to remove default Tasmota energy display, you just need to run this 
  
 ### Totals Counters (kWh) ###
 
-![Yearly total](./screen/tasmota-teleinfo-total-year.png)  ![Monthly total](./screen/tasmota-teleinfo-total-month.png)  ![Daily total](./screen/tasmota-teleinfo-total-day.png)
+![Daily total](./screen/tasmota-teleinfo-total-day.png)
