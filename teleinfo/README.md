@@ -563,7 +563,7 @@ If you want to remove default Tasmota energy display, you just need to run this 
 
 ### Graph for Power, Voltage and Cos φ ###
 
-![Grah monophase power](./screen/tasmota-teleinfo-graph-daily.png)  ![Grah monophase power](./screen/tasmota-teleinfo-graph-weekly.png)  ![Grah monophase voltage](./screen/tasmota-teleinfo-graph-voltage.png)  ![Grah monophase Cos phi](./screen/tasmota-teleinfo-graph-cosphi.png) 
+![Grah monophase power](./screen/tasmota-teleinfo-graph-daily.png)  ![Grah monophase cosphi](./screen/tasmota-teleinfo-graph-24h.png) 
  
 ### Totals Counters (kWh) ###
 
