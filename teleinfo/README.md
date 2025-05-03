@@ -67,7 +67,7 @@ Voici un tableau récapitulatif des fonctionnalités par famille d'ESP :
 | Calcul Cos φ                |     x      |      x      |     x     |
 | LED couleur contrat         |     x      |      x      |     x     |
 | Trames temps réel           |     x      |      x      |     x     |
-| Graph temps réel            |     x      |      x      |     x     |
+| Graph temps réel            |    live    |    live     |     x     |
 | Historique de conso/prod    |            |      x      |     x     |
 | Serveur TCP                 |     x      |      x      |     x     |
 | Serveur FTP                 |            |             |     x     |
@@ -78,8 +78,8 @@ Voici un tableau récapitulatif des fonctionnalités par famille d'ESP :
 | Intégration InfluxDB        |            |             |     x     |
 | Intégration API RTE         |            |             |     x     |
 | Pilotage afficheur Awtrix   |            |             |     x     |
-| Taille max d'une étiquette  |    32      |    32       |    112    |
-| Nombre max d'étiquettes     |    48      |    48       |    74     |
+| Taille max d'une étiquette  |    28      |    28       |    112    |
+| Nombre max d'étiquettes     |    56      |    56       |    74     |
 
 ## Options de configuration
 
