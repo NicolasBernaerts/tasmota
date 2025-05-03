@@ -10,7 +10,7 @@ Lorsque vous flashez ce fork pour la première fois, merci de faire un **reset 6
 
 Le **changelog** général est disponible dans le fichier **user_config_override.h**
 
-⚠️ Cette version 14.10 intègre une refonte complète des données historiques qui gère maintenant la production et les différentes périodes (Tempo par exemple). Le nouveau format de fichier est différent du format précédent. Après mise à jour de cette version, vous ne pourrez plus visualiser les anciennes données historisées. Elles seront toujours disponible dans le fichier CSV sur le FS.
+⚠️ La version 14.10+ intègre une refonte complète des données historiques qui gère maintenant la production et les différentes périodes (Tempo par exemple). Le nouveau format de fichier est différent du format précédent. Après mise à jour de cette version, vous ne pourrez plus visualiser les anciennes données historisées. Elles seront toujours disponible dans le fichier CSV sur le FS.
 
 ![Homepage page](./screen/tasmota-teleinfo-homepage.png)
 
