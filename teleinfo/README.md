@@ -148,7 +148,7 @@ Les données recues depuis le compteur sont publiées telles quelles en complém
 
 Ces données étant des données brutes, elles n'ont d'autre intérêt que l'analyse des trames en cas de problème.
 
-## Commands
+## Commandes
 
 Ce firmware propose un certain nombre de commandes **EnergyConfig** spécifiques disponibles en mode console :
 
