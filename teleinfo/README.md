@@ -523,29 +523,17 @@ Voici la liste exhaustive des fichiers concernés :
 
 Si tout se passe bien, vous devriez pouvoir compiler votre propre build.
 
-## Adapter
+## Adaptateur Teleinfo
 
-Between your Energy meter and your Tasmota device, you'll need an adapter to convert **Teleinfo** signal to **TTL serial**.
+Si vous me posez la question de quel adaptateur **Teleinfo** utiliser, je vous répondrais que le meilleur actuellement est le [**Denky D4**](https://www.tindie.com/products/hallard/denky-d4-esp32-tic-teleinfo-reader/) qui est très bien conçu et qui fonctionne parfaitement avec ce firmware.
 
-A very simple adapter diagram can be this one. Pleasee note that some Linky meters may need a resistor as low as **1k** instead of **1.5k** to avoid transmission errors.
+Mais si vous souhaitez vraiment réaliser vous même votre adaptateur Teleinfo, voici le schéma que j'ai mis en oeuvre sur plusieurs compteurs avec des Esp8266 et des ESP32-S3 :
 
 ![Simple Teleinfo adapter](./screen/teleinfo-adapter-diagram.png)
 
-Here is a board example using a monolithic 3.3V power supply and an ESP-01.
+Concernant la résistance en tête de l'opto-coupleur, certains compteurs Linky peuvent nécessiter une résistance assez faible, entre **800 Ω** et **1 kΩ** au lieu de la résistance de 1.5 kΩ.
 
-![Simple Teleinfo board](./screen/teleinfo-adapter-board.png)
-
-You need to connect your adapter output **ESP Rx** to any available serial port of your Tasmota device.
-
-This port should be connected to your ESP UART and be declared as **TInfo RX**.
-
-For example, you can use :
-  * ESP8266 : **GPIO3 (RXD)** port
-  * WT32-ETH01 : **GPIO5 (RXD)** port
-  * Olimex ESP32-POE : **GPIO2** port
-
-Finaly, in **Configure Teleinfo** you need to select your Teleinfo adapter protocol :
-  * **Historique** (original white meter or green Linky in historic mode, 1200 bauds)
-  * **Standard** (green Linky in standard mode, 9600 bauds)
-
-
+Concernant le port GPIO à utiliser coté ESP, je préconise les suivants :
+  * ESP8266 : **GPIO3 (RXD)**
+  * WT32-ETH01 : **GPIO5 (RXD)**
+  * Olimex ESP32-POE : **GPIO2**
