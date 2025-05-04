@@ -8,15 +8,19 @@
 
 <img align="right" src="./screen/teleinfo-intro-home.png" width=260>
 
-Cette évolution du firmware **Tasmota 14.5** permet de :
+Cette évolution du firmware **Tasmota** permet de :
   * gérer le flux **Teleinfo** des compteurs français (**Linky**, **PME/PMI** et **Emeraude**)
-  * gérer les compteurs en mode **Historique** et en mode **Standard**
-  * gérer les compteurs en mode **Consommation** et/ou **Production**
+  * gérer les Linky en mode **Historique** et en mode **Standard**
+  * gérer les Linky en mode **Consommation** et/ou **Production**
   * calculer le **Cosφ** en quasi temps réel
-  * publier les données pour **Domoticz**, **Home Assistant**, **Homie** et **Thingsboard**
+  * visualiser les trames reçues en temps réel
+  * fournir des graphs de suivi (VA, W, V et cosφ)
+  * suivre l'historique de consommation/production
+  * publier pour **Domoticz**, **Home Assistant**, **Homie** et **Thingsboard**
   * alimenter une base **InfluxDB**
   * s'abonner aux API RTE **Tempo**, **Pointe** et **Ecowatt**
   * gérer un afficheur déporté de type **Ulanzi** flashé sous **Awtrix**
+  * publier le flux **TIC** sur son réseau local en **TCP**
 
 Ce firmware a été développé et testé sur les compteurs suivants :
   * **Sagem Blanc monophase** en TIC **Historique**
@@ -29,6 +33,7 @@ Ce firmware a été développé et testé sur les compteurs suivants :
 <img align="right" src="./screen/teleinfo-intro-message.png" width=260>
 
 Il a été compilé et testé sur les ESP suivants :
+
   * **ESP8266** 1Mb (Sonoff Basic R2), 4Mb et 16Mb
   * **ESP32** 4Mb et **ESP32 Denky D4** 8Mb
   * **ESP32C3** 4Mb (Sonoff Basic R4 par exemple)
@@ -36,13 +41,6 @@ Il a été compilé et testé sur les ESP suivants :
   * **ESP32C6 Winky** 4Mb (auto-alimenté par le compteur)
   * **ESP32S2** 4Mb
   * **ESP32S3** 4Mb et 16Mb
-
-Ce firmware fournit également :
-  * un serveur intégré **TCP** pour diffuser en temps réel les données reçues du compteur
-  * un serveur intégré **FTP** pour récupérer les fichiers historiques
-  * le suivi en temps réel des trames réçues
-  * un graph en temps réel des données principales (tension, puissance et Cosφ)
-  * un historique de la production et de la consommation par période
 
 Si votre compteur est en mode historique, la tension est forcée à 230V.
 
@@ -491,7 +489,7 @@ Voici la liste des commandes de configuration spécifiques au Winky :
 ## Compilation
 
 Si vous voulez compiler ce firmware vous-même, vous devez :
-1. installer les sources **tasmota** officielles (utilisez la même version que celle déclarée en tête de cette page
+1. installer les sources **tasmota** depuis la version officielle **14.5** (respectez cette version)
 2. déposez ou remplacez les fichiers de ce **repository**
 3. déposez ou remplacez les fichiers du repository **tasmota/common**
 
