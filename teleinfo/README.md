@@ -449,9 +449,11 @@ Ce serveur FTP ne peut accepter qu'une seule connexion simultanée. Vous devez d
 
 ## Afficheur Awtrix
 
-Sous ESP32, ce firmware permet de gérer un afficheur déporté de type [[https://www.ulanzi.com/products/ulanzi-pixel-smart-clock-2882?ref=28e02dxl|Ulanzi]] flashé avec le firmware Open-Source [[https://blueforcer.github.io/awtrix3/#/README|awtrix]].
+Sous ESP32, ce firmware permet de gérer un affichage déporté des principales données sur un afficheur [**Ulanzi Awtrix**](https://www.ulanzi.com/products/ulanzi-pixel-smart-clock-2882?ref=28e02dxl).
 
-La commande **awtrix** explique toutes les possibilités :
+L'afficheur doit au préalable avoir été flashé avec le firmware Open-Source [**Awtrix3**](https://blueforcer.github.io/awtrix3/#/README).
+
+Le paramétrage est réalisé en mode console via la commande **awtrix** :
 
     HLP: Commandes d'affichage Awtrix :
       awtrix_addr <addr>  = Adresse IP du device Awtrix
