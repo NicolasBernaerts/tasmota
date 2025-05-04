@@ -453,6 +453,8 @@ Sous ESP32, ce firmware permet de gérer un affichage déporté des principales 
 
 L'afficheur doit au préalable avoir été flashé avec le firmware Open-Source [**Awtrix3**](https://blueforcer.github.io/awtrix3/#/README).
 
+<img src="./screen/teleinfo-awtrix-puissance.png" width=400>  <img src="./screen/teleinfo-awtrix-calendrier.png" width=400>
+
 Le paramétrage est réalisé en mode console via la commande **awtrix** :
 
     HLP: Commandes d'affichage Awtrix :
@@ -464,8 +466,6 @@ Le paramétrage est réalisé en mode console via la commande **awtrix** :
       awtrix_pwh   [1]   = Production du jour
       awtrix_cal   [0]   = Calendrier
       awtrix_pmax  [200] = Puissance produite max
-
-<img src="./screen/teleinfo-awtrix-puissance.jpg" width=400>  <img src="./screen/teleinfo-awtrix-calendrier.jpg" width=400>
 
 ## Carte Winky
 
