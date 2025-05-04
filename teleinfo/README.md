@@ -333,17 +333,16 @@ Toutes ces publications sont activables à travers la page **Configuration Telei
 
 <img align="right" src="./screen/teleinfo-rte-apps.png" width=400>
 
-Ce firmware permet également de s'abonner aux calendriers publiés par [**RTE**](https://data.rte-france.com/) et de publier les informations via MQTT. Il est à noter que cette fonctionnalité n'est disponible que sur les **ESP32**.
+Ce firmware permet également de s'abonner aux calendriers publiés par [**RTE**](https://data.rte-france.com/) et de publier les informations via MQTT.
 
-Les calendriers gérés sont les suivants :
-  * **Tempo**
-  * **Pointe**
-  * **Ecowatt**
+Il est à noter que cette fonctionnalité n'est disponible que sur les **ESP32**.
 
-Vous devez tout d'abord créer un compte sur le site **RTE** [https://data.rte-france.com/] Ensuite vous devez activer l'un ou l'autre des API suivantes :
-  * **Tempo**
-  * **Demand Response Signal**
-  * **Ecowatt**
+Vous devez tout d'abord créer un compte sur le site **RTE** [https://data.rte-france.com/].
+
+Suivant le calendrier souhaité, vous devez activer les API RTE suivantes :
+  * Tempo : **Tempo Like Supply Contract**
+  * Pointe : **Demand Response Signal**
+  * Ecowatt : **Ecowatt**
 
 <img align="right" src="./screen/teleinfo-rte-display.png" width=300>
 
