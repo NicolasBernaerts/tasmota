@@ -150,26 +150,26 @@ Ces données étant des données brutes, elles n'ont d'autre intérêt que l'ana
 
 Ce firmware propose un certain nombre de commandes **EnergyConfig** spécifiques disponibles en mode console :
 
-      historique   set historique mode at 1200 bauds (needs restart)
-      standard     set Standard mode at 9600 bauds (needs restart)
-      stats        display reception statistics
-      reset        reset contract data
-      error=0      display error counters on home page
-      percent=100  maximum acceptable contract (%)
-      
-      policy=1     message policy : 0=Telemetrie seulement, 1=± 5% Evolution puissance, 2=Tous les messages TIC
-      meter=1      publish METER & PROD data
-      contract=1   publish CONTRACT data
-      calendar=1   publish CAL data
-      relay=1      publish RELAY data
-      
-      maxv=235     graph max voltage (V)
-      maxva=3000  graph max power (VA or W)
-      nbday=8      number of daily logs
-      nbweek=4     number of weekly logs
-      maxhour=2    graph max total per hour (Wh)
-      maxday=10    graph max total per day (Wh)
-      maxmonth=100 graph max total per month (Wh)
+      historique     mode historique (1200 bauds)
+      standard       mode standard (9600 bauds)
+      noraw          pas d'emission trame TIC
+      full           emission topic TIC
+      skip=5         emet les topic TIC/LIVE toutes les xx trames
+      live           emission topic LIVE
+      reset          reset contrat et données
+      automode       auto-détection du mode Linky
+      calraz         remise a 0 des plages du calendrier
+      calhexa=0      format des plages horaires Linky [0:decimal/1:hexa]
+      percent=100    puissance maximale acceptable (% du contrat)
+      trigger=0      puissance déclenchant le relai de production (W)
+      policy=1       politique de publication : 0=A chaque Télémétrie, 1=Evolution de ±, 2=A chaque message reçu
+      meter=1        publication sections METER & CONTRACT [0/1]
+      calendar=0     publication section CAL [0/1]
+      relay=0        publication section RELAY [0/1]
+      period=1       affichage couleur periode en cours [0/1]
+      bright=80      luminosite d'affichage LED [0..100]
+      error=0        affiche les compteurs d'erreurs [0/1]
+      stats          statistiques de reception
 
 Vous pouvez passer plusieurs commandes en même temps :
 
