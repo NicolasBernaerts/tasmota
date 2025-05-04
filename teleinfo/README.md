@@ -6,9 +6,10 @@
 
 Le **changelog** général est disponible dans le fichier **user_config_override.h**
 
-<img align="right" src="./screen/teleinfo-intro-home.png">
 
 ## Presentation
+
+<img align="right" src="./screen/teleinfo-intro-home.png" width=260>
 
 Cette évolution du firmware **Tasmota 14.5** permet de :
   * gérer le flux **Teleinfo** des compteurs français (**Linky**, **PME/PMI** et **Emeraude**)
@@ -16,6 +17,7 @@ Cette évolution du firmware **Tasmota 14.5** permet de :
   * gérer les compteurs en mode **Consommation** et/ou **Production**
   * calculer le **Cosφ** en quasi temps réel
   * publier les données pour **Domoticz**, **Home Assistant**, **Homie** et **Thingsboard**
+  * alimenter une base **InfluxDB**
   * s'abonner aux API RTE **Tempo**, **Pointe** et **Ecowatt**
   * gérer un afficheur déporté de type **Ulanzi** flashé sous **Awtrix**
 
@@ -27,7 +29,7 @@ Ce firmware a été développé et testé sur les compteurs suivants :
   * **Ace6000 triphase** en TIC **PME/PMI**
   * **Emeraude** en TIC **Emeraude 2 quadrands**
 
-<img align="right" src="./screen/teleinfo-intro-message.png">
+<img align="right" src="./screen/teleinfo-intro-message.png" width=260>
 
 Il a été compilé et testé sur les ESP suivants :
   * **ESP8266** 1Mb (Sonoff Basic R2), 4Mb et 16Mb
@@ -97,7 +99,7 @@ Merci de ne configurer que les options souhaitées afin d'avoir un système opti
 
 Ces options permettent de définir le type de compteur auquel est connecté le module.
 
-<img align="right" src="./screen/teleinfo-config-mode.png" alt="Mode du compteur">
+<img align="right" src="./screen/teleinfo-config-mode.png" width=300>
 
 Les anciens compteurs sont tous en mode **Historique**.
 
@@ -109,7 +111,7 @@ Si vous modifiez cette option, le module redémarrera après sauvegarde.
 
 Ces options permettent de définir le type de données que vous souhaitez visualiser et publier via MQTT.
 
-<img align="right" src="./screen/teleinfo-config-donnees.png" alt="Donnees publiées">
+<img align="right" src="./screen/teleinfo-config-donnees.png" width=300>
 
 **Energie Tasmota** publie la section **ENERGY**, publication standard de tasmota. La plupart du temps vous n'avez pas besoin de cocher cette option car elle ne prend pas en compte la moitié des données publiées par un compteur Linky.
 
@@ -123,7 +125,7 @@ Ces options permettent de définir le type de données que vous souhaitez visual
 
 Cette option vous permet de définir la fréquence de publication des données.
 
-<img align="right" src="./screen/teleinfo-config-publication.png" alt="Politique de publication">
+<img align="right" src="./screen/teleinfo-config-publication.png" width=300>
 
   - **A chaque télémétrie** : Publication à chaque déclenchement de la télémétrie, configurée par **Période télémétrie**.
   - **Evolution de +-** : Publication chaque fois que la puissance varie de la valeur configurée sur l'une des phases. C'est mon option de prédilection.
@@ -176,7 +178,7 @@ Vous pouvez passer plusieurs commandes en même temps :
       
 ## Intégration
 
-<img align="right" src="./screen/teleinfo-config-integration.png" alt="Integration">
+<img align="right" src="./screen/teleinfo-config-integration.png" width=300>
 
 Ces options permettent de publier les données dans un format spécifiquement attendu par un logiciel domotique ou SGBD.
 Les données sont émises au boot après la réception de quelques messages complets depuis le compteur.
