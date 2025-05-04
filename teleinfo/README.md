@@ -453,7 +453,7 @@ Sous ESP32, ce firmware permet de gérer un affichage déporté des principales 
 
 L'afficheur doit au préalable avoir été flashé avec le firmware Open-Source [**Awtrix3**](https://blueforcer.github.io/awtrix3/#/README).
 
-<img src="./screen/teleinfo-awtrix-puissance.png" width=400>  <img src="./screen/teleinfo-awtrix-calendrier.png" width=400>
+<img src="./screen/teleinfo-awtrix-puissance.png" width=400 alt="Puissance instantanée">  <img src="./screen/teleinfo-awtrix-calendrier.png" width=400 alt="Calendrier Tempo">
 
 Le paramétrage est réalisé en mode console via la commande **awtrix** :
 
