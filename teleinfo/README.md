@@ -335,12 +335,12 @@ Certaines variantes de ce firmware (ESP avec au moins 4Mo de ROM) utilisent une 
 
 ## Calendriers RTE : Tempo, Pointe & Ecowatt
 
+<img align="right" src="./screen/teleinfo-rte-apps.png" width=400>
+
 Ce firmware permet également de s'abonner aux calendriers publiés par [**RTE**](https://data.rte-france.com/) :
   * **Tempo**
   * **Pointe**
   * **Ecowatt**
-
-<img align="right" src="./screen/teleinfo-rte-apps.png" alt="Applications RTE">
 
 Cette fonctionnalité n'est disponible que sur les **ESP32**. Vous devez tout d'abord créer un compte sur le site **RTE** [https://data.rte-france.com/] Ensuite vous devez activer l'un ou l'autre des API suivantes :
   * **Tempo**
@@ -349,7 +349,7 @@ Cette fonctionnalité n'est disponible que sur les **ESP32**. Vous devez tout d'
 
 Ces calendriers sont utilisés pour générer le calendrier de la journée et du lendemain.
 
-<img align="right" src="./screen/teleinfo-rte-display.png">
+<img align="right" src="./screen/teleinfo-rte-display.png" width=300>
 
 Ils sont utilisés suivant les règles suivantes :
   * si calendrier **Tempo** activé, publication de ses données
