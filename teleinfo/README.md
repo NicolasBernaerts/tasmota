@@ -456,14 +456,16 @@ L'afficheur doit au préalable avoir été flashé avec le firmware Open-Source 
 Le paramétrage est réalisé en mode console via la commande **awtrix** :
 
     HLP: Commandes d'affichage Awtrix :
-      awtrix_addr <addr>  = Adresse IP du device Awtrix
-      awtrix_delai [5]    = Délai entre 2 pages (min. 2s)
-      awtrix_lumi  [0]    = Luminosité (1..100%), 0=auto
-      awtrix_inst  [1]    = Puissance instantanée
-      awtrix_cwh   [0]    = Consommation du jour
-      awtrix_pwh   [0]    = Production du jour
-      awtrix_cal   [0]    = Calendrier
-      awtrix_pmax  [1000] = Puissance produite max
+      awtrix_addr <addr> = Adresse IP du device Awtrix
+      awtrix_delai [4]   = Délai entre 2 pages (min. 2s)
+      awtrix_lumi  [10]  = Luminosité (1..100%), 0=auto
+      awtrix_inst  [70]  = Puissance instantanée
+      awtrix_cwh   [1]   = Consommation du jour
+      awtrix_pwh   [1]   = Production du jour
+      awtrix_cal   [0]   = Calendrier
+      awtrix_pmax  [200] = Puissance produite max
+
+<img src="./screen/teleinfo-awtrix-puissance.jpg" width=400>  <img src="./screen/teleinfo-awtrix-calendrier.jpg" width=400>
 
 ## Carte Winky
 
