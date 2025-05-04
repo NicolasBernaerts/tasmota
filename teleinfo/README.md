@@ -2,21 +2,11 @@
 
 ⚠️ Ce firmware n'est pas le firmware officiel **Teleinfo** de **Tasmota** publié en 2020 par Charles Hallard. 
 
-Pour la famille des **ESP32**, merci de faire systématiquement un premier flash en mode **Série** afin de regénérer le partitionnement et d'éviter tout dysfonctionnement. Vous pourrez alors faire toutes les mises à jour suivantes en mode **OTA**.
+![Homepage page](./screen/teleinfo-intro-home.png)  ![Homepage page](./screen/teleinfo-intro-message.png)
 
-Si votre ESP est un **Denky D4**, vous pouvez flasher directement le firmware Denky D4 en mode **OTA**.
-
-Lorsque vous flashez ce fork pour la première fois, merci de faire un **reset 6** afin de réinitialiser la configuration en ROM pour eviter tout dysfonctionnement du fait d'une ancienne configuration mal interprétée.
+![Homepage page](./screen/teleinfo-intro-power.png)  ![Homepage page](./screen/teleinfo-intro-histo.png)
 
 Le **changelog** général est disponible dans le fichier **user_config_override.h**
-
-⚠️ La version 14.10+ intègre une refonte complète des données historiques qui gère maintenant la production et les différentes périodes (Tempo par exemple). Le nouveau format de fichier est différent du format précédent. Après mise à jour de cette version, vous ne pourrez plus visualiser les anciennes données historisées. Elles seront toujours disponible dans le fichier CSV sur le FS.
-
-![Homepage page](./screen/teleinfo-intro-home.png) ![Homepage page](./screen/teleinfo-intro-message.png)
-
-![Homepage page](./screen/teleinfo-intro-power.png) ![Homepage page](./screen/teleinfo-intro-voltage.png) 
-
-![Homepage page](./screen/teleinfo-intro-histo.png)
 
 ## Presentation
 
@@ -84,6 +74,16 @@ Voici un tableau récapitulatif des fonctionnalités par famille d'ESP :
 | Pilotage afficheur Awtrix   |            |             |     x     |
 | Taille max d'une étiquette  |    28      |    28       |    112    |
 | Nombre max d'étiquettes     |    56      |    56       |    74     |
+
+## Flash ##
+
+⚠️ La version 14.10+ intègre une refonte complète des données historiques qui gère maintenant la production et les différentes périodes (Tempo par exemple). Le nouveau format de fichier est différent du format précédent. Après mise à jour de cette version, vous ne pourrez plus visualiser les anciennes données historisées. Elles seront toujours disponible dans le fichier CSV sur le FS.
+
+Pour la famille des **ESP32**, merci de faire systématiquement un premier flash en mode **Série** afin de regénérer le partitionnement et d'éviter tout dysfonctionnement. Vous pourrez alors faire toutes les mises à jour suivantes en mode **OTA**.
+
+Si votre ESP est un **Denky D4**, vous pouvez flasher directement le firmware Denky D4 en mode **OTA**.
+
+Lorsque vous flashez ce fork pour la première fois, merci de faire un **reset 6** afin de réinitialiser la configuration en ROM pour eviter tout dysfonctionnement du fait d'une ancienne configuration mal interprétée.
 
 ## Options de configuration
 
@@ -487,12 +487,6 @@ Voici la liste des commandes de configuration spécifiques au Winky :
      - winky_stop <volt>   = tension déclanchant l'arrêt du winky (3.9)
      - winky_coeff         = raz des coefficients d'ajustement des tensions
      - winky_meter         = raz des valeurs du linky (tension et courant max mesurés)
-
-## Main screen ##
-
-If you want to remove default Tasmota energy display, you just need to run this command in console :
-
-    websensor3 0
 
 ## Compilation
 
