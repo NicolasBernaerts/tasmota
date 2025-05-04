@@ -1,12 +1,12 @@
 # Firmware Tasmota Teleinfo
 
+<img src="./screen/teleinfo-intro-power.png" width=500 height=300> <img src="./screen/teleinfo-intro-histo.png" width=500 height=300>
+
 ⚠️ Ce firmware n'est pas le firmware officiel **Teleinfo** de **Tasmota** publié en 2020 par Charles Hallard. 
 
-![Homepage page](./screen/teleinfo-intro-home.png)  ![Homepage page](./screen/teleinfo-intro-message.png)
-
-![Homepage page](./screen/teleinfo-intro-power.png)  ![Homepage page](./screen/teleinfo-intro-histo.png)
-
 Le **changelog** général est disponible dans le fichier **user_config_override.h**
+
+<img align="right" src="./screen/teleinfo-intro-home.png">
 
 ## Presentation
 
@@ -27,6 +27,8 @@ Ce firmware a été développé et testé sur les compteurs suivants :
   * **Ace6000 triphase** en TIC **PME/PMI**
   * **Emeraude** en TIC **Emeraude 2 quadrands**
 
+<img align="right" src="./screen/teleinfo-intro-message.png">
+
 Il a été compilé et testé sur les ESP suivants :
   * **ESP8266** 1Mb (Sonoff Basic R2), 4Mb et 16Mb
   * **ESP32** 4Mb et **ESP32 Denky D4** 8Mb
@@ -44,8 +46,6 @@ Ce firmware fournit également :
   * un historique de la production et de la consommation par période
 
 Si votre compteur est en mode historique, la tension est forcée à 230V.
-
-Des versions pré-compilées sont disponibles dans le répertoire [**binary**](./binary).
 
 Le protocole **Teleinfo** est décrit dans [ce document](https://www.enedis.fr/sites/default/files/Enedis-NOI-CPT_54E.pdf)
 
@@ -77,7 +77,7 @@ Voici un tableau récapitulatif des fonctionnalités par famille d'ESP :
 
 ## Flash ##
 
-⚠️ La version 14.10+ intègre une refonte complète des données historiques qui gère maintenant la production et les différentes périodes (Tempo par exemple). Le nouveau format de fichier est différent du format précédent. Après mise à jour de cette version, vous ne pourrez plus visualiser les anciennes données historisées. Elles seront toujours disponible dans le fichier CSV sur le FS.
+Des versions pré-compilées pour différentes familles d'ESP sont disponibles dans le répertoire [**binary**](./binary).
 
 Pour la famille des **ESP32**, merci de faire systématiquement un premier flash en mode **Série** afin de regénérer le partitionnement et d'éviter tout dysfonctionnement. Vous pourrez alors faire toutes les mises à jour suivantes en mode **OTA**.
 
@@ -85,93 +85,49 @@ Si votre ESP est un **Denky D4**, vous pouvez flasher directement le firmware De
 
 Lorsque vous flashez ce fork pour la première fois, merci de faire un **reset 6** afin de réinitialiser la configuration en ROM pour eviter tout dysfonctionnement du fait d'une ancienne configuration mal interprétée.
 
+⚠️ La version 14.10+ intègre une refonte complète des données historiques qui gère maintenant la production et les différentes périodes (Tempo par exemple). Le nouveau format de fichier est différent du format précédent. Après mise à jour de cette version, vous ne pourrez plus visualiser les anciennes données historisées. Elles seront toujours disponible dans le fichier CSV sur le FS.
+
 ## Options de configuration
 
-Ce firmware propose différentes options de configuration. Merci de bien lire ce qui suit afin d'avoir un système optimisé.
+Ce firmware propose différentes options de configuration.
+
+Merci de ne configurer que les options souhaitées afin d'avoir un système optimisé et un ESP réactif.
 
 ### Teleinfo
 
-![Donnees publiées](./screen/teleinfo-config-mode.png)
-
 Ces options permettent de définir le type de compteur auquel est connecté le module.
+
+<img align="right" src="./screen/teleinfo-config-mode.png" alt="Mode du compteur">
+
 Les anciens compteurs sont tous en mode **Historique**.
+
 Les Linky sont principalement en mode **Historique** mais ceux utilisés avec les nouveaux contrats sont le plus souvent configurés en mode **Standard**.
+
 Si vous modifiez cette option, le module redémarrera après sauvegarde.
 
 ### Données publiées
 
-![Donnees publiées](./screen/teleinfo-config-donnees.png)
+Ces options permettent de définir le type de données que vous souhaitez visualiser et publier via MQTT.
 
-#### Energie Tasmota
-Cette option publie la section **ENERGY**, publication standard de tasmota. La plupart du temps vous n'avez pas besoin de cocher cette option car elle ne prend pas en compte la moitié des données publiées par un compteur Linky.
-#### Consommation & Production
-Cette option publie la section **METER** et **CONTRACT**. C'est l'option que vous devriez cocher par défaut. Elle permet de publier toutes les données utiles du compteur en mode consommation, production et/ou auto-consommation. Ce sont en particulier les données utilisées par Home Assistant.
-#### Relais virtuels
-Cette option publie la section **RELAY**. Elle permet de s'abonner à l'état des relais virtuels publiés par le compteur ou à des relais fonction de la période en cours du contrat. Elle est à utiliser avec des device ayant été programmés avec mon firmware **Relai**.
-#### Calendrier
-Cette option publie la section **CAL**. Elle permet de publier les couleurs de contrat heure / heure pour le jour courant et le lendemain.
+<img align="right" src="./screen/teleinfo-config-donnees.png" alt="Donnees publiées">
+
+**Energie Tasmota** publie la section **ENERGY**, publication standard de tasmota. La plupart du temps vous n'avez pas besoin de cocher cette option car elle ne prend pas en compte la moitié des données publiées par un compteur Linky.
+
+**Consommation & Production** publie la section **METER** et **CONTRACT**. C'est l'option que vous devriez cocher par défaut. Elle permet de publier toutes les données utiles du compteur en mode consommation, production et/ou auto-consommation. Ce sont en particulier les données utilisées par Home Assistant.
+
+**Relais virtuels** publie la section **RELAY**. Elle permet de s'abonner à l'état des relais virtuels publiés par le compteur ou à des relais fonction de la période en cours du contrat. Elle est à utiliser avec des device ayant été programmés avec mon firmware **Relai**.
+
+**Calendrier** publie la section **CAL**. Elle permet de publier les couleurs de contrat heure / heure pour le jour courant et le lendemain.
 
 ### Politique de publication
 
-![Donnees publiées](./screen/teleinfo-config-publication.png)
+Cette option vous permet de définir la fréquence de publication des données.
 
-Cette option vous permet de définir la fréquence de publication des données :
-  - **A chaque télémétrie** : Les données sont publiées à chaque déclenchement de la télémétrie, configurée par **Période télémétrie**.
-  - **Evolution de +-** : Les données sont publiées chaque fois que la puissance varie de la valeur configurée sur l'une des phases. C'est mon option de prédilection.
-  - **A chaque message reçu** : Les données sont publiées à chaque trame publiée par le compteur, soit toutes les 1 à 2 secondes. Cette option n'est à utiliser que dans des cas très particuliers car elle stresse fortement l'ESP.
+<img align="right" src="./screen/teleinfo-config-publication.png" alt="Politique de publication">
 
-### Intégration
-
-![Donnees publiées](./screen/teleinfo-config-integration.png)
-
-Ces options permettent de publier les données dans un format spécifiquement attendu par un logiciel domotique ou SGBD.
-Les données sont émises au boot après la réception de quelques messages complets depuis le compteur.
-Cela permet d'émettre des données correspondant exactement au contrat lié au compteur raccordé.
-
-#### Home Assistant
-
-Toutes les données sélectionnées dans **Données publiées** sont annoncées à Home Assistant à chaque démarrage.
-
-Comme les données sont annoncées à HA, vous ne devriez plus avoir qu'à les sélectionner dans HA, qui s'abonnera et utilisera les données publiées. 
-
-Dans le cas particulier du Wenky, les messages d'auto-découverte ne sont pas émis au réveil s'il ne dispose pas d'une alimentation fixe via USB.
-
-![Home Assistant integration](./screen/teleinfo-ha-1.png)  ![Home Assistant integration](./screen/teleinfo-ha-2.png)
-
-#### Homie
-
-Les données sont publiées dans un format spécifique reconnu par les applications domotique compatibles [**Homie**](https://homieiot.github.io/). A chaque boot, toutes les données candidates à intégration dans un client **Homie** sont émises via MQTT en mode **retain**.
-
-Dans le cas particulier du Wenky, les messages d'auto-découverte ne sont pas émis au réveil s'il ne dispose pas d'une alimentation fixe via USB.
-
-#### Thingsboard
-
-Les données sont publiées dans un format spécifique reconnu nativement par la plateforme IoT  [**Thingsboard**](https://thingsboard.io/).
-
-Le paramétrage à appliquer coté **Tasmota** et coté **Thingsboard** pour que les données soient publiées et consommées est le suivant :
-
-![Tasmota config](./screen/teleinfo-thingsboard-config.jpg)  ![Thingsboard device](./screen/teleinfo-thingsboard-device.jpg)  ![Thingsboard credentials](./screen/teleinfo-thingsboard-credentials.jpg)
-
-#### Domoticz
-
-Les données sont publiées dans un format spécifique reconnu nativement par Domoticz.
-
-Une fois l'option sélectionnée et sauvegardée, vous pourrez définir les index Domoticz définis pour chacune des données publiées. Pour chaque donnée, un tooltip explique le type de données à définir dans Domoticz.
-
-#### InfluxDB
-
-Les principales données sont publiées sur un serveur InfluxDB, à travers les API https :
-  * mode du contrat (historique:1, standard:2, PME/PMI:3, Emeraude:4, Jaune:5)
-  * nombre de périodes dans le contrat et index de la période en cours
-  * niveau de la période en cours (bleu:1, blanc:2, rouge:3)
-  * type de la période (hc:0, hp:1)
-  * pour chaque phase : courant, tension, puissance apparente & puissance active
-  * cos φ 
-  * si le compteur est en mode production : puissance apparente, puissance active & cos φ 
-
-Une fois l'option sélectionnée et sauvegardée, vous pourrez définir les caractéristiques de votre serveur InfluxDB.
-
-Les données publiées devraient apparaître automatiquement sur votre instance InfluxDB.
+  - **A chaque télémétrie** : Publication à chaque déclenchement de la télémétrie, configurée par **Période télémétrie**.
+  - **Evolution de +-** : Publication chaque fois que la puissance varie de la valeur configurée sur l'une des phases. C'est mon option de prédilection.
+  - **A chaque message reçu** : Publication à chaque trame publiée par le compteur, soit toutes les 1 à 2 secondes. Cette option n'est à utiliser que dans des cas très particuliers car elle stresse fortement l'ESP.
 
 ### Spécificités
 
@@ -188,6 +144,128 @@ Toutes les données liées à la consommation et la production sont publiée en 
 Les données recues depuis le compteur sont publiées telles quelles en complément sur un topic **TIC/...**.
 
 Ces données étant des données brutes, elles n'ont d'autre intérêt que l'analyse des trames en cas de problème.
+
+## Commands
+
+Ce firmware propose un certain nombre de commandes **EnergyConfig** spécifiques disponibles en mode console :
+
+      historique   set historique mode at 1200 bauds (needs restart)
+      standard     set Standard mode at 9600 bauds (needs restart)
+      stats        display reception statistics
+      reset        reset contract data
+      error=0      display error counters on home page
+      percent=100  maximum acceptable contract (%)
+      
+      policy=1     message policy : 0=Telemetrie seulement, 1=± 5% Evolution puissance, 2=Tous les messages TIC
+      meter=1      publish METER & PROD data
+      contract=1   publish CONTRACT data
+      calendar=1   publish CAL data
+      relay=1      publish RELAY data
+      
+      maxv=235     graph max voltage (V)
+      maxva=3000  graph max power (VA or W)
+      nbday=8      number of daily logs
+      nbweek=4     number of weekly logs
+      maxhour=2    graph max total per hour (Wh)
+      maxday=10    graph max total per day (Wh)
+      maxmonth=100 graph max total per month (Wh)
+
+Vous pouvez passer plusieurs commandes en même temps :
+
+      EnergyConfig percent=110 nbday=8 nbweek=12
+      
+## Intégration
+
+<img align="right" src="./screen/teleinfo-config-integration.png" alt="Integration">
+
+Ces options permettent de publier les données dans un format spécifiquement attendu par un logiciel domotique ou SGBD.
+Les données sont émises au boot après la réception de quelques messages complets depuis le compteur.
+Cela permet d'émettre des données correspondant exactement au contrat lié au compteur raccordé.
+
+#### Home Assistant
+
+Toutes les données sélectionnées dans **Données publiées** sont annoncées à Home Assistant à chaque démarrage.
+
+Comme les données sont annoncées à HA, vous ne devriez plus avoir qu'à les sélectionner dans HA, qui s'abonnera et utilisera les données publiées. 
+
+Dans le cas particulier du Wenky, les messages d'auto-découverte ne sont pas émis au réveil s'il ne dispose pas d'une alimentation fixe via USB.
+
+L'intégration Home Assistant peut être activée via la page de configuration **Teleinfo** ou en mode console : 
+
+    hass 1
+
+La publication de déclaration pour Home Asisstant est réalisée en mode **retain**.
+
+![Home Assistant integration](./screen/teleinfo-ha-1.png)  ![Home Assistant integration](./screen/teleinfo-ha-2.png)
+
+#### Homie
+
+Les données sont publiées dans un format spécifique reconnu par les applications domotique compatibles [**Homie**](https://homieiot.github.io/). A chaque boot, toutes les données candidates à intégration dans un client **Homie** sont émises via MQTT en mode **retain**.
+
+Dans le cas particulier du Wenky, les messages d'auto-découverte ne sont pas émis au réveil s'il ne dispose pas d'une alimentation fixe via USB.
+
+L'intégration Homie peut être activée via la page de configuration **Teleinfo** ou en mode console : 
+
+    homie 1
+
+#### Thingsboard
+
+Les données sont publiées dans un format spécifique reconnu nativement par la plateforme IoT  [**Thingsboard**](https://thingsboard.io/).
+
+Le paramétrage à appliquer coté **Tasmota** et coté **Thingsboard** pour que les données soient publiées et consommées est le suivant :
+
+![Tasmota config](./screen/teleinfo-thingsboard-config.jpg)  ![Thingsboard device](./screen/teleinfo-thingsboard-device.jpg)  ![Thingsboard credentials](./screen/teleinfo-thingsboard-credentials.jpg)
+
+L'intégration Thingsboard peut être activée via la page de configuration **Teleinfo** ou en mode console : 
+
+    thingsboard 1
+    
+#### Domoticz
+
+Les données sont publiées dans un format spécifique reconnu nativement par Domoticz.
+
+Une fois l'option sélectionnée et sauvegardée, vous pourrez définir les index Domoticz définis pour chacune des données publiées. Pour chaque donnée, un tooltip explique le type de données à définir dans Domoticz.
+
+
+La configuration des messages émis pour Domoticz peut être réalisée via la page de configuration **Teleinfo** ou en mode console :
+
+    domo
+    HLP: commands for Teleinfo Domoticz integration
+      domo_set <0/1>     = activation de l'integration [0]
+      domo_va <0/1>      = puissances en VA plutot que W [0]
+      domo_key <num,idx> = set key num to index idx
+        <0,index>  : Totaux conso. Bleu
+        <1,index>  : Totaux conso. Blanc
+        <2,index>  : Totaux conso. Rouge
+        <3,index>  : Total global conso.
+        <4,index>  : Courant (3 phases)
+        <5,index>  : Tension (phase 1)
+        <6,index>  : Tension (phase 2)
+        <7,index>  : Tension (phase 3)
+        <8,index>  : Total Production
+        <9,index>  : Heure Pleine /Creuse
+        <10,index> : Couleur du Jour
+        <11,index> : Couleur du Lendemain
+
+#### InfluxDB
+
+Les principales données sont publiées sur un serveur InfluxDB, à travers les API https :
+  * mode du contrat (historique:1, standard:2, PME/PMI:3, Emeraude:4, Jaune:5)
+  * nombre de périodes dans le contrat et index de la période en cours
+  * niveau de la période en cours (bleu:1, blanc:2, rouge:3)
+  * type de la période (hc:0, hp:1)
+  * pour chaque phase : courant, tension, puissance apparente & puissance active
+  * cos φ 
+  * si le compteur est en mode production : puissance apparente, puissance active & cos φ 
+
+Une fois l'option sélectionnée et sauvegardée, vous pourrez définir les caractéristiques de votre serveur InfluxDB.
+
+Les données publiées devraient apparaître automatiquement sur votre instance InfluxDB.
+
+L'intégration InfluxDB peut être activée via la page de configuration **Teleinfo** ou en mode console : 
+
+    influx 1
+
 
 ## Publication MQTT
 
@@ -249,83 +327,6 @@ Toutes ces publications sont activables à travers la page **Configuration Telei
 |              |   Preavis   | Niveau du prochain préavis (utilisé en Tempo & EJP)     | 
 |              |    Label    | Libellé du prochain préavis    | 
 
-## Commands
-
-Ce firmware propose un certain nombre de commandes **EnergyConfig** spécifiques disponibles en mode console :
-
-      historique   set historique mode at 1200 bauds (needs restart)
-      standard     set Standard mode at 9600 bauds (needs restart)
-      stats        display reception statistics
-      reset        reset contract data
-      error=0      display error counters on home page
-      percent=100  maximum acceptable contract (%)
-      
-      policy=1     message policy : 0=Telemetrie seulement, 1=± 5% Evolution puissance, 2=Tous les messages TIC
-      meter=1      publish METER & PROD data
-      contract=1   publish CONTRACT data
-      calendar=1   publish CAL data
-      relay=1      publish RELAY data
-      
-      maxv=235     graph max voltage (V)
-      maxva=3000  graph max power (VA or W)
-      nbday=8      number of daily logs
-      nbweek=4     number of weekly logs
-      maxhour=2    graph max total per hour (Wh)
-      maxday=10    graph max total per day (Wh)
-      maxmonth=100 graph max total per month (Wh)
-
-Vous pouvez passer plusieurs commandes en même temps :
-
-      EnergyConfig percent=110 nbday=8 nbweek=12
-
-### Domoticz
-
-La configuration des messages émis pour Domoticz peut être réalisée via la page de configuration **Teleinfo** ou en mode console :
-
-    domo
-    HLP: commands for Teleinfo Domoticz integration
-      domo_set <0/1>     = activation de l'integration [0]
-      domo_va <0/1>      = puissances en VA plutot que W [0]
-      domo_key <num,idx> = set key num to index idx
-        <0,index>  : Totaux conso. Bleu
-        <1,index>  : Totaux conso. Blanc
-        <2,index>  : Totaux conso. Rouge
-        <3,index>  : Total global conso.
-        <4,index>  : Courant (3 phases)
-        <5,index>  : Tension (phase 1)
-        <6,index>  : Tension (phase 2)
-        <7,index>  : Tension (phase 3)
-        <8,index>  : Total Production
-        <9,index>  : Heure Pleine /Creuse
-        <10,index> : Couleur du Jour
-        <11,index> : Couleur du Lendemain
-
-### Home Assistant
-
-L'intégration Home Assistant peut être activée via la page de configuration **Teleinfo** ou en mode console : 
-
-    hass 1
-
-La publication de déclaration pour Home Asisstant est réalisée en mode **retain**.
-
-### Homie
-
-L'intégration Homie peut être activée via la page de configuration **Teleinfo** ou en mode console : 
-
-    homie 1
- 
-### ThingsBoard
-
-L'intégration Thingsboard peut être activée via la page de configuration **Teleinfo** ou en mode console : 
-
-    thingsboard 1
-
-### InfluxDB
-
-L'intégration InfluxDB peut être activée via la page de configuration **Teleinfo** ou en mode console : 
-
-    influx 1
-
 ## Partition LittleFS
 
 Certaines variantes de ce firmware (ESP avec au moins 4Mo de ROM) utilisent une partition **LittleFS** pour stocker les données historisées qui servent à générer les graphs de suivi. Lorsque vous souhaitez utiliser cette fonctionnalité, vérifier que vous flashez bien l'ESP en mode série la première fois afin de modifier le partitionnement.
@@ -337,16 +338,16 @@ Ce firmware permet également de s'abonner aux calendriers publiés par [**RTE**
   * **Pointe**
   * **Ecowatt**
 
+<img align="right" src="./screen/teleinfo-rte-apps.png" alt="Applications RTE">
+
 Cette fonctionnalité n'est disponible que sur les **ESP32**. Vous devez tout d'abord créer un compte sur le site **RTE** [https://data.rte-france.com/] Ensuite vous devez activer l'un ou l'autre des API suivantes :
   * **Tempo**
   * **Demand Response Signal**
   * **Ecowatt**
 
-![RTE applications](./screen/teleinfo-rte-apps.png) 
-
 Ces calendriers sont utilisés pour générer le calendrier de la journée et du lendemain.
 
-![RTE applications](./screen/teleinfo-rte-display.png)
+<img align="right" src="./screen/teleinfo-rte-display.png">
 
 Ils sont utilisés suivant les règles suivantes :
   * si calendrier **Tempo** activé, publication de ses données
