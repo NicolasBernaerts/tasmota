@@ -12,7 +12,11 @@ Le **changelog** général est disponible dans le fichier **user_config_override
 
 ⚠️ La version 14.10+ intègre une refonte complète des données historiques qui gère maintenant la production et les différentes périodes (Tempo par exemple). Le nouveau format de fichier est différent du format précédent. Après mise à jour de cette version, vous ne pourrez plus visualiser les anciennes données historisées. Elles seront toujours disponible dans le fichier CSV sur le FS.
 
-![Homepage page](./screen/tasmota-teleinfo-homepage.png)
+![Homepage page](./screen/teleinfo-intro-home.png) ![Homepage page](./screen/teleinfo-intro-message.png)
+
+![Homepage page](./screen/teleinfo-intro-power.png) ![Homepage page](./screen/teleinfo-intro-voltage.png) 
+
+![Homepage page](./screen/teleinfo-intro-histo.png)
 
 ## Presentation
 
@@ -87,7 +91,7 @@ Ce firmware propose différentes options de configuration. Merci de bien lire ce
 
 ### Teleinfo
 
-![Donnees publiées](./screen/tasmota-teleinfo-config-mode.png)
+![Donnees publiées](./screen/teleinfo-config-mode.png)
 
 Ces options permettent de définir le type de compteur auquel est connecté le module.
 Les anciens compteurs sont tous en mode **Historique**.
@@ -96,7 +100,7 @@ Si vous modifiez cette option, le module redémarrera après sauvegarde.
 
 ### Données publiées
 
-![Donnees publiées](./screen/tasmota-teleinfo-config-donnees.png)
+![Donnees publiées](./screen/teleinfo-config-donnees.png)
 
 #### Energie Tasmota
 Cette option publie la section **ENERGY**, publication standard de tasmota. La plupart du temps vous n'avez pas besoin de cocher cette option car elle ne prend pas en compte la moitié des données publiées par un compteur Linky.
@@ -109,7 +113,7 @@ Cette option publie la section **CAL**. Elle permet de publier les couleurs de c
 
 ### Politique de publication
 
-![Donnees publiées](./screen/tasmota-teleinfo-config-publication.png)
+![Donnees publiées](./screen/teleinfo-config-publication.png)
 
 Cette option vous permet de définir la fréquence de publication des données :
   - **A chaque télémétrie** : Les données sont publiées à chaque déclenchement de la télémétrie, configurée par **Période télémétrie**.
@@ -118,7 +122,7 @@ Cette option vous permet de définir la fréquence de publication des données :
 
 ### Intégration
 
-![Donnees publiées](./screen/tasmota-teleinfo-config-integration.png)
+![Donnees publiées](./screen/teleinfo-config-integration.png)
 
 Ces options permettent de publier les données dans un format spécifiquement attendu par un logiciel domotique ou SGBD.
 Les données sont émises au boot après la réception de quelques messages complets depuis le compteur.
@@ -132,7 +136,7 @@ Comme les données sont annoncées à HA, vous ne devriez plus avoir qu'à les s
 
 Dans le cas particulier du Wenky, les messages d'auto-découverte ne sont pas émis au réveil s'il ne dispose pas d'une alimentation fixe via USB.
 
-![Home Assistant integration](./screen/tasmota-ha-integration-1.png)  ![Home Assistant integration](./screen/tasmota-ha-integration-2.png)
+![Home Assistant integration](./screen/teleinfo-ha-1.png)  ![Home Assistant integration](./screen/teleinfo-ha-2.png)
 
 #### Homie
 
@@ -146,7 +150,7 @@ Les données sont publiées dans un format spécifique reconnu nativement par la
 
 Le paramétrage à appliquer coté **Tasmota** et coté **Thingsboard** pour que les données soient publiées et consommées est le suivant :
 
-![Tasmota config](./screen/tasmota-thingsboard-config.jpg)  ![Thingsboard device](./screen/thingsboard-device.jpg)  ![Thingsboard credentials](./screen/thingsboard-credentials.jpg)
+![Tasmota config](./screen/teleinfo-thingsboard-config.jpg)  ![Thingsboard device](./screen/teleinfo-thingsboard-device.jpg)  ![Thingsboard credentials](./screen/teleinfo-thingsboard-credentials.jpg)
 
 #### Domoticz
 
@@ -338,11 +342,11 @@ Cette fonctionnalité n'est disponible que sur les **ESP32**. Vous devez tout d'
   * **Demand Response Signal**
   * **Ecowatt**
 
-![RTE applications](./screen/rte-application-list.png) 
+![RTE applications](./screen/teleinfo-rte-apps.png) 
 
 Ces calendriers sont utilisés pour générer le calendrier de la journée et du lendemain.
 
-![RTE applications](./screen/tasmota-rte-display.png)
+![RTE applications](./screen/teleinfo-rte-display.png)
 
 Ils sont utilisés suivant les règles suivantes :
   * si calendrier **Tempo** activé, publication de ses données
@@ -483,7 +487,13 @@ Voici la liste des commandes de configuration spécifiques au Winky :
      - winky_stop <volt>   = tension déclanchant l'arrêt du winky (3.9)
      - winky_coeff         = raz des coefficients d'ajustement des tensions
      - winky_meter         = raz des valeurs du linky (tension et courant max mesurés)
-  
+
+## Main screen ##
+
+If you want to remove default Tasmota energy display, you just need to run this command in console :
+
+    websensor3 0
+
 ## Compilation
 
 Si vous voulez compiler ce firmware vous-même, vous devez :
@@ -526,11 +536,11 @@ Between your Energy meter and your Tasmota device, you'll need an adapter to con
 
 A very simple adapter diagram can be this one. Pleasee note that some Linky meters may need a resistor as low as **1k** instead of **1.5k** to avoid transmission errors.
 
-![Simple Teleinfo adapter](./screen/teleinfo-adapter-simple-diagram.png)
+![Simple Teleinfo adapter](./screen/teleinfo-adapter-diagram.png)
 
 Here is a board example using a monolithic 3.3V power supply and an ESP-01.
 
-![Simple Teleinfo board](./screen/teleinfo-adapter-simple-board.png)
+![Simple Teleinfo board](./screen/teleinfo-adapter-board.png)
 
 You need to connect your adapter output **ESP Rx** to any available serial port of your Tasmota device.
 
@@ -545,26 +555,4 @@ Finaly, in **Configure Teleinfo** you need to select your Teleinfo adapter proto
   * **Historique** (original white meter or green Linky in historic mode, 1200 bauds)
   * **Standard** (green Linky in standard mode, 9600 bauds)
 
-## Main screen ##
 
-![Monophasé](./screen/tasmota-teleinfo-main.png)  ![Triphasé](./screen/tasmota-teleinfo-main-triphase.png)
-
-If you want to remove default Tasmota energy display, you just need to run this command in console :
-
-    websensor3 0
-
-## Configuration
-
-![Config 1](./screen/tasmota-teleinfo-config-1.png)  ![Config 2](./screen/tasmota-teleinfo-config-2.png)  ![Config 3](./screen/tasmota-teleinfo-config-3.png)
-
-### Realtime messages ###
-
-![Grah message](./screen/tasmota-teleinfo-message.png) 
-
-### Graph for Power, Voltage and Cos φ ###
-
-![Grah monophase power](./screen/tasmota-teleinfo-graph-daily.png)  ![Grah monophase cosphi](./screen/tasmota-teleinfo-graph-24h.png) 
- 
-### Totals Counters (kWh) ###
-
-![Daily total](./screen/tasmota-teleinfo-total-day.png)
