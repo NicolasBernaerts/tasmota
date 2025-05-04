@@ -532,9 +532,7 @@ Mais si vous souhaitez vraiment réaliser vous même votre adaptateur Teleinfo, 
 
 ![Simple Teleinfo adapter](./screen/teleinfo-adapter-diagram.png)
 
-Concernant la résistance en tête de l'opto-coupleur, certains compteurs Linky peuvent nécessiter une résistance assez faible que la résistance de 1.5 kΩ.
-
-J'ai eu à descendre la résistance à **800 Ω** sur un compteur triphasé en mode standard pour éviter les erreurs de réception.
+Concernant la résistance en tête de l'opto-coupleur, certains compteurs Linky peuvent nécessiter une résistance assez faible que la résistance de 1.5 kΩ. J'ai eu à descendre la résistance à **800 Ω** sur un compteur triphasé en mode standard pour éviter les erreurs de réception.
 
 Concernant le port GPIO à utiliser coté ESP, je préconise les suivants :
   * ESP8266 : **GPIO3 (RXD)**
