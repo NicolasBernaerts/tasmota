@@ -80,7 +80,9 @@ Voici un tableau récapitulatif des fonctionnalités par famille d'ESP :
 
 Des versions pré-compilées pour différentes familles d'ESP sont disponibles dans le répertoire [**binary**](./binary).
 
-Pour la famille des **ESP32**, merci de faire systématiquement un premier flash en mode **Série** afin de regénérer le partitionnement et d'éviter tout dysfonctionnement. Vous pourrez alors faire toutes les mises à jour suivantes en mode **OTA**.
+Certaines variantes de ce firmware (ESP avec au moins 4Mo de ROM) utilisent une partition **LittleFS** pour stocker les données historisées qui servent à générer les graphs de suivi.
+
+Pour la famille des **ESP8266 4M+** et **ESP32**, merci de faire systématiquement un premier flash en mode **Série** afin de regénérer le partitionnement et d'éviter tout dysfonctionnement. Vous pourrez alors faire toutes les mises à jour suivantes en mode **OTA**.
 
 Si votre ESP est un **Denky D4**, vous pouvez flasher directement le firmware Denky D4 en mode **OTA**.
 
@@ -267,7 +269,6 @@ L'intégration InfluxDB peut être activée via la page de configuration **Telei
 
     influx 1
 
-
 ## Publication MQTT
 
 Dans le topic **../SENSOR**, les sections suivantes seront publiées selon votre configuration : 
@@ -327,10 +328,6 @@ Toutes ces publications sont activables à travers la page **Configuration Telei
 |              |    Volt     | Indicateur de surtension (0:pas de pb, 1:au moins 1 phase est en surtension)    | 
 |              |   Preavis   | Niveau du prochain préavis (utilisé en Tempo & EJP)     | 
 |              |    Label    | Libellé du prochain préavis    | 
-
-## Partition LittleFS
-
-Certaines variantes de ce firmware (ESP avec au moins 4Mo de ROM) utilisent une partition **LittleFS** pour stocker les données historisées qui servent à générer les graphs de suivi. Lorsque vous souhaitez utiliser cette fonctionnalité, vérifier que vous flashez bien l'ESP en mode série la première fois afin de modifier le partitionnement.
 
 ## Calendriers RTE : Tempo, Pointe & Ecowatt
 
