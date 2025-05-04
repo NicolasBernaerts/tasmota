@@ -4,9 +4,6 @@
 
 ⚠️ Ce firmware n'est pas le firmware officiel **Teleinfo** de **Tasmota** publié en 2020 par Charles Hallard. 
 
-Le **changelog** général est disponible dans le fichier **user_config_override.h**
-
-
 ## Presentation
 
 <img align="right" src="./screen/teleinfo-intro-home.png" width=260>
@@ -50,6 +47,8 @@ Ce firmware fournit également :
 Si votre compteur est en mode historique, la tension est forcée à 230V.
 
 Le protocole **Teleinfo** est décrit dans [ce document](https://www.enedis.fr/sites/default/files/Enedis-NOI-CPT_54E.pdf)
+
+Le **changelog** général est disponible dans le fichier **user_config_override.h**
 
 ## Fonctionnalités
 
