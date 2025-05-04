@@ -333,30 +333,25 @@ Toutes ces publications sont activables à travers la page **Configuration Telei
 
 <img align="right" src="./screen/teleinfo-rte-apps.png" width=400>
 
-Ce firmware permet également de s'abonner aux calendriers publiés par [**RTE**](https://data.rte-france.com/) :
+Ce firmware permet également de s'abonner aux calendriers publiés par [**RTE**](https://data.rte-france.com/) et de publier les informations via MQTT. Il est à noter que cette fonctionnalité n'est disponible que sur les **ESP32**.
+
+Les calendriers gérés sont les suivants :
   * **Tempo**
   * **Pointe**
   * **Ecowatt**
 
-Cette fonctionnalité n'est disponible que sur les **ESP32**. Vous devez tout d'abord créer un compte sur le site **RTE** [https://data.rte-france.com/] Ensuite vous devez activer l'un ou l'autre des API suivantes :
+Vous devez tout d'abord créer un compte sur le site **RTE** [https://data.rte-france.com/] Ensuite vous devez activer l'un ou l'autre des API suivantes :
   * **Tempo**
   * **Demand Response Signal**
   * **Ecowatt**
 
-Ces calendriers sont utilisés pour générer le calendrier de la journée et du lendemain.
-
 <img align="right" src="./screen/teleinfo-rte-display.png" width=300>
 
-Ils sont utilisés suivant les règles suivantes :
-  * si calendrier **Tempo** activé, publication de ses données
-  * sinon, si calendrier **Pointe** activé, publication de ses données
-  * sinon, publication des données de calendrier fournies par le compteur (**PJOURN+1**)
-
-En complément, si le calendrier **Ecowatt** est activé, les alertes sont publiées suivant les règles suivantes :
-  * alerte **orange**  = jour **blanc**
+Si le calendrier **Ecowatt** est activé, les alertes sont publiées suivant les règles suivantes :
+  * alerte **orange** = jour **blanc**
   * alerte **rouge**  = jour **rouge**
 
-La configuration est stockée dans le fichier **rte.cfg**.
+La configuration est stockée sur le FS dans le fichier **rte.cfg**.
 
 Voici la liste de toutes les commandes RTE disponibles en mode console :
 
@@ -398,13 +393,13 @@ Au prochain redémarrage, vous verrez dans les logs que votre ESP32 récupère u
     RTE: Ecowatt - Success 200
     RTE: Tempo - Update done (2/1/1)
 
-Les données RTE sont publiées sous des sections spécifiques sous **tele/SENSOR** :
+Les données des calendriers sont publiées sur un topic spécifiques **votre-esp/tele/RTE** :
 
-    your-device/tele/SENSOR = {"Time":"2023-12-20T07:23:39",TEMPO":{"lv":1,"hp":0,"label":"blue","icon":"🟦","yesterday":1,"today":1,"tomorrow":1}}
+    votre-esp/tele/RTE = {"Time":"2023-12-20T07:23:39",TEMPO":{"lv":1,"hp":0,"label":"blue","icon":"🟦","yesterday":1,"today":1,"tomorrow":1}}
 
-    your-device/tele/SENSOR = {"Time":"2023-12-20T07:36:02","POINTE":{"lv":1,"label":"blue","icon":"🟦","today":1,"tomorrow":1}}
+    votre-esp/tele/RTE = {"Time":"2023-12-20T07:36:02","POINTE":{"lv":1,"label":"blue","icon":"🟦","today":1,"tomorrow":1}}
 
-    your-device/tele/SENSOR = {"Time":"2022-10-10T23:51:09","ECOWATT":{"dval":2,"hour":14,"now":1,"next":2,
+    votre-esp/tele/RTE = {"Time":"2022-10-10T23:51:09","ECOWATT":{"dval":2,"hour":14,"now":1,"next":2,
       "day0":{"jour":"2022-10-06","dval":1,"0":1,"1":1,"2":1,"3":1,"4":1,"5":1,"6":1,...,"23":1},
       "day1":{"jour":"2022-10-07","dval":2,"0":1,"1":1,"2":2,"3":1,"4":1,"5":1,"6":1,...,"23":1},
       "day2":{"jour":"2022-10-08","dval":3,"0":1,"1":1,"2":1,"3":1,"4":1,"5":3,"6":1,...,"23":1},
