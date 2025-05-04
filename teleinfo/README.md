@@ -54,7 +54,7 @@ Suivant le type d'ESP utilisé, toutes les fonctionnalités ne sont pas disponib
 
 Voici un tableau récapitulatif des fonctionnalités par famille d'ESP :
 
-|       Fonctionnalité        | ESP8266 1M | ESP8266 4M+ | ESP32 4M+ |
+|       Fonctionnalité        |   ESP8266  | ESP8266 4M+ |   ESP32   |
 | --------------------------- | ---------- | ----------- | --------  |
 | IP fixe                     |     x      |      x      |     x     |
 | Calcul Cos φ                |     x      |      x      |     x     |
