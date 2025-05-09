@@ -406,12 +406,12 @@ Les données des calendriers sont publiées sur un topic spécifiques **votre-es
 
 Un serveur **TCP** est intégré à cette version de firmware.
 
-Il permet de récupérer très simplement le flux d'information publié par le compteur. Il est à noter que ce flux envoie toutes les données recues, sans aucune correction d'erreur.
+Il permet de récupérer très simplement le flux d'information publié par le compteur. C'est très intéressant pour diagnostiquer un problème ou permettre de rejouer les données plus tard. Il est à noter que ce flux envoie toutes les données recues, sans aucune correction d'erreur.
 
 La commande **tcp_help** explique toutes les possibilités :
-  * **tcp_status** : status of TCP server (running port or 0 if not running)
-  * **tcp_start** [port] : start TCP server on specified port
-  * **tcp_stop** : stop TCP server
+  * **tcp_status** : status du serveur TCP server (affiche le numéro de port utilisé ou **0** si éteint)
+  * **tcp_start** [port] : démarre le serveur sur le **port** précisé
+  * **tcp_stop** : arrêt du serveur
 
 Une fois le serveur activé, la réception du flux sur un PC sous Linux est un jeu d'enfant (ici sur le port 888) :
 
@@ -423,7 +423,13 @@ Une fois le serveur activé, la réception du flux sur un PC sous Linux est un j
         STGE	003A0001	:
         MSG1	PAS DE          MESSAGE         	<
 
-Si vous souhaitez enregistrer le flux sous Windows, l'utilitaire **ncat** devrait faire le job.
+Faites **Ctrl + C** pour arrêter la commande.
+
+Vous pouvez évidement enregistrer le flux dans un fichier :
+
+    # nc 192.168.1.10 888 > mon-fichier.log
+
+Si vous souhaitez enregistrer le flux sous Windows, l'utilitaire **ncat** devrait faire le job. Mais n'ayant plus de PC Windows depuis plusieurs années, je n'ai pas pu le tester.
 
 Le serveur étant minimaliste, il ne permet qu'une seule connexion simultanée. Toute nouvelle connexion tuera la connexion précédente.
 
