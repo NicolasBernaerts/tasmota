@@ -1,29 +1,33 @@
 Gazpar Tasmota firmware
 =============
 
-<img src="./screen/gazpar-histo-day.png" width=500 height=300>
-
 Presentation
 ------------
 
 <img align="right" src="./screen/gazpar-homepage.png" width=260>
 
-Cette évolution du firmware **Tasmota 14.6.0** intègre la gestion firmware has been enhanced to handle France gaz meters known as **Gazpar** using a dry contact counter.
+Cette évolution du firmware **Tasmota 14.6.0** intègre la gestion des compteurs de gaz intelligents **Gazpar**.
 
-It is compatible with **ESP8266** and **ESP32** chipsets.
+Elle est compatible avec les **ESP8266** et **ESP32**.
  
-This firmware uses LittleFS partition to store graph data. Il allows to keep historical data over reboots.
-To take advantage of this feature, make sure to follow partitioning procedure given in the **readme** of the **binary** folder.
+Ce firmware utilise la partition **LittleFS** pour stocker les historiques de consommation et les restituer sous forme de graphiques de consommation.
 
-This firmware provides some extra Web page on the device :
-  * **/graph** : yearly, monthly and daily graphs
+Pour garantir un partitionnement correct, veillez à flasher une première fois l'ESP en mode série. Une fois cette opération réalisée, les mises à jour pourront se faire via l'interface Web.
 
-Pre-compiled versions are available in the [**binary**](https://github.com/NicolasBernaerts/tasmota/tree/master/gazpar/binary) folder.
+<img src="./screen/gazpar-histo-day.png" width=500 height=300>
 
-Configuration
+Des fimrwares précompilés sont disponibles dans le répertoire  [**binary**](https://github.com/NicolasBernaerts/tasmota/tree/master/gazpar/binary).
+
+Connexion
 -------------
 
-Gazpar impulse should be declared as **Input 1**
+Gazpar propose un connecteur collecteur ouvert.
+
+Voici un schéma simplifié de connection entre le compteur et une GPIO d'ESP :
+
+<img src="./screen/gazpar-connexion.jpg" width=300>
+
+Le connecteur GPIO concerné doit être déclaré en **INPUT 1**.
 
 Compilation
 -----------
@@ -53,10 +57,3 @@ Voici la liste exhaustive des fichiers concernés :
 | tasmota/tasmota_sns_sensor/**xsns_99_timezone.ino** | Timezone Web configuration |
 
 If everything goes fine, you should be able to compile your own build.
-
-Screen shots
-------------
-
- ![Grah yearly](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/gazpar/screen/gazpar-graph-year.png)
- 
- ![Grah monthly](https://raw.githubusercontent.com/NicolasBernaerts/tasmota/master/gazpar/screen/gazpar-graph-month.png)
