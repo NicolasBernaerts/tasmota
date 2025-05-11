@@ -1,6 +1,8 @@
 Gazpar Tasmota firmware
 =============
 
+<img src="./screen/gazpar-histo-day.png" width=500 height=300>
+
 Presentation
 ------------
 
