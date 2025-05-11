@@ -3,14 +3,21 @@
 
   Copyright (C) 2022  Theo Arends, Nicolas Bernaerts
 
+  Gazpar impulse connector should be declared as Input 1
+
   Version history :
     28/04/2022 - v1.0 - Creation
     06/11/2022 - v1.1 - Rename to XSNS_119
     04/12/2022 - v1.2 - Add graphs
     15/05/2023 - v1.3 - Rewrite CSV file access
     05/05/2024 - v2.0 - Use Tasmota native FTP
-                        Home Asisstant and Homie auto-discovery
-        
+                        Domoticz, Home Asisstant and Homie auto-discovery
+    10/05/2024 - v3.0 - Based on Tasmota 14.6.0
+                        Use interrupt for meter pulse detection
+                        Rewrite historisation graphs
+
+  tasmota_template.h has been modified to allow INPUT for Esp8266
+
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
@@ -50,13 +57,14 @@
 \********************************************/
 
 // complementary modules
-#define USE_IPADDRESS                       // Add fixed IP configuration page
+#define USE_IP_OPTION                       // Add IP and options configuration page
 #define USE_TIMEZONE                        // Enable Timezone management
 #define USE_GAZPAR                          // Enable Teleinfo
 
 // home management integration
-#define USE_GAZPAR_HASS                     // Home Assistant auto-discovery intégration
-#define USE_GAZPAR_HOMIE                    // Homie protocol auto-discovery intégration
+#define USE_GAZPAR_DOMOTICZ                 // Domoticz auto-discovery integration
+#define USE_GAZPAR_HASS                     // Home Assistant auto-discovery integration
+#define USE_GAZPAR_HOMIE                    // Homie protocol auto-discovery integration
 
 // FTP server credentials
 #ifdef USE_FTP
@@ -65,16 +73,15 @@
 #endif
 
 // build
-#if defined BUILD_ESP32
+#if defined BUILD_ESP32_4M
 #define EXTENSION_BUILD   "esp32-4m"
-#elif defined BUILD_16M14M
-#define EXTENSION_BUILD   "esp-16m"
-#elif defined BUILD_4M2M
+
+#elif defined BUILD_16M
+#define EXTENSION_BUILD   "esp8266-16m"
+
+#elif defined BUILD_4M
 #define EXTENSION_BUILD   "esp8266-4m"
-#elif defined BUILD_2M1M
-#define EXTENSION_BUILD   "esp8266-2m"
-#elif defined BUILD_1M
-#define EXTENSION_BUILD   "esp8266-1m"
+
 #else
 #define EXTENSION_BUILD   "other"
 #endif
@@ -82,7 +89,7 @@
 // extension data
 #define EXTENSION_NAME    "Gazpar"            // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts" // author
-#define EXTENSION_VERSION "2.0"               // version
+#define EXTENSION_VERSION "3.0"               // version
 
 // MQTT default
 #undef MQTT_HOST
@@ -94,11 +101,11 @@
 #undef MQTT_PASS
 #define MQTT_PASS          ""
 #undef MQTT_TOPIC
-#define MQTT_TOPIC         "compteur"
+#define MQTT_TOPIC         "gazpar"
 #undef MQTT_FULLTOPIC
 #define MQTT_FULLTOPIC     "%topic%/%prefix%/"
 #undef FRIENDLY_NAME
-#define FRIENDLY_NAME      "Teleinfo"
+#define FRIENDLY_NAME      "Gazpar"
 
 // disable serial log
 #undef SERIAL_LOG_LEVEL 
@@ -251,16 +258,21 @@
 
 //#undef USE_ESP32_SENSORS
 
-//#define USE_TLS                               // for safeboot and BearSSL
+#define USE_TLS                               // for safeboot and BearSSL
+#define USE_MQTT_TLS                          // enable mqtts connexion
+#define USE_LIB_SSL_ENGINE
+
+#undef USE_LIGHT                              // Add support for light control
+#undef USE_WS2812                             // WS2812 Led string using library NeoPixelBus (+5k code, +1k mem, 232 iram) - Disable by //
+#undef USE_ADC                                // Add support for ADC on GPIO32 to GPIO39
 
 #undef USE_BLE_ESP32
 #undef USE_MI_ESP32
 #undef USE_IBEACON
 
-#undef USE_AUTOCONF                           // Disable Esp32 autoconf feature
-#undef USE_BERRY
+#undef USE_I2C                                // All I2C sensors and devices
+#undef USE_DISPLAY                            // Add Display support
 
-#undef USE_DISPLAY
 #undef USE_SR04
 #undef USE_LVGL
 
