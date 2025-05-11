@@ -23,11 +23,13 @@ Connexion
 
 Gazpar propose un connecteur collecteur ouvert.
 
-Voici un schéma simplifié de connection entre le compteur et une GPIO d'ESP :
+Voici un schéma simplifié de connection entre le compteur et une GPIO de votre ESP :
 
 <img src="./screen/gazpar-connexion.jpg" width=300>
 
 Le connecteur GPIO concerné doit être déclaré en **INPUT 1**.
+
+Evitez GPIO16 qui n'est pas compatible avec la gestion des interruptions matérielles utilisée par ce firmware.
 
 Compilation
 -----------
