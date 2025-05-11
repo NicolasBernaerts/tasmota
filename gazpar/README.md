@@ -6,6 +6,8 @@ Gazpar Tasmota firmware
 Presentation
 ------------
 
+<img align="right" src="./screen/gazpar-homepage.png" width=260>
+
 This evolution of **Tasmota 14.6.0** firmware has been enhanced to handle France gaz meters known as **Gazpar** using a dry contact counter.
 
 It is compatible with **ESP8266** and **ESP32** chipsets.
