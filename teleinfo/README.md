@@ -156,7 +156,7 @@ Ce firmware propose un certain nombre de commandes **EnergyConfig** spécifiques
       full           emission topic TIC
       skip=5         emet les topic TIC/LIVE toutes les xx trames
       live           emission topic LIVE
-      reset          reset contrat et données
+      reset          reset contrat et données (nécessite un redémarrage)
       automode       auto-détection du mode Linky
       calraz         remise a 0 des plages du calendrier
       calhexa=0      format des plages horaires Linky [0:decimal/1:hexa]
