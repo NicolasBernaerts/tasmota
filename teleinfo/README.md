@@ -150,8 +150,8 @@ Ces données étant des données brutes, elles n'ont d'autre intérêt que l'ana
 
 Ce firmware propose un certain nombre de commandes **EnergyConfig** spécifiques disponibles en mode console :
 
-      historique     mode historique (1200 bauds)
-      standard       mode standard (9600 bauds)
+      historique     mode historique (redémarrage)
+      standard       mode standard (rédémarrage)
       noraw          pas d'emission trame TIC
       full           emission topic TIC
       skip=5         emet les topic TIC/LIVE toutes les xx trames
