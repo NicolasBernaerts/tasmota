@@ -8,6 +8,12 @@
                         Save configuration to korad.cfg
                         Allow realtime data recording to CSV file
     15/12/2022 - v1.2 - Rewrite serial communication management
+    03/02/2023 - v1.3 - Based on Tasmota 12
+    29/02/2024 - v1.4 - Based on Tasmota 13
+    22/06/2025 - v2.0 - Based on Tasmota 15
+                        Complete rewrite to add support for Kuaiqu supplies
+                        Add CV and CC display
+                        Add ps_custom command
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -48,31 +54,29 @@
 \********************************************/
 
 // complementary modules
-#define USE_IPADDRESS                         // Add fixed IP configuration page
+#define USE_IP_OPTION                         // Add fixed IP configuration page
 #define USE_TIMEZONE                          // Add support for Timezone management
-#define USE_KORAD                             // Add support for KORAD power supply management
+#define USE_POWERSUPPLY                       // Add support for power supply management
+
+#ifdef USE_FTPSERVER
+#define FTP_SERVER_LOGIN      "ps"            // FTP server login
+#define FTP_SERVER_PASSWORD   "ps"            // FTP server password
+#endif
+
 
 // build
 #if defined BUILD_ESP32_4M
-#define EXTENSION_BUILD   "esp32-4m"
-#elif defined BUILD_16M14M
-#define EXTENSION_BUILD   "esp-16m14m"
-#elif defined BUILD_4M2M
-#define EXTENSION_BUILD   "esp-4m2m"
-#elif defined BUILD_2M1M
-#define EXTENSION_BUILD   "esp-2m1m"
-#elif defined BUILD_1M128K
-#define EXTENSION_BUILD   "esp-1m128k"
-#elif defined BUILD_1M64K
-#define EXTENSION_BUILD   "esp-1m64k"
-#else
-#define EXTENSION_BUILD   "esp-nofs"
+#define EXTENSION_BUILD     "esp32-4m"
+#elif defined BUILD_16M
+#define EXTENSION_BUILD     "esp8266-16m"
+#elif defined BUILD_4M
+#define EXTENSION_BUILD     "esp8266-4m"
 #endif
 
 // extension data
-#define EXTENSION_NAME "Korad"                // name
-#define EXTENSION_AUTHOR "Nicolas Bernaerts"  // author
-#define EXTENSION_VERSION "1.2"               // version
+#define EXTENSION_NAME      "PowerSupply"                // name
+#define EXTENSION_AUTHOR    "Nicolas Bernaerts"  // author
+#define EXTENSION_VERSION   "1.2"               // version
 
 // MQTT default
 #undef MQTT_HOST
@@ -84,15 +88,17 @@
 #undef MQTT_PASS
 #define MQTT_PASS          ""
 #undef MQTT_TOPIC
-#define MQTT_TOPIC         "serialrelay"
+#define MQTT_TOPIC         "powersupply"
 #undef MQTT_FULLTOPIC
 #define MQTT_FULLTOPIC     "%topic%/%prefix%/"
 #undef FRIENDLY_NAME
-#define FRIENDLY_NAME      "Serial Relays"
+#define FRIENDLY_NAME      "Power Supply"
 
 // disable serial log
 #undef SERIAL_LOG_LEVEL
 #define SERIAL_LOG_LEVEL LOG_LEVEL_NONE       // disable SerialLog
+
+#define USE_WEB_STATUS_LINE_WIFI              // enable wifi icon
 
 #undef USE_ARDUINO_OTA                        // support for Arduino OTA
 #undef USE_WPS                                // support for WPS as initial wifi configuration tool
