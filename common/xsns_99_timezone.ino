@@ -7,10 +7,12 @@
     22/07/2020 - v1.2 - Memory optimisation 
     10/04/2021 - v1.3 - Remove use of String to avoid heap fragmentation 
     22/04/2021 - v1.4 - Switch to a full Drv (without Sns) 
-    11/07/2021 - v1.5 - Tasmota 9.5 compatibility 
+    11/07/2021 - v1.5 - Based on Tasmota 9.5
     07/05/2022 - v1.6 - Add command to enable JSON publishing 
     15/03/2024 - v1.7 - Add wrong DNS detection
     27/08/2024 - v1.8 - Add RTC, MQTT and Wifi status to main page
+    02/07/2025 - v2.0 - Based on Tasmota 15
+                        Switch main status bar to new one of Tasmota
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -43,15 +45,9 @@
 #define D_CMND_TIMEZONE_DSTW      "dstw"
 #define D_CMND_TIMEZONE_DSTD      "dstd"
 
-// web URL
+// dialog name and URL
+const char PSTR_TIMEZONE_TITLE[]       PROGMEM = "Timezone";
 const char PSTR_TIMEZONE_PAGE_CONFIG[] PROGMEM = "/tz";
-
-// dialog strings
-const char PSTR_TIMEZONE[]        PROGMEM = "Timezone";
-const char PSTR_TIMEZONE_CONFIG[] PROGMEM = "Configure";
-
-// time icons
-//const char kTimezoneIcons[] PROGMEM = "🕛|🕧|🕐|🕜|🕑|🕝|🕒|🕞|🕓|🕟|🕔|🕠|🕕|🕡|🕖|🕢|🕗|🕣|🕘|🕤|🕙|🕥|🕚|🕦";
 
 // timezone setiing commands
 const char kTimezoneCommands[] PROGMEM = "tz||_pub|_ntp|_stdo|_stdm|_stdw|_stdd|_dsto|_dstm|_dstw|_dstd";
@@ -101,6 +97,7 @@ void TimezoneShowJSON (bool append)
 void TimezoneInit ()
 {
   // set switch mode
+  RtcTime.valid = 0;
   Settings->timezone = 99;
 
   // log help command
@@ -201,56 +198,57 @@ void CmndTimezoneDstD ()
 
 #ifdef USE_WEBSERVER
 
+// append wifi strength
+void TimezoneWebStatusLeft ()
+{
+  WSContentSend_P (PSTR ("<span class='rssi'>%d%%</span>\n"), WifiGetRssiAsQuality (WiFi.RSSI ()));
+}
+
+// append NTP
+void TimezoneWebStatusRight ()
+{
+  char str_status[4];
+
+  // NTP icon
+  if (RtcTime.valid) strcpy_P (str_status, PSTR ("ok")); else strcpy_P (str_status, PSTR ("ko")); 
+  WSContentSend_P (PSTR ("<span class='%s'>NTP</span>\n"), str_status);
+}
+
 // append local time to main page
 void TimezoneWebSensor ()
 {
-  int  rssi;
-  char str_status[8];
-
-  // get wifi RSSI
-  rssi = WiFi.RSSI ();
-
-  // begin
-  WSContentSend_P (PSTR ("<div style='text-align:center;padding:0px;'>\n"));
+  int32_t rssi;
+  char    str_color[8];
 
   // style
   WSContentSend_P (PSTR ("<style>\n"));
+
+  // style : wifi
+  rssi = WiFi.RSSI();
+  if (rssi >= -55) strcpy_P (str_color, PSTR ("#0e0"));
+    else if (rssi >= -70) strcpy_P (str_color, PSTR ("#ee0"));
+    else if (rssi >= -85) strcpy_P (str_color, PSTR ("#e80"));
+    else strcpy_P (str_color, PSTR ("#e00"));
+  WSContentSend_P (PSTR (".arc {border-top-color:#888;}\n"));
+  WSContentSend_P (PSTR (".arc.active {border-top-color:%s;}\n"), str_color);
+  WSContentSend_P (PSTR (".a3{width:24px;height:24px;top:1px;left:3px}\n"));
+  WSContentSend_P (PSTR (".a2{width:18px;height:18px;top:5px;left:6px}\n"));
+  WSContentSend_P (PSTR (".a1{width:12px;height:12px;top:9px;left:9px}\n"));
+  WSContentSend_P (PSTR (".a0{width:4px;height:4px;top:13px;left:12px;border:3px solid transparent;}\n"));
+
+  // style : status
+  WSContentSend_P (PSTR ("div#l1 span {margin:2px;padding:1px 4px;border-radius:5px;font-size:10px;}\n"));
+  WSContentSend_P (PSTR ("div#l1 span.rssi {padding-left:6px;}\n"));
+  WSContentSend_P (PSTR ("div#l1 span.ok {border:#0b0 1px solid;color:#0b0;}\n"));
+  WSContentSend_P (PSTR ("div#l1 span.ko {border:#b00 1px solid;color:#b00;}\n"));
+
+  // style : hour
   WSContentSend_P (PSTR ("table hr{display:none;}\n"));
-  WSContentSend_P (PSTR ("div.info {display:flex;padding:0px;}\n"));
-  WSContentSend_P (PSTR ("div.info div{padding:0px;}\n"));
-  if (rssi > -67) strcpy_P (str_status, PSTR ("green"));
-    else if (rssi > -75) strcpy_P (str_status, PSTR ("orange"));
-    else strcpy_P (str_status, PSTR ("red"));
-  WSContentSend_P (PSTR ("div.wifi {height:28px;float:right;padding:0px;aspect-ratio:1;border-radius:50%%;margin-top:4px;margin-bottom:-4px;background:repeating-radial-gradient(50%% 50%%, #0000 0,%s 1px 14%%,#0000 18%% 28%%);mask:conic-gradient(#000 0 0) no-repeat 50%%/16%% 16%%,conic-gradient(from -45deg at 50%% 57%%,#000 90deg,#0000 0);}\n"), str_status);
-  if (RtcTime.valid) strcpy_P (str_status, PSTR ("green")); else strcpy_P (str_status, PSTR ("red")); 
-  WSContentSend_P (PSTR ("div.rtc {float:left;margin:2px 8px;width:22px;height:22px;background-color:%s;--svg:url(\"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'><path d='M128,24A104,104,0,1,0,232,128,104.12041,104.12041,0,0,0,128,24Zm56,112H128a7.99541,7.99541,0,0,1-8-8V72a8,8,0,0,1,16,0v48h48a8,8,0,0,1,0,16Z'/></svg>\");-webkit-mask-image:var(--svg);mask-image:var(--svg);-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-size:100%% 100%%;mask-size:100%% 100%%;}\n"), str_status);
-  if (MqttIsConnected ()) strcpy_P (str_status, PSTR ("green")); else strcpy_P (str_status, PSTR ("red")); 
-  WSContentSend_P (PSTR ("div.mqtt {float:left;margin:4px 8px;width:16px;height:16px;background-color:%s;--svg:url(\"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M10.657 23.994h-9.45A1.21 1.21 0 0 1 0 22.788v-9.18h.071c5.784 0 10.504 4.65 10.586 10.386m7.606 0h-4.045C14.135 16.246 7.795 9.977 0 9.942V6.038h.071c9.983 0 18.121 8.044 18.192 17.956m4.53 0h-.97C21.754 12.071 11.995 2.407 0 2.372v-1.16C0 .55.544.006 1.207.006h7.64C15.733 2.49 21.257 7.789 24 14.508v8.291c0 .663-.544 1.195-1.207 1.195M16.713.006h6.092A1.19 1.19 0 0 1 24 1.2v5.914c-.91-1.242-2.046-2.65-3.158-3.762C19.588 2.11 18.122.987 16.714.005Z'/></svg>\");-webkit-mask-image:var(--svg);mask-image:var(--svg);-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-size:100%% 100%%;mask-size:100%% 100%%;}\n"), str_status);
+  WSContentSend_P (PSTR ("div.time {text-align:center;font-weight:bold;}\n"));
   WSContentSend_P (PSTR ("</style>\n"));
 
-  // detect DNS bad DNS server IP
-//  if (!RtcTime.valid) WSContentSend_P (PSTR ("<div class='error'>Check DNS server IP address</div>\n"));
-
-  // info bar
-  WSContentSend_P (PSTR ("<div class='info'>\n"));
-
-  // RTC and MQTT
-  WSContentSend_P (PSTR ("<div style='width:24%%;text-align:left;'>"));
-  if (RtcTime.valid) WSContentSend_P (PSTR ("<div class='rtc'></div>"));
-    else WSContentSend_P (PSTR ("<div class='rtc' title='Check DNS server IP address'></div>"));
-  if (MqttIsConnected ()) WSContentSend_P (PSTR ("<div class='mqtt'></div>"));
-    else WSContentSend_P (PSTR ("<div class='mqtt' title='Check MQTT configuration'></div>"));
-  WSContentSend_P (PSTR ("</div>\n"));
-
   // time
-  WSContentSend_P (PSTR ("<div style='width:52%%;font-size:16px;font-weight:bold;'>%02d:%02d:%02d</div>\n"), RtcTime.hour, RtcTime.minute, RtcTime.second);
-
-  // wifi signal
-  WSContentSend_P (PSTR ("<div style='width:24%%;text-align:right;'><div class='wifi'></div><span style='font-size:12px;'>%d%%</span></div>\n"), WifiGetRssiAsQuality (rssi));
-
-  // end
-  WSContentSend_P (PSTR ("</div>\n"));
-  WSContentSend_P (PSTR ("</div>\n"));
+  WSContentSend_P (PSTR ("<div class='time'>%02d:%02d:%02d</div>\n"), RtcTime.hour, RtcTime.minute, RtcTime.second);
 }
 
 #ifdef USE_TIMEZONE_WEB_CONFIG
@@ -258,7 +256,7 @@ void TimezoneWebSensor ()
 // timezone configuration page button
 void TimezoneWebConfigButton ()
 {
-  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s %s</button></form></p>"), PSTR_TIMEZONE_PAGE_CONFIG, PSTR_TIMEZONE_CONFIG, PSTR_TIMEZONE);
+  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>"), PSTR_TIMEZONE_PAGE_CONFIG, PSTR_TIMEZONE_TITLE);
 }
 
 // Timezone configuration web page
@@ -310,15 +308,17 @@ void TimezoneWebPageConfigure ()
   }
 
   // beginning of form
-  WSContentStart_P (PSTR_TIMEZONE_CONFIG);
+  WSContentStart_P (PSTR_TIMEZONE_TITLE);
   WSContentSendStyle ();
 
   // page style
   WSContentSend_P (PSTR ("<style>\n"));
   WSContentSend_P (PSTR ("p,br,hr {clear:both;}\n"));
   WSContentSend_P (PSTR ("p.dat {margin:0px 10px;}\n"));
-  WSContentSend_P (PSTR ("fieldset {margin-bottom:24px;padding-top:12px;}\n"));
-  WSContentSend_P (PSTR ("legend {padding:0px 15px;margin-top:-10px;font-weight:bold;}\n"));
+  WSContentSend_P (PSTR ("fieldset {background:#333;margin:15px 0px;border:none;border-radius:8px;}\n")); 
+  WSContentSend_P (PSTR ("legend {font-weight:bold;margin:0px;padding:5px;color:#888;background:transparent;}\n")); 
+  WSContentSend_P (PSTR ("legend:after {content:'';display:block;height:1px;margin:15px 0px;}\n"));
+  WSContentSend_P (PSTR ("div.main {padding:0px;margin-top:-25px;}\n"));
   WSContentSend_P (PSTR ("input,select {margin-bottom:10px;text-align:center;border:none;}\n"));
   WSContentSend_P (PSTR ("span {float:left;padding-top:4px;}\n"));
   WSContentSend_P (PSTR ("span.hea {width:60%%;}\n"));
@@ -331,25 +331,31 @@ void TimezoneWebPageConfigure ()
   // NTP server section  
   // ---------------------
   WSContentSend_P (PSTR_TZ_FIELDSET_START, "🕛 Time server");
+  WSContentSend_P (PSTR ("<div class='main'>\n"));
   WSContentSend_P (PSTR ("<p class='dat'>%s<br><input type='text' name='%s' value='%s'></p>\n"), PSTR ("First server"), PSTR (D_CMND_TIMEZONE_NTP), SettingsText(SET_NTPSERVER1));
+  WSContentSend_P (PSTR ("</div>\n"));
   WSContentSend_P (PSTR_TZ_FIELDSET_STOP);
 
   // Standard Time section  
   // ---------------------
   WSContentSend_P (PSTR_TZ_FIELDSET_START, "❄️ Standard Time");
+  WSContentSend_P (PSTR ("<div class='main'>\n"));
   WSContentSend_P (PSTR_TZ_FIELD_INPUT, PSTR ("Offset to GMT"),                         PSTR (D_CMND_TIMEZONE_STDO), -720, 720, 30, Settings->toffset[0],     PSTR ("mn"));
   WSContentSend_P (PSTR_TZ_FIELD_INPUT, PSTR ("Month<small> (1:jan 12:dec)</small>"),   PSTR (D_CMND_TIMEZONE_STDM), 1,    12,  1,  Settings->tflag[0].month, PSTR (""));
   WSContentSend_P (PSTR_TZ_FIELD_INPUT, PSTR ("Week<small> (0:last 4:fourth)</small>"), PSTR (D_CMND_TIMEZONE_STDW), 0,    4,   1,  Settings->tflag[0].week,  PSTR (""));
   WSContentSend_P (PSTR_TZ_FIELD_INPUT, PSTR ("Week day<small> (1:sun 7:sat)</small>"), PSTR (D_CMND_TIMEZONE_STDD), 1,    7,   1,  Settings->tflag[0].dow,   PSTR (""));
+  WSContentSend_P (PSTR ("</div>\n"));
   WSContentSend_P (PSTR_TZ_FIELDSET_STOP);
 
   // Daylight Saving Time section  
   // ----------------------------
   WSContentSend_P (PSTR_TZ_FIELDSET_START, "⛱️ Daylight Saving Time");
+  WSContentSend_P (PSTR ("<div class='main'>\n"));
   WSContentSend_P (PSTR_TZ_FIELD_INPUT, PSTR ("Offset to GMT"),                         PSTR (D_CMND_TIMEZONE_DSTO), -720, 720, 30, Settings->toffset[1],     PSTR ("mn"));
   WSContentSend_P (PSTR_TZ_FIELD_INPUT, PSTR ("Month<small> (1:jan 12:dec)</small>"),   PSTR (D_CMND_TIMEZONE_DSTM), 1,    12,  1,  Settings->tflag[1].month, PSTR (""));
   WSContentSend_P (PSTR_TZ_FIELD_INPUT, PSTR ("Week<small> (0:last 4:fourth)</small>"), PSTR (D_CMND_TIMEZONE_DSTW), 0,    4,   1,  Settings->tflag[1].week,  PSTR (""));
   WSContentSend_P (PSTR_TZ_FIELD_INPUT, PSTR ("Week day<small> (1:sun 7:sat)</small>"), PSTR (D_CMND_TIMEZONE_DSTD), 1,    7,   1,  Settings->tflag[1].dow,   PSTR (""));
+  WSContentSend_P (PSTR ("</div>\n"));
   WSContentSend_P (PSTR_TZ_FIELDSET_STOP);
 
   // save button  
@@ -393,7 +399,13 @@ bool Xsns99 (uint32_t function)
     case FUNC_WEB_SENSOR:
       TimezoneWebSensor ();
       break;
-
+    case FUNC_WEB_STATUS_LEFT:
+      TimezoneWebStatusLeft ();
+      break;
+    case FUNC_WEB_STATUS_RIGHT:
+      TimezoneWebStatusRight ();
+      break;
+      
 #ifdef USE_TIMEZONE_WEB_CONFIG
     case FUNC_WEB_ADD_BUTTON:
       TimezoneWebConfigButton ();
