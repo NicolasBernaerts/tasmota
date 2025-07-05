@@ -1,31 +1,30 @@
-# KORAD power supply Tasmota firmware
+# KORAD & KUAIQU power supply Tasmota firmware
 
-This evolution of **Tasmota 12** has been specifically developped to manage **Korad KA3005P** laboratory power supply.
+This evolution of **Tasmota 15** has been specifically developped to manage **Korad KA3005P** and **Kuaiqu** laboratory power supply.
 
-Korad serial protocol is well documented at https://sigrok.org/wiki/Korad_KAxxxxP_series
+Korad serial protocol is documented at https://sigrok.org/wiki/Korad_KAxxxxP_series
+Kuaiqu serial protocol is documented at https://www.eevblog.com/forum/testgear/kuaiqu-programmable-switchmode-power-supply-(32v-10-2a)/?action=dlattach;attach=2267752
 
 To use it, your need to add one specific ESP8266 extension card connected to the internal serial port of the power supply.
-
-A complete explanation with step by step procedure is available at http://www.bernaerts-nicolas.fr/iot/365-tasmota-korad-power-supply-web-mqtt
 
 Pre-compiled versions are available in the [**binary**](https://github.com/NicolasBernaerts/tasmota/tree/master/korad/binary) folder.
 
 ## Description
 
-This firmware allows to fully manage your **Korad 3005P** power supply from any browser.
+This firmware allows to fully manage your **Korad 3005P** or **Kuaiqu** power supply from any browser.
 
 It allows you to :
   * define up to 4 preset voltage values
   * define up to 4 preset current values
   * change output voltage and/or maximum current
-  * Set Overload Voltage Protection
-  * Set Overload Current Protection
+  * Set Overload Voltage Protection (Korad)
+  * Set Overload Current Protection (Korad)
   * Switch output On/Off
   * Record voltage and current to CSV file in realtime
   
-It has been developped specifically for ESP8266 with 4Mb with a LittleFS partition.  
+It has been developped specifically for ESP8266 with a LittleFS partition.  
 
-## Adapter board
+## Korad adapter board
 
 To communication with your **Korad KA3005P** power supply, you need to connect an internal Tasmota adapter board.
 
