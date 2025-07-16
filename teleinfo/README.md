@@ -495,7 +495,7 @@ Voici la liste des commandes de configuration spécifiques au Winky :
 ## Compilation
 
 Si vous voulez compiler ce firmware vous-même, vous devez :
-1. installer les sources **tasmota** depuis la version officielle **14.5** (respectez cette version)
+1. installer les sources **tasmota** depuis la version officielle **15.0.1** (respectez cette version)
 2. déposez ou remplacez les fichiers de ce **repository**
 3. déposez ou remplacez les fichiers du repository **tasmota/common**
 
