@@ -252,9 +252,7 @@ typedef union {
     uint32_t spare13 : 1;                  // bit 13
     uint32_t spare14 : 1;                  // bit 14
     uint32_t spare15 : 1;                  // bit 15
-    uint32_t spare16 : 1;                  // bit 16
-    uint32_t spare17 : 1;                  // bit 17
-    uint32_t spare18 : 1;                  // bit 18
+    uint32_t json_pretty_print : 3;        // bit 16.18 (v14.6.0.1) - JSON pretty print log data no or indent
     uint32_t dali_group_sliders : 5;       // bit 19.23 (v14.3.0.3) - (DALI) Number of group sliders 0 to 16
     uint32_t FTP_Mode : 2;                 // bit 24/25
     uint32_t tariff_forced : 2;            // bit 26/27 (v12.4.0.2) - Energy forced tariff : 0=tariff change on time, 1|2=tariff forced
@@ -443,16 +441,17 @@ typedef union {
   uint32_t tic : 1;                   // flag to publish TIC topic
   uint32_t percent : 8;               // percentage adjustment to max contract power (1...200)
   uint32_t adjust_v : 3;              // max graph voltage adjust (x 5V)
-  uint32_t adjust_va : 6;             // max graph power adjust (x 3kVA)
+  uint32_t adjust_va : 4;             // max graph power adjust (1kVA ^ xxx)
+  uint32_t spare19 : 2;               // keep some spares for future uses
   uint32_t calendar : 1;              // flag to publish CALENDAR section
   uint32_t relay : 1;                 // flag to publish RELAY section
   uint32_t led_period : 1;            // flag to set LED color according to current period color
   uint32_t live : 1;                  // flag to publish LIVE topic
   uint32_t energy : 1;                // flag to publish ENERGY data under SENSOR
-  uint32_t autodetect : 1;            // flag to trigger autodetection of speed
+  uint32_t spare26 : 1;               // kept for future use
   uint32_t skip : 3;                  // frames to send with live stream (1:all, 2:1 out of 2, ...)
   uint32_t cal_hexa : 1;              // flag to read calendar periods in hexa
-  uint32_t spare31 : 1;               // Keep some spares for future uses
+  uint32_t spare31 : 1;               // kept for future use
   };
 } TeleinfoCfg;
 

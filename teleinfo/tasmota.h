@@ -442,10 +442,7 @@ enum XsnsFunctions { FUNC_SETTINGS_OVERRIDE, FUNC_SETUP_RING1, FUNC_SETUP_RING2,
                      FUNC_WEB_GET_ARG, FUNC_WEB_ADD_HANDLER, FUNC_SET_SCHEME, FUNC_HOTPLUG_SCAN, FUNC_TIME_SYNCED,
                      FUNC_DEVICE_GROUP_ITEM,
                      FUNC_NETWORK_UP, FUNC_NETWORK_DOWN,
-
-                     // Integration InfluxDB (xdrv115)
-                     FUNC_API_INFLUXDB,
-                     
+                     FUNC_WEB_STATUS_LEFT, FUNC_WEB_STATUS_RIGHT,
                      FUNC_return_result = 200,  // Insert function WITHOUT return results before here. Following functions return results
                      FUNC_PIN_STATE, FUNC_MODULE_INIT, FUNC_ADD_BUTTON, FUNC_ADD_SWITCH, FUNC_BUTTON_PRESSED, FUNC_BUTTON_MULTI_PRESSED,
                      FUNC_SET_DEVICE_POWER,
@@ -497,13 +494,13 @@ enum SettingsTextIndex { SET_OTAURL,
                          SET_INFLUXDB_HOST, SET_INFLUXDB_PORT, SET_INFLUXDB_ORG, SET_INFLUXDB_TOKEN, SET_INFLUXDB_BUCKET, SET_INFLUXDB_RP,
                          SET_CANVAS,
                          SET_TELEGRAM_FINGERPRINT,
-                         
-                         // teleinfo calendars (xdrv15)
+
+                         // teleinfo calendars
                          SET_TIC_CAL_TODAY, SET_TIC_CAL_TMROW, SET_TIC_CAL_AFTER,
 
-                         // teleinfo awtrick (xdrv115)
+                         // teleinfo awtrix
                          SET_TIC_AW_URL,
-                        
+                                                  
                          SET_MAX, // limit of texts stored in Settings
                          // Index above are not stored in Settings and should be handled specifically in SettingText()
                          SET_BUTTON17, SET_BUTTON18, SET_BUTTON19, SET_BUTTON20, SET_BUTTON21, SET_BUTTON22, SET_BUTTON23, SET_BUTTON24,
@@ -512,6 +509,8 @@ enum SettingsTextIndex { SET_OTAURL,
                          };
 
 enum SpiInterfaces { SPI_NONE, SPI_MOSI, SPI_MISO, SPI_MOSI_MISO };
+
+enum XYZModemProtocols { TXMP_NONE, TXMP_SERIAL, TXMP_TASCONSOLE, TXMP_TELNET };
 
 enum DevGroupMessageType { DGR_MSGTYP_FULL_STATUS, DGR_MSGTYP_PARTIAL_UPDATE, DGR_MSGTYP_UPDATE, DGR_MSGTYP_UPDATE_MORE_TO_COME, DGR_MSGTYP_UPDATE_DIRECT, DGR_MSGTYPE_UPDATE_COMMAND, DGR_MSGTYPFLAG_WITH_LOCAL = 128 };
 
@@ -540,10 +539,10 @@ enum DevGroupShareItem { DGR_SHARE_POWER = 1, DGR_SHARE_LIGHT_BRI = 2, DGR_SHARE
 
 enum CommandSource { SRC_IGNORE, SRC_MQTT, SRC_RESTART, SRC_BUTTON, SRC_SWITCH, SRC_BACKLOG, SRC_SERIAL, SRC_WEBGUI, SRC_WEBCOMMAND, SRC_WEBCONSOLE, SRC_PULSETIMER,
                      SRC_TIMER, SRC_RULE, SRC_MAXPOWER, SRC_MAXENERGY, SRC_OVERTEMP, SRC_LIGHT, SRC_KNX, SRC_DISPLAY, SRC_WEMO, SRC_HUE, SRC_RETRY, SRC_REMOTE, SRC_SHUTTER,
-                     SRC_THERMOSTAT, SRC_CHAT, SRC_TCL, SRC_BERRY, SRC_FILE, SRC_SSERIAL, SRC_USBCONSOLE, SRC_SO47, SRC_SENSOR, SRC_WEB, SRC_MAX };
+                     SRC_THERMOSTAT, SRC_CHAT, SRC_TCL, SRC_BERRY, SRC_FILE, SRC_SSERIAL, SRC_USBCONSOLE, SRC_SO47, SRC_SENSOR, SRC_WEB, SRC_TELNET, SRC_MAX };
 const char kCommandSource[] PROGMEM = "I|MQTT|Restart|Button|Switch|Backlog|Serial|WebGui|WebCommand|WebConsole|PulseTimer|"
                                       "Timer|Rule|MaxPower|MaxEnergy|Overtemp|Light|Knx|Display|Wemo|Hue|Retry|Remote|Shutter|"
-                                      "Thermostat|Chat|TCL|Berry|File|SSerial|UsbConsole|SO47|Sensor|Web";
+                                      "Thermostat|Chat|TCL|Berry|File|SSerial|UsbConsole|SO47|Sensor|Web|Telnet";
 
 const uint8_t kDefaultRfCode[9] PROGMEM = { 0x21, 0x16, 0x01, 0x0E, 0x03, 0x48, 0x2E, 0x1A, 0x00 };
 
