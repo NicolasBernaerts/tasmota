@@ -167,7 +167,9 @@
                          Cleanup old data files if FS is full
                          Complete rewrite of speed detection
                          Add period profile
-                                                
+    10/07/2025 - v15.0   Switch all module to driver to minimize indexes
+                         Refactoring based on Tasmota 15
+
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License aStart STGE managements published by
   the Free Software Foundation, either version 3 of the License, or
@@ -210,7 +212,7 @@
 // extension description
 #define EXTENSION_NAME    "Teleinfo"              // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts"     // author
-#define EXTENSION_VERSION "15beta1"               // version
+#define EXTENSION_VERSION "15.0"                  // version
 
 // FTP server credentials
 #ifdef USE_FTP
