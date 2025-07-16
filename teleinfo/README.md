@@ -476,9 +476,9 @@ Elle peut être alimentée en continu par le port USB ou directement par le comp
 
 Typiquement, après configuration en alimentation USB, le Winky doit être programmé en mode console afin d'activer le mode **deep sleep**. Ceci se fait à travers la console tasmota :
 
-    deepsleeptime xxx
+    winky_sleep xxx
 
-où **xxx** représente le nombre de secondes entre 2 réveils. Un minimum de 60 (secondes) est préconisé et il faut éviter 300 qui définit un mode de fonctionnement spécifique de Tasmota. Si la super capacité n'est pas assez rechargée lors du prochain réveil, l'ESP se rendort pour un cycle supplémentaire.
+où **xxx** représente le nombre de secondes entre 2 réveils. Une valeur de **0** indique au Winky de calculer de manière dynamique l'heure de son réveil afin d'optimiser l'utilisation de la super-capacité. Sinon, en cas de valeur fixe, un minimum de 60 secondes est préconisé. Il faut éviter 300 qui définit un mode de fonctionnement spécifique de Tasmota. Si la super capacité n'est pas assez rechargée lors du prochain réveil, l'ESP se rendort pour un cycle supplémentaire.
 
 Voici la liste des commandes de configuration spécifiques au Winky :
 
@@ -506,25 +506,26 @@ Voici la liste exhaustive des fichiers concernés :
 | **platformio_override.ini** |    |
 | partition/**esp32_partition_xxx.csv** | Specific ESP32 partitionning files   |
 | boards/**espxxx.json** | ESP8266 and ESP32 boards description  |
-| tasmota/**user_config_override.h**  |    |
+| tasmota/**user_config_override.h**  | Specific configuration of Teleinfo project  |
 | tasmota/include/**tasmota.h**      | Add of in-memory variables |
 | tasmota/include/**tasmota_type.h** | Redefinition of teleinfo structure |
 | tasmota/tasmota_nrg_energy/**xnrg_15_teleinfo.ino** | Teleinfo energy driver  |
 | tasmota/tasmota_drv_driver/**xdrv_01_9_webserver.ino** | Add compilation target in footer  |
-| tasmota/tasmota_drv_driver/**xdrv_94_ip_option.ino** | Fixed IP address and misc options Web configuration |
-| tasmota/tasmota_drv_driver/**xdrv_97_tcp_server.ino** | Embedded TCP stream server |
-| tasmota/tasmota_drv_energy/**xdrv_110_teleinfo.ino** | Teleinfo driver  |
-| tasmota/tasmota_drv_energy/**xdrv_115_teleinfo_awtrix.ino** | Driver for Awtrix external display  |
-| tasmota/tasmota_drv_energy/**xdrv_116_integration_domoticz.ino** | Teleinfo domoticz integration  |
-| tasmota/tasmota_drv_energy/**xdrv_117_integration_hass.ino** | Teleinfo home assistant integration  |
-| tasmota/tasmota_drv_energy/**xdrv_118_integration_homie.ino** | Teleinfo homie protocol integration  |
-| tasmota/tasmota_drv_energy/**xdrv_119_integration_thingsboard.ino** | Teleinfo Thingsboard protocol integration  |
-| tasmota/tasmota_drv_energy/**xdrv_120_linky_relay.ino** | Management of relays according to periods and virtual relays  |
-| tasmota/tasmota_sns_sensor/**xsns_99_timezone.ino** | Timezone Web configuration |
-| tasmota/tasmota_sns_sensor/**xsns_119_rte_server.ino** | RTE Tempo, Pointe and Ecowatt data collection |
-| tasmota/tasmota_sns_sensor/**xsns_123_teleinfo_winky.ino** | Handling of Winky and deep sleep mode |
-| tasmota/tasmota_sns_sensor/**xsns_124_teleinfo_graph.ino** | Teleinfo sensor to handle curves |
-| tasmota/tasmota_sns_sensor/**xsns_126_influxdb_extension** | InfluxDB publication module |
+| tasmota/tasmota_drv_driver/**xdrv_98_teleinfo_00_data.ino** | Data structures used by teleinfo driver and modules |
+| tasmota/tasmota_drv_driver/**xdrv_98_teleinfo_01_tcp.ino** | Embedded TCP stream server |
+| tasmota/tasmota_sns_sensor/**xdrv_98_teleinfo_02_graph.ino** | Teleinfo live graph provider |
+| tasmota/tasmota_sns_sensor/**xdrv_98_teleinfo_03_histo.ino** | Teleinfo histogram provider |
+| tasmota/tasmota_drv_energy/**xdrv_98_teleinfo_04_relay.ino** | Management of relays according to periods and virtual relays  |
+| tasmota/tasmota_drv_energy/**xdrv_98_teleinfo_10_homie.ino** | Teleinfo Homie protocol integration  |
+| tasmota/tasmota_drv_energy/**xdrv_98_teleinfo_11_domoticz.ino** | Teleinfo Domoticz integration  |
+| tasmota/tasmota_drv_energy/**xdrv_98_teleinfo_12_homeassistant.ino** | Teleinfo Home Assistant integration  |
+| tasmota/tasmota_drv_energy/**xdrv_98_teleinfo_13_thingsboard.ino** | Teleinfo Thingsboard protocol integration  |
+| tasmota/tasmota_sns_sensor/**xdrv_98_teleinfo_14_influxdb.ino** | Teleinfo InfluxDB publication module |
+| tasmota/tasmota_sns_sensor/**xdrv_98_teleinfo_20_rte.ino** | RTE Tempo, Pointe and Ecowatt data collection |
+| tasmota/tasmota_drv_energy/**xdrv_98_teleinfo_30_awtrix.ino** | Teleinfo Awtrix display integration |
+| tasmota/tasmota_sns_sensor/**xdrv_98_teleinfo_40_winky.ino** | Handling of Winky module with deep sleep mode |
+| tasmota/tasmota_drv_energy/**xdrv_98_teleinfo_99_driver.ino** | Teleinfo main driver  |
+| tasmota/tasmota_drv_driver/**xdrv_99_misc_option.ino** | Misc options including fixed IP address |
 
 Si tout se passe bien, vous devriez pouvoir compiler votre propre build.
 
