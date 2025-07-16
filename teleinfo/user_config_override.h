@@ -220,7 +220,6 @@
 
 // complementary modules
 #define USE_MISC_OPTION                           // Add IP and common options configuration page
-#define USE_TCP_SERVER                            // Enable TCP server for Teleinfo TIC stream
 #define USE_TELEINFO_RELAY                        // Enable Teleinfo period and virtual relay association to local relays
 
 // teleinfo display is in French

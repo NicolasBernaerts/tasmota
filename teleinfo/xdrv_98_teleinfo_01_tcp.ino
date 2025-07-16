@@ -32,7 +32,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifdef USE_TCP_SERVER
+#ifdef USE_TELEINFO
 
 #ifdef ESP32
   #define TCP_DATA_MAX                256
@@ -284,4 +284,4 @@ void TeleinfoTCPSend (const char to_send)
   if (ptcp_server != nullptr) ptcp_server->send (to_send);
 }
 
-#endif    // USE_TCP_SERVER
+#endif  // USE_TELEINFO

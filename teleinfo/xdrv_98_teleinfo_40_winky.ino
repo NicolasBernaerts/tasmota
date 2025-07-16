@@ -37,7 +37,7 @@
 */
 
 #ifdef USE_TELEINFO
-#ifdef USE_WINKY
+#ifdef USE_TELEINFO_WINKY
 
 //#define XSNS_98                    98
 
@@ -852,47 +852,5 @@ void TeleinfoWinkyWebSensor ()
 
 #endif  // USE_WEBSERVER
 
-/***************************************\
- *              Interface
-\***************************************/
-/*
-// Teleinfo sensor (for graph)
-bool Xsns98 (uint32_t function)
-{
-  bool result = false;
-
-  // swtich according to context
-  switch (function) 
-  {
-    case FUNC_INIT:
-      TeleinfoWinkyInit ();
-      break;
-    case FUNC_COMMAND:
-      result = DecodeCommand (kTeleinfoWinkyCommands, TeleinfoWinkyCommand);
-      break;
-    case FUNC_EVERY_100_MSECOND:
-      TeleinfoWinkyEvery100ms ();
-      break;
-    case FUNC_EVERY_250_MSECOND:
-      TeleinfoWinkyEvery250ms ();
-      break;
-    case FUNC_EVERY_SECOND:
-      TeleinfoWinkyEverySecond ();
-      break;
-    case FUNC_SAVE_BEFORE_RESTART:
-      TeleinfoWinkySaveBeforeRestart ();
-      break;
-
-#ifdef USE_WEBSERVER
-     case FUNC_WEB_SENSOR:
-      TeleinfoWinkyWebSensor ();
-      break;
-#endif  // USE_WEBSERVER
-  }
-
-  return result;
-}
-*/
-
-#endif    // USE_WINKY
+#endif    // USE_TELEINFO_WINKY
 #endif    // USE_TELEINFO
