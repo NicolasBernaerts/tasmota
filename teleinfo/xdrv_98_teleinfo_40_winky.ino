@@ -13,6 +13,7 @@
     22/03/2025 v1.3 - add max received message before sleep
     10/06/2025 v2.0 - Complete rework of deepsleep management
     10/07/2025 v3.0 - Refactoring based on Tasmota 15
+                      Conversion from sensor to driver
 
   Configuration values are stored in :
     - Settings->knx_GA_addr[0..2] : multiplicator
@@ -38,8 +39,6 @@
 
 #ifdef USE_TELEINFO
 #ifdef USE_TELEINFO_WINKY
-
-//#define XSNS_98                    98
 
 /*****************************************\
  *               Constants
@@ -351,10 +350,8 @@ void TeleinfoWinkySaveBeforeRestart ()
 // update USB voltage : get raw value, calculate max raw for 5V and calculate voltage
 void TeleinfoWinkyReadVoltageUSB ()
 {
-//  if (Adcs.present >= 1)
   if (teleinfo_winky.usb.pin > 0)
   {
-//    teleinfo_winky.usb.raw = (uint32_t)AdcRead (Adc[0].pin, 3);
     teleinfo_winky.usb.raw = (uint32_t)AdcRead (teleinfo_winky.usb.pin, 3);
     teleinfo_winky.usb.ref = max (teleinfo_winky.usb.ref, teleinfo_winky.usb.raw);
     teleinfo_winky.usb.volt = WINKY_USB_MAXIMUM * teleinfo_winky.usb.raw / teleinfo_winky.usb.ref;
@@ -368,10 +365,8 @@ void TeleinfoWinkyReadVoltageUSB ()
 // update CAPA voltage : get raw value, calculate max raw for 5V and calculate voltage
 void TeleinfoWinkyReadVoltageCapa ()
 {
-  //if (Adcs.present >= 2)
   if (teleinfo_winky.capa.pin > 0)
   {
-//    teleinfo_winky.capa.raw = (uint32_t)AdcRead (Adc[1].pin, 3);
     teleinfo_winky.capa.raw = (uint32_t)AdcRead (teleinfo_winky.capa.pin, 3);
     teleinfo_winky.capa.ref  = max (teleinfo_winky.capa.ref, teleinfo_winky.capa.raw);
     teleinfo_winky.capa.volt = WINKY_CAPA_MAXIMUM * teleinfo_winky.capa.raw / teleinfo_winky.capa.ref;
@@ -384,10 +379,8 @@ void TeleinfoWinkyReadVoltageCapa ()
 // update LINKY voltage : get raw value and calculate voltage based on dividers
 void TeleinfoWinkyReadVoltageLinky ()
 {
-  //if (Adcs.present >= 3)
   if (teleinfo_winky.linky.pin > 0)
   {
-//    teleinfo_winky.linky.raw = (uint32_t)AdcRead (Adc[2].pin, 5);
     teleinfo_winky.linky.raw = (uint32_t)AdcRead (teleinfo_winky.linky.pin, 5);
     teleinfo_winky.linky.volt = WINKY_LINKY_MAXIMUM * teleinfo_winky.linky.raw / teleinfo_winky.capa.ref;
   }
@@ -561,7 +554,6 @@ void TeleinfoWinkyInit ()
   }
 
   // check if winky configured
-//  if (Adcs.present >= 2) teleinfo_winky.enabled = 1;
   if (teleinfo_winky.capa.pin > 0) teleinfo_winky.enabled = 1;
 
   // load configuration
@@ -795,7 +787,6 @@ void TeleinfoWinkyWebSensor ()
 
   // capa status bar
   // ---------------
-  //if (Adcs.present >= 2)
   if (teleinfo_winky.capa.pin > 0)
   {
     // get value
@@ -824,7 +815,6 @@ void TeleinfoWinkyWebSensor ()
   // Linky status bar
   // ---------------
 
-  //if (Adcs.present >= 3)
   if (teleinfo_winky.linky.pin > 0)
   {
     // get value

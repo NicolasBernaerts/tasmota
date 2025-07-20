@@ -1,5 +1,5 @@
 /*
-  xdrv_98_teleinfo_main.ino - France Teleinfo energy sensor support for Tasmota devices
+  xdrv_98_teleinfo_99_driver.ino - France Teleinfo energy sensor support for Tasmota devices
 
   Copyright (C) 2019-2025 Nicolas Bernaerts
 
@@ -49,8 +49,7 @@
                        Update color from RTE according to contract type (Tempo or EJP)
     30/04/2025 v14.10 - Drop data before wifi connexion to protect single core ESP boot process 
     01/06/2025 v14.11 - Add period profile
-    10/07/2025 v15.0  - Change from driver to sensor to minimize indexes
-                        Rename to xsns_126_teleinfo_main.ino
+    10/07/2025 v15.0  - Switch all module to driver to minimize indexes
                         Refactoring based on Tasmota 15
 
   Integration flags are stored in Settings :
@@ -737,12 +736,8 @@ void TeleinfoDriverInit ()
 
 
 // Handling of received teleinfo data, called 20x / second
-//   0x04 : Message reset 
-//   0x02 : Message start
-//   Ox03 : Message stop
-//   0x0A : Line start
-//   0x0D : Line stop
-//   0x09 : Line separator
+//     Message :    0x02 = start      Ox03 = stop        0x04 = reset 
+//     Line    :    0x0A = start      0x0D = stop        0x09 = separator
 void TeleinfoDriverEvery50ms ()
 {
   char   character;
