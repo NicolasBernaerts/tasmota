@@ -116,6 +116,7 @@
     07/05/2025 - v14.11 - Complete rewrite of speed detection
                           Add period profile
     10/07/2025 - v15.0  - Refactoring based on Tasmota 15
+                          Set hardware fallback to 2 on esp8266 for serial port 
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -132,12 +133,7 @@
 #ifdef USE_ENERGY_SENSOR
 #ifdef USE_TELEINFO
 
-/*************************************************\
- *               Variables
-\*************************************************/
-
-// declare teleinfo energy driver and sensor
-#define XNRG_15                       15
+#define XNRG_15             15
 
 /**************************************************\
  *                  Commands
@@ -463,7 +459,12 @@ void TeleinfoSerialStart ()
   if (PinUsed (GPIO_TELEINFO_RX))
   {
     // create and initialise serial port
+    // on esp8266, allow GPIO3 AND GPIO13 with hardware fallback to 2
+#ifdef ESP8266
+    teleinfo_serial = new TasmotaSerial (Pin (GPIO_TELEINFO_RX), -1, 2, 0);
+#else
     teleinfo_serial = new TasmotaSerial (Pin (GPIO_TELEINFO_RX), -1, 1, 0);
+#endif
 
     // start reception
     is_ready = teleinfo_serial->begin (TasmotaGlobal.baudrate, SERIAL_7E1);
@@ -2258,21 +2259,6 @@ void TeleinfoUpdateCosphi (long cosphi, struct tic_cosphi &struct_cosphi, const 
   struct_cosphi.arr_page[page] = struct_cosphi.value;
 }
 
-#ifdef ESP8266
-
-int64_t esp_timer_get_time ()
-{
-  int64_t ts_now;
-  struct  timeval tv_now; 
-
-  gettimeofday (&tv_now, NULL);
-  ts_now = (int64_t)tv_now.tv_sec * 1000000L + (int64_t)tv_now.tv_usec;
-
-  return ts_now;
-}
-
-#endif    // ESP8266
-
 uint32_t TeleinfoDetectTeleinfo ()
 {
   bool     detect = true;
@@ -3731,23 +3717,25 @@ void TeleinfoEnergyEverySecond ()
  *              Interface
 \***************************************/
 
-// Teleinfo energy driver
-bool Xnrg15 (uint32_t function)
+bool Xnrg15 (const uint32_t function)
 {
   bool result = false;
 
   // swtich according to context
   switch (function)
   {
-    case FUNC_PRE_INIT:
-      TeleinfoEnergyPreInit ();
-      break;
-    case FUNC_INIT:
-      TeleinfoEnergyInit ();
-      break;
     case FUNC_COMMAND:
       result = TeleinfoEnergyHandleCommand ();
       break;
+
+    case FUNC_PRE_INIT:
+      TeleinfoEnergyPreInit ();
+      break;
+
+    case FUNC_INIT:
+      TeleinfoEnergyInit ();
+      break;
+
     case FUNC_ENERGY_EVERY_SECOND:
       TeleinfoEnergyEverySecond ();
       break;
