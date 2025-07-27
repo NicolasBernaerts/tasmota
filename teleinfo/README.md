@@ -510,20 +510,20 @@ Voici la liste exhaustive des fichiers concernés :
 | tasmota/include/**tasmota.h**      | Add of in-memory variables |
 | tasmota/include/**tasmota_type.h** | Redefinition of teleinfo structure |
 | tasmota/tasmota_drv_driver/**xdrv_01_9_webserver.ino** | Add compilation target in footer  |
-| tasmota/tasmota_drv_driver/**xdrv_98_teleinfo_00_data.ino** | Data structures used by teleinfo driver and modules |
-| tasmota/tasmota_drv_driver/**xdrv_98_teleinfo_01_tcp.ino** | Embedded TCP stream server |
-| tasmota/tasmota_drv_driver/**xdrv_98_teleinfo_02_graph.ino** | Teleinfo live graph provider |
-| tasmota/tasmota_drv_driver/**xdrv_98_teleinfo_03_histo.ino** | Teleinfo histogram provider |
-| tasmota/tasmota_drv_driver/**xdrv_98_teleinfo_04_relay.ino** | Management of relays according to periods and virtual relays  |
-| tasmota/tasmota_drv_driver/**xdrv_98_teleinfo_10_homie.ino** | Teleinfo Homie protocol integration  |
-| tasmota/tasmota_drv_driver/**xdrv_98_teleinfo_11_domoticz.ino** | Teleinfo Domoticz integration  |
-| tasmota/tasmota_drv_driver/**xdrv_98_teleinfo_12_homeassistant.ino** | Teleinfo Home Assistant integration  |
-| tasmota/tasmota_drv_driver/**xdrv_98_teleinfo_13_thingsboard.ino** | Teleinfo Thingsboard protocol integration  |
-| tasmota/tasmota_drv_driver/**xdrv_98_teleinfo_14_influxdb.ino** | Teleinfo InfluxDB publication module |
-| tasmota/tasmota_drv_driver/**xdrv_98_teleinfo_20_rte.ino** | RTE Tempo, Pointe and Ecowatt data collection |
-| tasmota/tasmota_drv_driver/**xdrv_98_teleinfo_30_awtrix.ino** | Teleinfo Awtrix display integration |
-| tasmota/tasmota_drv_driver/**xdrv_98_teleinfo_40_winky.ino** | Handling of Winky module with deep sleep mode |
-| tasmota/tasmota_drv_driver/**xdrv_98_teleinfo_99_driver.ino** | Teleinfo main driver  |
+| tasmota/tasmota_drv_driver/**xdrv_98_00_teleinfo_data.ino** | Data structures used by teleinfo driver and modules |
+| tasmota/tasmota_drv_driver/**xdrv_98_01_teleinfo_tcp.ino** | Embedded TCP stream server |
+| tasmota/tasmota_drv_driver/**xdrv_98_02_teleinfo_graph.ino** | Teleinfo live graph provider |
+| tasmota/tasmota_drv_driver/**xdrv_98_03_teleinfo_histo.ino** | Teleinfo histogram provider |
+| tasmota/tasmota_drv_driver/**xdrv_98_04_teleinfo_relay.ino** | Management of relays according to periods and virtual relays  |
+| tasmota/tasmota_drv_driver/**xdrv_98_05_teleinfo_homie.ino** | Teleinfo Homie protocol integration  |
+| tasmota/tasmota_drv_driver/**xdrv_98_06_teleinfo_domoticz.ino** | Teleinfo Domoticz integration  |
+| tasmota/tasmota_drv_driver/**xdrv_98_07_teleinfo_homeassistant.ino** | Teleinfo Home Assistant integration  |
+| tasmota/tasmota_drv_driver/**xdrv_98_08_teleinfo_thingsboard.ino** | Teleinfo Thingsboard protocol integration  |
+| tasmota/tasmota_drv_driver/**xdrv_98_09_teleinfo_influxdb.ino** | Teleinfo InfluxDB publication module |
+| tasmota/tasmota_drv_driver/**xdrv_98_10_teleinfo_rte.ino** | RTE Tempo, Pointe and Ecowatt data collection |
+| tasmota/tasmota_drv_driver/**xdrv_98_11_teleinfo_awtrix.ino** | Teleinfo Awtrix display integration |
+| tasmota/tasmota_drv_driver/**xdrv_98_12_teleinfo_winky.ino** | Handling of Winky module with deep sleep mode |
+| tasmota/tasmota_drv_driver/**xdrv_98_20_teleinfo.ino** | Teleinfo main driver  |
 | tasmota/tasmota_drv_driver/**xdrv_99_misc_option.ino** | Misc options including fixed IP address |
 | tasmota/tasmota_nrg_energy/**xnrg_15_teleinfo.ino** | Teleinfo energy driver  |
 
