@@ -381,9 +381,9 @@ Une fois votre compte créé chez RTE et les API activées, vous devez déclarer
 
 Il ne vous reste plus qu'à activer les modules correspondant aux API RTE : 
 
-    tempo_enable 1
-    pointe_enable 1
-    eco_enable 1
+    tempo 1
+    pointe 1
+    eco 1
 
 Au prochain redémarrage, vous verrez dans les logs que votre ESP32 récupère un token puis les données des API activées.
 
@@ -485,13 +485,18 @@ Voici la liste des commandes de configuration spécifiques au Winky :
 
     winky
     HLP: gestion du winky
-     - winky_sleep <sec>   = duree du deepsleep en sec.
-     - winky_max <nb>      = nbre de messages recus avant deepsleep
-     - winky_ref <farad>   = valeur de reference de la super capa (1.5 par exemple)
-     - winky_start <volt>  = tension minimale pour démarrer le winky (4.5)
-     - winky_stop <volt>   = tension déclanchant l'arrêt du winky (3.9)
-     - winky_coeff         = raz des coefficients d'ajustement des tensions
-     - winky_meter         = raz des valeurs du linky (tension et courant max mesurés)
+     - winky_display <0/1> = display data on main page [1]
+     - winky_sleep         = deepsleep [0]
+                             0           : calcul base sur la tension
+                             1.00 a 9.99 : multiplicateur duree eveil
+                             10 ou +     : duree fixe (max 120)
+     - winky_max           = nbre de trames avant deepsleep [3]
+                             2 ou + : valeurs acceptables
+     - winky_start <volt>  = ension min. démarrage [4.50]
+     - winky_stop <volt>   = tension min. arrêt [3.90]
+     - winky_ref <farad>   = capacité super capa (F) [1.50]
+     - winky_coeff         = raz coefficients ajustement des tensions
+     - winky_meter         = raz tension/courant linky
 
 ## Compilation
 
