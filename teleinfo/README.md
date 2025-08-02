@@ -150,6 +150,7 @@ Ces données étant des données brutes, elles n'ont d'autre intérêt que l'ana
 
 Ce firmware propose un certain nombre de commandes **EnergyConfig** spécifiques disponibles en mode console :
 
+      display=1      affichage sur page acceuil
       historique     mode historique (redémarrage)
       standard       mode standard (rédémarrage)
       noraw          pas d'emission trame TIC
@@ -358,19 +359,19 @@ Voici la liste de toutes les commandes RTE disponibles en mode console :
      - rte_token          = display current token
      - rte_sandbox <0/1>  = set sandbox mode (0/1)
     Ecowatt commands :
-     - eco_enable <0/1>   = enable/disable ecowatt server
-     - eco_display <0/1>  = display ecowatt calendra in main page
+     - eco <0/1>          = enable ecowatt calendar
+     - eco_display <0/1>  = display ecowatt calendar in main page
      - eco_version <4/5>  = set ecowatt API version to use
      - eco_update         = force ecowatt update from RTE server 
      - eco_publish        = publish ecowatt data now
     Tempo commands :
-     - tempo_enable <0/1>  = enable/disable tempo server
-     - tempo_display <0/1> = display tempo calendra in main page
+     - tempo <0/1>         = enable tempo calendar
+     - tempo_display <0/1> = display tempo calendar in main page
      - tempo_update        = force tempo update from RTE server
      - tempo_publish       = publish tempo data now
     Pointe commands :
-     - pointe_enable <0/1> = enable/disable pointe period server
-     - pointe_display <0/1 = display pointe calendra in main page
+     - pointe <0/1>        = enable pointe calendar
+     - pointe_display <0/1 = display pointe calendar in main page
      - pointe_update       = force pointe period update from RTE server
      - pointe_publish      = publish pointe period data now
 
