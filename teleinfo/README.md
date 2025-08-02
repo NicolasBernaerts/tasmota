@@ -486,11 +486,11 @@ Voici la liste des commandes de configuration spécifiques au Winky :
     winky
     HLP: gestion du winky
      - winky_display <0/1> = display data on main page [1]
-     - winky_sleep         = deepsleep [0]
+     - winky_sleep <val>   = deepsleep [0]
                              0           : calcul base sur la tension
                              1.00 a 9.99 : multiplicateur duree eveil
                              10 ou +     : duree fixe (max 120)
-     - winky_max           = nbre de trames avant deepsleep [3]
+     - winky_max <val>     = nbre de trames avant deepsleep [3]
                              2 ou + : valeurs acceptables
      - winky_start <volt>  = ension min. démarrage [4.50]
      - winky_stop <volt>   = tension min. arrêt [3.90]
