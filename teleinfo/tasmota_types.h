@@ -448,7 +448,7 @@ typedef union {
   uint32_t led_period : 1;            // flag to set LED color according to current period color
   uint32_t live : 1;                  // flag to publish LIVE topic
   uint32_t energy : 1;                // flag to publish ENERGY data under SENSOR
-  uint32_t spare26 : 1;               // kept for future use
+  uint32_t display : 1;               // display data on main page
   uint32_t skip : 3;                  // frames to send with live stream (1:all, 2:1 out of 2, ...)
   uint32_t cal_hexa : 1;              // flag to read calendar periods in hexa
   uint32_t spare31 : 1;               // kept for future use
