@@ -54,25 +54,27 @@ Suivant le type d'ESP utilisé, toutes les fonctionnalités ne sont pas disponib
 
 Voici un tableau récapitulatif des fonctionnalités par famille d'ESP :
 
-|       Fonctionnalité        |   ESP8266  | ESP8266 4M+ |   ESP32   |
-| --------------------------- | ---------- | ----------- | --------  |
-| IP fixe                     |     x      |      x      |     x     |
-| Calcul Cos φ                |     x      |      x      |     x     |
-| LED couleur contrat         |     x      |      x      |     x     |
-| Trames temps réel           |     x      |      x      |     x     |
-| Graph temps réel            |    live    |    live     |     x     |
-| Historique de conso/prod    |            |      x      |     x     |
-| Serveur TCP                 |     x      |      x      |     x     |
-| Serveur FTP                 |            |             |     x     |
-| Intégration Home Assistant  |     x      |      x      |     x     |
-| Intégration Domoticz        |     x      |      x      |     x     |
-| Intégration Homie           |     x      |      x      |     x     |
-| Intégration Thingsboard     |     x      |      x      |     x     |
-| Intégration InfluxDB        |            |             |     x     |
-| Intégration API RTE         |            |             |     x     |
-| Pilotage afficheur Awtrix   |            |             |     x     |
-| Taille max d'une étiquette  |    28      |    28       |    112    |
-| Nombre max d'étiquettes     |    56      |    56       |    74     |
+|       Fonctionnalité          |   ESP8266  | ESP8266 4M+ |   ESP32   |
+| ----------------------------- | ---------- | ----------- | --------  |
+| IP fixe                       |     x      |      x      |     x     |
+| Calcul Cos φ                  |     x      |      x      |     x     |
+| LED couleur contrat           |     x      |      x      |     x     |
+| Trames temps réel             |     x      |      x      |     x     |
+| Graph temps réel              |    live    |    live     |     x     |
+| Historique de conso/prod      |            |      x      |     x     |
+| Serveur TCP                   |     x      |      x      |     x     |
+| Serveur FTP                   |            |             |     x     |
+| Intégration Home Assistant    |     x      |      x      |     x     |
+| Intégration Domoticz          |     x      |      x      |     x     |
+| Intégration Homie             |     x      |      x      |     x     |
+| Intégration Thingsboard       |     x      |      x      |     x     |
+| Intégration InfluxDB          |            |             |     x     |
+| Prévision calendrier RTE      |            |             |     x     |
+| API production solaire        |            |             |     x     |
+| Prévision production solaire  |            |             |     x     |
+| Pilotage afficheur Awtrix     |            |             |     x     |
+| Taille max d'une étiquette    |    28      |    28       |    112    |
+| Nombre max d'étiquettes       |    56      |    56       |    74     |
 
 ## Flash ##
 
@@ -290,15 +292,15 @@ Toutes ces publications sont activables à travers la page **Configuration Telei
 |              |     P       | Puissance apparente globale (VA)   | 
 |              |     W       | Puissance active globale (W)    | 
 |              |     C       | Facteur de puissance (cos φ)   | 
-|              |    I*x*     | Courant (A) sur la phase **_x_**   | 
-|              |    U*x*     | Tension (V) sur la phase **_x_**    | 
-|              |    P*x*     | Puissance apparente (VA) sur la phase **_x_**    | 
-|              |    W*x*     | Puissance active (W) sur la phase **_x_**   | 
-|              |    TDAY     | Puissance totale consommée aujourd'hui (Wh)   | 
-|              |    YDAY     | Puissance totale consommée hier (Wh)   | 
+|              |    I1..I3   | Courant (A) sur chaque phase  | 
+|              |    U1..U3   | Tension (V) sur chaque phase    | 
+|              |    P1..P3   | Puissance apparente (VA) sur chaque phase    | 
+|              |    W1..W3   | Puissance active (W) sur chaque phase   | 
 |              |    PP       | Puissance apparente **produite** (VA) | 
 |              |    PW       | Puissance active **produite** (VA) | 
 |              |    PC       | Facteur de puissance (cos φ) de la **production**  | 
+|              |    TDAY     | Puissance totale consommée aujourd'hui (Wh)   | 
+|              |    YDAY     | Puissance totale consommée hier (Wh)   | 
 |              |   PTDAY     | Puissance totale **produite** aujourd'hui (Wh) | 
 |              |   PYDAY     | Puissance totale **produite** hier (Wh) | 
 | **CONTRACT** |   serial    | Numéro de série du compteur    | 
@@ -311,18 +313,12 @@ Toutes ces publications sont activables à travers la page **Configuration Telei
 |              |    CONSO    | Compteur global (Wh) de l'ensemble des périodes de consommation    | 
 |              |  *PERIODE*  | Compteur total (Wh) de la période de consommation *PERIODE*      | 
 |              |    PROD     | Compteur global (Wh) de la production    | 
-| **CAL**      |    lv       | Niveau de la période actuelle (0 inconnu, 1 bleu, 2 blanc, 3 rouge)     | 
+| **CAL**      |    level    | Niveau de la période actuelle (0 inconnu, 1 bleu, 2 blanc, 3 rouge)     | 
 |              |    hp       | Type de la période courante (0:heure creuse, 1 heure pleine) | 
-|              |  **tday**   | Section avec le niveau et le type de chaque heure du jour | 
-|              |  **tmrw**   | Section avec le niveau et le type de chaque heure du lendemain | 
-| **RELAY**    |    R1       | Etat du relai virtual n°1 (0:ouvert, 1:fermé)   | 
-|              |    ...      |                                                 | 
-|              |    R8       | Etat du relai virtual n°8 (0:ouvert, 1:fermé)   | 
-|              |    P1       | Etat de la période n°1 (0:inactive, 1:active)   | 
-|              |    L1       | Libellé de la période n°1   | 
-|              |    ...      |                                                 | 
-|              |    P9       | Etat de la période n°9 (0:inactive, 1:active)   | 
-|              |    L9       | Libellé de la période n°9   | 
+| **RELAY**    |    V1..V8   | Etat des relais virtuels (**0/1**)   | 
+|              |    C1..Cn   | Etat des relais périodes du contrat (**Etat,Niveau,Libelle**)     | 
+|              |    P1       | Etat des relais de production (**0/1**) | 
+|              |    W1       | Libellé de la période n°1   | 
 | **ALERT**    |    Load     | Indicateur de surconsommation (0:pas de pb, 1:sur-consommation)     | 
 |              |    Volt     | Indicateur de surtension (0:pas de pb, 1:au moins 1 phase est en surtension)    | 
 |              |   Preavis   | Niveau du prochain préavis (utilisé en Tempo & EJP)     | 
@@ -387,52 +383,35 @@ Il ne vous reste plus qu'à activer les modules correspondant aux API RTE :
 
 Au prochain redémarrage, vous verrez dans les logs que votre ESP32 récupère un token puis les données des API activées.
 
-    RTE: Token - abcdefghiL23OeISCK50tsGKzYD60hUt2TeESE1kBEe38x0MH0apF0y valid for 7200 seconds
-    RTE: Ecowatt - Success 200
-    RTE: Tempo - Update done (2/1/1)
+    RTE: Token: abcdefghiL23OeISCK50tsGKzYD60hUt2TeESE1kBEe38x0MH0apF0y valid for 7200 seconds
+    RTE: Ecowatt: Success 200
+    RTE: Tempo: Update done (2/1/1)
 
-Les données des calendriers sont publiées sur un topic spécifiques **votre-esp/tele/RTE** :
-
-    votre-esp/tele/RTE = {"Time":"2023-12-20T07:23:39",TEMPO":{"lv":1,"hp":0,"label":"blue","icon":"🟦","yesterday":1,"today":1,"tomorrow":1}}
-
-    votre-esp/tele/RTE = {"Time":"2023-12-20T07:36:02","POINTE":{"lv":1,"label":"blue","icon":"🟦","today":1,"tomorrow":1}}
-
-    votre-esp/tele/RTE = {"Time":"2022-10-10T23:51:09","ECOWATT":{"dval":2,"hour":14,"now":1,"next":2,
-      "day0":{"jour":"2022-10-06","dval":1,"0":1,"1":1,"2":1,"3":1,"4":1,"5":1,"6":1,...,"23":1},
-      "day1":{"jour":"2022-10-07","dval":2,"0":1,"1":1,"2":2,"3":1,"4":1,"5":1,"6":1,...,"23":1},
-      "day2":{"jour":"2022-10-08","dval":3,"0":1,"1":1,"2":1,"3":1,"4":1,"5":3,"6":1,...,"23":1},
-      "day3":{"jour":"2022-10-09","dval":2,"0":1,"1":1,"2":1,"3":2,"4":1,"5":1,"6":1,...,"23":1}}}
+Les données des calendriers RTE sont publiées sur le topic **votre-esp/tele/RTE** après chaque télépériode.
 
 ## Serveur TCP
 
 Un serveur **TCP** est intégré à cette version de firmware.
 
-Il permet de récupérer très simplement le flux d'information publié par le compteur. C'est très intéressant pour diagnostiquer un problème ou permettre de rejouer les données plus tard. Il est à noter que ce flux envoie toutes les données recues, sans aucune correction d'erreur.
+Il permet de récupérer très simplement le flux d'information publié par le compteur. C'est très intéressant pour diagnostiquer un problème ou permettre de rejouer les données plus tard. Il est à noter que ce flux envoie toutes les données recues, sans aucune correction d'erreur. Le serveur étant minimaliste, il ne permet qu'une seule connexion simultanée. Toute nouvelle connexion tuera la connexion précédente.
 
-La commande **tcp_help** explique toutes les possibilités :
-  * **tcp_status** : status du serveur TCP server (affiche le numéro de port utilisé ou **0** si éteint)
-  * **tcp_start** [port] : démarre le serveur sur le **port** précisé
-  * **tcp_stop** : arrêt du serveur
+La commande **tcp_** explique toutes les possibilités :
 
-Une fois le serveur activé, la réception du flux sur un PC sous Linux est un jeu d'enfant (ici sur le port 888) :
+    HLP: TCP Server commands :
+     - tcp_status       = server listening port, 0 if stopped (0)
+     - tcp_start <port> = start server on specified port
+     - tcp_stop         = stop stream
+       Server allows only 1 concurrent connexion
+       Any new client will kill previous one
+
+Une fois le serveur activé, la réception du flux sur un PC sous Linux est un jeu d'enfant (ici sur le port 888). Faites **Ctrl + C** pour arrêter la commande.
 
     # nc 192.168.1.10 888
         SMAXSN-1	E220422144756	05210	W
         CCASN	E220423110000	01468	:
-        CCASN-1	E220423100000	01444	Q
-        UMOY1	E220423114000	235	(
-        STGE	003A0001	:
-        MSG1	PAS DE          MESSAGE         	<
-
-Faites **Ctrl + C** pour arrêter la commande.
-
-Vous pouvez évidement enregistrer le flux dans un fichier :
-
-    # nc 192.168.1.10 888 > mon-fichier.log
+        ...
 
 Si vous souhaitez enregistrer le flux sous Windows, l'utilitaire **ncat** devrait faire le job. Mais n'ayant plus de PC Windows depuis plusieurs années, je n'ai pas pu le tester.
-
-Le serveur étant minimaliste, il ne permet qu'une seule connexion simultanée. Toute nouvelle connexion tuera la connexion précédente.
 
 ## Serveur FTP
 
