@@ -87,11 +87,9 @@ Lorsque vous flashez ce fork pour la première fois, merci de faire un **reset 6
 
 ⚠️ La version 14.10+ intègre une refonte complète des données historiques qui gère maintenant la production et les différentes périodes (Tempo par exemple). Le nouveau format de fichier est différent du format précédent. Après mise à jour de cette version, vous ne pourrez plus visualiser les anciennes données historisées. Elles seront toujours disponible dans le fichier CSV sur le FS.
 
-## Options de configuration
+## Configuration
 
-Ce firmware propose différentes options de configuration.
-
-Merci de ne configurer que les options souhaitées afin d'avoir un système optimisé et un ESP réactif.
+Ce firmware propose différentes options de configuration. Essayez de ne configurer que les options souhaitées afin d'avoir un système optimisé et un ESP réactif.
 
 ### Teleinfo
 
@@ -116,7 +114,7 @@ Ces options permettent de définir le type de données que vous souhaitez visual
   * **Relais virtuels** publie la section **RELAY**. Elle permet de s'abonner à l'état des relais virtuels publiés par le compteur ou à des relais fonction de la période en cours du contrat. Elle est à utiliser avec des device ayant été programmés avec mon firmware **Relai**.
   * **Calendrier** publie la section **CAL**. Elle permet de publier les couleurs de contrat heure / heure pour le jour courant et le lendemain.
 
-### Politique de publication
+### Fréquence de publication
 
 Cette option vous permet de définir la fréquence de publication des données.
 
@@ -126,14 +124,12 @@ Cette option vous permet de définir la fréquence de publication des données.
   - **Evolution de +-** : Publication chaque fois que la puissance varie de la valeur configurée sur l'une des phases. C'est mon option de prédilection.
   - **A chaque message reçu** : Publication à chaque trame publiée par le compteur, soit toutes les 1 à 2 secondes. Cette option n'est à utiliser que dans des cas très particuliers car elle stresse fortement l'ESP.
 
-### Spécificités
+### Données spécifiques
 
-Ces options ne sont pas nécessaires dans la plupart des cas, en particulier si vous utilisez une solution domotique.
+Ces options ne sont pas nécessaires dans la plupart des cas, en particulier si vous utilisez une solution domotique. Si vous n'en avez pas un besoin express, évitez de les sélectionner.
 
-Si vous n'en avez pas un besoin express, évitez de les sélectionner.
-
-  * **Données temps réel** : Toutes les données liées à la consommation et la production sont publiée en complément sur un topic **LIVE/...** toutes les 3 secondes.
-  * **Données Teleinfo brutes** : Les données recues depuis le compteur sont publiées telles quelles en complément sur un topic **TIC/...**.
+  * **Données temps réel** : Les données de consommation et de production sont publiée toutes les 3 secondes sur le topic **.../tele/LIVE**
+  * **Données Teleinfo brutes** : Les données recues depuis le compteur sont publiées telles quelles sur le topic **../tele/TIC**
 
 ## Commandes
 
@@ -303,15 +299,48 @@ Au prochain redémarrage, vous verrez dans les logs que votre ESP32 récupère u
     RTE: Ecowatt: Success 200
     RTE: Tempo: Update done (2/1/1)
 
-Les données des calendriers RTE sont publiées sur le topic **votre-esp/tele/RTE** après chaque télépériode.
+Les données des calendriers RTE sont publiées sur le topic **.../tele/RTE** après chaque télépériode.
 
+## Production Solaire
+
+Ce firmware intègre un module assez basique de gestion de la production solaire. Il fournit :
+  * une API de déclaration de puissance active et de total de production
+  * une interface avec le site [**Forecast.Solar**](https://forecast.solar/) pour intégrer les prévisions de production
+
+L'alimentation de la production solaire se fait à travers l'URL **http://tasmota.ip/solar** qui prend comme paramètre :
+  * power : puissance active instantanée (W), remise à 0 si aucune mise à jour après 2 mn
+  * total : compteur total de la production (Wh)
+
+     http://tasmota.ip/solar?power=890&total=10500
+
+La liste des commandes disponibles est récupérée via la commande **solar** :
+
+    HLP: commands about Solar Production Forecast
+     - solar_enable <1> = enable solar production
+     - solar_forecast <1> = enable solar forecast
+     - solar_key <> = API key (null to remove)
+     - solar_dec <45> = solar panel declination
+            0 : horizontal
+           90 : vertical
+     - solar_az <0> = solar panel azimuth
+         -180 : north
+          -90 : east
+            0 : south
+           90 : west
+          180 : north
+     - solar_update = force forecast data update
+
+Avant d'activer le module de prévision de production solaire, il est impératif d'avoir saisi les données **latitude**, **longitude**, **solar_dec** et **solar_az**.
+
+Les données de production et de prévision de production solaire se retrouvent dans les graphs d'historiques.
+  
 ## Serveur TCP
 
 Un serveur **TCP** est intégré à cette version de firmware.
 
 Il permet de récupérer très simplement le flux d'information publié par le compteur. C'est très intéressant pour diagnostiquer un problème ou permettre de rejouer les données plus tard. Il est à noter que ce flux envoie toutes les données recues, sans aucune correction d'erreur. Le serveur étant minimaliste, il ne permet qu'une seule connexion simultanée. Toute nouvelle connexion tuera la connexion précédente.
 
-La commande **tcp_** explique toutes les possibilités :
+La commande **tcp** liste les commandes disponibles :
 
     HLP: TCP Server commands :
      - tcp_status       = server listening port, 0 if stopped (0)
@@ -343,22 +372,23 @@ Ce serveur FTP ne peut accepter qu'une seule connexion simultanée. Vous devez d
 
 ## Afficheur Awtrix
 
-Sous ESP32, ce firmware permet de gérer un affichage déporté des principales données sur un afficheur [**Ulanzi Awtrix**](https://www.ulanzi.com/products/ulanzi-pixel-smart-clock-2882?ref=28e02dxl) :
-  * Puissance instantanée (consommation ou production)
+Ce firmware permet de gérer un affichage déporté des principales données sur un afficheur [**Ulanzi Awtrix**](https://www.ulanzi.com/products/ulanzi-pixel-smart-clock-2882?ref=28e02dxl) :
+  * Puissance instantanée et Cos φ (consommation ou production)
   * Calendrier du jour et du lendemain (bleu, blanc ou rouge)
-  * Consommation / production du jour
+  * Total de la consommation et/ou production du jour
 
 L'afficheur doit au préalable avoir été flashé avec le firmware Open-Source [**Awtrix3**](https://blueforcer.github.io/awtrix3/#/README).
 
 <img src="./screen/teleinfo-awtrix-puissance.png" width=400 alt="Puissance instantanée">  <img src="./screen/teleinfo-awtrix-calendrier.png" width=400 alt="Calendrier Tempo">
 
-Le paramétrage est réalisé en mode console via la commande **awtrix** :
+Le paramétrage est réalisé en mode console. Les commandes disponibles sont listées avec la commande **awtrix** :
 
     HLP: Commandes d'affichage Awtrix :
       awtrix_addr <addr> = Adresse IP du device Awtrix
       awtrix_delai [4]   = Délai entre 2 pages (min. 2s)
-      awtrix_lumi  [10]  = Luminosité (1..100%), 0=auto
-      awtrix_inst  [70]  = Puissance instantanée
+      awtrix_lumi  [0]   = Luminosité (1..100%), 0=auto
+      awtrix_inst  [1]   = Puissance instantanée
+      awtrix_cos   [1]   = Cos φ
       awtrix_cwh   [1]   = Consommation du jour
       awtrix_pwh   [1]   = Production du jour
       awtrix_cal   [0]   = Calendrier
@@ -376,9 +406,8 @@ Typiquement, après configuration en alimentation USB, le Winky doit être progr
 
 où **xxx** représente le nombre de secondes entre 2 réveils. Une valeur de **0** indique au Winky de calculer de manière dynamique l'heure de son réveil afin d'optimiser l'utilisation de la super-capacité. Sinon, en cas de valeur fixe, un minimum de 60 secondes est préconisé. Il faut éviter 300 qui définit un mode de fonctionnement spécifique de Tasmota. Si la super capacité n'est pas assez rechargée lors du prochain réveil, l'ESP se rendort pour un cycle supplémentaire.
 
-Voici la liste des commandes de configuration spécifiques au Winky :
+La liste des commandes de configuration du winky est accessible via la commande **winky** :
 
-    winky
     HLP: gestion du winky
      - winky_display <0/1> = display data on main page [1]
      - winky_sleep <val>   = deepsleep [0]
