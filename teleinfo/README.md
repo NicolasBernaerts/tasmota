@@ -29,25 +29,23 @@ Ce firmware a été développé et testé sur les compteurs suivants :
   * **Linky triphase** en TIC **Historique** & **Standard**
   * **Ace6000 triphase** en TIC **PME/PMI**
   * **Emeraude** en TIC **Emeraude 2 quadrands**
-
-<img align="right" src="./screen/teleinfo-intro-message.png" width=260>
-
+  * 
 Il a été compilé et testé sur les ESP suivants :
 
   * **ESP8266** (1Mb, 4Mb et 16Mb)
   * **ESP32** (4Mb) et **ESP32 Denky D4** (8Mb)
-  * **ESP32C3** (4Mb)
-  * **Winky ESP32C3 et ESP32C6** auto-alimenté (4Mb)
-  * **ESP32S2** (4Mb)
-  * **ESP32S3** (4Mb et 16Mb)
+  * **ESP32C3** (4Mb) et **Winky ESP32C6 / C3** auto-alimenté (4Mb)
+  * **ESP32S2** (4Mb) et **ESP32S3** (4Mb et 16Mb)
 
 Si votre compteur est en mode historique, la tension est forcée à 230V.
 
-Le protocole **Teleinfo** est décrit dans [ce document](https://www.enedis.fr/sites/default/files/Enedis-NOI-CPT_54E.pdf)
-
 Le **changelog** général est disponible dans le fichier **user_config_override.h**
 
+Le protocole **Teleinfo** est décrit dans [ce document](https://www.enedis.fr/sites/default/files/Enedis-NOI-CPT_54E.pdf)
+
 ## Fonctionnalités
+
+<img align="right" src="./screen/teleinfo-intro-message.png" width=260>
 
 Suivant le type d'ESP utilisé, toutes les fonctionnalités ne sont pas disponibles.
 
