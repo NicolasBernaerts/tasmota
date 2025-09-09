@@ -34,13 +34,12 @@ Ce firmware a été développé et testé sur les compteurs suivants :
 
 Il a été compilé et testé sur les ESP suivants :
 
-  * **ESP8266** 1Mb (Sonoff Basic R2), 4Mb et 16Mb
-  * **ESP32** 4Mb et **ESP32 Denky D4** 8Mb
-  * **ESP32C3** 4Mb (Sonoff Basic R4 par exemple)
-  * **ESP32C3 Winky** 4Mb (auto-alimenté par le compteur)
-  * **ESP32C6 Winky** 4Mb (auto-alimenté par le compteur)
-  * **ESP32S2** 4Mb
-  * **ESP32S3** 4Mb et 16Mb
+  * **ESP8266** (1Mb, 4Mb et 16Mb)
+  * **ESP32** (4Mb) et **ESP32 Denky D4** (8Mb)
+  * **ESP32C3** (4Mb)
+  * **Winky ESP32C3 et ESP32C6** auto-alimenté (4Mb)
+  * **ESP32S2** (4Mb)
+  * **ESP32S3** (4Mb et 16Mb)
 
 Si votre compteur est en mode historique, la tension est forcée à 230V.
 
@@ -70,8 +69,8 @@ Voici un tableau récapitulatif des fonctionnalités par famille d'ESP :
 | Intégration Thingsboard       |     x      |      x      |     x     |
 | Intégration InfluxDB          |            |             |     x     |
 | Prévision calendrier RTE      |            |             |     x     |
-| API production solaire        |            |             |     x     |
-| Prévision production solaire  |            |             |     x     |
+| API Production Solaire        |            |             |     x     |
+| Prévision Production Solaire  |            |             |     x     |
 | Pilotage afficheur Awtrix     |            |             |     x     |
 | Taille max d'une étiquette    |    28      |    28       |    112    |
 | Nombre max d'étiquettes       |    56      |    56       |    74     |
@@ -114,13 +113,10 @@ Ces options permettent de définir le type de données que vous souhaitez visual
 
 <img align="right" src="./screen/teleinfo-config-donnees.png" width=300>
 
-**Energie Tasmota** publie la section **ENERGY**, publication standard de tasmota. La plupart du temps vous n'avez pas besoin de cocher cette option car elle ne prend pas en compte la moitié des données publiées par un compteur Linky.
-
-**Consommation & Production** publie la section **METER** et **CONTRACT**. C'est l'option que vous devriez cocher par défaut. Elle permet de publier toutes les données utiles du compteur en mode consommation, production et/ou auto-consommation. Ce sont en particulier les données utilisées par Home Assistant.
-
-**Relais virtuels** publie la section **RELAY**. Elle permet de s'abonner à l'état des relais virtuels publiés par le compteur ou à des relais fonction de la période en cours du contrat. Elle est à utiliser avec des device ayant été programmés avec mon firmware **Relai**.
-
-**Calendrier** publie la section **CAL**. Elle permet de publier les couleurs de contrat heure / heure pour le jour courant et le lendemain.
+  * **Energie Tasmota** publie la section **ENERGY**, publication standard de tasmota. La plupart du temps vous n'avez pas besoin de cocher cette option car elle ne prend pas en compte la moitié des données publiées par un compteur Linky.
+  * **Consommation & Production** publie la section **METER** et **CONTRACT**. C'est l'option que vous devriez cocher par défaut. Elle permet de publier toutes les données utiles du compteur en mode consommation, production et/ou auto-consommation. Ce sont en particulier les données utilisées par Home Assistant.
+  * **Relais virtuels** publie la section **RELAY**. Elle permet de s'abonner à l'état des relais virtuels publiés par le compteur ou à des relais fonction de la période en cours du contrat. Elle est à utiliser avec des device ayant été programmés avec mon firmware **Relai**.
+  * **Calendrier** publie la section **CAL**. Elle permet de publier les couleurs de contrat heure / heure pour le jour courant et le lendemain.
 
 ### Politique de publication
 
@@ -138,15 +134,8 @@ Ces options ne sont pas nécessaires dans la plupart des cas, en particulier si 
 
 Si vous n'en avez pas un besoin express, évitez de les sélectionner.
 
-#### Données temps réel
-
-Toutes les données liées à la consommation et la production sont publiée en complément sur un topic **LIVE/...** toutes les 3 secondes.
-
-#### Données Teleinfo brutes
-
-Les données recues depuis le compteur sont publiées telles quelles en complément sur un topic **TIC/...**.
-
-Ces données étant des données brutes, elles n'ont d'autre intérêt que l'analyse des trames en cas de problème.
+  * **Données temps réel** : Toutes les données liées à la consommation et la production sont publiée en complément sur un topic **LIVE/...** toutes les 3 secondes.
+  * **Données Teleinfo brutes** : Les données recues depuis le compteur sont publiées telles quelles en complément sur un topic **TIC/...**.
 
 ## Commandes
 
@@ -188,50 +177,19 @@ Cela permet d'émettre des données correspondant exactement au contrat lié au 
 
 #### Home Assistant
 
-Toutes les données sélectionnées dans **Données publiées** sont annoncées à Home Assistant à chaque démarrage.
+Toutes les données sélectionnées dans **Données publiées** sont annoncées à Home Assistant à chaque démarrage. Comme les données sont annoncées à HA, vous ne devriez plus avoir qu'à les sélectionner dans HA, qui s'abonnera et utilisera les données publiées. La publication de déclaration pour Home Asisstant est réalisée en mode **retain**. Dans le cas particulier du Winky, les messages d'auto-découverte ne sont pas émis au réveil s'il ne dispose pas d'une alimentation fixe via USB.
 
-Comme les données sont annoncées à HA, vous ne devriez plus avoir qu'à les sélectionner dans HA, qui s'abonnera et utilisera les données publiées. 
-
-Dans le cas particulier du Wenky, les messages d'auto-découverte ne sont pas émis au réveil s'il ne dispose pas d'une alimentation fixe via USB.
-
-L'intégration Home Assistant peut être activée via la page de configuration **Teleinfo** ou en mode console : 
+L'intégration Home Assistant peut être également être activée en mode console : 
 
     hass 1
 
-La publication de déclaration pour Home Asisstant est réalisée en mode **retain**.
-
 ![Home Assistant integration](./screen/teleinfo-ha-1.png)  ![Home Assistant integration](./screen/teleinfo-ha-2.png)
 
-#### Homie
-
-Les données sont publiées dans un format spécifique reconnu par les applications domotique compatibles [**Homie**](https://homieiot.github.io/). A chaque boot, toutes les données candidates à intégration dans un client **Homie** sont émises via MQTT en mode **retain**.
-
-Dans le cas particulier du Wenky, les messages d'auto-découverte ne sont pas émis au réveil s'il ne dispose pas d'une alimentation fixe via USB.
-
-L'intégration Homie peut être activée via la page de configuration **Teleinfo** ou en mode console : 
-
-    homie 1
-
-#### Thingsboard
-
-Les données sont publiées dans un format spécifique reconnu nativement par la plateforme IoT  [**Thingsboard**](https://thingsboard.io/).
-
-Le paramétrage à appliquer coté **Tasmota** et coté **Thingsboard** pour que les données soient publiées et consommées est le suivant :
-
-![Tasmota config](./screen/teleinfo-thingsboard-config.jpg)  ![Thingsboard device](./screen/teleinfo-thingsboard-device.jpg)  ![Thingsboard credentials](./screen/teleinfo-thingsboard-credentials.jpg)
-
-L'intégration Thingsboard peut être activée via la page de configuration **Teleinfo** ou en mode console : 
-
-    thingsboard 1
-    
 #### Domoticz
 
-Les données sont publiées dans un format spécifique reconnu nativement par Domoticz.
+Les données sont publiées dans un format spécifique reconnu nativement par Domoticz. Vous pouvez définir les données à publier en saisissant leur index. Pour chaque donnée, un tooltip explique le type de données à définir dans Domoticz.
 
-Une fois l'option sélectionnée et sauvegardée, vous pourrez définir les index Domoticz définis pour chacune des données publiées. Pour chaque donnée, un tooltip explique le type de données à définir dans Domoticz.
-
-
-La configuration des messages émis pour Domoticz peut être réalisée via la page de configuration **Teleinfo** ou en mode console :
+La configuration des messages émis pour Domoticz peut également être réalisée en mode console :
 
     domo
     HLP: commands for Teleinfo Domoticz integration
@@ -251,78 +209,38 @@ La configuration des messages émis pour Domoticz peut être réalisée via la p
         <10,index> : Couleur du Jour
         <11,index> : Couleur du Lendemain
 
+#### Homie
+
+Les données sont publiées dans un format spécifique reconnu par les applications domotique compatibles [**Homie**](https://homieiot.github.io/). A chaque boot, toutes les données candidates à intégration dans un client **Homie** sont émises via MQTT en mode **retain**. Dans le cas particulier du Winky, les messages d'auto-découverte ne sont pas émis au réveil s'il ne dispose pas d'une alimentation fixe via USB.
+
+L'intégration Homie peut également être activée en mode console : 
+
+    homie 1
+
 #### InfluxDB
 
-Les principales données sont publiées sur un serveur InfluxDB, à travers les API https :
+Après avoir sélectionner l'option, vous devez définir les caractéristiques de votre serveur InfluxDB. Les données publiées devraient apparaître automatiquement sur votre instance InfluxDB.
+
+Les données publiées sont les suivantes :
   * mode du contrat (historique:1, standard:2, PME/PMI:3, Emeraude:4, Jaune:5)
   * nombre de périodes dans le contrat et index de la période en cours
-  * niveau de la période en cours (bleu:1, blanc:2, rouge:3)
-  * type de la période (hc:0, hp:1)
-  * pour chaque phase : courant, tension, puissance apparente & puissance active
-  * cos φ 
+  * niveau (bleu:1, blanc:2, rouge:3) et type (hc:0, hp:1) de la période en cours
+  * pour chaque phase : courant, tension, puissance apparente & puissance active et cos φ 
   * si le compteur est en mode production : puissance apparente, puissance active & cos φ 
 
-Une fois l'option sélectionnée et sauvegardée, vous pourrez définir les caractéristiques de votre serveur InfluxDB.
-
-Les données publiées devraient apparaître automatiquement sur votre instance InfluxDB.
-
-L'intégration InfluxDB peut être activée via la page de configuration **Teleinfo** ou en mode console : 
+L'activation d'InfluxDB peut également être réalisée en mode console : 
 
     influx 1
 
-## Publication MQTT
+#### Thingsboard
 
-Dans le topic **../SENSOR**, les sections suivantes seront publiées selon votre configuration : 
-  * **ENERGY** : section officielle de Tasmota, qui ne contien qu'un sous ensemble de données
-  * **METER** : données normalisées de consommation et production en temps réel
-  * **CONTRACT** : données normalisées du contrat intégrant les compteurs de périodes en Wh
-  * **CAL** : calendrier heure/heure du jour et du lendemain, consolidé entre la publication compteur et les données RTE reçues (Tempo, Pointe et/ou Ecowatt)
-  * **RELAY** : relais virtuels publiés par le compteur
-  * **ALERT** : alertes publiées dans les messages STGE (changement Tempo / EJP, surpuissance & survoltage)
+Les données sont publiées dans un format spécifique reconnu nativement par la plateforme IoT  [**Thingsboard**](https://thingsboard.io/). Le paramétrage à appliquer coté **Tasmota** et coté **Thingsboard** pour que les données soient publiées et consommées est le suivant :
 
-Toutes ces publications sont activables à travers la page **Configuration Teleinfo**.
+![Tasmota config](./screen/teleinfo-thingsboard-config.jpg)  ![Thingsboard device](./screen/teleinfo-thingsboard-device.jpg)  ![Thingsboard credentials](./screen/teleinfo-thingsboard-credentials.jpg)
 
-|    Section   |     Clé     |  Valeur   |
-| ------------ | ----------- | ----------- |
-| **METER**    |    PH       | Nombre de phases (1 ou 3)  | 
-|              |   PSUB      | Puissance apparente (VA) maximale par phase dans le contrat    | 
-|              |   ISUB      | Courant (A) maximal par phase dans le contrat    | 
-|              |   PMAX      | Puissance apparente (VA) maximale par phase intégrant le pourcentage acceptable   | 
-|              |     I       | Courant global (A)    | 
-|              |     P       | Puissance apparente globale (VA)   | 
-|              |     W       | Puissance active globale (W)    | 
-|              |     C       | Facteur de puissance (cos φ)   | 
-|              |    I1..I3   | Courant (A) sur chaque phase  | 
-|              |    U1..U3   | Tension (V) sur chaque phase    | 
-|              |    P1..P3   | Puissance apparente (VA) sur chaque phase    | 
-|              |    W1..W3   | Puissance active (W) sur chaque phase   | 
-|              |    PP       | Puissance apparente **produite** (VA) | 
-|              |    PW       | Puissance active **produite** (VA) | 
-|              |    PC       | Facteur de puissance (cos φ) de la **production**  | 
-|              |    TDAY     | Puissance totale consommée aujourd'hui (Wh)   | 
-|              |    YDAY     | Puissance totale consommée hier (Wh)   | 
-|              |   PTDAY     | Puissance totale **produite** aujourd'hui (Wh) | 
-|              |   PYDAY     | Puissance totale **produite** hier (Wh) | 
-| **CONTRACT** |   serial    | Numéro de série du compteur    | 
-|              |    name     | Nom du contrat en cours        | 
-|              |   period    | Nom de la periode en cours     | 
-|              |    color    | Couleur de la periode en cours     | 
-|              |    hour     | Type de la periode en cours     | 
-|              |    tday     | Couleur du jour   | 
-|              |    tmrw     | Couleur du lendemain     | 
-|              |    CONSO    | Compteur global (Wh) de l'ensemble des périodes de consommation    | 
-|              |  *PERIODE*  | Compteur total (Wh) de la période de consommation *PERIODE*      | 
-|              |    PROD     | Compteur global (Wh) de la production    | 
-| **CAL**      |    level    | Niveau de la période actuelle (0 inconnu, 1 bleu, 2 blanc, 3 rouge)     | 
-|              |    hp       | Type de la période courante (0:heure creuse, 1 heure pleine) | 
-| **RELAY**    |    V1..V8   | Etat des relais virtuels (**0/1**)   | 
-|              |    C1..Cn   | Etat des relais périodes du contrat (**Etat,Niveau,Libelle**)     | 
-|              |    P1       | Etat des relais de production (**0/1**) | 
-|              |    W1       | Libellé de la période n°1   | 
-| **ALERT**    |    Load     | Indicateur de surconsommation (0:pas de pb, 1:sur-consommation)     | 
-|              |    Volt     | Indicateur de surtension (0:pas de pb, 1:au moins 1 phase est en surtension)    | 
-|              |   Preavis   | Niveau du prochain préavis (utilisé en Tempo & EJP)     | 
-|              |    Label    | Libellé du prochain préavis    | 
+L'intégration Thingsboard peut également être activée en mode console : 
+
+    thingsboard 1
 
 ## Calendriers RTE : Tempo, Pointe & Ecowatt
 
@@ -476,6 +394,52 @@ Voici la liste des commandes de configuration spécifiques au Winky :
      - winky_ref <farad>   = capacité super capa (F) [1.50]
      - winky_coeff         = raz coefficients ajustement des tensions
      - winky_meter         = raz tension/courant linky
+
+## Publication MQTT
+
+Le topic **../SENSOR** est enrichi des données suivantes :
+
+|    Section   |     Clé     |  Valeur   |
+| ------------ | ----------- | ----------- |
+| **METER**    |    PH       | Nombre de phases (1 ou 3)  | 
+|              |   PSUB      | Puissance apparente (VA) maximale par phase dans le contrat    | 
+|              |   ISUB      | Courant (A) maximal par phase dans le contrat    | 
+|              |   PMAX      | Puissance apparente (VA) maximale par phase intégrant le pourcentage acceptable   | 
+|              |     I       | Courant global (A)    | 
+|              |     P       | Puissance apparente globale (VA)   | 
+|              |     W       | Puissance active globale (W)    | 
+|              |     C       | Facteur de puissance (cos φ)   | 
+|              |    I1..I3   | Courant (A) sur chaque phase  | 
+|              |    U1..U3   | Tension (V) sur chaque phase    | 
+|              |    P1..P3   | Puissance apparente (VA) sur chaque phase    | 
+|              |    W1..W3   | Puissance active (W) sur chaque phase   | 
+|              |    PP       | Puissance apparente **produite** (VA) | 
+|              |    PW       | Puissance active **produite** (VA) | 
+|              |    PC       | Facteur de puissance (cos φ) de la **production**  | 
+|              |    TDAY     | Puissance totale consommée aujourd'hui (Wh)   | 
+|              |    YDAY     | Puissance totale consommée hier (Wh)   | 
+|              |   PTDAY     | Puissance totale **produite** aujourd'hui (Wh) | 
+|              |   PYDAY     | Puissance totale **produite** hier (Wh) | 
+| **CONTRACT** |   serial    | Numéro de série du compteur    | 
+|              |    name     | Nom du contrat en cours        | 
+|              |   period    | Nom de la periode en cours     | 
+|              |    color    | Couleur de la periode en cours     | 
+|              |    hour     | Type de la periode en cours     | 
+|              |    tday     | Couleur du jour   | 
+|              |    tmrw     | Couleur du lendemain     | 
+|              |    CONSO    | Compteur global (Wh) de l'ensemble des périodes de consommation    | 
+|              |  *PERIODE*  | Compteur total (Wh) de la période de consommation *PERIODE*      | 
+|              |    PROD     | Compteur global (Wh) de la production    | 
+| **CAL**      |    level    | Niveau de la période actuelle (0 inconnu, 1 bleu, 2 blanc, 3 rouge)     | 
+|              |    hp       | Type de la période courante (0:heure creuse, 1 heure pleine) | 
+| **RELAY**    |    V1..V8   | Etat des relais virtuels (**0/1**)   | 
+|              |    C1..Cn   | Etat des relais périodes du contrat (**Etat,Niveau,Libelle**)     | 
+|              |    P1       | Etat des relais de production (**0/1**) | 
+|              |    W1       | Libellé de la période n°1   | 
+| **ALERT**    |    Load     | Indicateur de surconsommation (0:pas de pb, 1:sur-consommation)     | 
+|              |    Volt     | Indicateur de surtension (0:pas de pb, 1:au moins 1 phase est en surtension)    | 
+|              |   Preavis   | Niveau du prochain préavis (utilisé en Tempo & EJP)     | 
+|              |    Label    | Libellé du prochain préavis    | 
 
 ## Compilation
 
