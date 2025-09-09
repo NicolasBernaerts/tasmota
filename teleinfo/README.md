@@ -330,7 +330,7 @@ La liste des commandes disponibles est récupérée via la commande **solar** :
           180 : north
      - solar_update = force forecast data update
 
-Avant d'activer le module de prévision de production solaire, il est impératif d'avoir saisi les données **latitude**, **longitude**, **solar_dec** et **solar_az**.
+Avant d'activer le module de prévision de production solaire, il est impératif d'avoir saisi les données **latitude**, **longitude**, **solar_dec** et **solar_az**. Vous devez également configurer la puissance maximale de production de vos panneaux avec **energyconfig prod=xxxx**.
 
 Les données de production et de prévision de production solaire se retrouvent dans les graphs d'historiques.
   
