@@ -130,8 +130,8 @@ Ces options ne sont pas nécessaires dans la plupart des cas, en particulier si 
 
 **Si vous n'en avez pas un besoin express, évitez de les sélectionner car elles stressent fortement l'ESP et peuvent le rendre instable si la connexion wifi n'est pas très bonne.**
 
-  * **Données temps réel** : Les données de consommation et de production sont publiée toutes les 3 secondes sur le topic **.../tele/LIVE**
-  * **Données Teleinfo brutes** : Les données recues depuis le compteur sont publiées telles quelles sur le topic **../tele/TIC**
+  * **Données temps réel** : Les données de consommation et de production sont publiée **toutes les 3 secondes** sur le topic **.../tele/LIVE**
+  * **Données Teleinfo brutes** : Les données brutes du compteur sont publiées **toutes les 1 à 2 secondes** sur le topic **../tele/TIC**
 
 ## Commandes
 
