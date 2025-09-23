@@ -142,7 +142,7 @@ Ce firmware propose un certain nombre de commandes **EnergyConfig** spécifiques
       standard       mode standard (rédémarrage)
       noraw          pas d'emission trame TIC
       full           emission topic TIC
-      skip=5         emet les topic TIC/LIVE toutes les xx trames
+      skip=5         emet le topic TIC toutes les xx trames
       live           emission topic LIVE
       reset          reset contrat et données (nécessite un redémarrage)
       automode       auto-détection du mode Linky
