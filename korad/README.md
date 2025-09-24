@@ -1,9 +1,8 @@
 # KORAD & KUAIQU power supply Tasmota firmware
 
-This evolution of **Tasmota 15** has been specifically developped to manage **Korad KA3005P** and **Kuaiqu** laboratory power supply.
+![Control page](./screen/tasmota-korad-control.png)
 
-Korad serial protocol is documented at https://sigrok.org/wiki/Korad_KAxxxxP_series
-Kuaiqu serial protocol is documented at https://www.eevblog.com/forum/testgear/kuaiqu-programmable-switchmode-power-supply-(32v-10-2a)/?action=dlattach;attach=2267752
+This evolution of **Tasmota 15** has been specifically developped to manage **Korad KA3005P** and **Kuaiqu** laboratory power supply.
 
 To use it, your need to add one specific ESP8266 extension card connected to the internal serial port of the power supply.
 
@@ -23,6 +22,11 @@ It allows you to :
   * Record voltage and current to CSV file in realtime
   
 It has been developped specifically for ESP8266 with a LittleFS partition.  
+
+Korad serial protocol is documented [here](https://sigrok.org/wiki/Korad_KAxxxxP_series)
+
+Kuaiqu serial protocol is documented [here](https://www.eevblog.com/forum/testgear/kuaiqu-programmable-switchmode-power-supply-(32v-10-2a)/?action=dlattach;attach=2267752)
+
 
 ## Korad adapter board
 
@@ -81,8 +85,4 @@ Once you've flashed the specific Tasmota firmware, you should get the following 
 ### Configuration
 
 ![Main page](./screen/tasmota-korad-main.png) ![Presets](./screen/tasmota-korad-preset.png)  
-
-### Control
-
-![Control page](./screen/tasmota-korad-control.png)
 
