@@ -77,13 +77,19 @@ Voici un tableau récapitulatif des fonctionnalités par famille d'ESP :
 
 Des versions pré-compilées pour différentes familles d'ESP sont disponibles dans le répertoire [**binary**](./binary).
 
-Certaines variantes de ce firmware (ESP avec au moins 4Mo de ROM) utilisent une partition **LittleFS** pour stocker les données historisées qui servent à générer les graphs de suivi.
+Certaines variantes de ce firmware (ESP avec au moins 4Mo de ROM) utilisent une partition **LittleFS** pour stocker les données historisées qui servent à générer les graphs de suivi. Tasmota officiel utilise 320k pour le FS, alors que ce build utilise 1.3M.
 
-Pour la famille des **ESP8266 4M+** et **ESP32**, merci de faire systématiquement un premier flash en mode **Série** afin de regénérer le partitionnement et d'éviter tout dysfonctionnement. Vous pourrez alors faire toutes les mises à jour suivantes en mode **OTA**.
+Pour la famille des **ESP8266 4M+** et **ESP32 4M+**, merci de faire systématiquement un premier flash en mode **Série** afin de regénérer le partitionnement et d'éviter tout dysfonctionnement. Vous pourrez alors faire toutes les mises à jour suivantes en mode **OTA**.
 
-Si votre ESP est un **Denky D4**, vous pouvez flasher directement le firmware Denky D4 en mode **OTA**.
+Typiquement pour flasher ce firmware depuis un Tasmota officiel, il faut réaliser les opérations suivantes :
+  * **reset 1** en mode console pour revenir en configuration usine
+  * flash en mode serie du firmware **factory**
+  * paramétrage wifi via le hotspot de l'ESP
+  * paramétrage du module
 
-Lorsque vous flashez ce fork pour la première fois, merci de faire un **reset 6** afin de réinitialiser la configuration en ROM pour eviter tout dysfonctionnement du fait d'une ancienne configuration mal interprétée.
+Vous devriez ensuite avoir un firmware Teleinfo totalement opérationnel.
+
+Si votre ESP est un **Denky D4**, vous pouvez flasher directement le firmware Denky D4 en mode **Upload** ou **OTA**.
 
 ⚠️ La version 14.10+ intègre une refonte complète des données historiques qui gère maintenant la production et les différentes périodes (Tempo par exemple). Le nouveau format de fichier est différent du format précédent. Après mise à jour de cette version, vous ne pourrez plus visualiser les anciennes données historisées. Elles seront toujours disponible dans le fichier CSV sur le FS.
 
