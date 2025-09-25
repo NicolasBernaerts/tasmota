@@ -441,6 +441,8 @@ Concernant le port GPIO à utiliser, voici des préconisations importantes :
   * ESP8266 : utiliser uniquement **GPIO3 (RXD)** ou **GPIO13**
   * ESP32 : ne pas utiliser **GPIO6 à GPIO11**, **GPIO16** et **GPIO17** car ils sont utilisés pour les accès mémoire
 
+### Adaptateur Linky
+
 Si vous me posez la question de quel adaptateur **Teleinfo** utiliser, je vous répondrais que le meilleur actuellement est le [**Denky D4**](https://www.tindie.com/products/hallard/denky-d4-esp32-tic-teleinfo-reader/) qui est très bien conçu et qui fonctionne parfaitement avec ce firmware.
 
 Mais si vous souhaitez vraiment réaliser vous même votre adaptateur Teleinfo, voici le schéma que j'ai mis en oeuvre sur plusieurs compteurs avec des Esp8266 et des ESP32-S3 :
@@ -448,6 +450,10 @@ Mais si vous souhaitez vraiment réaliser vous même votre adaptateur Teleinfo, 
 ![Simple Teleinfo adapter](./screen/teleinfo-adapter-diagram.png)
 
 Concernant la résistance en tête de l'opto-coupleur, certains compteurs Linky peuvent nécessiter une résistance plus faible que la résistance classique de 1.5 kΩ. J'ai eu à descendre la résistance à **800 Ω** sur un compteur triphasé en mode standard pour éviter les erreurs de réception.
+
+### Adaptateur PME/PMI
+
+A compléter
 
 ## Publication MQTT
 
