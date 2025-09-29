@@ -93,52 +93,6 @@ Si votre ESP est un **Denky D4**, vous pouvez flasher directement le firmware De
 
 ⚠️ La version 14.10+ intègre une refonte complète des données historiques qui gère maintenant la production et les différentes périodes (Tempo par exemple). Le nouveau format de fichier est différent du format précédent. Après mise à jour de cette version, vous ne pourrez plus visualiser les anciennes données historisées. Elles seront toujours disponible dans le fichier CSV sur le FS.
 
-## Configuration
-
-Ce firmware propose différentes options de configuration. Essayez de ne configurer que les options souhaitées afin d'avoir un système optimisé et un ESP réactif.
-
-### Teleinfo
-
-Ces options permettent de définir le type de compteur auquel est connecté le module.
-
-<img align="right" src="./screen/teleinfo-config-mode.png" width=300>
-
-Les anciens compteurs sont tous en mode **Historique**.
-
-Les Linky sont principalement en mode **Historique** mais ceux utilisés avec les nouveaux contrats sont le plus souvent configurés en mode **Standard**.
-
-Si vous modifiez cette option, le module redémarrera après sauvegarde.
-
-### Données publiées
-
-Ces options permettent de définir le type de données que vous souhaitez visualiser et publier via MQTT.
-
-<img align="right" src="./screen/teleinfo-config-donnees.png" width=300>
-
-  * **Energie Tasmota** publie la section **ENERGY**, publication standard de tasmota. La plupart du temps vous n'avez pas besoin de cocher cette option car elle ne prend pas en compte la moitié des données publiées par un compteur Linky.
-  * **Consommation & Production** publie la section **METER** et **CONTRACT**. C'est l'option que vous devriez cocher par défaut. Elle permet de publier toutes les données utiles du compteur en mode consommation, production et/ou auto-consommation. Ce sont en particulier les données utilisées par Home Assistant.
-  * **Relais virtuels** publie la section **RELAY**. Elle permet de s'abonner à l'état des relais virtuels publiés par le compteur ou à des relais fonction de la période en cours du contrat. Elle est à utiliser avec des device ayant été programmés avec mon firmware **Relai**.
-  * **Calendrier** publie la section **CAL**. Elle permet de publier les couleurs de contrat heure / heure pour le jour courant et le lendemain.
-
-### Fréquence de publication
-
-Cette option vous permet de définir la fréquence de publication des données.
-
-<img align="right" src="./screen/teleinfo-config-publication.png" width=300>
-
-  - **A chaque télémétrie** : Publication à chaque déclenchement de la télémétrie, configurée par **Période télémétrie**.
-  - **Evolution de +-** : Publication chaque fois que la puissance varie de la valeur configurée sur l'une des phases. C'est mon option de prédilection.
-  - **A chaque message reçu** : Publication à chaque trame publiée par le compteur, soit toutes les 1 à 2 secondes. Cette option n'est à utiliser que dans des cas très particuliers car elle stresse fortement l'ESP.
-
-### Données spécifiques
-
-Ces options ne sont pas nécessaires dans la plupart des cas, en particulier si vous utilisez une solution domotique.
-
-**Si vous n'en avez pas un besoin express, évitez de les sélectionner car elles stressent fortement l'ESP et peuvent le rendre instable si la connexion wifi n'est pas très bonne.**
-
-  * **Données temps réel** : Les données de consommation et de production sont publiée **toutes les 3 secondes** sur le topic **.../tele/LIVE**
-  * **Données Teleinfo brutes** : Les données brutes du compteur sont publiées **toutes les 1 à 2 secondes** sur le topic **../tele/TIC**
-
 ## Commandes
 
 Ce firmware propose un certain nombre de commandes **EnergyConfig** spécifiques disponibles en mode console :
@@ -167,8 +121,51 @@ Ce firmware propose un certain nombre de commandes **EnergyConfig** spécifiques
 
 Vous pouvez passer plusieurs commandes en même temps :
 
-      EnergyConfig percent=110 nbday=8 nbweek=12
-      
+      EnergyConfig percent=110 trigger=1000 calendar=1
+
+La commande **live** permet de publier les données de consommation et de production **toutes les 3 secondes** sur le topic **.../tele/LIVE**
+
+La commande **full** permet de publier les données brutes du compteur **toutes les 1 à 2 secondes** sur le topic **../tele/TIC**. La publication peut être ajustée par la commande **skip=xx**.
+
+## Configuration
+
+Ce firmware propose différentes options de configuration. Essayez de ne configurer que les options nécessaires afin d'avoir un système optimisé et un ESP réactif.
+
+### Teleinfo
+
+Ces options permettent de définir le type de compteur auquel est connecté le module.
+
+<img align="right" src="./screen/teleinfo-config-mode.png" width=300>
+
+Les anciens compteurs sont tous en mode **Historique**.
+
+Les Linky sont principalement en mode **Historique** mais ceux utilisés avec les nouveaux contrats sont le plus souvent configurés en mode **Standard**.
+
+Si vous choisissez **Auto-découverte** la vitesse de votre compteur sera testée au prochain démarrage.
+
+Si vous modifiez cette option, le module redémarrera après sauvegarde.
+
+### Données publiées
+
+Ces options permettent de définir le type de données que vous souhaitez visualiser et publier via MQTT.
+
+<img align="right" src="./screen/teleinfo-config-donnees.png" width=300>
+
+  * **Energie Tasmota** publie la section **ENERGY**, publication standard de tasmota. La plupart du temps vous n'avez pas besoin de cocher cette option car elle ne prend pas en compte la moitié des données publiées par un compteur Linky.
+  * **Consommation & Production** publie la section **METER** et **CONTRACT**. C'est l'option que vous devriez cocher par défaut. Elle permet de publier toutes les données utiles du compteur en mode consommation, production et/ou auto-consommation. Ce sont en particulier les données utilisées par Home Assistant.
+  * **Relais virtuels** publie la section **RELAY**. Elle permet de s'abonner à l'état des relais virtuels publiés par le compteur ou à des relais fonction de la période en cours du contrat. Elle est à utiliser avec des device ayant été programmés avec mon firmware **Relai**.
+  * **Calendrier** publie la section **CAL**. Elle permet de publier les couleurs de contrat heure / heure pour le jour courant et le lendemain.
+
+### Fréquence de publication
+
+Cette option vous permet de définir la fréquence de publication des données.
+
+<img align="right" src="./screen/teleinfo-config-publication.png" width=300>
+
+  - **A chaque télémétrie** : Publication à chaque déclenchement de la télémétrie, configurée par **Période télémétrie**.
+  - **Evolution de +-** : Publication chaque fois que la puissance varie de la valeur configurée sur l'une des phases. C'est mon option de prédilection.
+  - **A chaque message reçu** : Publication à chaque trame publiée par le compteur, soit toutes les 1 à 2 secondes. Cette option n'est à utiliser que dans des cas très particuliers car elle stresse fortement l'ESP.
+
 ## Intégration
 
 <img align="right" src="./screen/teleinfo-config-integration.png" width=300>
