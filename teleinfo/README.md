@@ -439,8 +439,8 @@ La liste des commandes de configuration du winky est accessible via la commande 
 ## GPIO et Adaptateur
 
 Concernant le port GPIO à utiliser, voici des préconisations importantes :
-  * ESP8266 : utiliser uniquement **GPIO3 (RXD)** ou **GPIO13**
-  * ESP32 : ne pas utiliser **GPIO6 à GPIO11**, **GPIO16** et **GPIO17** car ils sont utilisés pour les accès mémoire
+  * ESP8266 : Utiliser uniquement **GPIO3 (RxD)** ou **GPIO13**
+  * ESP32 : Le port **RxD** est souvent un très bon choix. Ne pas utiliser **GPIO6 à GPIO11**, **GPIO16** et **GPIO17** car ils sont utilisés pour les accès mémoire
 
 ### Adaptateur Linky
 
