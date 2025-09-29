@@ -454,7 +454,11 @@ Concernant la résistance en tête de l'opto-coupleur, certains compteurs Linky 
 
 ### Adaptateur PME/PMI
 
-A compléter
+Les compteurs PME/PMI, comme l' **ACE6000**, utilisent une vraie liaison RS232 qui est disponible sur le **port RJ45** du compteur.
+
+L'adaptateur à utiliser pour ces compteurs est donc différent de celui des Linky. Le plus simple est d'acheter un simple convertisseur RS232 / TTL et de le connecter de la manière suivante :
+
+![PME/PMI Teleinfo adapter](./screen/teleinfo-pmepmi-interface.jpg)
 
 ## Publication MQTT
 
