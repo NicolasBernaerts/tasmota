@@ -6,7 +6,7 @@
 
 ## Presentation
 
-<img align="right" src="./screen/teleinfo-intro-home.png" width=260>
+<img align="right" src="./screen/teleinfo-main-detail.png" width=260>
 
 Cette évolution du firmware **Tasmota** permet de :
   * gérer le flux **Teleinfo** des compteurs français (**Linky**, **PME/PMI** et **Emeraude**)
@@ -30,12 +30,16 @@ Ce firmware a été développé et testé sur les compteurs suivants :
   * **Ace6000 triphase** en TIC **PME/PMI**
   * **Emeraude** en TIC **Emeraude 2 quadrands**
 
+<img align="right" src="./screen/teleinfo-main-minimize.png" width=260>
+
 Il a été compilé et testé sur les ESP suivants :
 
   * **ESP8266** (1Mb, 4Mb et 16Mb)
   * **ESP32** (4Mb) et **ESP32 Denky D4** (8Mb)
   * **ESP32C3** (4Mb) et **Winky ESP32C3 / ESP32C6** auto-alimenté (4Mb)
   * **ESP32S2** (4Mb) et **ESP32S3** (4Mb et 16Mb)
+
+Sur la page d'acceuil, chaque section peut être minimisée ou maximisée par un simple clic de souris.
 
 Si votre compteur est en mode historique, la tension est forcée à 230V.
 
