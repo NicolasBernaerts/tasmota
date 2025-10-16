@@ -1,5 +1,7 @@
 You'll find here pre-compiled binaries for Teleinfo project.
 
+**If you come from an official Tasmota firware, please do a serial flash with a factory image to avoid any boot loop.**
+
 These binaries are ready to be flashed on ESP8266 or ESP32.
 Each binary has its own specificities :
   * **tasmota-teleinfo.bin** : target is ESP8266 with 1M memory. It won't handle LittleFS to store history files.
