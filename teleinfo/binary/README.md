@@ -1,6 +1,6 @@
 You'll find here pre-compiled binaries for Teleinfo project.
 
-**If you come from an official Tasmota firware, please do a serial flash with a factory image to avoid any boot loop.**
+**If you come from an official Tasmota firmware, please do a serial flash with a factory image to avoid any boot loop as partitioning and data are not identical.**
 
 These binaries are ready to be flashed on ESP8266 or ESP32.
 Each binary has its own specificities :
