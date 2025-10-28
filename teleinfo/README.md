@@ -129,7 +129,15 @@ Vous pouvez passer plusieurs commandes en même temps :
 
 La commande **live** permet de publier les données de consommation et de production **toutes les 3 secondes** sur le topic **.../tele/LIVE**
 
+<img align="right" src="./screen/teleinfo-avgload.jpg" width=200>
+
 La commande **full** permet de publier les données brutes du compteur **toutes les 1 à 2 secondes** sur le topic **../tele/TIC**. La publication peut être ajustée par la commande **skip=xx**.
+
+En complément, ce firmware permet de suivre la charge moyenne du CPU depuis l'écran d'acceuil via la commande **webload 1**.
+
+Suivant le type de CPU et votre taux de publication MQTT, la charge moyenne peut dépasser les 70%, ce qui peut mettre en péril la stabilité du CPU et provoquer des reboot intempestifs.
+
+Si votre charge moyenne CPU est trop élevée, une commande du type **sleep 100** ou **sleep 200** devrait permettre de la diminuer de manière notable.
 
 ## Configuration
 
