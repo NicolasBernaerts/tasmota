@@ -16,4 +16,4 @@ In the **tools** folder you get 2 simple tools :
   * **tasmota-discover** to list all devices (tasmota and others) available on the same LAN.
   * **tasmota-flash** to erase and/or flash ESP8266 and ESP32 devices.
 
-
+Du fait des projets Tasmota que je développe, je suis en échange avec l'université de Grenoble qui réalise une étude sur l'utilisation énergétique  dans les foyers français. Cette étude a pour but de catégoriser les consommations énergétiques pour en déduire des axes d'évolution. Si vous souhaitez y participer, vous pouvez vous inscrire sur le lien [https://miniprojets.net/index.php/2025/11/07/lancement-de-letude-oneforall/]. Votre participation permettra en cible de diminuer notre empreinte énergétique :-)
