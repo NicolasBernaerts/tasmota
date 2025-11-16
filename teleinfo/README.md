@@ -137,11 +137,22 @@ En complément, ce firmware permet de suivre la charge moyenne du CPU depuis l'�
 
     webload 1
 
-Suivant le type de CPU et votre taux de publication MQTT, la charge moyenne peut dépasser les 70%, ce qui peut mettre en péril la stabilité du CPU et provoquer des reboot intempestifs.
+Suivant le type de CPU et votre taux de publication MQTT, la charge moyenne peut dépasser les 70% penadnt plusieurs secondes, ce qui peut mettre en péril la stabilité du CPU et provoquer des reboot intempestifs.
 
 Si votre charge moyenne CPU est trop élevée, une commande **sleep** avec une valeur de 100 ou 200 devrait permettre de la diminuer de manière notable.
 
     sleep 200
+
+## Alertes
+
+Ce firmware publie plusieurs types d'alertes dans la section **ALERT** du topic **SENSOR** :
+  * **Surtension** : la clé **volt** vaut **1** si le compteur annonce une surtension. La clé **volt-src** annonce alors l'origine de l'alerte (STGE)
+  * **Surcharge** : la clé **load** vaut **1** si le compteur annonce un dépassement de puissance. La clé **load-src** annonce alors l'origine de l'alerte (STGE, ADPS, ADIR, ...)
+  * **Pointe à venir** : la clé **period** vaut **1** si le compteur annonce un une periode de pointe à venir. La clé **period-src** annonce alors l'origine de l'alerte (STGE)
+
+En cas d'absence d'alerte, toutes ces clés sont à **0**.
+
+Suite à publication, une alerte est levée si elle n'est plus annoncée pendant 5 secondes.
 
 ## Configuration
 
