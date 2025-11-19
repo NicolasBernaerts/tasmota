@@ -59,6 +59,7 @@ Voici un tableau récapitulatif des fonctionnalités par famille d'ESP :
 | ----------------------------- | ---------- | ----------- | ----------- | ---------------- |
 | IP fixe                       |     x      |      x      |      x      |         x        |
 | Calcul Cos φ                  |     x      |      x      |      x      |         x        |
+| Alertes dépasseemnt           |     x      |      x      |      x      |         x        |
 | LED couleur contrat           |     x      |      x      |      x      |         x        |
 | Trames temps réel             |     x      |      x      |      x      |                  |
 | Graph temps réel              |    live    |    live     |      x      |                  |
@@ -146,9 +147,15 @@ Si votre charge moyenne CPU est trop élevée, une commande **sleep** avec une v
 ## Alertes
 
 Ce firmware publie plusieurs types d'alertes dans la section **ALERT** du topic **SENSOR** :
-  * **Surtension** : la clé **volt** vaut **1** si le compteur annonce une surtension. La clé **volt-src** annonce alors l'origine de l'alerte (STGE)
-  * **Surcharge** : la clé **load** vaut **1** si le compteur annonce un dépassement de puissance. La clé **load-src** annonce alors l'origine de l'alerte (STGE, ADPS, ADIR, ...)
-  * **Pointe à venir** : la clé **period** vaut **1** si le compteur annonce un une periode de pointe à venir. La clé **period-src** annonce alors l'origine de l'alerte (STGE)
+  * **Surtension** : la clé **volt** vaut **1** si le compteur annonce une surtension.
+  * **Surcharge** : la clé **load** vaut **1** si le compteur annonce un dépassement de puissance. La clé **load-src** annonce alors l'origine de l'alerte.
+  * **Pointe à venir** : la clé **period** vaut **1** si le compteur annonce un une periode de pointe à venir.
+
+Pour les dépassements de puissance, **load-src** peut prendre plusieurs valeurs :
+  * **STGE** : dépassement annoncé par l'étiquette STGE
+  * **ADPS, ADIR** : dépassement global annoncé par le Linky
+  * **ADIR1, ADIR2, ADIR3** : dépassement d'une phase annoncé par le Linky
+  * **PMAX1, PMAX2, PMAX3** : dépassement d'une phase calculé sur la base de **PMAX**
 
 En cas d'absence d'alerte, toutes ces clés sont à **0**.
 
