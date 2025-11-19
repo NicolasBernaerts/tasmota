@@ -59,7 +59,7 @@ Voici un tableau récapitulatif des fonctionnalités par famille d'ESP :
 | ----------------------------- | ---------- | ----------- | ----------- | ---------------- |
 | IP fixe                       |     x      |      x      |      x      |         x        |
 | Calcul Cos φ                  |     x      |      x      |      x      |         x        |
-| Alertes dépasseemnt           |     x      |      x      |      x      |         x        |
+| Alertes dépassement           |     x      |      x      |      x      |         x        |
 | LED couleur contrat           |     x      |      x      |      x      |         x        |
 | Trames temps réel             |     x      |      x      |      x      |                  |
 | Graph temps réel              |    live    |    live     |      x      |                  |
