@@ -1,0 +1,16 @@
+# ESP32 Partition table for Tasmota Teleinfo 8MB
+# Optimized for ESP32 POE with extended LittleFS
+# Name,   Type, SubType, Offset,  Size,    Flags
+nvs,      data, nvs,     0x9000,  0x6000,
+otadata,  data, ota,     0xf000,  0x2000,
+app0,     app,  ota_0,   0x10000, 0x2F0000,
+app1,     app,  ota_1,   0x300000,0x2F0000,
+spiffs,   data, spiffs,  0x5F0000,0x200000,
+coredump, data, coredump,0x7F0000,0x10000,
+# nvs:      24 KB  - Configuration storage (extended for secure NVS)
+# otadata:   8 KB  - OTA selection
+# app0:   2.94 MB  - First OTA partition
+# app1:   2.94 MB  - Second OTA partition
+# spiffs:    2 MB  - LittleFS for data storage (SQLite, CSV, logs)
+# coredump: 64 KB  - Core dump storage for debugging
+# Total:     8 MB

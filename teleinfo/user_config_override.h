@@ -247,8 +247,27 @@
 
 #elif BUILD_ESP32_DENKYD4
   #define EXTENSION_BUILD "denkyd4-8m"
-  #define USER_TEMPLATE "{\"NAME\":\"Denky D4\",\"GPIO\":[32,0,0,0,1,0,0,0,0,1,1376,1,0,0,0,0,0,640,608,0,0,0,0,0,0,0,5632,0,0,0,0,0,0,0,0,0],\"FLAG\":0,\"BASE\":1}" 
+  #define USER_TEMPLATE "{\"NAME\":\"Denky D4\",\"GPIO\":[32,0,0,0,1,0,0,0,0,1,1376,1,0,0,0,0,0,640,608,0,0,0,0,0,0,0,5632,0,0,0,0,0,0,0,0,0],\"FLAG\":0,\"BASE\":1}"
   #define MQTT_TOPIC "denky_%06X"
+
+#elif BUILD_ESP32_POE_OLIMEX
+  #define EXTENSION_BUILD "esp32-poe-olimex-8m"
+  #define USER_TEMPLATE "{\"NAME\":\"Olimex ESP32-POE\",\"GPIO\":[1,1,1,1,1,1,0,0,5536,1,1,1,1,0,5600,0,0,0,0,5568,0,0,0,0,0,0,0,0,1376,1,1,1,1,0,0,1],\"FLAG\":0,\"BASE\":1}"
+  #define MQTT_TOPIC "teleinfo_poe_%06X"
+
+  // Ethernet-specific optimizations
+  #define USE_TELEINFO_RTOS              // Enable dual-core FreeRTOS
+  #define USE_TELEINFO_SECURITY          // Enable NVS encryption & TLS
+  #define USE_TELEINFO_SQLITE            // Enable SQLite database
+  #define USE_TELEINFO_PROMETHEUS        // Enable Prometheus endpoint
+
+  // Network optimization for Ethernet POE
+  #define WIFI_CONFIG_NO_SSID            // Don't require WiFi config
+  #define TIC_LIVE_DEFAULT 1             // Publish every 1s (Ethernet is stable)
+
+  // MQTT optimization for stable network
+  #define MQTT_KEEPALIVE 120             // 2 minutes (vs 30s WiFi)
+  #define MQTT_SOCKET_TIMEOUT 10         // 10s (vs 4s WiFi)
 
 #elif BUILD_ESP32_WINKYC6
   #define EXTENSION_BUILD "winkyc6-4m"
