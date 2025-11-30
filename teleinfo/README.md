@@ -147,19 +147,15 @@ Si votre charge moyenne CPU est trop élevée, une commande **sleep** avec une v
 ## Alertes
 
 Ce firmware publie plusieurs types d'alertes dans la section **ALERT** du topic **SENSOR** :
-  * **Surtension** : la clé **volt** vaut **1** si le compteur annonce une surtension.
-  * **Surcharge** : la clé **load** vaut **1** si le compteur annonce un dépassement de puissance. La clé **load-src** annonce alors l'origine de l'alerte.
-  * **Pointe à venir** : la clé **period** vaut **1** si le compteur annonce un une periode de pointe à venir.
+  * **Tension** : la clé **volt** est renseignée si le compteur annonce un pronblème de tension. Elle peut contenir **STGE** si le défaut est indiqué par le Linky ou la **valeur de la tension mesurée** sur l'une des phase si elle est de +/- 10% par rapport à 230 V.
+  * **Puissance** : la clé **load** est renseignée si le compteur annonce un dépassement de puissance. La valeur peut être **STGE**, **ADPS**, **ADIR**, **ADIR1**, **ADIR2**, **ADIR3**, **DEP**, **DEP1**, **DEP2** ou **DEP3** en fonction de l'annonce faite par le Linky.
+  * **Période** : la clé **period** est renseignée sir le compteur annonce une période de pointe. Elle peut valoir **PM1**, **PM2** ou **PM3** suivant l'annonce du compteur.
 
-Pour les dépassements de puissance, **load-src** peut prendre plusieurs valeurs :
-  * **STGE** : dépassement annoncé par l'étiquette STGE
-  * **ADPS, ADIR** : dépassement global annoncé par le Linky
-  * **ADIR1, ADIR2, ADIR3** : dépassement d'une phase annoncé par le Linky
-  * **PMAX1, PMAX2, PMAX3** : dépassement d'une phase calculé sur la base de **PMAX**
+    {"ALERT":{"volt"="","load"="DEP2","period"="PM3"}
+    {"ALERT":{"volt"="STGE","load"="","period"="PM1"}
+    {"ALERT":{"volt"="265","load"="","period"=""}
 
-En cas d'absence d'alerte, toutes ces clés sont à **0**.
-
-Suite à publication, une alerte est levée si elle n'est plus annoncée pendant 5 secondes.
+Suite à sa publication, une alerte est levée si elle n'est plus annoncée pendant 5 secondes.
 
 ## Configuration
 
