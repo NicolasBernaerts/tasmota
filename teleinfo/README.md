@@ -210,7 +210,11 @@ Cela permet d'émettre des données correspondant exactement au contrat lié au 
 
 #### Home Assistant
 
-Toutes les données sélectionnées dans **Données publiées** sont annoncées à Home Assistant à chaque démarrage. Comme les données sont annoncées à HA, vous ne devriez plus avoir qu'à les sélectionner dans HA, qui s'abonnera et utilisera les données publiées. La publication de déclaration pour Home Asisstant est réalisée en mode **retain**. 
+Toutes les données sélectionnées dans **Données publiées** sont annoncées à Home Assistant à chaque démarrage. Comme les données sont annoncées à HA, vous ne devriez plus avoir qu'à les sélectionner dans HA, qui s'abonnera et utilisera les données publiées.
+
+L'intégration nécessite d'utiliser l'integration **MQTT** dans HA et d'activer la **découverte automatique** avec le topic **homeassistant**.
+
+La publication de déclaration pour Home Asisstant est réalisée en mode **retain**, ainsi HA conservera les données à chaque redémarrage.
 
 Dans le cas particulier du Winky, les messages d'auto-découverte sont émis uniquement lors du premier réveil après connexion au compteur en mode **auto-alimenté**. En mode USB, ils sont émis à chaque boot.
 
