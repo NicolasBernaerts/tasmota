@@ -19,6 +19,7 @@ Cette évolution du firmware **Tasmota** permet de :
   * publier pour **Domoticz**, **Home Assistant**, **Homie** et **Thingsboard**
   * alimenter une base **InfluxDB**
   * s'abonner aux API RTE **Tempo**, **Pointe** et **Ecowatt**
+  * exploiter les API **OpenDPE** pour les prévisions Tempo
   * gérer un afficheur déporté de type **Ulanzi** flashé sous **Awtrix**
   * publier le flux **TIC** sur son réseau local en **TCP**
 
@@ -72,6 +73,7 @@ Voici un tableau récapitulatif des fonctionnalités par famille d'ESP :
 | Intégration Thingsboard       |     x      |      x      |      x      |         x        |
 | Intégration InfluxDB          |            |             |      x      |         x        |
 | Prévision calendrier RTE      |            |             |      x      |                  |
+| Prévision openDPE             |            |             |      x      |                  |
 | API Production Solaire        |            |             |      x      |                  |
 | Prévision Production Solaire  |            |             |      x      |                  |
 | Pilotage afficheur Awtrix     |            |             |      x      |                  |
@@ -120,7 +122,6 @@ Ce firmware propose un certain nombre de commandes **EnergyConfig** spécifiques
       calendar=0     publication section CAL [0/1]
       relay=0        publication section RELAY [0/1]
       period=1       affichage couleur periode en cours [0/1]
-      bright=80      luminosite d'affichage LED [0..100]
       error=0        affiche les compteurs d'erreurs [0/1]
       stats          statistiques de reception
 
@@ -281,15 +282,15 @@ L'intégration Thingsboard peut également être activée en mode console :
 
     thingsboard 1
 
-## Calendriers RTE : Tempo, Pointe & Ecowatt
+## Calendriers RTE et OpenDPE : Tempo, Pointe & Ecowatt
 
 <img align="right" src="./screen/teleinfo-rte-apps.png" width=400>
 
-Ce firmware permet également de s'abonner aux calendriers publiés par [**RTE**](https://data.rte-france.com/) et de publier les informations via MQTT.
+Ce firmware permet également de s'abonner aux calendriers publiés par [**RTE**](https://data.rte-france.com/) et par [**Open DPE**](https://open-dpe.fr//). Les données collectées sont alors publiées via MQTT.
 
 Il est à noter que cette fonctionnalité n'est disponible que sur les **ESP32**.
 
-Vous devez tout d'abord créer un compte sur le site **RTE** [https://data.rte-france.com/].
+Pour accéder aux données RTE, vous devez tout d'abord créer un compte sur le site **RTE** [https://data.rte-france.com/].
 
 Suivant le calendrier souhaité, vous devez activer les API RTE suivantes :
   * Tempo : **Tempo Like Supply Contract**
@@ -302,31 +303,28 @@ Si le calendrier **Ecowatt** est activé, les alertes sont publiées suivant les
   * alerte **orange** = jour **blanc**
   * alerte **rouge**  = jour **rouge**
 
-La configuration est stockée sur le FS dans le fichier **rte.cfg**.
+La configuration est stockée sur le FS dans le fichier **teleinfo-rte.dat**.
 
 Voici la liste de toutes les commandes RTE disponibles en mode console :
 
-    HLP: RTE server commands
     RTE global commands :
-     - rte_key <key>      = set RTE base64 private key
-     - rte_token          = display current token
-     - rte_sandbox <0/1>  = set sandbox mode (0/1)
-    Ecowatt commands :
-     - eco <0/1>          = enable ecowatt calendar
-     - eco_display <0/1>  = display ecowatt calendar in main page
-     - eco_version <4/5>  = set ecowatt API version to use
-     - eco_update         = force ecowatt update from RTE server 
-     - eco_publish        = publish ecowatt data now
+     - rte_key <key>         = set RTE base64 private key
+     - rte_token             = display current token
+     - rte_sandbox <0/1>     = set sandbox mode (0/1)
+     - rte_publish           = publish data
     Tempo commands :
-     - tempo <0/1>         = enable tempo calendar
-     - tempo_display <0/1> = display tempo calendar in main page
-     - tempo_update        = force tempo update from RTE server
-     - tempo_publish       = publish tempo data now
+     - tempo <0/1>           = enable tempo calendar
+     - tempo_display <0/1>   = display tempo calendar in main page
+     - tempo_update          = force tempo update from RTE server
+     - opendpe_update        = force tempo update from RTE server
     Pointe commands :
-     - pointe <0/1>        = enable pointe calendar
-     - pointe_display <0/1 = display pointe calendar in main page
-     - pointe_update       = force pointe period update from RTE server
-     - pointe_publish      = publish pointe period data now
+     - pointe <0/1>          = enable pointe calendar
+     - pointe_display <0/1   = display pointe calendar in main page
+     - pointe_update         = force pointe period update from RTE server
+    Ecowatt commands :
+     - ecowatt <0/1>         = enable ecowatt calendar
+     - ecowatt_display <0/1> = display ecowatt calendar in main page
+     - ecowatt_update        = force ecowatt update from RTE server 
 
 Une fois votre compte créé chez RTE et les API activées, vous devez déclarer votre **private Base64 key** en mode console :
 
@@ -345,6 +343,8 @@ Au prochain redémarrage, vous verrez dans les logs que votre ESP32 récupère u
     RTE: Tempo: Update done (2/1/1)
 
 Les données des calendriers RTE sont publiées sur le topic **.../tele/RTE** après chaque télépériode.
+
+Dès l'activation de l'option **tempo**, les API **Open DPE** seront activées pour bénéficier des prévisions sur 7 jours.
 
 ## Production Solaire
 
