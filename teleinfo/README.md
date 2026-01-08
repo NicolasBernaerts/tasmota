@@ -18,8 +18,8 @@ Cette évolution du firmware **Tasmota** permet de :
   * suivre l'historique de consommation/production
   * publier pour **Domoticz**, **Home Assistant**, **Homie** et **Thingsboard**
   * alimenter une base **InfluxDB**
-  * s'abonner aux API RTE **Tempo**, **Pointe** et **Ecowatt**
-  * exploiter les API **OpenDPE** pour les prévisions Tempo
+  * s'abonner aux API RTE **TempoLight**, **Tempo**, **Pointe** et **Ecowatt**
+  * s'abonner aux API **Open DPE** pour les prévisions Tempo sur 7 jours
   * gérer un afficheur déporté de type **Ulanzi** flashé sous **Awtrix**
   * publier le flux **TIC** sur son réseau local en **TCP**
 
@@ -290,7 +290,9 @@ Ce firmware permet également de s'abonner aux calendriers publiés par [**RTE**
 
 Il est à noter que cette fonctionnalité n'est disponible que sur les **ESP32**.
 
-Pour accéder aux données RTE, vous devez tout d'abord créer un compte sur le site **RTE** [https://data.rte-france.com/].
+Les données **RTE Tempo Light** et **Open DPE** sont accessibles librement par la seule activation du module **tempo**.
+
+Pour accéder aux autres données RTE, vous devez tout d'abord créer un compte sur le site **RTE** [https://data.rte-france.com/].
 
 Suivant le calendrier souhaité, vous devez activer les API RTE suivantes :
   * Tempo : **Tempo Like Supply Contract**
@@ -308,23 +310,23 @@ La configuration est stockée sur le FS dans le fichier **teleinfo-rte.dat**.
 Voici la liste de toutes les commandes RTE disponibles en mode console :
 
     RTE global commands :
-     - rte_key <key>         = set RTE base64 private key
-     - rte_token             = display current token
-     - rte_sandbox <0/1>     = set sandbox mode (0/1)
-     - rte_publish           = publish data
+     - rte_key <key>         = clé privée RTE en base64
+     - rte_token             = token RTE actuel
+     - rte_sandbox <0/1>     = mode bac à sable (0/1)
+     - rte_publish           = publication des données
     Tempo commands :
-     - tempo <0/1>           = enable tempo calendar
-     - tempo_display <0/1>   = display tempo calendar in main page
-     - tempo_update          = force tempo update from RTE server
-     - opendpe_update        = force tempo update from RTE server
+     - tempo <0/1>           = activation des API Tempo
+     - tempo_display <0/1>   = données Tempo sur page d'accueil
+     - tempo_update          = mise a jour des données Tempo
+     - opendpe_update        = mise a jour des prévisions OpenDPE
     Pointe commands :
-     - pointe <0/1>          = enable pointe calendar
-     - pointe_display <0/1   = display pointe calendar in main page
-     - pointe_update         = force pointe period update from RTE server
+     - pointe <0/1>          = activation des API Pointe
+     - pointe_display <0/1   = données Pointe sur page d'accueil
+     - pointe_update         = mise a jour des données Pointe
     Ecowatt commands :
-     - ecowatt <0/1>         = enable ecowatt calendar
-     - ecowatt_display <0/1> = display ecowatt calendar in main page
-     - ecowatt_update        = force ecowatt update from RTE server 
+     - ecowatt <0/1>         = activation des API Ecowatt
+     - ecowatt_display <0/1> = données Ecowatt sur page d'accueil
+     - ecowatt_update        = mise a jour des données Ecowatt 
 
 Une fois votre compte créé chez RTE et les API activées, vous devez déclarer votre **private Base64 key** en mode console :
 
@@ -334,13 +336,13 @@ Il ne vous reste plus qu'à activer les modules correspondant aux API RTE :
 
     tempo 1
     pointe 1
-    eco 1
+    ecowatt 1
 
 Au prochain redémarrage, vous verrez dans les logs que votre ESP32 récupère un token puis les données des API activées.
 
-    RTE: Token: abcdefghiL23OeISCK50tsGKzYD60hUt2TeESE1kBEe38x0MH0apF0y valid for 7200 seconds
-    RTE: Ecowatt: Success 200
-    RTE: Tempo: Update done (2/1/1)
+    RTE: Token - abcdefghiL23OeISCK50tsGKzYD60hUt2TeESE1kBEe38x0MH0apF0y valid for 7200 seconds
+    RTE: Ecowatt - Success 200
+    RTE: Tempo - Update done (2/1/1)
 
 Les données des calendriers RTE sont publiées sur le topic **.../tele/RTE** après chaque télépériode.
 
