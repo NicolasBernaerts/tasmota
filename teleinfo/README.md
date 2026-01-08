@@ -318,7 +318,6 @@ Voici la liste de toutes les commandes RTE disponibles en mode console :
      - tempo <0/1>           = activation des API Tempo
      - tempo_display <0/1>   = données Tempo sur page d'accueil
      - tempo_update          = mise a jour des données Tempo
-     - opendpe_update        = mise a jour des prévisions OpenDPE
     Pointe commands :
      - pointe <0/1>          = activation des API Pointe
      - pointe_display <0/1   = données Pointe sur page d'accueil
