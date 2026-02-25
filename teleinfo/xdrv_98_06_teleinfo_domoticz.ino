@@ -11,6 +11,7 @@
     14/10/2024 v1.4 - Change conso total to P1SmartMeter
     03/07/2025 v1.5 - Rename to xsns_126_teleinfo_domoticz.ino
     10/07/2025 v2.0 - Refactoring based on Tasmota 15
+    07/09/2025 v2.1 - Limit publications to 1 per sec.
 
   Configuration values are stored in :
 
@@ -34,8 +35,7 @@
 
 #ifdef USE_TELEINFO
 
-// declare teleinfo domoticz integration
-//#define XDRV_116              116
+#ifdef USE_TELEINFO_DOMOTICZ
 
 /*******************************************\
  *               Variables
@@ -52,40 +52,34 @@ enum DomoticzDataType { DOMO_DATA_METER_BLUE, DOMO_DATA_METER_WHITE, DOMO_DATA_M
                         DOMO_DATA_12, DOMO_DATA_13, DOMO_DATA_14, DOMO_DATA_15, DOMO_DATA_MAX };
 
 const char kTeleinfoDomoticzLabels[] PROGMEM = 
-                        "Conso. Bleu (Wh/W)" "|" 
-                        "Conso. Blanc (Wh/W)" "|" 
-                        "Conso. Rouge (Wh/W)" "|"
+                        "Conso. Bleu (Wh/W)"    "|" 
+                        "Conso. Blanc (Wh/W)"   "|" 
+                        "Conso. Rouge (Wh/W)"   "|"
                         "Conso générale (Wh/W)" "|" 
-                        "Courant (3 phases)" "|" 
-                        "Tension (phase 1)" "|" 
-                        "Tension (phase 2)" "|" 
-                        "Tension (phase 3)" "|"
-                        "Production (Wh/W)" "|"
-                        "Heure Pleine /Creuse" "|" 
-                        "Couleur du Jour" "|" 
-                        "Couleur du Lendemain" "|"
-                        "12" "|" 
-                        "13" "|" 
-                        "14" "|" 
-                        "15";
+                        "Courant (3 phases)"    "|" 
+                        "Tension (phase 1)"     "|" 
+                        "Tension (phase 2)"     "|" 
+                        "Tension (phase 3)"     "|"
+                        "Production (Wh/W)"     "|"
+                        "Heure Pleine /Creuse"  "|" 
+                        "Couleur du Jour"       "|" 
+                        "Couleur du Lendemain"  "|"
+                        "12" "|" "13" "|" "14" "|" "15";
 
 const char kTeleinfoDomoticzTitles[] PROGMEM = 
                         "[P1SmartMeter] Total HC/HP + conso. instantanée (Base, EJP, HC/HP, Tempo bleu, ...)" "|"
-                        "[P1SmartMeter] Total HC/HP + conso. instantanée (Tempo Blanc)" "|"
-                        "[P1SmartMeter] Total HC/HP + conso. instantanée (Tempo Rouge)" "|"
-                        "[P1SmartMeter] Total général + conso. instnatanée" "|" 
-                        "[Current] Courant monophasé ou sur chacune des 3 phases" "|" 
-                        "[Voltage] Tension phase 1" "|" 
-                        "[Voltage] Tension phase 2" "|" 
-                        "[Voltage] Tension phase 3" "|"
-                        "[P1SmartMeter] Total + production instantanée" "|"
-                        "[Alert] HC/HP actuel (0:Heure Pleine, 1:Heure creuse)" "|"
-                        "[Alert] Couleur du Jour (0:Inconnue, 1:Bleu, 2:Blanc, 4:Rouge)" "|" 
-                        "[Alert] Couleur du Lendemain (0:Inconnue, 1:Bleu, 2:Blanc, 4:Rouge)" "|"
-                        "Non utilisé" "|"
-                        "Non utilisé" "|"
-                        "Non utilisé" "|"
-                        "Non utilisé";
+                        "[P1SmartMeter] Total HC/HP + conso. instantanée (Tempo Blanc)"                       "|"
+                        "[P1SmartMeter] Total HC/HP + conso. instantanée (Tempo Rouge)"                       "|"
+                        "[P1SmartMeter] Total général + conso. instnatanée"                                   "|" 
+                        "[Current] Courant monophasé ou sur chacune des 3 phases"                             "|" 
+                        "[Voltage] Tension phase 1"                                                           "|" 
+                        "[Voltage] Tension phase 2"                                                           "|" 
+                        "[Voltage] Tension phase 3"                                                           "|"
+                        "[P1SmartMeter] Total + production instantanée"                                       "|"
+                        "[Alert] HC/HP actuel (0:Heure Pleine, 1:Heure creuse)"                               "|"
+                        "[Alert] Couleur du Jour (0:Inconnue, 1:Bleu, 2:Blanc, 4:Rouge)"                      "|" 
+                        "[Alert] Couleur du Lendemain (0:Inconnue, 1:Bleu, 2:Blanc, 4:Rouge)"                 "|"
+                        "Non utilisé" "|" "Non utilisé" "|" "Non utilisé" "|" "Non utilisé";
 
 // Commands
 const char kTeleinfoDomoticzCommands[]         PROGMEM = "domo" "|"                "|"          "_set"          "|"            "_va"        "|"          "_key";
@@ -96,8 +90,8 @@ void (* const TeleinfoDomoticzCommand[])(void) PROGMEM = { &CmndTeleinfoDomoticz
 \**************************************/
 
 static struct {
-  uint8_t enabled = 0;                  // flag to enable integration
-  uint8_t use_va  = 0;                  // flag to publish VA instead of W
+  bool    enabled = false;              // flag to enable integration
+  bool    use_va  = false;              // flag to publish VA instead of W
   uint8_t index   = UINT8_MAX;          // next index to be published
 } teleinfo_domoticz;
 
@@ -108,15 +102,15 @@ static struct {
 // load configuration
 void TeleinfoDomoticzLoadConfig () 
 {
-  teleinfo_domoticz.enabled = Settings->rf_code[16][2];
-  teleinfo_domoticz.use_va  = Settings->rf_code[16][4];
+  teleinfo_domoticz.enabled = (bool)Settings->rf_code[16][2];
+  teleinfo_domoticz.use_va  = (bool)Settings->rf_code[16][4];
 }
 
 // save configuration
 void TeleinfoDomoticzSaveConfig () 
 {
-  Settings->rf_code[16][2] = teleinfo_domoticz.enabled;
-  Settings->rf_code[16][4] = teleinfo_domoticz.use_va;
+  Settings->rf_code[16][2] = (uint8_t)teleinfo_domoticz.enabled;
+  Settings->rf_code[16][4] = (uint8_t)teleinfo_domoticz.use_va;
 }
 
 /***************************************\
@@ -139,7 +133,7 @@ void TeleinfoDomoticzSet (const bool enabled)
 // get integration
 bool TeleinfoDomoticzGet () 
 {
-  return (teleinfo_domoticz.enabled == 1);
+  return teleinfo_domoticz.enabled;
 }
 
 // set Domoticz key
@@ -189,14 +183,16 @@ void CmndTeleinfoDomoticzHelp ()
 // Enable Domoticz integration
 void CmndTeleinfoDomoticzEnable ()
 {
-  if (XdrvMailbox.data_len > 0) TeleinfoDomoticzSet (XdrvMailbox.payload != 0); 
+  if (XdrvMailbox.data_len > 0) TeleinfoDomoticzSet (XdrvMailbox.payload != 0);
+
   ResponseCmndNumber (teleinfo_domoticz.enabled);
 }
 
 // Enable Domoticz integration
 void CmndTeleinfoDomoticzUseVA ()
 {
-  if (XdrvMailbox.data_len > 0) teleinfo_domoticz.use_va = (uint8_t)XdrvMailbox.payload; 
+  if (XdrvMailbox.data_len > 0) teleinfo_domoticz.use_va = (XdrvMailbox.payload != 0);
+  
   ResponseCmndNumber (teleinfo_domoticz.use_va);
 }
 
@@ -249,9 +245,12 @@ void TeleinfoDomoticzInit ()
 void TeleinfoDomoticzEvery250ms ()
 {
   // check if enabled
+//  if (!RtcTime.valid) return;
   if (!teleinfo_domoticz.enabled) return;
-  if (!RtcTime.valid) return;
   if (!MqttIsConnected ()) return;
+
+  // check query timestamp
+  if (!TeleinfoDriverWebAllow (TIC_WEB_MQTT)) return;  
 
   // publish if needed
   if (teleinfo_domoticz.index < DOMO_DATA_MAX) TeleinfoDomoticzPublishNext ();
@@ -292,7 +291,7 @@ uint8_t TeleinfoDomoticzPublishNext ()
     // init
     value = 0;
     nvalue = 0;
-    strcpy (str_svalue,  "" );
+    strcpy_P (str_svalue,  PSTR (""));
     strcpy_P (str_total_1, PSTR ("0"));
     strcpy_P (str_total_2, PSTR ("0"));
     sns_index = TeleinfoDomoticzGetKey ();
@@ -305,8 +304,8 @@ uint8_t TeleinfoDomoticzPublishNext ()
       case DOMO_DATA_METER_WHITE:
       case DOMO_DATA_METER_RED:
         index = teleinfo_domoticz.index * 2;
-        lltoa (teleinfo_conso.index_wh[index], str_total_1, 10);
-        lltoa (teleinfo_conso.index_wh[index + 1], str_total_2, 10);
+        lltoa (teleinfo_conso_wh.index[index], str_total_1, 10);
+        lltoa (teleinfo_conso_wh.index[index + 1], str_total_2, 10);
         if ((teleinfo_contract.period == index) || (teleinfo_contract.period == index + 1))
         {
           if (teleinfo_domoticz.use_va) value = teleinfo_conso.papp;
@@ -317,7 +316,7 @@ uint8_t TeleinfoDomoticzPublishNext ()
 
       // total power
       case DOMO_DATA_POWER_CONSO:
-        lltoa (teleinfo_conso.total_wh, str_total_1, 10);
+        lltoa (teleinfo_conso_wh.total, str_total_1, 10);
         if (teleinfo_domoticz.use_va) value = teleinfo_conso.papp;
           else value = teleinfo_conso.pact;
         sprintf_P (str_svalue, PSTR ("%s;%s;0;0;%d;0"), str_total_1, str_total_2, value);
@@ -345,7 +344,7 @@ uint8_t TeleinfoDomoticzPublishNext ()
 
       // prod
       case DOMO_DATA_METER_PROD:
-        lltoa (teleinfo_prod.total_wh, str_total_1, 10);
+        lltoa (teleinfo_prod_wh.total, str_total_1, 10);
         if (teleinfo_domoticz.use_va) value = teleinfo_prod.papp;
           else value = teleinfo_prod.pact;
         sprintf_P (str_svalue, PSTR ("%s;%s;0;0;%d;0"), str_total_1, str_total_2, value);
@@ -389,8 +388,9 @@ uint8_t TeleinfoDomoticzPublishNext ()
     }
   }
 
-  // increase next index
+  // increase next index and declare publication
   teleinfo_domoticz.index++;
+  TeleinfoDriverWebDeclare (TIC_WEB_MQTT);  
 
   return teleinfo_domoticz.index;
 }
@@ -421,7 +421,7 @@ void TeleinfoDomoticzDisplayParameters ()
   const char *pstr_title;
 
   // section start
-  WSContentSend_P (PSTR ("<fieldset style='border-color:#888;margin-left:12px;margin-top:8px;padding:8px 0px;'>\n"));
+  WSContentSend_P (PSTR ("<fieldset class='config' id='domo-cfg' style='display:none;'>\n"));
 
   // loop to display indexes
   for (index = 0; index < DOMO_DATA_12; index ++)
@@ -438,6 +438,12 @@ void TeleinfoDomoticzDisplayParameters ()
 
   // section end
   WSContentSend_P (PSTR ("</fieldset>\n"));
+
+  // javascript to display/hide
+  WSContentSend_P (PSTR ("<script type='text/javascript'>\n"));
+  WSContentSend_P (PSTR ("function onChangeDomo() {document.getElementById('domo-cfg').style.display=document.getElementById('domo').checked?'block':'none';}\n"));
+  WSContentSend_P (PSTR ("onChangeDomo();\n"));
+  WSContentSend_P (PSTR ("</script>\n"));
 }
 
 void TeleinfoDomoticzRetrieveParameters ()
@@ -456,8 +462,7 @@ void TeleinfoDomoticzRetrieveParameters ()
 
   // parameter 'useva'
   WebGetArg (PSTR ("useva"), str_param, sizeof (str_param));
-  if (strlen (str_param) > 0) teleinfo_domoticz.use_va = 1;
-    else teleinfo_domoticz.use_va = 0;
+  teleinfo_domoticz.use_va = (strlen (str_param) > 0);
 }
 
 #endif    // USE_WEBSERVER
@@ -490,5 +495,7 @@ bool XdrvTeleinfoDomoticz (const uint32_t function)
   return result;
 }
 
-#endif      // USE_TELEINFO
+#endif    // USE_TELEINFO_DOMOTICZ
+
+#endif    // USE_TELEINFO
 

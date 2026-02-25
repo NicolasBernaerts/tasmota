@@ -6,9 +6,10 @@
   Version history :
     01/04/2024 v1.0 - Creation
     14/04/2024 v1.1 - switch to rf_code configuration
-                        Change key 2DAY to TDAY
+                      Change key 2DAY to TDAY
     20/06/2024 v1.2 - Add meter serial number and global conso counter
     10/07/2025 v2.0 - Refactoring based on Tasmota 15
+    07/09/2025 v2.1 - Limit publications to 1 per sec.
                        
   Configuration values are stored in :
     - Settings->rf_code[16][1]  : Flag en enable/disable integration
@@ -27,75 +28,81 @@
 
 #ifdef USE_TELEINFO
 
+#ifdef USE_TELEINFO_HOMIE
+
 /*************************************************\
  *               Variables
 \*************************************************/
 
 #define TELEINFO_HOMIE_NB_MESSAGE    5
 
-static const char PSTR_HOMIE_URL_CONNECT[]    PROGMEM = "|/$homie|/$name|/$state|/$nodes|END";
-static const char PSTR_HOMIE_URL_DISCONNECT[] PROGMEM = "|/$state|END";
-static const char PSTR_HOMIE_URL_GROUP[]      PROGMEM = "|/$name|/$properties|END";
-static const char PSTR_HOMIE_URL_DEFAULT[]    PROGMEM = "|/$name|/$datatype|/$unit|END";
+static const char PSTR_HOMIE_URL_CONNECT[]         PROGMEM = "|/$homie" "|/$name"       "|/$state" "|/$nodes" "|END";
+static const char PSTR_HOMIE_URL_DISCONNECT[]      PROGMEM = "|/$state" "|END";
+static const char PSTR_HOMIE_URL_GROUP[]           PROGMEM = "|/$name"  "|/$properties" "|END";
+static const char PSTR_HOMIE_URL_DEFAULT[]         PROGMEM = "|/$name"  "|/$datatype"   "|/$unit" "|END";
 
-static const char PSTR_HOMIE_PUB_CONNECT[]         PROGMEM = "|3.0|%s|ready|ctr,cal,prod,conso,ph1,ph2,ph3,relay,total";
+static const char PSTR_HOMIE_PUB_CONNECT[]         PROGMEM = "|3.0"        "|%s"           "|ready"   "|ctr,cal,prod,conso,ph1,ph2,ph3,relay,total";
 static const char PSTR_HOMIE_PUB_CONTRACT[]        PROGMEM = "/ctr"        "|Contrat"      "|name"    "|";
 static const char PSTR_HOMIE_PUB_CONTRACT_NAME[]   PROGMEM = "/ctr/name"   "|Type contrat" "|string"  "|";
 static const char PSTR_HOMIE_PUB_CONTRACT_SERIAL[] PROGMEM = "/ctr/serial" "|N° série"     "|integer" "|";
 
-static const char PSTR_HOMIE_PUB_CALENDAR[]        PROGMEM = "/cal|Calendrier|period,color,hour,2day,tmrw|";
-static const char PSTR_HOMIE_PUB_CALENDAR_PERIOD[] PROGMEM = "/cal/period" "|Période"    "|string" "|";
-static const char PSTR_HOMIE_PUB_CALENDAR_COLOR[]  PROGMEM = "/cal/color"  "|Couleur"    "|string" "|";
-static const char PSTR_HOMIE_PUB_CALENDAR_HOUR[]   PROGMEM = "/cal/hour"   "|Heure"      "|string" "|";
-static const char PSTR_HOMIE_PUB_CALENDAR_TODAY[]  PROGMEM = "/cal/tday"   "|Aujourdhui" "|string" "|";
-static const char PSTR_HOMIE_PUB_CALENDAR_TOMRW[]  PROGMEM = "/cal/tmrw"   "|Demain"     "|string" "|";
+static const char PSTR_HOMIE_PUB_CALENDAR[]        PROGMEM = "/cal"        "|Calendrier" "|period,color,hour,2day,tmrw" "|";
+static const char PSTR_HOMIE_PUB_CALENDAR_PERIOD[] PROGMEM = "/cal/period" "|Période"    "|string"                      "|";
+static const char PSTR_HOMIE_PUB_CALENDAR_COLOR[]  PROGMEM = "/cal/color"  "|Couleur"    "|string"                      "|";
+static const char PSTR_HOMIE_PUB_CALENDAR_HOUR[]   PROGMEM = "/cal/hour"   "|Heure"      "|string"                      "|";
+static const char PSTR_HOMIE_PUB_CALENDAR_TODAY[]  PROGMEM = "/cal/tday"   "|Aujourdhui" "|string"                      "|";
+static const char PSTR_HOMIE_PUB_CALENDAR_TOMRW[]  PROGMEM = "/cal/tmrw"   "|Demain"     "|string"                      "|";
 
-static const char PSTR_HOMIE_PUB_PROD[]       PROGMEM = "/prod|Production|yday,2day,p,w,c|";
-static const char PSTR_HOMIE_PUB_PROD_P[]     PROGMEM = "/prod/p"    "|Prod Puissance apparente" "|integer" "|VA";
-static const char PSTR_HOMIE_PUB_PROD_W[]     PROGMEM = "/prod/w"    "|Prod Puissance active"    "|integer" "|W";
-static const char PSTR_HOMIE_PUB_PROD_C[]     PROGMEM = "/prod/c"    "|Prod Cos φ"               "|float"   "|";
-static const char PSTR_HOMIE_PUB_PROD_YTDAY[] PROGMEM = "/prod/yday" "|Prod Hier"                "|integer" "|Wh";
-static const char PSTR_HOMIE_PUB_PROD_TODAY[] PROGMEM = "/prod/tday" "|Prod Aujourdhui"          "|integer" "|Wh";
+static const char PSTR_HOMIE_PUB_PROD[]            PROGMEM = "/prod"      "|Production"               "|yday,2day,p,w,c" "|";
+static const char PSTR_HOMIE_PUB_PROD_P[]          PROGMEM = "/prod/p"    "|Prod Puissance apparente" "|integer"         "|VA";
+static const char PSTR_HOMIE_PUB_PROD_W[]          PROGMEM = "/prod/w"    "|Prod Puissance active"    "|integer"         "|W";
+static const char PSTR_HOMIE_PUB_PROD_C[]          PROGMEM = "/prod/c"    "|Prod Cos φ"               "|float"           "|";
+static const char PSTR_HOMIE_PUB_PROD_YTDAY[]      PROGMEM = "/prod/yday" "|Prod Hier"                "|integer"         "|Wh";
+static const char PSTR_HOMIE_PUB_PROD_TODAY[]      PROGMEM = "/prod/tday" "|Prod Aujourdhui"          "|integer"         "|Wh";
 
-static const char PSTR_HOMIE_PUB_CONSO[]       PROGMEM = "/conso|Conso|yday,2day,p,w,c,i,u|";
-static const char PSTR_HOMIE_PUB_CONSO_P[]     PROGMEM = "/conso/p"    "|Conso Puissance apparente" "|integer" "|VA";
-static const char PSTR_HOMIE_PUB_CONSO_W[]     PROGMEM = "/conso/w"    "|Conso Puissance active"    "|integer" "|W";
-static const char PSTR_HOMIE_PUB_CONSO_C[]     PROGMEM = "/conso/c"    "|Conso Cos φ"               "|float"   "|";
-static const char PSTR_HOMIE_PUB_CONSO_I[]     PROGMEM = "/conso/i"    "|Conso Courant"             "|float"   "|A";
-static const char PSTR_HOMIE_PUB_CONSO_U[]     PROGMEM = "/conso/u"    "|Conso Tension"             "|integer" "|V";
-static const char PSTR_HOMIE_PUB_CONSO_YTDAY[] PROGMEM = "/conso/yday" "|Conso hier"                "|integer" "|Wh";
-static const char PSTR_HOMIE_PUB_CONSO_TODAY[] PROGMEM = "/conso/2day" "|Conso aujourd'hui"         "|integer" "|Wh";
+static const char PSTR_HOMIE_PUB_CONSO[]           PROGMEM = "/conso"      "|Conso"                     "|yday,2day,p,w,c,i,u" "|";
+static const char PSTR_HOMIE_PUB_CONSO_P[]         PROGMEM = "/conso/p"    "|Conso Puissance apparente" "|integer"             "|VA";
+static const char PSTR_HOMIE_PUB_CONSO_W[]         PROGMEM = "/conso/w"    "|Conso Puissance active"    "|integer"             "|W";
+static const char PSTR_HOMIE_PUB_CONSO_C[]         PROGMEM = "/conso/c"    "|Conso Cos φ"               "|float"               "|";
+static const char PSTR_HOMIE_PUB_CONSO_I[]         PROGMEM = "/conso/i"    "|Conso Courant"             "|float"               "|A";
+static const char PSTR_HOMIE_PUB_CONSO_U[]         PROGMEM = "/conso/u"    "|Conso Tension"             "|integer"             "|V";
+static const char PSTR_HOMIE_PUB_CONSO_YTDAY[]     PROGMEM = "/conso/yday" "|Conso hier"                "|integer"             "|Wh";
+static const char PSTR_HOMIE_PUB_CONSO_TODAY[]     PROGMEM = "/conso/2day" "|Conso aujourd'hui"         "|integer"             "|Wh";
 
-static const char PSTR_HOMIE_PUB_PH1[]   PROGMEM = "/ph1|Phase 1|u,i,p,w|";
-static const char PSTR_HOMIE_PUB_PH1_U[] PROGMEM = "/ph1/u" "|Ph1 Tension"             "|integer" "|V";
-static const char PSTR_HOMIE_PUB_PH1_I[] PROGMEM = "/ph1/i" "|Ph1 Courant"             "|float"   "|A";
-static const char PSTR_HOMIE_PUB_PH1_P[] PROGMEM = "/ph1/p" "|Ph1 Puissance apparente" "|integer" "|VA";
-static const char PSTR_HOMIE_PUB_PH1_W[] PROGMEM = "/ph1/w" "|Ph1 Puissance active"    "|integer" "|W";
+static const char PSTR_HOMIE_PUB_PH1[]             PROGMEM = "/ph1"   "|Phase 1"                 "|u,i,p,w" "|";
+static const char PSTR_HOMIE_PUB_PH1_U[]           PROGMEM = "/ph1/u" "|Ph1 Tension"             "|integer" "|V";
+static const char PSTR_HOMIE_PUB_PH1_I[]           PROGMEM = "/ph1/i" "|Ph1 Courant"             "|float"   "|A";
+static const char PSTR_HOMIE_PUB_PH1_P[]           PROGMEM = "/ph1/p" "|Ph1 Puissance apparente" "|integer" "|VA";
+static const char PSTR_HOMIE_PUB_PH1_W[]           PROGMEM = "/ph1/w" "|Ph1 Puissance active"    "|integer" "|W";
 
-static const char PSTR_HOMIE_PUB_PH2[]   PROGMEM = "/ph2|Phase 2|u,i,p,w|";
-static const char PSTR_HOMIE_PUB_PH2_U[] PROGMEM = "/ph2/u" "|Ph2 Tension"             "|integer" "|V";
-static const char PSTR_HOMIE_PUB_PH2_I[] PROGMEM = "/ph2/i" "|Ph2 Courant"             "|float"   "|A";
-static const char PSTR_HOMIE_PUB_PH2_P[] PROGMEM = "/ph2/p" "|Ph2 Puissance apparente" "|integer" "|VA";
-static const char PSTR_HOMIE_PUB_PH2_W[] PROGMEM = "/ph2/w" "|Ph2 Puissance active"    "|integer" "|W";
+static const char PSTR_HOMIE_PUB_PH2[]             PROGMEM = "/ph2"   "|Phase 2"                 "|u,i,p,w" "|";
+static const char PSTR_HOMIE_PUB_PH2_U[]           PROGMEM = "/ph2/u" "|Ph2 Tension"             "|integer" "|V";
+static const char PSTR_HOMIE_PUB_PH2_I[]           PROGMEM = "/ph2/i" "|Ph2 Courant"             "|float"   "|A";
+static const char PSTR_HOMIE_PUB_PH2_P[]           PROGMEM = "/ph2/p" "|Ph2 Puissance apparente" "|integer" "|VA";
+static const char PSTR_HOMIE_PUB_PH2_W[]           PROGMEM = "/ph2/w" "|Ph2 Puissance active"    "|integer" "|W";
 
-static const char PSTR_HOMIE_PUB_PH3[]   PROGMEM = "/ph3|Phase 3|u,i,p,w|";
-static const char PSTR_HOMIE_PUB_PH3_U[] PROGMEM = "/ph3/u" "|Ph3 Tension"             "|integer" "|V";
-static const char PSTR_HOMIE_PUB_PH3_I[] PROGMEM = "/ph3/i" "|Ph3 Courant"             "|float"   "|A";
-static const char PSTR_HOMIE_PUB_PH3_P[] PROGMEM = "/ph3/p" "|Ph3 Puissance apparente" "|integer" "|VA";
-static const char PSTR_HOMIE_PUB_PH3_W[] PROGMEM = "/ph3/w" "|Ph3 Puissance active"    "|integer" "|W";
+static const char PSTR_HOMIE_PUB_PH3[]             PROGMEM = "/ph3"   "|Phase 3"                 "|u,i,p,w" "|";
+static const char PSTR_HOMIE_PUB_PH3_U[]           PROGMEM = "/ph3/u" "|Ph3 Tension"             "|integer" "|V";
+static const char PSTR_HOMIE_PUB_PH3_I[]           PROGMEM = "/ph3/i" "|Ph3 Courant"             "|float"   "|A";
+static const char PSTR_HOMIE_PUB_PH3_P[]           PROGMEM = "/ph3/p" "|Ph3 Puissance apparente" "|integer" "|VA";
+static const char PSTR_HOMIE_PUB_PH3_W[]           PROGMEM = "/ph3/w" "|Ph3 Puissance active"    "|integer" "|W";
 
-static const char PSTR_HOMIE_PUB_RELAY[]      PROGMEM = "/relay|Relais|r1,r2,r3,r4,r5,r6,r7,r8|";
-static const char PSTR_HOMIE_PUB_RELAY_DATA[] PROGMEM = "/relay/r%u" "|Relai virtual %u" "|boolean" "|";
+static const char PSTR_HOMIE_PUB_RELAY[]           PROGMEM = "/relay"     "|Relais"           "|r1,r2,r3,r4,r5,r6,r7,r8" "|";
+static const char PSTR_HOMIE_PUB_RELAY_DATA[]      PROGMEM = "/relay/r%u" "|Relai virtual %u" "|boolean"                 "|";
 
-static const char PSTR_HOMIE_PUB_TOTAL[]        PROGMEM = "/total|Totaux|%s|";
-static const char PSTR_HOMIE_PUB_TOTAL_PROD[]   PROGMEM = "/total/prod"  "|Total Production" "|integer" "|Wh";
-static const char PSTR_HOMIE_PUB_TOTAL_CONSO[]  PROGMEM = "/total/conso" "|Total Conso"      "|integer" "|Wh";
-static const char PSTR_HOMIE_PUB_TOTAL_PERIOD[] PROGMEM = "/total/c%u"   "|Total %s"         "|integer" "|Wh";
+static const char PSTR_HOMIE_PUB_TOTAL[]           PROGMEM = "/total"       "|Totaux"           "|%s"      "|";
+static const char PSTR_HOMIE_PUB_TOTAL_PROD[]      PROGMEM = "/total/prod"  "|Total Production" "|integer" "|Wh";
+static const char PSTR_HOMIE_PUB_TOTAL_CONSO[]     PROGMEM = "/total/conso" "|Total Conso"      "|integer" "|Wh";
+static const char PSTR_HOMIE_PUB_TOTAL_PERIOD[]    PROGMEM = "/total/c%u"   "|Total %s"         "|integer" "|Wh";
 
-static const char PSTR_HOMIE_PUB_DISCONNECT[] PROGMEM = "|disconnected";
+static const char PSTR_HOMIE_PUB_ALERT[]           PROGMEM = "/alert"      "|Alerte"     "|volt,load" "|";
+static const char PSTR_HOMIE_PUB_ALERT_VOLT[]      PROGMEM = "/alert/volt" "|Surtension" "|boolean"   "|";
+static const char PSTR_HOMIE_PUB_ALERT_LOAD[]      PROGMEM = "/alert/load" "|Surcharge"  "|boolean"   "|";
+
+static const char PSTR_HOMIE_PUB_DISCONNECT[]      PROGMEM = "|disconnected";
 
 // Commands
-const char kTeleinfoHomieCommands[] PROGMEM = "" "|" "homie";
+const char kTeleinfoHomieCommands[]         PROGMEM = "" "|"   "homie";
 void (* const TeleinfoHomieCommand[])(void) PROGMEM = { &CmndTeleinfoHomieEnable };
 
 /********************************\
@@ -108,7 +115,7 @@ static struct {
   uint8_t sub_stage = 0;                    // sub index within stage if multiple data
   uint8_t sub_step  = 1;                    // auto-discovery step within a stage
   uint8_t data      = 0;                    // first data index to publish
-  uint8_t arr_data[TIC_PUB_MAX];            // array of data publication flags
+  uint8_t arr_data[TIC_PUB_END];            // array of data publication flags
 } teleinfo_homie;
 
 /******************************************\
@@ -120,14 +127,14 @@ void TeleinfoHomieLoadConfig ()
 {
   uint8_t index;
 
-  teleinfo_homie.enabled = Settings->rf_code[16][1];
-  for (index = 0; index < TIC_PUB_MAX; index++) teleinfo_homie.arr_data[index] = 0;
+  teleinfo_homie.enabled = (bool)Settings->rf_code[16][1];
+  for (index = 0; index < TIC_PUB_END; index++) teleinfo_homie.arr_data[index] = 0;
 }
 
 // save configuration
 void TeleinfoHomieSaveConfig () 
 {
-  Settings->rf_code[16][1] = teleinfo_homie.enabled;
+  Settings->rf_code[16][1] = (uint8_t)teleinfo_homie.enabled;
 }
 
 /***************************************\
@@ -156,7 +163,7 @@ void TeleinfoHomieSet (const bool enabled)
 // get integration
 bool TeleinfoHomieGet () 
 {
-  return (teleinfo_homie.enabled == 1);
+  return teleinfo_homie.enabled;
 }
 
 /*******************************\
@@ -167,7 +174,8 @@ bool TeleinfoHomieGet ()
 void CmndTeleinfoHomieEnable ()
 {
   if (XdrvMailbox.data_len > 0) TeleinfoHomieSet ((XdrvMailbox.payload != 0));
-  ResponseCmndNumber (teleinfo_homie.enabled);
+  
+  ResponseCmndNumber ((uint8_t)teleinfo_homie.enabled);
 }
 
 /*******************************\
@@ -194,9 +202,12 @@ void TeleinfoHomieEvery100ms ()
   // do not publish value before end of auto-discovery declaration
   if (teleinfo_homie.stage != UINT8_MAX) return;
 
+  // check query timestamp
+  if (!TeleinfoDriverWebAllow (TIC_WEB_MQTT)) return; 
+
   // publish current data
   if (TeleinfoHomiePublishStage (teleinfo_homie.data)) teleinfo_homie.data++;
-  if (teleinfo_homie.data >= TIC_PUB_MAX) teleinfo_homie.data = UINT8_MAX;
+  if (teleinfo_homie.data >= TIC_PUB_END) teleinfo_homie.data = UINT8_MAX;
 }
 
 // trigger publication
@@ -210,8 +221,11 @@ void TeleinfoHomieEvery250ms ()
   // check publication validity 
   if (!teleinfo_homie.enabled) return;
   if (teleinfo_homie.stage == UINT8_MAX) return;
-  if (!RtcTime.valid) return;
+//  if (!RtcTime.valid) return;
   if (!MqttIsConnected ()) return;
+
+  // check query timestamp
+  if (!TeleinfoDriverWebAllow (TIC_WEB_MQTT)) return; 
 
   // publish current data
   result = TeleinfoHomiePublishSubStage (teleinfo_homie.stage, teleinfo_homie.sub_stage, teleinfo_homie.sub_step);
@@ -227,20 +241,20 @@ void TeleinfoHomieEvery250ms ()
     if ((teleinfo_homie.stage == TIC_PUB_RELAY_DATA) || (teleinfo_homie.stage == TIC_PUB_TOTAL_INDEX)) teleinfo_homie.sub_stage++;
       else teleinfo_homie.stage++;
     if ((teleinfo_homie.stage == TIC_PUB_RELAY_DATA) && (teleinfo_homie.sub_stage >= 8)) teleinfo_homie.stage++;
-    if ((teleinfo_homie.stage == TIC_PUB_TOTAL_INDEX) && (teleinfo_homie.sub_stage >= teleinfo_contract.period_qty)) teleinfo_homie.stage++;
+    if ((teleinfo_homie.stage == TIC_PUB_TOTAL_INDEX) && (teleinfo_homie.sub_stage >= teleinfo_contract_db.period_qty)) teleinfo_homie.stage++;
     if ((teleinfo_homie.stage != TIC_PUB_RELAY_DATA) && (teleinfo_homie.stage != TIC_PUB_TOTAL_INDEX)) teleinfo_homie.sub_stage = 0; 
 
     // handle data publication
-    if ((teleinfo_homie.stage == TIC_PUB_CALENDAR)    && (!teleinfo_config.calendar))    teleinfo_homie.stage = TIC_PUB_PROD;
-    if ((teleinfo_homie.stage == TIC_PUB_PROD)        && (!teleinfo_config.meter))       teleinfo_homie.stage = TIC_PUB_RELAY;
-    if ((teleinfo_homie.stage == TIC_PUB_PROD)        && (teleinfo_prod.total_wh == 0))  teleinfo_homie.stage = TIC_PUB_CONSO;
-    if ((teleinfo_homie.stage == TIC_PUB_CONSO)       && (teleinfo_conso.total_wh == 0)) teleinfo_homie.stage = TIC_PUB_RELAY;
+    if ((teleinfo_homie.stage == TIC_PUB_CALENDAR)    && !teleinfo_config.calendar     ) teleinfo_homie.stage = TIC_PUB_PROD;
+    if ((teleinfo_homie.stage == TIC_PUB_PROD)        && !teleinfo_config.meter        ) teleinfo_homie.stage = TIC_PUB_RELAY;
+    if ((teleinfo_homie.stage == TIC_PUB_PROD)        && !teleinfo_prod.enabled        ) teleinfo_homie.stage = TIC_PUB_CONSO;
+    if ((teleinfo_homie.stage == TIC_PUB_CONSO)       && !teleinfo_conso.enabled       ) teleinfo_homie.stage = TIC_PUB_RELAY;
     if ((teleinfo_homie.stage == TIC_PUB_PH1)         && (teleinfo_contract.phase == 1)) teleinfo_homie.stage = TIC_PUB_RELAY;
-    if ((teleinfo_homie.stage == TIC_PUB_RELAY)       && (!teleinfo_config.relay))       teleinfo_homie.stage = TIC_PUB_TOTAL;
-    if ((teleinfo_homie.stage == TIC_PUB_TOTAL)       && (!teleinfo_config.meter))       teleinfo_homie.stage = TIC_PUB_MAX;
-    if ((teleinfo_homie.stage == TIC_PUB_TOTAL_PROD)  && (teleinfo_prod.total_wh == 0))  teleinfo_homie.stage = TIC_PUB_TOTAL_CONSO;
-    if ((teleinfo_homie.stage == TIC_PUB_TOTAL_CONSO) && (teleinfo_conso.total_wh == 0)) teleinfo_homie.stage = TIC_PUB_MAX;
-    if (teleinfo_homie.stage == TIC_PUB_MAX)
+    if ((teleinfo_homie.stage == TIC_PUB_RELAY)       && !teleinfo_config.relay        ) teleinfo_homie.stage = TIC_PUB_TOTAL;
+    if ((teleinfo_homie.stage == TIC_PUB_TOTAL)       && !teleinfo_config.meter        ) teleinfo_homie.stage = TIC_PUB_ALERT;
+    if ((teleinfo_homie.stage == TIC_PUB_TOTAL_PROD)  && !teleinfo_prod.enabled        ) teleinfo_homie.stage = TIC_PUB_TOTAL_CONSO;
+    if ((teleinfo_homie.stage == TIC_PUB_TOTAL_CONSO) && !teleinfo_conso.enabled       ) teleinfo_homie.stage = TIC_PUB_ALERT;
+    if  (teleinfo_homie.stage == TIC_PUB_END)
     {
       teleinfo_homie.stage     = UINT8_MAX;
       teleinfo_homie.sub_stage = 0;
@@ -256,7 +270,7 @@ void TeleinfoHomieEvery250ms ()
 bool TeleinfoHomiePublishStage (const uint8_t stage)
 {
   // check parameter
-  if (stage >= TIC_PUB_MAX) return false;
+  if (stage >= TIC_PUB_END) return false;
 
   // reset sub-index for most data
   if ((stage != TIC_PUB_RELAY_DATA) && (stage != TIC_PUB_TOTAL_INDEX)) teleinfo_homie.sub_stage = 0;
@@ -270,13 +284,21 @@ bool TeleinfoHomiePublishStage (const uint8_t stage)
     // decide if current data is fully published
     if ((stage == TIC_PUB_RELAY_DATA) || (stage == TIC_PUB_TOTAL_INDEX)) teleinfo_homie.sub_stage++;
     if ((stage == TIC_PUB_RELAY_DATA) && (teleinfo_homie.sub_stage >= 8)) teleinfo_homie.sub_stage = 0;
-    if ((stage == TIC_PUB_TOTAL_INDEX) && (teleinfo_homie.sub_stage >= teleinfo_contract.period_qty)) teleinfo_homie.sub_stage = 0;
+    if ((stage == TIC_PUB_TOTAL_INDEX) && (teleinfo_homie.sub_stage >= teleinfo_contract_db.period_qty)) teleinfo_homie.sub_stage = 0;
 
     // if no sub-index left, data is fully published
     if (teleinfo_homie.sub_stage == 0) teleinfo_homie.arr_data[stage] = 0; 
   }
 
   return (teleinfo_homie.arr_data[stage] == 0);
+}
+
+// ask for publication
+void TeleinfoHomieData ()
+{
+  TeleinfoHomieDataConsoProd ();
+  if (teleinfo_config.calendar) TeleinfoHomieDataCalendar ();
+  if (teleinfo_config.relay)    TeleinfoHomieDataRelay ();
 }
 
 // publish all pending messages
@@ -288,10 +310,7 @@ void TeleinfoHomiePublishAllData ()
   // loop to publish next available value
   teleinfo_homie.stage = UINT8_MAX;
   teleinfo_homie.data  = 0;
-  while (teleinfo_homie.data < TIC_PUB_MAX)
-  {
-    if (TeleinfoHomiePublishStage (teleinfo_homie.data)) teleinfo_homie.data++;
-  }
+  while (teleinfo_homie.data < TIC_PUB_END) { if (TeleinfoHomiePublishStage (teleinfo_homie.data)) teleinfo_homie.data++; }
 }
 
 void TeleinfoHomieDataConsoProd ()
@@ -302,7 +321,7 @@ void TeleinfoHomieDataConsoProd ()
   teleinfo_homie.data = 0;
 
   // conso data
-  if (teleinfo_conso.total_wh > 0)
+  if (teleinfo_conso.enabled)
   {
     for (index = TIC_PUB_CONSO_P; index <= TIC_PUB_CONSO_TODAY; index++) teleinfo_homie.arr_data[index] = 1;
     if (teleinfo_contract.phase > 1)
@@ -314,16 +333,16 @@ void TeleinfoHomieDataConsoProd ()
   }
 
   // production data
-  if (teleinfo_prod.total_wh > 0)
+  if (teleinfo_prod.enabled)
     for (index = TIC_PUB_PROD_P; index <= TIC_PUB_PROD_TODAY; index++) teleinfo_homie.arr_data[index] = 1;
 
   // total data
-  if (teleinfo_conso.total_wh > 0)
+  if (teleinfo_conso.enabled)
   {
     teleinfo_homie.arr_data[TIC_PUB_TOTAL_CONSO] = 1;
     teleinfo_homie.arr_data[TIC_PUB_TOTAL_INDEX] = 1;
   }
-  if (teleinfo_prod.total_wh > 0)  teleinfo_homie.arr_data[TIC_PUB_TOTAL_PROD] = 1;
+  if (teleinfo_prod.enabled) teleinfo_homie.arr_data[TIC_PUB_TOTAL_PROD] = 1;
 }
 
 void TeleinfoHomieDataCalendar ()
@@ -355,20 +374,19 @@ bool TeleinfoHomiePublishSubStage (const uint8_t stage, const uint8_t index, con
   char        str_text[128];
 
   // check parameters
-  if (stage == UINT8_MAX) return false;
+  if (stage  == UINT8_MAX) return false;
   if ((stage == TIC_PUB_RELAY_DATA) && (index >= 8)) return false;
-  if ((stage == TIC_PUB_TOTAL_INDEX) && (index >= TIC_INDEX_MAX)) return false;
+  if ((stage == TIC_PUB_TOTAL_INDEX) && (index >= TIC_PERIOD_MAX)) return false;
 
   // init
-  pstr_url   = nullptr;
-  pstr_param = nullptr;
-  strcpy (str_id,   "");
-  strcpy (str_temp, "");
-  strcpy (str_name, "");
-  strcpy (str_text, "");
+  str_id[0]   = 0;
+  str_temp[0] = 0;
+  str_name[0] = 0;
+  str_text[0] = 0;
   Response_P ("");
 
   // set url leaves
+  pstr_url = nullptr;
   switch (stage)
   {
     case TIC_PUB_CONNECT:    pstr_url = PSTR_HOMIE_URL_CONNECT; break;
@@ -390,6 +408,7 @@ bool TeleinfoHomiePublishSubStage (const uint8_t stage, const uint8_t index, con
   if (strcmp (str_temp, "END") == 0) return false;
 
   // load parameters according to stage/data
+  pstr_param = nullptr;
   switch (stage)
   {
     // declaration
@@ -403,46 +422,46 @@ bool TeleinfoHomiePublishSubStage (const uint8_t stage, const uint8_t index, con
     case TIC_PUB_CONTRACT_NAME:   pstr_param = PSTR_HOMIE_PUB_CONTRACT_NAME; break;
 
 
-    case TIC_PUB_CALENDAR:        pstr_param = PSTR_HOMIE_PUB_CALENDAR; break;
+    case TIC_PUB_CALENDAR:        pstr_param = PSTR_HOMIE_PUB_CALENDAR;        break;
     case TIC_PUB_CALENDAR_PERIOD: pstr_param = PSTR_HOMIE_PUB_CALENDAR_PERIOD; break;
-    case TIC_PUB_CALENDAR_COLOR:  pstr_param = PSTR_HOMIE_PUB_CALENDAR_COLOR; break;
-    case TIC_PUB_CALENDAR_HOUR:   pstr_param = PSTR_HOMIE_PUB_CALENDAR_HOUR; break;
-    case TIC_PUB_CALENDAR_TODAY:  pstr_param = PSTR_HOMIE_PUB_CALENDAR_TODAY; break;
-    case TIC_PUB_CALENDAR_TOMRW:  pstr_param = PSTR_HOMIE_PUB_CALENDAR_TOMRW; break;
+    case TIC_PUB_CALENDAR_COLOR:  pstr_param = PSTR_HOMIE_PUB_CALENDAR_COLOR;  break;
+    case TIC_PUB_CALENDAR_HOUR:   pstr_param = PSTR_HOMIE_PUB_CALENDAR_HOUR;   break;
+    case TIC_PUB_CALENDAR_TODAY:  pstr_param = PSTR_HOMIE_PUB_CALENDAR_TODAY;  break;
+    case TIC_PUB_CALENDAR_TOMRW:  pstr_param = PSTR_HOMIE_PUB_CALENDAR_TOMRW;  break;
 
-    case TIC_PUB_PROD:            pstr_param = PSTR_HOMIE_PUB_PROD; break;
-    case TIC_PUB_PROD_P:          pstr_param = PSTR_HOMIE_PUB_PROD_P; break;
-    case TIC_PUB_PROD_W:          pstr_param = PSTR_HOMIE_PUB_PROD_W; break;
-    case TIC_PUB_PROD_C:          pstr_param = PSTR_HOMIE_PUB_PROD_C; break;
-    case TIC_PUB_PROD_YTDAY:      if (TeleinfoDriverIsPowered ()) pstr_param = PSTR_HOMIE_PUB_PROD_YTDAY; break;
-    case TIC_PUB_PROD_TODAY:      if (TeleinfoDriverIsPowered ()) pstr_param = PSTR_HOMIE_PUB_PROD_TODAY; break;
+    case TIC_PUB_PROD:       pstr_param = PSTR_HOMIE_PUB_PROD;   break;
+    case TIC_PUB_PROD_P:     pstr_param = PSTR_HOMIE_PUB_PROD_P; break;
+    case TIC_PUB_PROD_W:     pstr_param = PSTR_HOMIE_PUB_PROD_W; break;
+    case TIC_PUB_PROD_C:     pstr_param = PSTR_HOMIE_PUB_PROD_C; break;
+    case TIC_PUB_PROD_YTDAY: if (TeleinfoDriverIsPowered ()) pstr_param = PSTR_HOMIE_PUB_PROD_YTDAY; break;
+    case TIC_PUB_PROD_TODAY: if (TeleinfoDriverIsPowered ()) pstr_param = PSTR_HOMIE_PUB_PROD_TODAY; break;
 
-    case TIC_PUB_CONSO:           pstr_param = PSTR_HOMIE_PUB_CONSO; break;
-    case TIC_PUB_CONSO_P:         pstr_param = PSTR_HOMIE_PUB_CONSO_P; break;
-    case TIC_PUB_CONSO_W:         pstr_param = PSTR_HOMIE_PUB_CONSO_W; break;
-    case TIC_PUB_CONSO_C:         pstr_param = PSTR_HOMIE_PUB_CONSO_C; break;
-    case TIC_PUB_CONSO_I:         pstr_param = PSTR_HOMIE_PUB_CONSO_I; break;
-    case TIC_PUB_CONSO_U:         pstr_param = PSTR_HOMIE_PUB_CONSO_U; break;
-    case TIC_PUB_CONSO_YTDAY:     if (TeleinfoDriverIsPowered ()) pstr_param = PSTR_HOMIE_PUB_CONSO_YTDAY; break;
-    case TIC_PUB_CONSO_TODAY:     if (TeleinfoDriverIsPowered ()) pstr_param = PSTR_HOMIE_PUB_CONSO_TODAY; break;
+    case TIC_PUB_CONSO:       pstr_param = PSTR_HOMIE_PUB_CONSO;   break;
+    case TIC_PUB_CONSO_P:     pstr_param = PSTR_HOMIE_PUB_CONSO_P; break;
+    case TIC_PUB_CONSO_W:     pstr_param = PSTR_HOMIE_PUB_CONSO_W; break;
+    case TIC_PUB_CONSO_C:     pstr_param = PSTR_HOMIE_PUB_CONSO_C; break;
+    case TIC_PUB_CONSO_I:     pstr_param = PSTR_HOMIE_PUB_CONSO_I; break;
+    case TIC_PUB_CONSO_U:     pstr_param = PSTR_HOMIE_PUB_CONSO_U; break;
+    case TIC_PUB_CONSO_YTDAY: if (TeleinfoDriverIsPowered ()) pstr_param = PSTR_HOMIE_PUB_CONSO_YTDAY; break;
+    case TIC_PUB_CONSO_TODAY: if (TeleinfoDriverIsPowered ()) pstr_param = PSTR_HOMIE_PUB_CONSO_TODAY; break;
 
-    case TIC_PUB_PH1:             pstr_param = PSTR_HOMIE_PUB_PH1; break;
-    case TIC_PUB_PH1_U:           pstr_param = PSTR_HOMIE_PUB_PH1_U; break;
-    case TIC_PUB_PH1_I:           pstr_param = PSTR_HOMIE_PUB_PH1_I; break;
-    case TIC_PUB_PH1_P:           pstr_param = PSTR_HOMIE_PUB_PH1_P; break;
-    case TIC_PUB_PH1_W:           pstr_param = PSTR_HOMIE_PUB_PH1_W; break;
+    case TIC_PUB_PH1:   pstr_param = PSTR_HOMIE_PUB_PH1;   break;
+    case TIC_PUB_PH1_U: pstr_param = PSTR_HOMIE_PUB_PH1_U; break;
+    case TIC_PUB_PH1_I: pstr_param = PSTR_HOMIE_PUB_PH1_I; break;
+    case TIC_PUB_PH1_P: pstr_param = PSTR_HOMIE_PUB_PH1_P; break;
+    case TIC_PUB_PH1_W: pstr_param = PSTR_HOMIE_PUB_PH1_W; break;
 
-    case TIC_PUB_PH2:             pstr_param = PSTR_HOMIE_PUB_PH2; break;
-    case TIC_PUB_PH2_U:           pstr_param = PSTR_HOMIE_PUB_PH2_U; break;
-    case TIC_PUB_PH2_I:           pstr_param = PSTR_HOMIE_PUB_PH2_I; break;
-    case TIC_PUB_PH2_P:           pstr_param = PSTR_HOMIE_PUB_PH2_P; break;
-    case TIC_PUB_PH2_W:           pstr_param = PSTR_HOMIE_PUB_PH2_W; break;
+    case TIC_PUB_PH2:   pstr_param = PSTR_HOMIE_PUB_PH2;   break;
+    case TIC_PUB_PH2_U: pstr_param = PSTR_HOMIE_PUB_PH2_U; break;
+    case TIC_PUB_PH2_I: pstr_param = PSTR_HOMIE_PUB_PH2_I; break;
+    case TIC_PUB_PH2_P: pstr_param = PSTR_HOMIE_PUB_PH2_P; break;
+    case TIC_PUB_PH2_W: pstr_param = PSTR_HOMIE_PUB_PH2_W; break;
 
-    case TIC_PUB_PH3:             pstr_param = PSTR_HOMIE_PUB_PH3; break;
-    case TIC_PUB_PH3_U:           pstr_param = PSTR_HOMIE_PUB_PH3_U; break;
-    case TIC_PUB_PH3_I:           pstr_param = PSTR_HOMIE_PUB_PH3_I; break;
-    case TIC_PUB_PH3_P:           pstr_param = PSTR_HOMIE_PUB_PH3_P; break;
-    case TIC_PUB_PH3_W:           pstr_param = PSTR_HOMIE_PUB_PH3_W; break;
+    case TIC_PUB_PH3:   pstr_param = PSTR_HOMIE_PUB_PH3;   break;
+    case TIC_PUB_PH3_U: pstr_param = PSTR_HOMIE_PUB_PH3_U; break;
+    case TIC_PUB_PH3_I: pstr_param = PSTR_HOMIE_PUB_PH3_I; break;
+    case TIC_PUB_PH3_P: pstr_param = PSTR_HOMIE_PUB_PH3_P; break;
+    case TIC_PUB_PH3_W: pstr_param = PSTR_HOMIE_PUB_PH3_W; break;
 
     case TIC_PUB_RELAY: pstr_param = PSTR_HOMIE_PUB_RELAY; break;
     case TIC_PUB_RELAY_DATA:
@@ -455,8 +474,8 @@ bool TeleinfoHomiePublishSubStage (const uint8_t stage, const uint8_t index, con
       pstr_param = PSTR_HOMIE_PUB_TOTAL;
       if (data == 2)
       {
-        if (teleinfo_prod.total_wh > 0) strcpy_P (str_text, PSTR ("prod"));
-        for (count = 0; count < teleinfo_contract.period_qty; count ++)
+        if (teleinfo_prod.enabled) strcpy_P (str_text, PSTR ("prod"));
+        for (count = 0; count < teleinfo_contract_db.period_qty; count ++)
         {
           sprintf_P (str_temp, PSTR ("c%u"), count);
           if (strlen (str_text) > 0) strcat_P (str_text, PSTR (","));
@@ -466,11 +485,11 @@ bool TeleinfoHomiePublishSubStage (const uint8_t stage, const uint8_t index, con
       break;
 
     case TIC_PUB_TOTAL_PROD: 
-      if (teleinfo_prod.total_wh > 0) pstr_param = PSTR_HOMIE_PUB_TOTAL_PROD;
+      if (teleinfo_prod.enabled) pstr_param = PSTR_HOMIE_PUB_TOTAL_PROD;
       break;
 
     case TIC_PUB_TOTAL_CONSO: 
-      if (teleinfo_conso.total_wh > 0) pstr_param = PSTR_HOMIE_PUB_TOTAL_CONSO;
+      if (teleinfo_conso.enabled) pstr_param = PSTR_HOMIE_PUB_TOTAL_CONSO;
       break;
 
     case TIC_PUB_TOTAL_INDEX: 
@@ -480,6 +499,11 @@ bool TeleinfoHomiePublishSubStage (const uint8_t stage, const uint8_t index, con
       if (data == 0) sprintf_P (str_text, GetTextIndexed (str_temp, sizeof (str_temp), data, pstr_param), index);
       else if (data == 1) sprintf_P (str_text, GetTextIndexed (str_temp, sizeof (str_temp), data, pstr_param), str_name);
       break;
+
+    // alert
+    case TIC_PUB_ALERT:      pstr_param = PSTR_HOMIE_PUB_ALERT;      break;
+    case TIC_PUB_ALERT_VOLT: pstr_param = PSTR_HOMIE_PUB_ALERT_VOLT; break;
+    case TIC_PUB_ALERT_LOAD: pstr_param = PSTR_HOMIE_PUB_ALERT_LOAD; break;
 
     // disconnexion
     case TIC_PUB_DISCONNECT: pstr_param = PSTR_HOMIE_PUB_DISCONNECT; break;
@@ -491,16 +515,18 @@ bool TeleinfoHomiePublishSubStage (const uint8_t stage, const uint8_t index, con
   // if publishing metadata
   if (data > 0)
   {
-    if (strlen (str_text) > 0) Response_P (PSTR ("%s"), str_text);
-      else Response_P (GetTextIndexed (str_text, sizeof (str_text), data, pstr_param));
+    if (strlen (str_text) == 0) GetTextIndexed (str_text, sizeof (str_text), data, pstr_param);
+    Response_P (PSTR ("%s"), str_text);
+//    if (strlen (str_text) > 0) Response_P (PSTR ("%s"), str_text);
+//      else Response_P (GetTextIndexed (str_text, sizeof (str_text), data, pstr_param));
   }
 
   // else, publishing value
   else switch (stage)
   {
     // contract
-    case TIC_PUB_CONTRACT_NAME: TeleinfoContractGetName (str_text, sizeof (str_text)); Response_P (PSTR ("%s"), str_text); break;
-    case TIC_PUB_CONTRACT_SERIAL: lltoa (teleinfo_meter.ident, str_text, 10); Response_P (PSTR ("%s"), str_text); break;
+    case TIC_PUB_CONTRACT_NAME:   TeleinfoContractGetName (str_text, sizeof (str_text)); Response_P (PSTR ("%s"), str_text); break;
+    case TIC_PUB_CONTRACT_SERIAL: lltoa (teleinfo_meter.ident, str_text, 10); Response_P (PSTR ("%s"), str_text);            break;
 
     // calendar
     case TIC_PUB_CALENDAR_PERIOD: TeleinfoPeriodGetLabel (str_text, sizeof (str_text)); Response_P (PSTR ("%s"), str_text); break;
@@ -510,15 +536,15 @@ bool TeleinfoHomiePublishSubStage (const uint8_t stage, const uint8_t index, con
     case TIC_PUB_CALENDAR_TOMRW:  GetTextIndexed (str_text, sizeof (str_text), TeleinfoDriverCalendarGetLevel (TIC_DAY_TMROW, 12 * 2, true), kTeleinfoLevelLabel); Response_P (PSTR ("%s"), str_text); break;
 
     // production
-    case TIC_PUB_PROD_YTDAY: Response_P (PSTR ("%d"), teleinfo_prod.yesterday_wh); break;
-    case TIC_PUB_PROD_TODAY: Response_P (PSTR ("%d"), teleinfo_prod.today_wh); break;
+    case TIC_PUB_PROD_YTDAY: Response_P (PSTR ("%d"), teleinfo_prod_wh.yesterday); break;
+    case TIC_PUB_PROD_TODAY: Response_P (PSTR ("%d"), teleinfo_prod_wh.today); break;
     case TIC_PUB_PROD_P:     Response_P (PSTR ("%d"), teleinfo_prod.papp); break;
     case TIC_PUB_PROD_W:     Response_P (PSTR ("%d"), teleinfo_prod.pact); break;
     case TIC_PUB_PROD_C:     Response_P (PSTR ("%d.%02d"), teleinfo_prod.cosphi.value / 1000, teleinfo_prod.cosphi.value % 1000 / 10); break;
   
     // conso
-    case TIC_PUB_CONSO_YTDAY: Response_P (PSTR ("%d"), teleinfo_conso.yesterday_wh); break;
-    case TIC_PUB_CONSO_TODAY: Response_P (PSTR ("%d"), teleinfo_conso.today_wh); break;
+    case TIC_PUB_CONSO_YTDAY: Response_P (PSTR ("%d"), teleinfo_conso_wh.yesterday); break;
+    case TIC_PUB_CONSO_TODAY: Response_P (PSTR ("%d"), teleinfo_conso_wh.today); break;
     case TIC_PUB_CONSO_P:     Response_P (PSTR ("%d"), teleinfo_conso.papp); break;
     case TIC_PUB_CONSO_W:     Response_P (PSTR ("%d"), teleinfo_conso.pact); break;
     case TIC_PUB_CONSO_U:     Response_P (PSTR ("%d"), teleinfo_conso.phase[0].voltage); break;
@@ -532,27 +558,31 @@ bool TeleinfoHomiePublishSubStage (const uint8_t stage, const uint8_t index, con
 
     // 3 phases
     case TIC_PUB_PH1_U: Response_P (PSTR ("%d"), teleinfo_conso.phase[0].voltage); break;
-    case TIC_PUB_PH1_P: Response_P (PSTR ("%d"), teleinfo_conso.phase[0].papp); break;
-    case TIC_PUB_PH1_W: Response_P (PSTR ("%d"), teleinfo_conso.phase[0].pact); break;
+    case TIC_PUB_PH1_P: Response_P (PSTR ("%d"), teleinfo_conso.phase[0].papp);    break;
+    case TIC_PUB_PH1_W: Response_P (PSTR ("%d"), teleinfo_conso.phase[0].pact);    break;
     case TIC_PUB_PH1_I: Response_P (PSTR ("%d.%02d"), teleinfo_conso.phase[0].current / 1000, teleinfo_conso.phase[0].current % 1000 / 10); break;
 
     case TIC_PUB_PH2_U: Response_P (PSTR ("%d"), teleinfo_conso.phase[1].voltage); break;
-    case TIC_PUB_PH2_P: Response_P (PSTR ("%d"), teleinfo_conso.phase[1].papp); break;
-    case TIC_PUB_PH2_W: Response_P (PSTR ("%d"), teleinfo_conso.phase[1].pact); break;
+    case TIC_PUB_PH2_P: Response_P (PSTR ("%d"), teleinfo_conso.phase[1].papp);    break;
+    case TIC_PUB_PH2_W: Response_P (PSTR ("%d"), teleinfo_conso.phase[1].pact);    break;
     case TIC_PUB_PH2_I: Response_P (PSTR ("%d.%02d"), teleinfo_conso.phase[1].current / 1000, teleinfo_conso.phase[1].current % 1000 / 10); break;
 
     case TIC_PUB_PH3_U: Response_P (PSTR ("%d"), teleinfo_conso.phase[2].voltage); break;
-    case TIC_PUB_PH3_P: Response_P (PSTR ("%d"), teleinfo_conso.phase[2].papp); break;
-    case TIC_PUB_PH3_W: Response_P (PSTR ("%d"), teleinfo_conso.phase[2].pact); break;
+    case TIC_PUB_PH3_P: Response_P (PSTR ("%d"), teleinfo_conso.phase[2].papp);    break;
+    case TIC_PUB_PH3_W: Response_P (PSTR ("%d"), teleinfo_conso.phase[2].pact);    break;
     case TIC_PUB_PH3_I: Response_P (PSTR ("%d.%02d"), teleinfo_conso.phase[2].current / 1000, teleinfo_conso.phase[2].current % 1000 / 10); break;
 
     // relay
     case TIC_PUB_RELAY_DATA: if (TeleinfoRelayStatus (index + 1)) Response_P (PSTR ("true")); else Response_P (PSTR ("false")); break;
 
     // counters
-    case TIC_PUB_TOTAL_PROD:  lltoa (teleinfo_prod.total_wh, str_text, 10); Response_P (PSTR ("%s"), str_text); break;
-    case TIC_PUB_TOTAL_CONSO: lltoa (teleinfo_conso.total_wh, str_text, 10); Response_P (PSTR ("%s"), str_text); break;
-    case TIC_PUB_TOTAL_INDEX: lltoa (teleinfo_conso.index_wh[index], str_text, 10); Response_P (PSTR ("%s"), str_text); break;
+    case TIC_PUB_TOTAL_PROD:  lltoa (teleinfo_prod_wh.total, str_text, 10); Response_P (PSTR ("%s"), str_text);         break;
+    case TIC_PUB_TOTAL_CONSO: lltoa (teleinfo_conso_wh.total, str_text, 10); Response_P (PSTR ("%s"), str_text);        break;
+    case TIC_PUB_TOTAL_INDEX: lltoa (teleinfo_conso_wh.index[index], str_text, 10); Response_P (PSTR ("%s"), str_text); break;
+
+    // alert
+    case TIC_PUB_ALERT_VOLT: Response_P (PSTR ("%u"), TeleinfoDriverAlertGetStatus (TIC_ALERT_OVERVOLT)); break;
+    case TIC_PUB_ALERT_LOAD: Response_P (PSTR ("%u"), TeleinfoDriverAlertGetStatus (TIC_ALERT_OVERLOAD)); break;
   }
 
   // if nothing to publish, ignore
@@ -569,6 +599,9 @@ bool TeleinfoHomiePublishSubStage (const uint8_t stage, const uint8_t index, con
     length = (uint8_t)strlen (str_text);
     for (count = 0; count < length; count ++) str_text[count] = tolower (str_text[count]);
     MqttPublish (str_text, (data != 0));
+
+    // declare publication
+    TeleinfoDriverWebDeclare (TIC_WEB_MQTT);  
   }
 
   return true;
@@ -605,5 +638,7 @@ bool XdrvTeleinfoHomie (const uint32_t function)
   return result;
 }
 
-#endif      // USE_TELEINFO
+#endif    // USE_TELEINFO_HASS
+
+#endif    // USE_TELEINFO
 

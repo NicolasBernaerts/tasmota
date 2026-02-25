@@ -33,6 +33,7 @@
 */
 
 #ifdef USE_TELEINFO
+#ifdef USE_TELEINFO_TCP
 
 #ifdef ESP32
   #define TCP_DATA_MAX                256
@@ -199,6 +200,7 @@ void CmndTeleinfoTCPStart (void)
 
   // if port is provided
   if (XdrvMailbox.data_len > 0) tcp_port = XdrvMailbox.payload;
+  
   if (tcp_port > 0)
   {
     // if TCP server not created, create it
@@ -312,4 +314,5 @@ bool XdrvTeleinfoTCP (const uint32_t function)
   return result;
 }
 
-#endif  // USE_TELEINFO
+#endif    // USE_TELEINFO_TCP
+#endif    // USE_TELEINFO

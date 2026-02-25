@@ -3,172 +3,205 @@
 
   Copyright (C) 2019-2024  Theo Arends, Nicolas Bernaerts
 
-    05/05/2019 - v1.0  - Creation
-    16/05/2019 - v1.1  - Add Tempo and EJP contracts
-    08/06/2019 - v1.2  - Handle active and apparent power
-    05/07/2019 - v2.0  - Rework with selection thru web interface
-    02/01/2020 - v3.0  - Functions rewrite for Tasmota 8.x compatibility
-    05/02/2020 - v3.1  - Add support for 3 phases meters
-    14/03/2020 - v3.2  - Add apparent power graph
-    05/04/2020 - v3.3  - Add Timezone management
-    13/05/2020 - v3.4  - Add overload management per phase
-    19/05/2020 - v3.6  - Add configuration for first NTP server
-    26/05/2020 - v3.7  - Add Information JSON page
-    29/07/2020 - v3.8  - Add Meter section to JSON
-    05/08/2020 - v4.0  - Major code rewrite, JSON section is now TIC, numbered like new official Teleinfo module
-                         Web sensor display update
-    18/09/2020 - v4.1  - Based on Tasmota 8.4
-    07/10/2020 - v5.0  - Handle different graph periods and javascript auto update
-    18/10/2020 - v5.1  - Expose icon on web server
-    25/10/2020 - v5.2  - Real time graph page update
-    30/10/2020 - v5.3  - Add TIC message page
-    02/11/2020 - v5.4  - Tasmota 9.0 compatibility
-    09/11/2020 - v6.0  - Handle ESP32 ethernet devices with board selection
-    11/11/2020 - v6.1  - Add data.json page
-    20/11/2020 - v6.2  - Checksum bug
-    29/12/2020 - v6.3  - Strengthen message error control
-    25/02/2021 - v7.0  - Prepare compatibility with TIC standard
-                         Add power status bar
-    05/03/2021 - v7.1  - Correct bug on hardware energy counter
-    08/03/2021 - v7.2  - Handle voltage and checksum for horodatage
-    12/03/2021 - v7.3  - Use average / overload for graph
-    15/03/2021 - v7.4  - Change graph period parameter
-    21/03/2021 - v7.5  - Support for TIC Standard
-    29/03/2021 - v7.6  - Add voltage graph
-    04/04/2021 - v7.7  - Change in serial port & graph height selection
-                         Handle number of indexes according to contract
-                         Remove use of String to avoid heap fragmentation 
-    14/04/2021 - v7.8  - Calculate Cos phi and Active power (W)
-    21/04/2021 - v8.0  - Fixed IP configuration and change in Cos phi calculation
-    29/04/2021 - v8.1  - Bug fix in serial port management and realtime energy totals
-                         Control initial baud rate to avoid crash (thanks to Seb)
-    26/05/2021 - v8.2  - Add active power (W) graph
-    22/06/2021 - v8.3  - Change in serial management for ESP32
-    04/08/2021 - v9.0  - Tasmota 9.5 compatibility
-                         Add LittleFS historic data record
-                         Complete change in VA, W and cos phi measurement based on transmission time
-                         Add PME/PMI ACE6000 management
-                         Add energy update interval configuration
-                         Add TIC to TCP bridge (command 'tcpstart 8888' to publish teleinfo stream on port 8888)
-    04/09/2021 - v9.1  - Save settings in LittleFS partition if available
-                         Log rotate and old files deletion if space low
-    10/10/2021 - v9.2  - Add peak VA and V in history files
-    02/11/2021 - v9.3  - Add period and totals in history files
-                         Add simple FTP server to access history files
-    13/03/2022 - v9.4  - Change keys to ISUB and PSUB in METER section
-    20/03/2022 - v9.5  - Change serial init and major rework in active power calculation
-    01/04/2022 - v9.6  - Add software watchdog feed to avoid lock
-    22/04/2022 - v9.7  - Option to minimise LittleFS writes (day:every 1h and week:every 6h)
-                         Correction of EAIT bug
-    04/08/2022 - v9.8  - Based on Tasmota 12, add ESP32S2 support
-                         Remove FTP server auto start
-    18/08/2022 - v9.9  - Force GPIO_TELEINFO_RX as digital input
-                         Correct bug littlefs config and graph data recording
-                         Add Tempo and Production mode (thanks to Sébastien)
-                         Correct publication synchronised with teleperiod
-    26/10/2022 - v10.0 - Add bar graph monthly (every day) and yearly (every month)
-    06/11/2022 - v10.1 - Bug fixes on bar graphs and change in lltoa conversion
-    15/11/2022 - v10.2 - Add bar graph daily (every hour)
-    04/02/2023 - v10.3 - Add graph swipe (horizontal and vertical)
-                         Disable wifi sleep on ESP32 to avoid latency
-    25/02/2023 - v11.0 - Split between xnrg and xsns
-                         Use Settings->teleinfo to store configuration
-                         Update today and yesterday totals
-    03/06/2023 - v11.1 - Graph curves live update
-                         Rewrite of Tasmota energy update
-                         Avoid 100ms rules teleperiod update
-    11/06/2023 - v11.2 - Change graph organisation & live display
-    15/08/2023 - v11.3 - Evolution in graph navigation
-                         Change in XMLHttpRequest management 
-    10/10/2023 - v12.0 - Add support for Ecowatt signal in ESP32 versions
-    17/10/2023 - v12.1 - Handle Production & consommation simultaneously
-                         Display all periods with total
-    07/11/2023 - v12.2 - Rotate daily and weekly files every second
-                         Change in ecowatt stream reception to avoid overload
-                         Remove daily graph to save RAM on ESP8266 1Mb
-                         Change daily filename to teleinfo-day-00.csv
-    19/11/2023 - v13.0 - Tasmota 13 compatibility
-                         Switch to safeboot partitionning
-                         Calculate active power for production
-    05/12/2023 - v13.1 - Add RTE Tempo calendar
-    07/12/2023 - v13.2 - Handle both Ecowatt v4 and v5 (command eco_version)
-    03/01/2024 - v13.3 - Add alert management thru STGE
-    15/01/2024 - v13.6 - Add support for Denky (thanks to C. Hallard prototype)
-                         Add RTE pointe API
-                         Add Emeraude 2 meter management
-                         Add calendar and virtual relay management
-    25/02/2024 - v14.0 - Complete rewrite of Contrat and Period management
-                         Activate serial reception when NTP time is ready
-                         Change MQTT publication and data reception handling to minimize errors
-                         Support various temperature sensors
-                         Add Domoticz topics publication (idea from Sebastien)
-                         Add support for Wenky with deep sleep (thanks to C. Hallard prototype)
-                         Lots of bug fixes (thanks to B. Monot and Sebastien)
-                         Separation of curve and historisation sources
-                         Removal of all float calculations
-    27/03/2024 - v14.1 - Integration of Home Assistant auto discovery (with help of msevestre31)
-                         Section COUNTER renamed as CONTRACT with addition of contract data
-    28/03/2024 - v14.2 - Add Today and Yesterday conso and Prod
-                         Disable Tasmota auto-discovery
-    04/04/2024 - v14.3 - Correct RTE Tempo summer bug (different URL for Heure Ete / Heure Hiver)
-                         All ESP32 are using Arduino 3.0 libraries
-                         Add integration of Homie auto-discovery
-                         Update Home assistant auto-discovery with state_class
-                         Switch to native Tasmota FTP server
-                         Correct graph display bug
-                         Add HC/HP 12h30 contract
-    21/05/2024 - v14.4 - Based on Tasmota 14
-                         Group all sensor data in a single frame
-                         Publish Teleinfo raw data under /TIC instead of /SENSOR
-                         Publish RTE data under /RTE instead of /SENSOR
-                         Add serial reception buffer to minimize reception errors
-    01/06/2024 - v14.5 - Add contract auto-discovery for unknown Standard contracts
-    28/06/2024 - v14.6 - JSON : Change in calendar (for compliance)
-                         JSON : Add CONTRACT/serial and CONTRACT/CONSO
-                         Remove all String for ESP8266 stability
-    30/06/2024 - v14.7 - Add virtual and physical reception status LED (WS2812 ...)
-                         Add commands full and noraw (compatibility with official version)
-                         Always publish CONTRACT data with METER and PROD
-    16/07/2024 - v14.8 - Add global power, current and voltage to Domoticz integration
-                         Add ThingsBoard integration
-                         Add relay management for periods and linky virtual relays
-                         Increase ESP32 reception buffer to 8192 bytes
-                         Redesign of contract management and auto-discovery
-                         Rewrite of periods management by meter type
-                         Change of contract format in teleinfo.cfg
-                         Add contract change detection on main page
-                         Optimisation of serial reception to minimise errors
-                         Support for Winky C3
-                         Correct bug in Tempo Historique contract management
-                         Add Live publication option
-                         Add command 'data' to publish teleinfo data
-                         Add command 'tic' to publish raw TIC data
-    08/03/2025 - v14.9 - Based on Tasmota 14.5.0
-                         Synchronise time on first meter frame before NTP
-                         Add InfluxDB integration with indexes and totals
-                         Change Domoticz conso total to P1SmartMeter
-                         Publish HomeAssistant topic in mode retain
-                         Add command energyconfig skip=x (0..7) to publish LIVE topic
-                         Adaptation on Winky analog input for Tasmota 14.3 compatibility
-                         Correct bug in Linky calendar management
-                         RTE API used with RTC connexions, no need of MQTT connexion
-                         Rework of cosphi calculation algo
-                         Convert contract type to upper case before detection
-                         Correct brand new counter index bug
-                         Complete rewrite of calendar management
-                         Handle calendar for TEMPO and EJP in historic mode
-                         First step of generic TEMPO contract detection
-                         Avoid NTARF and STGE to detect period as they as out of synchro very often
-                         ESP8266 memory optimisation
-                         Add Ulanzi remote display management thru Awtrix open-source firmware
-    16/03/2025 - v14.10  Correct bug in contract auto-discovery
-    01/05/2025 - v14.11  Based on Tasmota 14.6.0
-                         Correct bug in week number calculation for sundays
-                         Cleanup old data files if FS is full
-                         Complete rewrite of speed detection
-                         Add period profile
-    10/07/2025 - v15.0   Switch all module to driver to minimize indexes
-                         Refactoring based on Tasmota 15
+    05/05/2019 - v1.0   Creation
+    16/05/2019 - v1.1   Add Tempo and EJP contracts
+    08/06/2019 - v1.2   Handle active and apparent power
+    05/07/2019 - v2.0   Rework with selection thru web interface
+    02/01/2020 - v3.0   Functions rewrite for Tasmota 8.x compatibility
+    05/02/2020 - v3.1   Add support for 3 phases meters
+    14/03/2020 - v3.2   Add apparent power graph
+    05/04/2020 - v3.3   Add Timezone management
+    13/05/2020 - v3.4   Add overload management per phase
+    19/05/2020 - v3.6   Add configuration for first NTP server
+    26/05/2020 - v3.7   Add Information JSON page
+    29/07/2020 - v3.8   Add Meter section to JSON
+    05/08/2020 - v4.0   Major code rewrite, JSON section is now TIC, numbered like new official Teleinfo module
+                        Web sensor display update
+    18/09/2020 - v4.1   Based on Tasmota 8.4
+    07/10/2020 - v5.0   Handle different graph periods and javascript auto update
+    18/10/2020 - v5.1   Expose icon on web server
+    25/10/2020 - v5.2   Real time graph page update
+    30/10/2020 - v5.3   Add TIC message page
+    02/11/2020 - v5.4   Tasmota 9.0 compatibility
+    09/11/2020 - v6.0   Handle ESP32 ethernet devices with board selection
+    11/11/2020 - v6.1   Add data.json page
+    20/11/2020 - v6.2   Checksum bug
+    29/12/2020 - v6.3   Strengthen message error control
+    25/02/2021 - v7.0   Prepare compatibility with TIC standard
+                        Add power status bar
+    05/03/2021 - v7.1   Correct bug on hardware energy counter
+    08/03/2021 - v7.2   Handle voltage and checksum for horodatage
+    12/03/2021 - v7.3   Use average / overload for graph
+    15/03/2021 - v7.4   Change graph period parameter
+    21/03/2021 - v7.5   Support for TIC Standard
+    29/03/2021 - v7.6   Add voltage graph
+    04/04/2021 - v7.7   Change in serial port & graph height selection
+                        Handle number of indexes according to contract
+                        Remove use of String to avoid heap fragmentation 
+    14/04/2021 - v7.8   Calculate Cos phi and Active power (W)
+    21/04/2021 - v8.0   Fixed IP configuration and change in Cos phi calculation
+    29/04/2021 - v8.1   Bug fix in serial port management and realtime energy totals
+                        Control initial baud rate to avoid crash (thanks to Seb)
+    26/05/2021 - v8.2   Add active power (W) graph
+    22/06/2021 - v8.3   Change in serial management for ESP32
+    04/08/2021 - v9.0   Tasmota 9.5 compatibility
+                        Add LittleFS historic data record
+                        Complete change in VA, W and cos phi measurement based on transmission time
+                        Add PME/PMI ACE6000 management
+                        Add energy update interval configuration
+                        Add TIC to TCP bridge (command 'tcpstart 8888' to publish teleinfo stream on port 8888)
+    04/09/2021 - v9.1   Save settings in LittleFS partition if available
+                        Log rotate and old files deletion if space low
+    10/10/2021 - v9.2   Add peak VA and V in history files
+    02/11/2021 - v9.3   Add period and totals in history files
+                        Add simple FTP server to access history files
+    13/03/2022 - v9.4   Change keys to ISUB and PSUB in METER section
+    20/03/2022 - v9.5   Change serial init and major rework in active power calculation
+    01/04/2022 - v9.6   Add software watchdog feed to avoid lock
+    22/04/2022 - v9.7   Option to minimise LittleFS writes (day:every 1h and week:every 6h)
+                        Correction of EAIT bug
+    04/08/2022 - v9.8   Based on Tasmota 12, add ESP32S2 support
+                        Remove FTP server auto start
+    18/08/2022 - v9.9   Force GPIO_TELEINFO_RX as digital input
+                        Correct bug littlefs config and graph data recording
+                        Add Tempo and Production mode (thanks to Sébastien)
+                        Correct publication synchronised with teleperiod
+    26/10/2022 - v10.0  Add bar graph monthly (every day) and yearly (every month)
+    06/11/2022 - v10.1  Bug fixes on bar graphs and change in lltoa conversion
+    15/11/2022 - v10.2  Add bar graph daily (every hour)
+    04/02/2023 - v10.3  Add graph swipe (horizontal and vertical)
+                        Disable wifi sleep on ESP32 to avoid latency
+    25/02/2023 - v11.0  Split between xnrg and xsns
+                        Use Settings->teleinfo to store configuration
+                        Update today and yesterday totals
+    03/06/2023 - v11.1  Graph curves live update
+                        Rewrite of Tasmota energy update
+                        Avoid 100ms rules teleperiod update
+    11/06/2023 - v11.2  Change graph organisation & live display
+    15/08/2023 - v11.3  Evolution in graph navigation
+                        Change in XMLHttpRequest management 
+    10/10/2023 - v12.0  Add support for Ecowatt signal in ESP32 versions
+    17/10/2023 - v12.1  Handle Production & consommation simultaneously
+                        Display all periods with total
+    07/11/2023 - v12.2  Rotate daily and weekly files every second
+                        Change in ecowatt stream reception to avoid overload
+                        Remove daily graph to save RAM on ESP8266 1Mb
+                        Change daily filename to teleinfo-day-00.csv
+    19/11/2023 - v13.0  Tasmota 13 compatibility
+                        Switch to safeboot partitionning
+                        Calculate active power for production
+    05/12/2023 - v13.1  Add RTE Tempo calendar
+    07/12/2023 - v13.2  Handle both Ecowatt v4 and v5 (command eco_version)
+    03/01/2024 - v13.3  Add alert management thru STGE
+    15/01/2024 - v13.6  Add support for Denky (thanks to C. Hallard prototype)
+                        Add RTE pointe API
+                        Add Emeraude 2 meter management
+                        Add calendar and virtual relay management
+    25/02/2024 - v14.0  Complete rewrite of Contrat and Period management
+                        Activate serial reception when NTP time is ready
+                        Change MQTT publication and data reception handling to minimize errors
+                        Support various temperature sensors
+                        Add Domoticz topics publication (idea from Sebastien)
+                        Add support for Wenky with deep sleep (thanks to C. Hallard prototype)
+                        Lots of bug fixes (thanks to B. Monot and Sebastien)
+                        Separation of curve and historisation sources
+                        Removal of all float calculations
+    27/03/2024 - v14.1  Integration of Home Assistant auto discovery (with help of msevestre31)
+                        Section COUNTER renamed as CONTRACT with addition of contract data
+    28/03/2024 - v14.2  Add Today and Yesterday conso and Prod
+                        Disable Tasmota auto-discovery
+    04/04/2024 - v14.3  Correct RTE Tempo summer bug (different URL for Heure Ete / Heure Hiver)
+                        All ESP32 are using Arduino 3.0 libraries
+                        Add integration of Homie auto-discovery
+                        Update Home assistant auto-discovery with state_class
+                        Switch to native Tasmota FTP server
+                        Correct graph display bug
+                        Add HC/HP 12h30 contract
+    21/05/2024 - v14.4  Based on Tasmota 14
+                        Group all sensor data in a single frame
+                        Publish Teleinfo raw data under /TIC instead of /SENSOR
+                        Publish RTE data under /RTE instead of /SENSOR
+                        Add serial reception buffer to minimize reception errors
+    01/06/2024 - v14.5  Add contract auto-discovery for unknown Standard contracts
+    28/06/2024 - v14.6  JSON : Change in calendar (for compliance)
+                        JSON : Add CONTRACT/serial and CONTRACT/CONSO
+                        Remove all String for ESP8266 stability
+    30/06/2024 - v14.7  Add virtual and physical reception status LED (WS2812 ...)
+                        Add commands full and noraw (compatibility with official version)
+                        Always publish CONTRACT data with METER and PROD
+    16/07/2024 - v14.8  Add global power, current and voltage to Domoticz integration
+                        Add ThingsBoard integration
+                        Add relay management for periods and linky virtual relays
+                        Increase ESP32 reception buffer to 8192 bytes
+                        Redesign of contract management and auto-discovery
+                        Rewrite of periods management by meter type
+                        Change of contract format in teleinfo.cfg
+                        Add contract change detection on main page
+                        Optimisation of serial reception to minimise errors
+                        Support for Winky C3
+                        Correct bug in Tempo Historique contract management
+                        Add Live publication option
+                        Add command 'data' to publish teleinfo data
+                        Add command 'tic' to publish raw TIC data
+    08/03/2025 - v14.9  Based on Tasmota 14.5.0
+                        Synchronise time on first meter frame before NTP
+                        Add InfluxDB integration with indexes and totals
+                        Change Domoticz conso total to P1SmartMeter
+                        Publish HomeAssistant topic in mode retain
+                        Add command energyconfig skip=x (0..7) to publish LIVE topic
+                        Adaptation on Winky analog input for Tasmota 14.3 compatibility
+                        Correct bug in Linky calendar management
+                        RTE API used with RTC connexions, no need of MQTT connexion
+                        Rework of cosphi calculation algo
+                        Convert contract type to upper case before detection
+                        Correct brand new counter index bug
+                        Complete rewrite of calendar management
+                        Handle calendar for TEMPO and EJP in historic mode
+                        First step of generic TEMPO contract detection
+                        Avoid NTARF and STGE to detect period as they as out of synchro very often
+                        ESP8266 memory optimisation
+                        Add Ulanzi remote display management thru Awtrix open-source firmware
+    16/03/2025 - v14.10 Correct bug in contract auto-discovery
+    01/05/2025 - v14.11 Based on Tasmota 14.6.0
+                        Correct bug in week number calculation for sundays
+                        Cleanup old data files if FS is full
+                        Complete rewrite of speed detection
+                        Add period profile
+    10/08/2025 - v15.0  Refactoring based on Tasmota 15.0
+                        Switch all module to driver to minimize indexes
+                        Publish all SENSOR as Teleperiod to enable rules
+                        Calculate production delta on active power
+                        Add solar production data collection
+                        Add solar production prediction
+                        Set https timeout to 3 sec
+                        Limit publications to 1 per sec.
+                        Add solar production and forecast to histo graphs 
+                        Add solar production and forecast to instant graphs 
+    25/02/2026 - v15.1  Based on Tasmota 15.2
+                        Handle specific faulty format of ACE6000 ([02] and [03])
+                        Handle display for generic PME/PMI, Emeraude and Jaune meters
+                        Hide and Show with click on main page displays
+                        Correct PME/PMI total on period switch
+                        Add Solar production and forecast in Home Assistant intergration
+                        Handle Awtrix publication for Winky with deepsleep on super capa
+                        Change in contract and period detection
+                        If possible, save contract data to teleinfo-contract.dat
+                        Speed detection checked every second till detection
+                        Handle contract change 'on the fly' without reboot
+                        Save data to teleinfo-driver.dat
+                        Add TempoAP7, Pointe Mobile, Week-end, HC et Week-End & Super Creuses contract
+                        Update incorrect time slot when displaying 24h and Semaine graph
+                        Adapt to FUNC_JSON_APPEND call every second
+                        Add load average graph on main page
+                        Save data at midnight and on period change (to avoid spikes on reboot)
+                        Detect PME/PMI meters with MESURES1 also as some PME/PMI meters don't publish ADS
+                        Rework of ALERT section to separate volt, load and period
+                        Add OpenDPE Tempo forecast to RTE module (thanks to Loris excellent API)
+                        Save RTE data to teleinfo-rte.dat instead of rte.cfg to save context
+                        Add data to InfluxDB integration
+                        Rewrite RGB LED management
+                        Add Prometheus API metrics
+                        Add RTE Tempo Light management
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License aStart STGE managements published by
@@ -212,17 +245,26 @@
 // extension description
 #define EXTENSION_NAME    "Teleinfo"              // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts"     // author
-#define EXTENSION_VERSION "15.0"                  // version
-
-// FTP server credentials
-#ifdef USE_FTP
-  #define USER_FTP          "teleinfo"            // FTP server login
-  #define PW_FTP            "teleinfo"            // FTP server password
-#endif
+#define EXTENSION_VERSION "15.1"                  // version
 
 // complementary modules
 #define USE_MISC_OPTION                           // Add IP and common options configuration page
+
+// teleinfo modules
+#define USE_TELEINFO_TCP                          // Enable TCP server to forward meter stream to network
+#define USE_TELEINFO_GRAPH                        // Enable Power, voltage and cosphi graph
+#define USE_TELEINFO_HISTO                        // Enable consumption and production historisation
 #define USE_TELEINFO_RELAY                        // Enable Teleinfo period and virtual relay association to local relays
+
+// integration modules
+#define USE_TELEINFO_HASS                         // Home Assistant integration
+#define USE_TELEINFO_DOMOTICZ                     // Domoticz integration
+#define USE_TELEINFO_HOMIE                        // Homie integration
+#define USE_TELEINFO_PROMETHEUS                   // Prometheus metrics API
+
+#ifdef ESP32
+  #define USE_TELEINFO_THINGSBOARD                // Thingsboard integration
+#endif    // ESP32
 
 // teleinfo display is in French
 #define MY_LANGUAGE        fr_FR
@@ -305,14 +347,13 @@
 // ----------------------
 
 #define USE_WEB_STATUS_LINE_WIFI              // enable wifi icon
+#define USE_WEB_STATUS_LINE_LOAD              // enable load icon
 
 #define MDNS_ENABLE false                     // disable multicast DNS
 
-#define MQTT_DATA_STRING                      // Enable use heap instead of fixed memory for TasmotaGlobal.mqtt_data
-
 #undef FS_SD_MMC                              // disable SD MMC to remove warnings
 
-#undef USE_ARDUINO_OTA                        // supporTeleinfoContractUpdatet for Arduino OTA
+#undef USE_ARDUINO_OTA                        // support for Arduino OTA
 #undef USE_WPS                                // support for WPS as initial wifi configuration tool
 #undef USE_SMARTCONFIG                        // support for Wifi SmartConfig as initial wifi configuration tool
 #undef USE_MQTT_TLS                           // TLS support won't work as the MQTTHost is not set
@@ -333,22 +374,22 @@
 #undef USE_DISCOVERY                          // Discovery services for both MQTT and web server
 #undef MQTT_HOST_DISCOVERY                    // Find MQTT host serTeleinfoContractUpdatever (overrides MQTT_HOST if found)
 
-#undef USE_TIMERS                             // support for up to 16 timers
-#undef USE_TIMERS_WEB                         // support for timer webpage
-#undef USE_SUNRISE                            // support for Sunrise and sunset tools
+#undef USE_TIMERS                            // support for up to 16 timers
+#undef USE_TIMERS_WEB                        // support for timer webpage
+#undef USE_SUNRISE                           // support for Sunrise and sunset tools
 
 #undef USE_SCRIPT                             // Add support for script (+17k code)
 
-#define USE_RULES                             // Support for rules
-  #define USE_EXPRESSION                      // Add support for expression evaluation in rules (+3k2 code, +64 bytes mem)  
-    #define SUPPORT_IF_STATEMENT              // Add support for IF statement in rules (+4k2 code, -332 bytes mem)  
+#undef USE_RULES                             // Support for rules
+  #undef USE_EXPRESSION                      // Add support for expression evaluation in rules (+3k2 code, +64 bytes mem)  
+    #undef SUPPORT_IF_STATEMENT              // Add support for IF statement in rules (+4k2 code, -332 bytes mem)  
 
 #undef ROTARY_V1                              // Add support for Rotary Encoder as used in MI Desk Lamp (+0k8 code)
 #undef USE_SONOFF_RF                          // Add support for Sonoff Rf Bridge (+3k2 code)
 #undef USE_RF_FLASH                           // Add support for flashing the EFM8BB1 chip on the Sonoff RF Bridge.
 #undef USE_SONOFF_SC                          // Add support for Sonoff Sc (+1k1 code)
 #undef USE_TUYA_MCU                           // Add support for Tuya Serial MCU
-#undef USE_TUYAMCUBR                            // Add support for TuyaMCU Bridge
+#undef USE_TUYAMCUBR                          // Add support for TuyaMCU Bridge
 #undef USE_ARMTRONIX_DIMMERS                  // Add support for Armtronix Dimmers (+1k4 code)
 #undef USE_PS_16_DZ                           // Add support for PS-16-DZ Dimmer (+2k code)
 #undef USE_SONOFF_IFAN                        // Add support for Sonoff iFan02 and iFan03 (+2k code)
@@ -359,7 +400,7 @@
 #undef USE_DEEPSLEEP                          // Add support for deepsleep (+1k code)
 
 #undef USE_EXS_DIMMER                         // Add support for ES-Store WiFi Dimmer (+1k5 code)
-#undef USE_HOTPLUG                              // Add support for sensor HotPlug
+#undef USE_HOTPLUG                            // Add support for sensor HotPlug
 #undef EXS_MCU_CMNDS                          // Add command to send MCU commands (+0k8 code)
 #undef USE_DEVICE_GROUPS                      // Add support for device groups (+5k5 code)
 #undef USE_DEVICE_GROUPS_SEND                 // Add support for the DevGroupSend command (+0k6 code)
@@ -370,7 +411,7 @@
 #undef SHELLY_CMDS                            // Add command to send co-processor commands (+0k3 code)
 #undef SHELLY_FW_UPGRADE                      // Add firmware upgrade option for co-processor (+3k4 code)
 #undef SHELLY_VOLTAGE_MON                     // Add support for reading voltage and current measurment (-0k0 code)
-#undef USE_MAGIC_SWITCH                         // Add Sonoff MagicSwitch support as implemented in Sonoff Basic R4 (+612B flash, +64B IRAM for intr)
+#undef USE_MAGIC_SWITCH                       // Add Sonoff MagicSwitch support as implemented in Sonoff Basic R4 (+612B flash, +64B IRAM for intr)
 
 #undef USE_LIGHT                              // Add support for light control
 #undef USE_WS2812                             // WS2812 Led string using library NeoPixelBus (+5k code, +1k mem, 232 iram) - Disable by //
@@ -379,37 +420,32 @@
 #undef USE_MY92X1                             // Add support for MY92X1 RGBCW led controller as used in Sonoff B1, Ailight and Lohas
 #undef USE_SM16716                            // Add support for SM16716 RGB LED controller (+0k7 code)
 #undef USE_SM2135                             // Add support for SM2135 RGBCW led control as used in Action LSC (+0k6 code)
-#undef USE_SM2335                               // Add support for SM2335 RGBCW led control as used in SwitchBot Color Bulb (+0k7 code)
-#undef USE_BP1658CJ                             // Add support for BP1658CJ RGBCW led control as used in Orein OS0100411267 Bulb
-#undef USE_BP5758D                              // Add support for BP5758D RGBCW led control as used in some Tuya lightbulbs (+0k8 code)
+#undef USE_SM2335                             // Add support for SM2335 RGBCW led control as used in SwitchBot Color Bulb (+0k7 code)
+#undef USE_BP1658CJ                           // Add support for BP1658CJ RGBCW led control as used in Orein OS0100411267 Bulb
+#undef USE_BP5758D                            // Add support for BP5758D RGBCW led control as used in some Tuya lightbulbs (+0k8 code)
 #undef USE_SONOFF_L1                          // Add support for Sonoff L1 led control
 #undef USE_ELECTRIQ_MOODL                     // Add support for ElectriQ iQ-wifiMOODL RGBW LED controller (+0k3 code)
 #undef USE_LIGHT_PALETTE                      // Add support for color palette (+0k7 code)
 #undef USE_LIGHT_VIRTUAL_CT                   // Add support for Virtual White Color Temperature (+1.1k code)
 #undef USE_DGR_LIGHT_SEQUENCE                 // Add support for device group light sequencing (requires USE_DEVICE_GROUPS) (+0k2 code)
-#undef USE_LSC_MCSL                             // Add support for GPE Multi color smart light as sold by Action in the Netherlands (+1k1 code)
-#undef USE_LIGHT_ARTNET                         // Add support for DMX/ArtNet via UDP on port 6454 (+3.5k code)
+#undef USE_LSC_MCSL                           // Add support for GPE Multi color smart light as sold by Action in the Netherlands (+1k1 code)
+#undef USE_LIGHT_ARTNET                       // Add support for DMX/ArtNet via UDP on port 6454 (+3.5k code)
 
 #undef USE_COUNTER                            // Enable inputs as counter (+0k8 code)
 
-//#define USE_ADC_VCC                            // display analog input as VCC
+#undef USE_DS18x20                           // Add support for DS18x20 sensors with id sort, single scan and read retry (+2k6 code)
+#undef USE_I2C                               // Enable all I2C sensors and devices
+#undef USE_SHT                               // [I2cDriver8] Enable SHT1X sensor (+1k4 code)
+#undef USE_SHT3X                             // [I2cDriver15] Enable SHT3x (I2C address 0x44 or 0x45) or SHTC3 (I2C address 0x70) sensor (+0k7 code)
+#undef USE_HTU                               // [I2cDriver9] Enable HTU21/SI7013/SI7020/SI7021 sensor (I2C address 0x40) (+1k5 code)
+#undef USE_BMP                               // [I2cDriver10] Enable BMP085/BMP180/BMP280/BME280 sensors (I2C addresses 0x76 and 0x77) (+4k4 code)
 
-#define USE_DS18x20                            // Add support for DS18x20 sensors with id sort, single scan and read retry (+2k6 code)
-
-#define USE_I2C                               // Enable all I2C sensors and devices
-
-#define USE_SHT3X                             // Enable SHT30 and SHT40
-#define USE_SHT                                // [I2cDriver8] Enable SHT1X sensor (+1k4 code)
-#define USE_HTU                                // [I2cDriver9] Enable HTU21/SI7013/SI7020/SI7021 sensor (I2C address 0x40) (+1k5 code)
-#define USE_BMP                                // [I2cDriver10] Enable BMP085/BMP180/BMP280/BME280 sensors (I2C addresses 0x76 and 0x77) (+4k4 code)
-
-#undef USE_BME68X                           // Enable support for BME680/BME688 sensor using Bosch BME68x library (+6k9 code)
+#undef USE_BME68X                             // Enable support for BME680/BME688 sensor using Bosch BME68x library (+6k9 code)
 #undef USE_BH1750                             // [I2cDriver11] Enable BH1750 sensor (I2C address 0x23 or 0x5C) (+0k5 code)
 #undef USE_VEML6070                           // [I2cDriver12] Enable VEML6070 sensor (I2C addresses 0x38 and 0x39) (+1k5 code)
 #undef USE_ADS1115                            // [I2cDriver13] Enable ADS1115 16 bit A/D converter (I2C address 0x48, 0x49, 0x4A or 0x4B) based on Adafruit ADS1x15 library (no library needed) (+0k7 code)
 #undef USE_INA219                             // [I2cDriver14] Enable INA219 (I2C address 0x40, 0x41 0x44 or 0x45) Low voltage and current sensor (+1k code)
 #undef USE_INA226                             // [I2cDriver35] Enable INA226 (I2C address 0x40, 0x41 0x44 or 0x45) Low voltage and current sensor (+2k3 code)
-#undef USE_SHT3X                              // [I2cDriver15] Enable SHT3x (I2C address 0x44 or 0x45) or SHTC3 (I2C address 0x70) sensor (+0k7 code)
 #undef USE_TSL2561                            // [I2cDriver16] Enable TSL2561 sensor (I2C address 0x29, 0x39 or 0x49) using library Joba_Tsl2561 (+2k3 code)
 #undef USE_TSL2591                            // [I2cDriver40] Enable TSL2591 sensor (I2C address 0x29) using library Adafruit_TSL2591 (+1k6 code)
 #undef USE_MGS                                // [I2cDriver17] Enable Xadow and Grove Mutichannel Gas sensor using library Multichannel_Gas_Sensor (+10k code)
@@ -491,70 +527,69 @@
 #undef USE_AMSX915                            // [I2CDriver86] Enable AMS5915/AMS6915 pressure/temperature sensor (+1k2 code)
 #undef USE_SPL06_007                          // [I2cDriver87] Enable SPL06_007 pressure and temperature sensor (I2C addresses 0x76) (+2k5 code)
 #undef USE_RTC_CHIPS                          // Enable RTC chip support and NTP server - Select only one
-#undef USE_DS3231                           // [I2cDriver26] Enable DS3231 RTC (I2C address 0x68) (+1k2 code)
-#undef DS3231_ENABLE_TEMP                   //   In DS3231 driver, enable the internal temperature sensor
-#undef USE_BM8563                           // [I2cDriver59] Enable BM8563 RTC - found in M5Stack - support both I2C buses on ESP32 (I2C address 0x51) (+2.5k code)
-#undef USE_PCF85363                         // [I2cDriver66] Enable PCF85363 RTC - found Shelly 3EM (I2C address 0x51) (+0k7 code)
+#undef USE_DS3231                             // [I2cDriver26] Enable DS3231 RTC (I2C address 0x68) (+1k2 code)
+#undef DS3231_ENABLE_TEMP                     //   In DS3231 driver, enable the internal temperature sensor
+#undef USE_BM8563                             // [I2cDriver59] Enable BM8563 RTC - found in M5Stack - support both I2C buses on ESP32 (I2C address 0x51) (+2.5k code)
+#undef USE_PCF85363                           // [I2cDriver66] Enable PCF85363 RTC - found Shelly 3EM (I2C address 0x51) (+0k7 code)
 
 #undef USE_DISPLAY                            // Add I2C/TM1637/MAX7219 Display Support (+2k code)
-#undef USE_DISPLAY_MODES1TO5                // Enable display mode 1 to 5 in addition to mode 0
-#undef USE_DISPLAY_LCD                      // [DisplayModel 1] [I2cDriver3] Enable Lcd display (I2C addresses 0x27 and 0x3F) (+6k code)
-#undef USE_DISPLAY_MATRIX                   // [DisplayModel 3] [I2cDriver5] Enable 8x8 Matrix display (I2C adresseses see below) (+11k code)
-#undef USE_DISPLAY_SEVENSEG                 // [DisplayModel 11] [I2cDriver47] Enable sevenseg display (I2C 0x70-0x77) (<+11k code)
-#undef USE_DISPLAY_SH1106                   // [DisplayModel 7] [I2cDriver6] Enable SH1106 Oled 128x64 display (I2C addresses 0x3C and 0x3D)
-#undef USE_DISPLAY_TM1650                   // [DisplayModel 20] [I2cDriver74] Enable TM1650 display (I2C addresses 0x24 - 0x27 and 0x34 - 0x37)
-#undef USE_DT_VARS                          // Display variables that are exposed in JSON MQTT strings e.g. in TelePeriod messages.
-#undef USE_GRAPH                            // Enable line charts with displays
+#undef USE_DISPLAY_MODES1TO5                  // Enable display mode 1 to 5 in addition to mode 0
+#undef USE_DISPLAY_LCD                        // [DisplayModel 1] [I2cDriver3] Enable Lcd display (I2C addresses 0x27 and 0x3F) (+6k code)
+#undef USE_DISPLAY_MATRIX                     // [DisplayModel 3] [I2cDriver5] Enable 8x8 Matrix display (I2C adresseses see below) (+11k code)
+#undef USE_DISPLAY_SEVENSEG                   // [DisplayModel 11] [I2cDriver47] Enable sevenseg display (I2C 0x70-0x77) (<+11k code)
+#undef USE_DISPLAY_SH1106                     // [DisplayModel 7] [I2cDriver6] Enable SH1106 Oled 128x64 display (I2C addresses 0x3C and 0x3D)
+#undef USE_DISPLAY_TM1650                     // [DisplayModel 20] [I2cDriver74] Enable TM1650 display (I2C addresses 0x24 - 0x27 and 0x34 - 0x37)
+#undef USE_DT_VARS                            // Display variables that are exposed in JSON MQTT strings e.g. in TelePeriod messages.
+#undef USE_GRAPH                              // Enable line charts with displays
 
-#undef USE_DISPLAY_TM1637                   // [DisplayModel 15] Enable TM1637 Module
-#undef USE_DISPLAY_MAX7219                  // [DisplayModel 19] Enable MAX7219 Module
-#undef USE_UNIVERSAL_DISPLAY                   // New universal display driver for both I2C and SPI
+#undef USE_DISPLAY_TM1637                     // [DisplayModel 15] Enable TM1637 Module
+#undef USE_DISPLAY_MAX7219                    // [DisplayModel 19] Enable MAX7219 Module
+#undef USE_UNIVERSAL_DISPLAY                  // New universal display driver for both I2C and SPI
 
 #undef USE_SPI                                // Disable all SPI devices
 
-#undef USE_HDMI_CEC                              // Add support for HDMI CEC bus (+7k code, 1456 bytes IRAM)
+#undef USE_HDMI_CEC                           // Add support for HDMI CEC bus (+7k code, 1456 bytes IRAM)
 
 // -- Serial sensors ------------------------------
-#undef USE_MHZ19                                // Add support for MH-Z19 CO2 sensor (+2k code)
-#undef USE_SENSEAIR                             // Add support for SenseAir K30, K70 and S8 CO2 sensor (+2k3 code)
-#undef USE_CM110x                               // Add support for CM110x CO2 sensors (+2k7code)
-#undef USE_PMS5003                              // Add support for PMS5003 and PMS7003 particle concentration sensor (+1k3 code)
-#undef USE_NOVA_SDS                             // Add support for SDS011 and SDS021 particle concentration sensor (+1k5 code)
-#undef USE_HPMA                                 // Add support for Honeywell HPMA115S0 particle concentration sensor (+1k4)
-#undef USE_SR04                                 // Add support for HC-SR04 ultrasonic devices (+1k code)
-#undef USE_ME007                                // Add support for ME007 ultrasonic devices (+1k5 code)
-#undef USE_DYP                                  // Add support for DYP ME-007 ultrasonic distance sensor, serial port version (+0k5 code)
-#undef USE_SERIAL_BRIDGE                        // Add support for software Serial Bridge (+2k code)
-#undef USE_MODBUS_BRIDGE                        // Add support for software Modbus Bridge (+4.5k code)
-#undef USE_MODBUS_BRIDGE_TCP                    // Add support for software Modbus TCP Bridge (also enable Modbus TCP Bridge) (+2k code)
+#undef USE_MHZ19                              // Add support for MH-Z19 CO2 sensor (+2k code)
+#undef USE_SENSEAIR                           // Add support for SenseAir K30, K70 and S8 CO2 sensor (+2k3 code)
+#undef USE_CM110x                             // Add support for CM110x CO2 sensors (+2k7code)
+#undef USE_PMS5003                            // Add support for PMS5003 and PMS7003 particle concentration sensor (+1k3 code)
+#undef USE_NOVA_SDS                           // Add support for SDS011 and SDS021 particle concentration sensor (+1k5 code)
+#undef USE_HPMA                               // Add support for Honeywell HPMA115S0 particle concentration sensor (+1k4)
+#undef USE_SR04                               // Add support for HC-SR04 ultrasonic devices (+1k code)
+#undef USE_ME007                              // Add support for ME007 ultrasonic devices (+1k5 code)
+#undef USE_DYP                                // Add support for DYP ME-007 ultrasonic distance sensor, serial port version (+0k5 code)
+#undef USE_SERIAL_BRIDGE                      // Add support for software Serial Bridge (+2k code)
+#undef USE_MODBUS_BRIDGE                      // Add support for software Modbus Bridge (+4.5k code)
+#undef USE_MODBUS_BRIDGE_TCP                  // Add support for software Modbus TCP Bridge (also enable Modbus TCP Bridge) (+2k code)
 
-#undef USE_TCP_BRIDGE                           //  Add support for Serial to TCP bridge (+1.3k code)
+#undef USE_TCP_BRIDGE                         //  Add support for Serial to TCP bridge (+1.3k code)
 
-#undef USE_MP3_PLAYER                           // Use of the DFPlayer Mini MP3 Player RB-DFR-562 commands: play, pause, stop, track, volume and reset
+#undef USE_MP3_PLAYER                         // Use of the DFPlayer Mini MP3 Player RB-DFR-562 commands: play, pause, stop, track, volume and reset
 #undef USE_DY_SV17F                           // Use of DY-SV17F MP3 Player commands: play, stop, track and volume
-#undef USE_AZ7798                               // Add support for AZ-Instrument 7798 CO2 datalogger (+1k6 code)
-#undef USE_PN532_HSU                            // Add support for PN532 using HSU (Serial) interface (+1k7 code, 156 bytes mem)
-#undef USE_RDM6300                              // Add support for RDM6300 125kHz RFID Reader (+0k8)
-#undef USE_IBEACON                              // Add support for bluetooth LE passive scan of ibeacon devices (uses HM17 module)
-#undef USE_GPS                                  // Add support for GPS and NTP Server for becoming Stratus 1 Time Source (+3k1 code, +132 bytes RAM)
-#undef USE_HM10                                 // (ESP8266 only) Add support for HM-10 as a BLE-bridge (+17k code)
-#undef USE_HRXL                                 // Add support for MaxBotix HRXL-MaxSonar ultrasonic range finders (+0k7)
-#undef USE_TASMOTA_CLIENT                       // Add support for Arduino Uno/Pro Mini via serial interface including flashing (+2k6 code, 64 mem)
-#undef USE_OPENTHERM                            // Add support for OpenTherm (+15k code)
-#undef USE_MIEL_HVAC                            // Add support for Mitsubishi Electric HVAC serial interface (+5k code)
-#undef USE_TUYAMCUBR                            // Add support for TuyaMCU Bridge
-#undef USE_PROJECTOR_CTRL                       // Add support for LCD/DLP Projector serial control interface (+2k code)
-#undef USE_AS608                                // Add support for AS608 optical and R503 capacitive fingerprint sensor (+3k code)
-#undef USE_TFMINIPLUS                           // Add support for TFmini Plus (TFmini, TFmini-S) LiDAR modules via UART interface (+0k8)
-#undef USE_HRG15                                // Add support for Hydreon RG-15 Solid State Rain sensor (+1k5 code)
-#undef USE_VINDRIKTNING                         // Add support for IKEA VINDRIKTNING particle concentration sensor (+0k6 code)
-#undef USE_LD2410                               // Add support for HLK-LD2410 24GHz smart wave motion sensor (+2k8 code)
-#undef USE_LOX_O2                               // Add support for LuminOx LOX O2 Sensor (+0k8 code)
-#undef USE_GM861                                // Add support for GM861 1D and 2D Bar Code Reader (+1k3 code)
+#undef USE_AZ7798                             // Add support for AZ-Instrument 7798 CO2 datalogger (+1k6 code)
+#undef USE_PN532_HSU                          // Add support for PN532 using HSU (Serial) interface (+1k7 code, 156 bytes mem)
+#undef USE_RDM6300                            // Add support for RDM6300 125kHz RFID Reader (+0k8)
+#undef USE_IBEACON                            // Add support for bluetooth LE passive scan of ibeacon devices (uses HM17 module)
+#undef USE_GPS                                // Add support for GPS and NTP Server for becoming Stratus 1 Time Source (+3k1 code, +132 bytes RAM)
+#undef USE_HM10                               // (ESP8266 only) Add support for HM-10 as a BLE-bridge (+17k code)
+#undef USE_HRXL                               // Add support for MaxBotix HRXL-MaxSonar ultrasonic range finders (+0k7)
+#undef USE_TASMOTA_CLIENT                     // Add support for Arduino Uno/Pro Mini via serial interface including flashing (+2k6 code, 64 mem)
+#undef USE_OPENTHERM                          // Add support for OpenTherm (+15k code)
+#undef USE_MIEL_HVAC                          // Add support for Mitsubishi Electric HVAC serial interface (+5k code)
+#undef USE_TUYAMCUBR                          // Add support for TuyaMCU Bridge
+#undef USE_PROJECTOR_CTRL                     // Add support for LCD/DLP Projector serial control interface (+2k code)
+#undef USE_AS608                              // Add support for AS608 optical and R503 capacitive fingerprint sensor (+3k code)
+#undef USE_TFMINIPLUS                         // Add support for TFmini Plus (TFmini, TFmini-S) LiDAR modules via UART interface (+0k8)
+#undef USE_HRG15                              // Add support for Hydreon RG-15 Solid State Rain sensor (+1k5 code)
+#undef USE_VINDRIKTNING                       // Add support for IKEA VINDRIKTNING particle concentration sensor (+0k6 code)
+#undef USE_LD2410                             // Add support for HLK-LD2410 24GHz smart wave motion sensor (+2k8 code)
+#undef USE_LOX_O2                             // Add support for LuminOx LOX O2 Sensor (+0k8 code)
+#undef USE_GM861                              // Add support for GM861 1D and 2D Bar Code Reader (+1k3 code)
 
-
-#define USE_ENERGY_SENSOR                        // Add support for Energy Monitors (+14k code)
-#undef USE_ENERGY_MARGIN_DETECTION              // Add support for Energy Margin detection (+1k6 code)
+#define USE_ENERGY_SENSOR                     // Add support for Energy Monitors (+14k code)
+#undef USE_ENERGY_MARGIN_DETECTION            // Add support for Energy Margin detection (+1k6 code)
 #undef USE_ENERGY_POWER_LIMIT                 // Add additional support for Energy Power Limit detection (+1k2 code)
 #undef USE_ENERGY_DUMMY                         // Add support for dummy Energy monitor allowing user values (+0k7 code)
 #undef USE_HLW8012                              // Add support for HLW8012, BL0937 or HJL-01 Energy Monitor for Sonoff Pow and WolfBlitz
@@ -575,7 +610,6 @@
 #undef USE_BL09XX                               // Add support for various BL09XX Energy monitor as used in Blitzwolf SHP-10 or Sonoff Dual R3 v2 (+1k6 code)
 
 #define USE_TELEINFO                             // Add support for Teleinfo via serial RX interface (+5k2 code, +168 RAM + SmartMeter LinkedList Values RAM)
-//#undef USE_TELEINFO                             // Add support for Teleinfo via serial RX interface (+5k2 code, +168 RAM + SmartMeter LinkedList Values RAM)
 
 #undef USE_IEM3000                              // Add support for Schneider Electric iEM3000-Modbus series energy monitor (+0k8 code)
 #undef USE_WE517                                // Add support for Orno WE517-Modbus energy monitor (+1k code)
@@ -641,62 +675,84 @@
 #undef USE_PID                                 // Add suport for the PID  feature (+11k2 code)
 #undef USE_DRV_FILE_JSON_DEMO
 
-// -- TLS support ----------------------------
-//#define USE_TLS                               // for safeboot and BearSSL
-
 // ----------------------
 //    ESP32 specific
 // ----------------------
 
 #ifdef ESP32
 
-// berry and autoconf
-#define USE_AUTOCONF                          // Enable Esp32 autoconf feature
-//#undef USE_BERRY                            // Enable Berry scripting langage
+  // teleinfo modules for ESP32
+  #define USE_TELEINFO_INFLUXDB                 // support for InfluxDB
+  #define USE_TELEINFO_RTE                      // support for RTE calendars
+  #define USE_TELEINFO_AWTRIX                   // support for Awtrix display
+  #define USE_TELEINFO_SOLAR                    // support for solar production forecast
 
-// display
-#define USE_I2C                               // All I2C sensors and devices
-#define USE_DISPLAY                           // Add Display support
-#undef  USE_DISPLAY_TM1621_SONOFF
+  // timers
+  #define USE_TIMERS                            // support for up to 16 timers
+  #define USE_TIMERS_WEB                        // support for timer webpage
+  #define USE_SUNRISE                           // support for Sunrise and sunset tools
 
-#define USE_INFLUXDB                          // InfluxDB integration
-#define USE_WEBCLIENT_HTTPS                   // HTTPs for InfluxDB
-#define USE_WIREGUARD                         // Wireguard VPN client
+  // sensors
+  #define USE_DS18x20                           // Add support for DS18x20 sensors with id sort, single scan and read retry (+2k6 code)
+  #define USE_I2C                               // Enable all I2C sensors and devices
+  #define USE_SHT                               // [I2cDriver8] Enable SHT1X sensor (+1k4 code)
+  #define USE_SHT3X                             // [I2cDriver15] Enable SHT3x (I2C address 0x44 or 0x45) or SHTC3 (I2C address 0x70) sensor (+0k7 code)
+  #define USE_HTU                               // [I2cDriver9] Enable HTU21/SI7013/SI7020/SI7021 sensor (I2C address 0x40) (+1k5 code)
+  #define USE_BMP                               // [I2cDriver10] Enable BMP085/BMP180/BMP280/BME280 sensors (I2C addresses 0x76 and 0x77) (+4k4 code)
 
-#define USE_RTE                               // RTE Tempo, Pointe and Ecowatt
+  // rules
+  #define USE_RULES                             // Support for rules
+  #define USE_EXPRESSION                      // Add support for expression evaluation in rules (+3k2 code, +64 bytes mem)  
+    #define SUPPORT_IF_STATEMENT              // Add support for IF statement in rules (+4k2 code, -332 bytes mem)  
 
-//#define USE_DEEPSLEEP                         // Add support for deepsleep (+1k code)
+  // watchdog
+  #define USE_ESP32_WDT
 
-//#undef USE_ESP32_SENSORS
+  // berry and autoconf
+  #define USE_AUTOCONF                         // Enable Esp32 autoconf feature
+  #define USE_BERRY                            // Enable Berry scripting langage
 
-#define USE_TLS                               // for safeboot and BearSSL
-#define USE_MQTT_TLS                          // enable mqtts connexion
-#define USE_LIB_SSL_ENGINE
+  // FTP server
+  #define USE_FTP                              // Embeded FTP server
+  #define USER_FTP         "teleinfo"          // FTP server login
+  #define PW_FTP           "teleinfo"          // FTP server password
 
-// conso LED status
-#define USE_LIGHT                              // Add support for light control
-#define USE_WS2812                             // WS2812 Led string using library NeoPixelBus (+5k code, +1k mem, 232 iram) - Disable by //
-#define USE_ADC                                // Add support for ADC on GPIO32 to GPIO39
+  // display
+  #define USE_I2C                              // All I2C sensors and devices
+  #define USE_DISPLAY                          // Add Display support
+  #undef  USE_DISPLAY_TM1621_SONOFF
 
-#undef USE_BLE_ESP32
-#undef USE_MI_ESP32
-#undef USE_IBEACON
+  #define USE_INFLUXDB                         // InfluxDB integration
+  #define USE_WEBCLIENT_HTTPS                  // HTTPs for InfluxDB
+  #define USE_WIREGUARD                        // Wireguard VPN client
 
-#undef USE_SR04
+  #define USE_TLS                              // for safeboot and BearSSL
+  #define USE_MQTT_TLS                         // enable mqtts connexion
+  #define USE_LIB_SSL_ENGINE
 
-#undef USE_WEBCAM
+  // conso LED status
+  #define USE_LIGHT                            // Add support for light control
+  #define USE_WS2812                           // WS2812 Led string using library NeoPixelBus (+5k code, +1k mem, 232 iram) - Disable by //
+  #define USE_ADC                              // Add support for ADC on GPIO32 to GPIO39
 
-#undef USE_M5STACK_CORE2
-#undef USE_I2S_AUDIO
-#undef USE_TTGO_WATCH
+  #undef USE_BLE_ESP32
+  #undef USE_MI_ESP32
+  #undef USE_IBEACON
 
-#undef USE_ALECTO_V2
-#undef USE_RF_SENSOR
-#undef USE_HX711
-#undef USE_MAX31855
+  #undef USE_SR04
 
-#undef USE_MHZ19
-#undef USE_SENSEAIR   
+  #undef USE_WEBCAM
+
+  #undef USE_M5STACK_CORE2
+  #undef USE_I2S_AUDIO
+  #undef USE_TTGO_WATCH
+
+  #undef USE_ALECTO_V2
+  #undef USE_RF_SENSOR
+  #undef USE_HX711
+  #undef USE_MAX31855
+
+  #undef USE_MHZ19
+  #undef USE_SENSEAIR   
 
 #endif  // ESP32
-

@@ -6,6 +6,18 @@
   Version history :
     10/07/2025 v1.0 - Refactoring based on Tasmota 15
 
+  Integration flags are stored in Settings :
+
+    - Settings->rf_code[10][0..8]
+    - Settings->rf_code[11][0..2] : Main screen display flags
+    - Settings->rf_code[16][0]    : Home Assistant integration flag
+    - Settings->rf_code[16][2]    : Domoticz integration flag
+    - Settings->rf_code[16][1]    : Homie integration flag
+    - Settings->rf_code[16][3]    : Thingsboard integration flag
+    - Settings->rf_code[16][5]    : Influxdb extension flag
+    - Settings->rf_code[16][6]    : Minimum production power level to activate local relay (x50 W)
+    - Settings->rf_code[16][7]    : LED brightness
+
   RAM : esp8266 ~ 5600 bytes
         esp32   ~ 20000 bytes
 
@@ -43,28 +55,28 @@ enum TeleinfoCommandResult { TIC_COMMAND_NOTHING, TIC_COMMAND_SAVE, TIC_COMMAND_
 
 // TIC reception
 #define TIC_LINE_SIZE               128       // maximum size of a received TIC line
-#define TIC_CODE_SIZE               20        // maximum size of a period code
-#define TIC_KEY_MAX                 12        // maximum size of a TIC etiquette
+#define TIC_ETIQUETTE_SIZE          12        // maximum size of a TIC etiquette
+#define TIC_CONTRACT_CODE_SIZE      20        // max size of a contract code
+#define TIC_PERIOD_CODE_SIZE        16        // max size of period code
+#define TIC_PERIOD_LABEL_SIZE       20        // max size of period label
+#define TIC_PERIOD_MAX              14        // maximum number of indexes per contract
+#define TIC_NEW_CONTRACT_TRIGGER    8         // number of message to trigger contract change
 
 #ifdef ESP32
-  #define TIC_BUFFER_MAX            16384     // size of reception buffer (15 sec. at 9600 bps)
   #define TIC_LINE_QTY              74        // maximum number of lines handled in a TIC message
-  #define TIC_DATA_MAX              112       // maximum size of a TIC donnee
+  #define TIC_DONNEE_SIZE           112       // maximum size of a TIC donnee
   #define TIC_RX_BUFFER             1024
 #else
-  #define TIC_BUFFER_MAX            512       // size of reception buffer (3.5 sec. at 1200 bps)
-  #define TIC_LINE_QTY              56        // maximum number of lines handled in a TIC message
-  #define TIC_DATA_MAX              28        // maximum size of a TIC donnee
+  #define TIC_LINE_QTY              54        // maximum number of lines handled in a TIC message
+  #define TIC_DONNEE_SIZE           36        // maximum size of a TIC donnee
   #define TIC_RX_BUFFER             256
 #endif    // ESP32
 
 // teleinfo constant
 #define TIC_PHASE_MAX               3         // maximum number of phases
-
 #define TIC_POINTE_MAX              3         // maximum number of pointe dates
-#define TIC_INDEX_MAX               14        // maximum number of indexes per contract
-#define TIC_VOLTAGE                 230       // default voltage provided
-#define TIC_VOLTAGE_MAXIMUM         260       // maximum voltage for value to be acceptable
+#define TIC_VOLTAGE_DEFAULT         230       // default voltage provided
+#define TIC_VOLTAGE_MAXIMUM         300       // maximum voltage for value to be acceptable
 #define TIC_VOLTAGE_MINIMUM         100       // minimum voltage for value to be acceptable
 #define TIC_VOLTAGE_REF             200       // voltage reference for max power calculation
 #define TIC_PERCENT_MIN             1         // minimum acceptable percentage of energy contract
@@ -74,6 +86,7 @@ enum TeleinfoCommandResult { TIC_COMMAND_NOTHING, TIC_COMMAND_SAVE, TIC_COMMAND_
 #define TIC_RTC_TIMEOUT_BATTERY     15        // RTC setup timeout before setting from meter when on battery
 
 // publication constants
+#define TIC_WEB_REFRESH             1000      // Web refresh timeout
 #define TIC_MESSAGE_MIN             2         // minimum number of messages to publish data
 #define TIC_MESSAGE_DELAY           500       // delay between messages (to avoid serial reception errors)
 
@@ -84,32 +97,31 @@ enum TeleinfoCommandResult { TIC_COMMAND_NOTHING, TIC_COMMAND_SAVE, TIC_COMMAND_
 
 // timeout and delays
 #define TELEINFO_RECEPTION_TIMEOUT  3000      // timeout for TIC frame reception (in ms)
-#define TELEINFO_PREAVIS_TIMEOUT    15        // timeout to reset preavis flag (in sec.)
+#define TELEINFO_ALERT_TIMEOUT      5         // timeout to reset alert flag (in sec.)
+#define TIC_ALERT_SRC_SIZE          6
 
 // RGB limits
 #define TIC_RGB_RED_MAX             208
 #define TIC_RGB_GREEN_MAX           176
 
-// colors for conso and prod
-#define TIC_COLOR_PROD              "#1c0"
-#define TIC_COLOR_PROD_PREV         "#160"
-#define TIC_COLOR_CONSO             "#6cf"
-#define TIC_COLOR_CONSO_PREV        "#069"
+// calendar display
+#define TIC_CALENDAR_SLOT           34        // each slot is 3.4% width
+
+// data file
+#define TIC_DATA_VERSION            1         // saved data version
+const char PSTR_DRIVER_DATA_FILE[]  PROGMEM = "/teleinfo-contract.dat";
 
 // commands : MQTT
 #define CMND_TIC_RATE               "rate"
 #define CMND_TIC_POLICY             "policy"
 #define CMND_TIC_METER              "meter"
 #define CMND_TIC_ENERGY             "energy"
-#define CMND_TIC_TIC                "tic"
-#define CMND_TIC_LIVE               "live"
-#define CMND_TIC_SKIP               "skip"
-#define CMND_TIC_SENSOR             "sensor"
-#define CMND_TIC_BRIGHT             "bright"
+#define CMND_TIC_LED                "led"
 #define CMND_TIC_CALENDAR           "calendar"
 #define CMND_TIC_RELAY              "relay"
 #define CMND_TIC_DELTA              "delta"
-#define CMND_TIC_TRIGGER            "trigger"
+#define CMND_TIC_MAIN               "main"
+#define CMND_TIC_DATA               "data"
 
 #define CMND_TIC_DOMO               "domo"
 #define CMND_TIC_HASS               "hass"
@@ -117,44 +129,27 @@ enum TeleinfoCommandResult { TIC_COMMAND_NOTHING, TIC_COMMAND_SAVE, TIC_COMMAND_
 #define CMND_TIC_THINGSBOARD        "things"
 #define CMND_TIC_INFLUXDB           "influx"
 
-#define CMND_TIC_TODAY_CONSO        "tday-conso"
-#define CMND_TIC_TODAY_PROD         "tday-prod"
-#define CMND_TIC_YESTERDAY_CONSO    "yday-conso"
-#define CMND_TIC_YESTERDAY_PROD     "yday-prod"
-
 #define CMND_TIC_CONTRACT_INDEX     "index"
 #define CMND_TIC_CONTRACT_NAME      "name"
 #define CMND_TIC_CONTRACT_PERIOD    "period"
 
-// commands : Web
-#define CMND_TIC_ETH                "eth"
-#define CMND_TIC_PHASE              "phase"
-#define CMND_TIC_PERIOD             "period"
-#define CMND_TIC_HISTO              "histo"
-#define CMND_TIC_HOUR               "hour"
-#define CMND_TIC_DAY                "day"
-#define CMND_TIC_MONTH              "month"
-#define CMND_TIC_DATA               "data"
-
-
 // interface strings
-#define TIC_MESSAGE                 "Message"
-
-// configuration file
-#define TIC_FILE_CFG                "/teleinfo.cfg"
+#define TIC_TELEINFO                "Teleinfo"
+#define TIC_MESSAGE                 "Messages"
+#define TIC_HISTO                   "Historique"
 
 // web URL
-#define TIC_ICON_LINKY_PNG          "/linky.png"
-#define TIC_PAGE_TIC_CFG            "/tic.cfg"
-#define TIC_PAGE_TIC_MSG            "/tic"
-#define TIC_PAGE_TIC_UPD            "/tic.upd"
+#define TIC_PAGE_CONFIG             "/tic-cfg"
+#define TIC_PAGE_MESSAGE            "/tic-msg"
+#define TIC_PAGE_UPDATE             "/tic-upd"
+#define TIC_PAGE_DISPLAY            "/tic-disp"
 
 // default LED brightness
 #define TIC_BRIGHT_DEFAULT          50        // default LED brightness
 
 // EnergyConfig commands
-const char kTeleinfoEnergyCommands[] PROGMEM =    "historique"   "|"   "standard"   "|"   "noraw"   "|"   "full"   "|"   "period"   "|"   "live"   "|"   "skip"   "|"   "bright"   "|"   "percent"   "|"   "stats"   "|"   "error"   "|"   "reset"   "|"    "calraz"   "|"   "calhexa"   "|"    "trigger"   "|" CMND_TIC_POLICY "|" CMND_TIC_METER "|" CMND_TIC_CALENDAR "|" CMND_TIC_RELAY;
-enum TeleinfoEnergyCommand                   { TIC_CMND_HISTORIQUE, TIC_CMND_STANDARD, TIC_CMND_NORAW, TIC_CMND_FULL, TIC_CMND_PERIOD, TIC_CMND_LIVE, TIC_CMND_SKIP, TIC_CMND_BRIGHT, TIC_CMND_PERCENT, TIC_CMND_STATS, TIC_CMND_ERROR, TIC_CMND_RESET,  TIC_CMND_CALRAZ, TIC_CMND_CALHEXA,  TIC_CMND_TRIGGER,  TIC_CMND_POLICY  ,  TIC_CMND_METER  ,  TIC_CMND_CALENDAR  ,  TIC_CMND_RELAY};
+const char kTeleinfoEnergyCommands[] PROGMEM =    "historique"   "|"   "standard"   "|"   "noraw"   "|"   "full"   "|"   "period"   "|"   "live"   "|"   "skip"   "|"   "bright"   "|"   "percent"   "|"   "stats"   "|"   "error"   "|"   "reset"   "|"    "calraz"   "|"   "calhexa"   "|"   "prod"   "|"   "trigger"   "|"    "display"   "|" CMND_TIC_POLICY "|" CMND_TIC_METER "|" CMND_TIC_CALENDAR "|" CMND_TIC_RELAY;
+enum TeleinfoEnergyCommand                   { TIC_CMND_HISTORIQUE, TIC_CMND_STANDARD, TIC_CMND_NORAW, TIC_CMND_FULL, TIC_CMND_PERIOD, TIC_CMND_LIVE, TIC_CMND_SKIP, TIC_CMND_BRIGHT, TIC_CMND_PERCENT, TIC_CMND_STATS, TIC_CMND_ERROR, TIC_CMND_RESET,  TIC_CMND_CALRAZ, TIC_CMND_CALHEXA, TIC_CMND_PROD, TIC_CMND_TRIGGER,  TIC_CMND_DISPLAY,  TIC_CMND_POLICY  ,  TIC_CMND_METER  ,  TIC_CMND_CALENDAR  ,  TIC_CMND_RELAY};
 
 // Data publication commands
 static const char kTeleinfoDriverCommands[]  PROGMEM =          "|tic";
@@ -164,10 +159,15 @@ void (* const TeleinfoDriverCommand[])(void) PROGMEM = { &CmndTeleinfoDriverTIC 
 enum TeleinfoMessagePolicy { TIC_POLICY_TELEMETRY, TIC_POLICY_DELTA, TIC_POLICY_MESSAGE, TIC_POLICY_MAX };
 const char kTeleinfoMessagePolicy[] PROGMEM = "A chaque Télémétrie|Evolution de ±|A chaque message reçu";
 
-// config : param
-enum TeleinfoConfigKey                          { TIC_CONFIG_BRIGHT , TIC_CONFIG_TODAY_CONSO , TIC_CONFIG_TODAY_PROD , TIC_CONFIG_YESTERDAY_CONSO , TIC_CONFIG_YESTERDAY_PROD, TIC_CONFIG_MAX };    // config parameters
-const long arrTeleinfoConfigDefault[] PROGMEM = { TIC_BRIGHT_DEFAULT, 0                      , 0                     , 0                          , 0 };                                            // config default values
-const char kTeleinfoConfigKey[]       PROGMEM =    CMND_TIC_BRIGHT "|" CMND_TIC_TODAY_CONSO "|" CMND_TIC_TODAY_PROD "|" CMND_TIC_YESTERDAY_CONSO "|" CMND_TIC_YESTERDAY_PROD;                       // config keys
+// power calculation units
+enum TeleinfoContractUnit { TIC_UNIT_NONE, TIC_UNIT_KVA, TIC_UNIT_KW, TIC_UNIT_MAX };
+
+// power calculation units
+enum TeleinfoDisplayType { TIC_DISPLAY_CONTRACT, TIC_DISPLAY_CONSO, TIC_DISPLAY_PRODUCTION, TIC_DISPLAY_CALENDAR, TIC_DISPLAY_RELAY, TIC_DISPLAY_SOLAR, TIC_DISPLAY_FORECAST, TIC_DISPLAY_WINKY, TIC_DISPLAY_ECOWATT, TIC_DISPLAY_TEMPO, TIC_DISPLAY_POINTE, TIC_DISPLAY_MAX };
+
+// publication type
+enum TeleinfoWebType                   { TIC_WEB_MQTT, TIC_WEB_HTTP, TIC_WEB_HTTPS, TIC_WEB_MAX };
+const uint16_t arrTeleinfoWebDelay[] = {      490    ,     1090    ,      2490                  };
 
 // config : contract
 enum TeleinfoContractKey { TIC_CONTRACT_INDEX, TIC_CONTRACT_NAME, TIC_CONTRACT_PERIOD, TIC_CONTRACT_MAX };                                                                                                                                 // contract parameters
@@ -184,37 +184,54 @@ enum TeleinfoPublish { TIC_PUB_CONNECT,
                        TIC_PUB_PH3, TIC_PUB_PH3_U, TIC_PUB_PH3_I, TIC_PUB_PH3_P, TIC_PUB_PH3_W,   
                        TIC_PUB_RELAY, TIC_PUB_RELAY_DATA,
                        TIC_PUB_TOTAL, TIC_PUB_TOTAL_PROD, TIC_PUB_TOTAL_CONSO, TIC_PUB_TOTAL_INDEX, 
-#ifdef USE_RTE_SERVER
-                       TIC_PUB_RTE_TEMPO_TODAY, TIC_PUB_RTE_TEMPO_TOMRW, TIC_PUB_RTE_POINTE_TODAY, TIC_PUB_RTE_POINTE_TOMRW,
-#endif  // RTE_SERVER
-                       TIC_PUB_MAX, 
+                       TIC_PUB_ALERT, TIC_PUB_ALERT_VOLT, TIC_PUB_ALERT_LOAD,
+
+#ifdef USE_TELEINFO_SOLAR
+                       TIC_PUB_SOLAR_W, TIC_PUB_SOLAR_TOTAL,
+                       TIC_PUB_FORECAST_W, TIC_PUB_FORECAST_TODAY, TIC_PUB_FORECAST_TOMRW,
+#endif  // USE_TELEINFO_SOLAR
+
+#ifdef USE_TELEINFO_RTE
+                       TIC_PUB_RTE_TEMPO_TODAY, TIC_PUB_RTE_TEMPO_TOMRW, 
+                       TIC_PUB_RTE_TEMPO_DAY2,  TIC_PUB_RTE_TEMPO_DAY3, 
+                       TIC_PUB_RTE_TEMPO_DAY4,  TIC_PUB_RTE_TEMPO_DAY5, 
+                       TIC_PUB_RTE_TEMPO_DAY6, 
+                       TIC_PUB_RTE_POINTE_TODAY, TIC_PUB_RTE_POINTE_TOMRW,
+#endif  // USE_TELEINFO_RTE
+
+                       TIC_PUB_END, 
                        TIC_PUB_DISCONNECT };
 
-// power calculation modes
-enum TeleinfoContractUnit { TIC_UNIT_NONE, TIC_UNIT_KVA, TIC_UNIT_KW, TIC_UNIT_MAX };
+// phase colors
+enum TeleinfoPhase                       { TIC_PHASE_CONSO1, TIC_PHASE_CONSO2, TIC_PHASE_CONSO3, TIC_PHASE_PROD,    TIC_PHASE_SOLAR     ,  TIC_PHASE_FORECAST , TIC_PHASE_END };
+const char kTeleinfoPhaseLabel[] PROGMEM =    "Phase 1"   "|"   "Phase 2"   "|"   "Phase 3"   "|"  "Revente"  "|" "Production Solaire" "|" "Prévision Solaire"; // phase label
+const char kTeleinfoPhaseColor[] PROGMEM =   "#04a5fb"  "|"  "#e72eff"  "|"  "#91919c"  "|" "#29a842" "|"     "#dd9900"      "|"     "#ccaa00"    ; // phase bar graph colors
+const char kTeleinfoPhaseCurve[] PROGMEM =   "#04a5fb"  "|"  "#e72eff"  "|"  "#91919c"  "|" "#29a842" "|"     "#dd9900"      "|"     "#ccaa00"    ; // phase curve colors
+const char kTeleinfoPhasePeak[]  PROGMEM =   "#04a5fb"  "|"  "#e72eff"  "|"  "#91919c"  "|"                                                             ; // phase peak colors
 
 // contract periods
-#define TIC_DAY_SLOT_MAX                48
-enum TeleinfoPeriodDay                  { TIC_DAY_TODAY  , TIC_DAY_TMROW, TIC_DAY_AFTER, TIC_DAY_MAX};
-const char kTeleinfoPeriodDay[] PROGMEM = "Aujourd'hui" "|"  "Demain"  "|" "Après-dem.";
+#define TIC_DAY_SLOT_MAX 48
+enum TeleinfoPeriodDay   { TIC_DAY_TODAY, TIC_DAY_TMROW, TIC_DAY_AFTER, TIC_DAY_MAX};
+//const char kTeleinfoPeriodDay[] PROGMEM =    "Aujour."  "|"  "Demain"  "|"  "Après-d.";
 
 // contract hours
-const char kTeleinfoHourShort[] PROGMEM = "HC|HP";
-const char kTeleinfoHourLabel[] PROGMEM = "Creuse|Pleine";
+enum TeleinfoHourType                   { TIC_HOUR_HC, TIC_HOUR_HP, TIC_HOUR_MAX };
+const char kTeleinfoHourShort[] PROGMEM =    "HC"   "|"    "HP"   ;
+const char kTeleinfoHourLabel[] PROGMEM =  "Creuse" "|"  "Pleine" ;
 
 // contract periods
-enum TeleinfoLevel  { TIC_LEVEL_NONE, TIC_LEVEL_BLUE, TIC_LEVEL_WHITE, TIC_LEVEL_RED, TIC_LEVEL_MAX };
-const char kTeleinfoLevelShort[]       PROGMEM = "ND|JB|JW|JR";
-const char kTeleinfoLevelLabel[]       PROGMEM = "Inconnu|Bleu|Blanc|Rouge";
-const char kTeleinfoLevelDot[]         PROGMEM = "🟢|🔵|⚪|🔴";
-const char kTeleinfoLevelCalDot[]      PROGMEM = "⚪|⚪|⚫|⚪";
-const char kTeleinfoLevelCalRGB[]      PROGMEM = "#946|#06b|#ddd|#b00";         // calendar color for period levels
-const char kTeleinfoLevelCalText[]     PROGMEM = "#fff|#fff|#000|#fff";         // calendar color for period text
-const char kTeleinfoLevelCalProd[]     PROGMEM = "#dd3";                        // production color (yellow)
-const char kTeleinfoLevelCalProdText[] PROGMEM = "#000";                        // production color text
+enum TeleinfoLevel                               { TIC_LEVEL_NONE, TIC_LEVEL_BLUE, TIC_LEVEL_WHITE, TIC_LEVEL_RED, TIC_LEVEL_PROD , TIC_LEVEL_SOLAR, TIC_LEVEL_FORECAST, TIC_LEVEL_END };
+const char    kTeleinfoLevelShort[]    PROGMEM =        "ND"    "|"     "JB"    "|"     "JW"     "|"     "JR"   "|"                                                    ;
+const char    kTeleinfoLevelLabel[]    PROGMEM =     "Inconnu"  "|"   "Bleu"    "|"    "Blanc"   "|"    "Rouge" "|"   "Revente"  "|"  "Solaire"   "|"   "Prévision"    ;
+const char    kTeleinfoLevelIcon[]     PROGMEM =        "❔"    "|"     "🔵"    "|"     "⚪"     "|"     "🔴"   "|"                                                    ;
+const char    kTeleinfoLevelCalColor[] PROGMEM =      "#555"  "|"   "#06b"  "|"   "#ddd"   "|"   "#b00" "|"    "#0a0"  "|"   "#fb0"   "|"    "#dc0"      ;   // calendar color for period levels
+const char    kTeleinfoLevelCalText[]  PROGMEM =      "#fff"  "|"   "#fff"  "|"   "#000"   "|"   "#fff" "|"    "#fff"  "|"   "#000"   "|"    "#000"      ;   // calendar color for period text
+const char    kTeleinfoLevelCalDot[]   PROGMEM =        "⚪"    "|"     "⚪"    "|"     "⚫"     "|"     "⚪"   "|"                                                    ;   // calendar period dot
+const uint8_t arrTeletinfoLedColor[][3]        = {  {255,255,0}  ,    {0,0,255}  ,  {255,255,255} ,   {255,0,0}  ,     {0,255,0}  ,   {255,255,0}                     };   // led color (RGB)
 
-// preavis levels
-enum TeleinfoPreavisLevel {TIC_PREAVIS_NONE, TIC_PREAVIS_WARNING, TIC_PREAVIS_ALERT, TIC_PREAVIS_DANGER, TIC_PREAVIS_MAX};
+// alert levels
+enum TeleinfoAlertType              { TIC_ALERT_PERIOD, TIC_ALERT_OVERVOLT, TIC_ALERT_OVERLOAD, TIC_ALERT_MAX };
+const char kTeleinfoAlert[] PROGMEM =      "period"    "|"    "volt"     "|"      "load"     "|"               ;                                                                                                                             // units labels
 
 // serial port management
 enum TeleinfoSerialStatus { TIC_SERIAL_INIT, TIC_SERIAL_GPIO, TIC_SERIAL_SPEED, TIC_SERIAL_FAILED, TIC_SERIAL_ACTIVE, TIC_SERIAL_STOPPED, TIC_SERIAL_MAX };
@@ -226,12 +243,10 @@ enum TeleinfoReceptionStatus { TIC_RECEPTION_NONE, TIC_RECEPTION_MESSAGE, TIC_RE
 enum TeleinfoUnit                  { TELEINFO_UNIT_VA, TELEINFO_UNIT_VAMAX, TELEINFO_UNIT_W, TELEINFO_UNIT_V, TELEINFO_UNIT_VMAX, TELEINFO_UNIT_COS, TELEINFO_UNIT_MAX };       // available graph units
 const char kTeleinfoUnit[] PROGMEM =      "VA"      "|"        "VA"      "|"      "W"     "|"      "V"     "|"        "V"      "|"       "cosφ";                                                                                                                             // units labels
 
-// Led status                                          not used          red                blue               yellow            no light             green             green
-enum TicLedStatus                                   { TIC_LED_STEP_NONE, TIC_LED_STEP_WIFI, TIC_LED_STEP_MQTT, TIC_LED_STEP_TIC, TIC_LED_STEP_NODATA, TIC_LED_STEP_ERR, TIC_LED_STEP_OK, TIC_LED_STEP_MAX };    // LED status
-const uint16_t arrTicLedOn[TIC_LED_STEP_MAX]      = { 0,                 1000,              1000,              1000,             0,                   100,              100           };                        // led ON (in ms)
-const uint16_t arrTicLedOff[TIC_LED_STEP_MAX]     = { 1000,              0,                 0,                 0,                1000,                900,              2900          };                        // led OFF (in ms)
-const uint8_t arrTicLedColor[TIC_LED_STEP_MAX][3] = { {0,0,0},           {255,0,0},         {0,0,255},         {255,255,0},      {0,0,0},             {0,255,0},        {0,255,0}     };                        // led color RED
-enum TicLedPower { TIC_LED_PWR_OFF, TIC_LED_PWR_ON, TIC_LED_PWR_SLEEP, TIC_LED_PWR_MAX };       // LED power
+// Led status                                              no wifi             no data             error             ok
+enum TicLedStatus                                   { TIC_LED_STEP_WIFI, TIC_LED_STEP_NODATA, TIC_LED_STEP_ERR, TIC_LED_STEP_OK, TIC_LED_STEP_MAX };    // LED status
+const uint16_t arrTicLedOn[TIC_LED_STEP_MAX]      = {        500       ,         100        ,       100       ,       100                         };    // led ON (in ms)
+const uint16_t arrTicLedOff[TIC_LED_STEP_MAX]     = {        500       ,         900        ,       900       ,       2900                        };    // led OFF (in ms)
 
 // -------------------
 //  TELEINFO Protocol
@@ -243,8 +258,8 @@ const char kTeleinfoModeName[] PROGMEM =    "Inconnu"   "|"   "Historique" "|"  
 const char kTeleinfoModeIcon[] PROGMEM =       "❔"     "|"       "🇭"     "|"       "🇸"     "|"      "🇵"    "|"       "🇪"     "|"    "🇯";
 
 // list of etiquettes according to meter mode
-enum TicEtiquetteUnknown                   { TIC_UKN_NONE, TIC_UKN_ADCO, TIC_UKN_ADSC, TIC_UKN_ADS, TIC_UKN_CONTRAT, TIC_UKN_JAUNE, TIC_UKN_MAX };
-const char kTicEtiquetteUnknown[]  PROGMEM =                 "|ADCO"       "|ADSC"       "|ADS"       "|CONTRAT"       "|JAUNE";
+enum TicEtiquetteUnknown                   { TIC_UKN_NONE, TIC_UKN_ADCO, TIC_UKN_ADSC, TIC_UKN_ADS, TIC_UKN_CONTRAT, TIC_UKN_JAUNE, TIC_UKN_MESURES1, TIC_UKN_MAX };
+const char kTicEtiquetteUnknown[]  PROGMEM =            "|"   "ADCO"  "|"   "ADSC"  "|"   "ADS"  "|"   "CONTRAT"  "|"   "JAUNE"  "|"    "MESURES1"  ;
 
 enum TicEtiquetteHisto                     { TIC_HIS_NONE = TIC_UKN_MAX, TIC_HIS_ADCO, TIC_HIS_OPTARIF, TIC_HIS_ISOUSC, TIC_HIS_BASE, TIC_HIS_HCHC, TIC_HIS_HCHP, TIC_HIS_EJPHN, TIC_HIS_EJPHPM, TIC_HIS_BBRHCJB, TIC_HIS_BBRHPJB, TIC_HIS_BBRHCJW, TIC_HIS_BBRHPJW, TIC_HIS_BBRHCJR, TIC_HIS_BBRHPJR,  TIC_HIS_PEJP, TIC_HIS_PTEC, TIC_HIS_IINST, TIC_HIS_IINST1, TIC_HIS_IINST2, TIC_HIS_IINST3, TIC_HIS_ADPS, TIC_HIS_PAPP, TIC_HIS_DEMAIN, TIC_HIS_ADIR1, TIC_HIS_ADIR2, TIC_HIS_ADIR3, TIC_HIS_MAX };
 const char kTicEtiquetteHisto[]    PROGMEM =                               "|ADCO"       "|OPTARIF"       "|ISOUSC"       "|BASE"       "|HCHC"       "|HCHP"       "|EJPHN"       "|EJPHPM"      "|BBRHCJB"       "|BBRHPJB"        "|BBRHCJW"       "|BBRHPJW"       "|BBRHCJR"       "|BBRHPJR"       "|PEJP"        "|PTEC"       "|IINST"       "|IINST1"       "|IINST2"       "|IINST3"       "|ADPS"      "|PAPP"         "|DEMAIN"        "|ADIR1"       "|ADIR2"       "|ADIR3";
@@ -273,116 +288,139 @@ const char *const arr_kTicEtiquette[] PROGMEM = { kTicEtiquetteUnknown,     // c
 // Manufacturers
 // -------------<
 
-const char kTicManufacturer00to09[] PROGMEM = "|Crouzet / Monetel|Sagem / Sagemcom|Schlumberger / Actaris / Itron|Landis & Gyr / Siemens Metering|Sauter / Stepper Energie / Zellweger|ITRON|MAEC|Matra-Chauvin Arnoux / Enerdis|Faure-Herman";
-const char kTicManufacturer10to19[] PROGMEM = "Sevme / SIS|Magnol / Elster / Honeywell|Gaz Thermique||Ghielmetti / Dialog E.S. / Micronique|MECELEC|Legrand / Baco|SERD-Schlumberger|Schneider / Merlin Gerin / Gardy|General Electric / Power Control / ABB";
-const char kTicManufacturer20to29[] PROGMEM = "Nuovo Pignone / Dresser|SCLE|EDF|GDF / GDF-SUEZ|Hager – General Electric|Delta-Dore|RIZ|Iskraemeco|GMT|Analog Device";
-const char kTicManufacturer30to39[] PROGMEM = "Michaud|Hexing Electrical Co Ltd|Siame|Larsen & Toubro Ltd|Elster / Honeywell|Electronic Afzar Azma|Advanced Electronic Co Ltd|AEM|Zhejiang Chint Inst. & Meter Co Ltd|ZIV";
-const char kTicManufacturer70to79[] PROGMEM = "Landis & Gyr (export)|Stepper Energie France (export)";
-const char kTicManufacturer80to89[] PROGMEM = "|Sagem / Sagemcom|Landis & Gyr / Siemens Metering|Elster / Honeywell|Sagem / Sagemcom|ITRON";
+const char kTicManufacturer00to09[]   PROGMEM = "|Crouzet / Monetel|Sagem / Sagemcom|Schlumberger / Actaris / Itron|Landis & Gyr / Siemens Metering|Sauter / Stepper Energie / Zellweger|ITRON|MAEC|Matra-Chauvin Arnoux / Enerdis|Faure-Herman";
+const char kTicManufacturer10to19[]   PROGMEM = "Sevme / SIS|Magnol / Elster / Honeywell|Gaz Thermique||Ghielmetti / Dialog E.S. / Micronique|MECELEC|Legrand / Baco|SERD-Schlumberger|Schneider / Merlin Gerin / Gardy|General Electric / Power Control / ABB";
+const char kTicManufacturer20to29[]   PROGMEM = "Nuovo Pignone / Dresser|SCLE|EDF|GDF / GDF-SUEZ|Hager – General Electric|Delta-Dore|RIZ|Iskraemeco|GMT|Analog Device";
+const char kTicManufacturer30to39[]   PROGMEM = "Michaud|Hexing Electrical Co Ltd|Siame|Larsen & Toubro Ltd|Elster / Honeywell|Electronic Afzar Azma|Advanced Electronic Co Ltd|AEM|Zhejiang Chint Inst. & Meter Co Ltd|ZIV";
+const char kTicManufacturer70to79[]   PROGMEM = "Landis & Gyr (export)|Stepper Energie France (export)";
+const char kTicManufacturer80to89[]   PROGMEM = "|Sagem / Sagemcom|Landis & Gyr / Siemens Metering|Elster / Honeywell|Sagem / Sagemcom|ITRON";
 
 // Models
 // ------
 
-const char kTicModel00to09[] PROGMEM = "|Bleu mono. BBR,Gen1|Poste HTA/BT,Gen3|||Bleu monophasé,Gen1|Jaune tarif modulable|PRISME ou ICE|Sauter modifié EURIDIS|Bleu triphasé,Gen1";
-const char kTicModel10to19[] PROGMEM = "Jaune,Gen2|Bleu mono. FERRARIS|Prisme|||Bleu mono. sans BBR";
-const char kTicModel20to29[] PROGMEM = "Bleu mono. ½taux,Gen1|Bleu tri. ½taux,Gen1|Bleu monophasé,Gen2|Bleu mono. ½taux,Gen2||Bleu monophasé,Gen2|Bleu triphasé,Gen2|Bleu tri. ½taux,Gen2|Bleu monophasé,Gen3|Bleu mono. ½taux,Gen3";
-const char kTicModel30to39[] PROGMEM = "Bleu triphasé,Gen3|Bleu tri. ½taux,Gen3|Bleu tri. télétotalisation|Jaune branchement direct|ICE 4 quadrants|Trimaran 2P classe 0,2s|PME-PMI BT > 36kva|Prépaiement|HXE34 de HECL tri.";
-const char kTicModel40to49[] PROGMEM = "||ACTARIS mono. export|ACTARIS mono. export|ACTARIS tri. export|ACTARIS / AECL tri. export";
-const char kTicModel60to69[] PROGMEM = "Linky monophasé 60A,Gen1|Linky monophasé 60A,Gen3|Linky monophasé 90A,Gen1|Linky triphasé 60A,Gen1|Linky monophasé 60A,Gen3|Linky mono. 90A CPL,Gen3||Linky monophasé 90A,Gen1|Linky triphasé 60A,Gen1";
-const char kTicModel70to79[] PROGMEM = "Linky monophasé 60A,Gen3|Linky triphasé 60A,Gen3|HXE12K mono. 10-80A 4 tarifs||HXE34K tri. 10-80A 4 tarifs|Linky monophasé 90A,Gen3|Linky triphasé 60A,Gen3";
-const char kTicModel80to89[] PROGMEM = "||||||SEI mono. 60A 60Hz,Gen3|SEI tri. 60A 60Hz,Gen3|ACTARIS mono. PLC DSMR2.2|ACTARIS tri. PLC DSMR2.2";
-const char kTicModel90to99[] PROGMEM = "Monophasé CPL intégré,Gen1|Triphasé CPL intégré,Gen2|Linky ORES mono. 90A,Gen3|Linky ORES tri. 60A 3fils,Gen3|Linky ORES tri. 60A 4fils,Gen3";
+const char kTicModel00to09[]   PROGMEM = "|Bleu mono. BBR,Gen1|Poste HTA/BT,Gen3|||Bleu monophasé,Gen1|Jaune tarif modulable|PRISME ou ICE|Sauter modifié EURIDIS|Bleu triphasé,Gen1";
+const char kTicModel10to19[]   PROGMEM = "Jaune,Gen2|Bleu mono. FERRARIS|Prisme|||Bleu mono. sans BBR";
+const char kTicModel20to29[]   PROGMEM = "Bleu mono. ½taux,Gen1|Bleu tri. ½taux,Gen1|Bleu monophasé,Gen2|Bleu mono. ½taux,Gen2||Bleu monophasé,Gen2|Bleu triphasé,Gen2|Bleu tri. ½taux,Gen2|Bleu monophasé,Gen3|Bleu mono. ½taux,Gen3";
+const char kTicModel30to39[]   PROGMEM = "Bleu triphasé,Gen3|Bleu tri. ½taux,Gen3|Bleu tri. télétotalisation|Jaune branchement direct|ICE 4 quadrants|Trimaran 2P classe 0,2s|PME-PMI BT > 36kva|Prépaiement|HXE34 de HECL tri.";
+const char kTicModel40to49[]   PROGMEM = "||ACTARIS mono. export|ACTARIS mono. export|ACTARIS tri. export|ACTARIS / AECL tri. export";
+const char kTicModel60to69[]   PROGMEM = "Linky monophasé 60A,Gen1|Linky monophasé 60A,Gen3|Linky monophasé 90A,Gen1|Linky triphasé 60A,Gen1|Linky monophasé 60A,Gen3|Linky mono. 90A CPL,Gen3||Linky monophasé 90A,Gen1|Linky triphasé 60A,Gen1";
+const char kTicModel70to79[]   PROGMEM = "Linky monophasé 60A,Gen3|Linky triphasé 60A,Gen3|HXE12K mono. 10-80A 4 tarifs||HXE34K tri. 10-80A 4 tarifs|Linky monophasé 90A,Gen3|Linky triphasé 60A,Gen3";
+const char kTicModel80to89[]   PROGMEM = "||||||SEI mono. 60A 60Hz,Gen3|SEI tri. 60A 60Hz,Gen3|ACTARIS mono. PLC DSMR2.2|ACTARIS tri. PLC DSMR2.2";
+const char kTicModel90to99[]   PROGMEM = "Monophasé CPL intégré,Gen1|Triphasé CPL intégré,Gen2|Linky ORES mono. 90A,Gen3|Linky ORES tri. 60A 3fils,Gen3|Linky ORES tri. 60A 4fils,Gen3";
 
 // Contracts & Periods
 // --------------------
 
 // Inconnu
-const char kTicPeriodUnknown[]    PROGMEM = "";
+const char kTicPeriodUnknown[]         PROGMEM = "";
 
 // Historique Base
-const char kTicPeriodHistoBase[]  PROGMEM = "1|1|1|TH..|Toutes Heures";
+const char kTicPeriodHistoBase[]       PROGMEM = "1|1|1|TH..|Toutes Heures";
 
 // Historique Heure Pleine / Heure creuse
-const char kTicPeriodHistoHcHp[]  PROGMEM = "1|1|0|HC..|Creuses" "|" "2|1|1|HP..|Pleines";
+const char kTicPeriodHistoHcHp[]       PROGMEM = "1|1|0|HC..|Creuses"            "|"  "2|1|1|HP..|Pleines";
 
 // Historique EJP
-const char kTicPeriodHistoEjp[]   PROGMEM = "1|1|1|HN..|Normale" "|" "2|3|1|PM..|Pointe Mobile";
+const char kTicPeriodHistoEjp[]        PROGMEM = "1|1|1|HN..|Normale"            "|"  "2|3|1|PM..|Pointe Mobile";
 
 // Historique Tempo
-const char kTicPeriodHistoTempo[] PROGMEM =  "1|1|0|HCJB|Creuses Bleu"  "|" "2|1|1|HPJB|Pleines Bleu" 
-                                         "|" "3|2|0|HCJW|Creuses Blanc" "|" "4|2|1|HPJW|Pleines Blanc"
-                                         "|" "5|3|0|HCJR|Creuses Rouge" "|" "6|3|1|HPJR|Pleines Rouge";
+const char kTicPeriodHistoTempo[]      PROGMEM =  "1|1|0|HCJB|Creuses Bleu"      "|"  "2|1|1|HPJB|Pleines Bleu" 
+                                              "|" "3|2|0|HCJW|Creuses Blanc"     "|"  "4|2|1|HPJW|Pleines Blanc"
+                                              "|" "5|3|0|HCJR|Creuses Rouge"     "|"  "6|3|1|HPJR|Pleines Rouge";
 
 // Standard Base
-const char kTicPeriodStdBase[]    PROGMEM = "1|1|1|BASE|Toutes Heures";
+const char kTicPeriodStdBase[]         PROGMEM = "1|1|1|BASE|Toutes Heures";
 
 // Standard Heure Pleine / Heure creuse
-const char kTicPeriodStdHcHp[]    PROGMEM = "1|1|0|HEURE CREUSE|Creuses" "|" "2|1|1|HEURE PLEINE|Pleines"; 
+const char kTicPeriodStdHcHp[]         PROGMEM = "1|1|0|HEURE CREUSE|Creuses"    "|"  "2|1|1|HEURE PLEINE|Pleines"; 
 
 // Standard Heure Pleine / Heure creuse 12h30
-const char kTicPeriodStdHcHp12h[] PROGMEM = "1|1|0|HEURES CREUSES|Creuses" "|" "2|1|1|HEURES PLEINES|Pleines";
+const char kTicPeriodStdHcHp12h[]      PROGMEM = "1|1|0|HEURES CREUSES|Creuses"  "|"  "2|1|1|HEURES PLEINES|Pleines";
 
 // Standard EJP
-const char kTicPeriodStdEjp[]     PROGMEM = "1|1|1|HEURE NORMALE|Normale" "|" "2|3|1|HEURE POINTE|Pointe Mobile";
+const char kTicPeriodStdEjp[]          PROGMEM = "1|1|1|HEURE NORMALE|Normale"   "|"  "2|3|1|HEURE POINTE|Pointe Mobile";
 
 // Standard Tempo 
-const char kTicPeriodStdTempo[]   PROGMEM = "1|1|0|HC BLEU|Creuses Bleu"   "|" "2|1|1|HP BLEU|Pleines Bleu"
-                                        "|" "3|2|0|HC BLANC|Creuses Blanc" "|" "4|2|1|HP BLANC|Pleines Blanc"
-                                        "|" "5|3|0|HC ROUGE|Creuses Rouge" "|" "6|3|1|HP ROUGE|Pleines Rouge";
+const char kTicPeriodStdTempo[]        PROGMEM = "1|1|0|HC BLEU|Creuses Bleu"    "|"  "2|1|1|HP BLEU|Pleines Bleu"
+                                           "|" "3|2|0|HC BLANC|Creuses Blanc"    "|"  "4|2|1|HP BLANC|Pleines Blanc"
+                                           "|" "5|3|0|HC ROUGE|Creuses Rouge"    "|"  "6|3|1|HP ROUGE|Pleines Rouge";
+
+// Standard TempoAP7
+const char kTicPeriodStdTempoAP7[]     PROGMEM = "1|1|0|HCJB|Creuses Bleu"       "|"  "2|1|1|HPJB|Pleines Bleu"
+                                             "|" "3|2|0|HCJW|Creuses Blanc"      "|"  "4|2|1|HPJW|Pleines Blanc"
+                                             "|" "5|3|0|HCJR|Creuses Rouge"      "|"  "6|3|1|HPJR|Pleines Rouge";
+
+// Standard Pointe Mobile
+const char kTicPeriodStdPointeMobile[] PROGMEM = "1|1|0|HC Jnormal|Creuses Normal"  "|"  "2|1|1|HP Jnormal|Pleines Normal"
+                                             "|" "3|3|0|HC Pointe|Creuses Pointe"   "|"  "4|3|1|HP Pointe|Pleines Pointe";
+
+// Standard Super Creuses
+const char kTicPeriodStdSupCreuse[]    PROGMEM = "1|1|0|H SUPER CREUSES|Super Creuses"  "|"  "2|1|0|HEURES CREUSES|Creuses"  "|" "3|1|1|HEURES PLEINES|Pleines";
+
+// Standard Semaine / Week-end
+const char kTicPeriodStdWeekEnd[]      PROGMEM = "1|1|0|HEURE WEEK-END|Week-end"    "|"  "2|1|1|HEURE SEMAINE|Semaine"; 
+
+// Standard Semaine / Week-end
+const char kTicPeriodStdHCWeekEnd[]    PROGMEM = "1|1|0|HEURE CREUSE|Creuses"    "|"  "2|1|1|HEURE PLEINE|Pleines"  "|" "3|1|0|HEURE WEEK-END|Week-end";
 
 // PME/PMI 
-const char kTicPeriodPmePmi[]    PROGMEM =  "1|3|1|P|Pointe"              "|" "2|3|1|M|Pointe Mobile"
-                                        "|" "3|1|0|HH|Hiver"
-                                        "|" "4|1|1|HP|Pleines"            "|" "5|1|0|HC|Creuses"
-                                        "|" "6|1|1|HPH|Pleines Hiver"     "|" "7|1|0|HCH|Creuses Hiver"
-                                        "|" "8|1|1|HPE|Pleines Eté"       "|" "9|1|0|HCE|Creuses Eté"
-                                        "|" "10|1|1|HPD|Pleines ½ saison" "|" "11|1|0|HCD|Creuses ½ saison"
-                                        "|" "12|1|0|JA|Juillet-Août";
+const char kTicPeriodPmePmi[]          PROGMEM =  "1|3|1|P|Pointe"                  "|"  "2|3|1|M|Pointe Mobile"
+                                              "|" "3|1|0|HH|Hiver"
+                                              "|" "4|1|1|HP|Pleines"                "|"  "5|1|0|HC|Creuses"
+                                              "|" "6|1|1|HPH|Pleines Hiver"         "|"  "7|1|0|HCH|Creuses Hiver"
+                                              "|" "8|1|1|HPE|Pleines Eté"           "|"  "9|1|0|HCE|Creuses Eté"
+                                              "|" "10|1|1|HPD|Pleines demi-saison"  "|"  "11|1|0|HCD|Creuses demi-saison"
+                                              "|" "12|1|0|JA|Juillet-Août";
 
 // Emeraude 2 quadrants - A5 Base, A8 Basen A5 EJP, A8 EJP, A8 Modulable
-const char kTicPeriodEmeraude[]  PROGMEM = "1|3|1|P|Pointe"          "|" "2|3|1|PM|Pointe Mobile"     
-                                       "|" "3|1|1|HPH|Pleines Hiver" "|" "4|1|1|HPD|Pleines ½ saison"
-                                       "|" "5|1|0|HCH|Creuses Hiver" "|" "6|1|0|HCD|Creuses ½ saison"
-                                       "|" "7|1|1|HPE|Pleines Eté"   "|" "8|1|0|HCE|Creuses Eté"
-                                       "|" "9|1|1|JA|Juillet-Aout"   "|" "10|1|1|HH|Hiver" "|" "11|1|1|HD|½ saison"
-                                       "|" "12|3|1|HM|Hiver Mobile"  "|" "13|3|1|DSM|½ saison Mobile" "|" "14|3|0|SCM|Creuses Mobile";
+const char kTicPeriodEmeraude[]        PROGMEM = "1|3|1|P|Pointe"                "|"  "2|3|1|PM|Pointe Mobile"     
+                                              "|" "3|1|1|HPH|Pleines Hiver"      "|"  "4|1|1|HPD|Pleines demi-saison"
+                                              "|" "5|1|0|HCH|Creuses Hiver"      "|"  "6|1|0|HCD|Creuses demi-saison"
+                                              "|" "7|1|1|HPE|Pleines Ete"        "|"  "8|1|0|HCE|Creuses Ete"
+                                              "|" "9|1|1|JA|Juillet-Aout"        "|"  "10|1|1|HH|Hiver"                 "|" "11|1|1|HD|Demi-saison"
+                                              "|" "12|3|1|HM|Hiver Mobile"       "|"  "13|3|1|DSM|Demi-saison Mobile"   "|" "14|3|0|SCM|Creuses Mobile";
 
 // Periods
-enum TicContract                      { TIC_C_UNKNOWN, TIC_C_HIS_BASE, TIC_C_HIS_HCHP, TIC_C_HIS_EJP, TIC_C_HIS_TEMPO, TIC_C_STD_BASE,   TIC_C_STD_HCHP    , TIC_C_STD_HCHP12H, TIC_C_STD_EJP, TIC_C_STD_TEMPO, TIC_C_PME_BT4SUP36, TIC_C_PME_BT5SUP36, TIC_C_PME_TVA5_BASE, TIC_C_PME_TVA8_BASE,   TIC_C_PME_TJMU  , TIC_C_PME_TJLU_SD , TIC_C_PME_TJLU_P , TIC_C_PME_TJLU_PH , TIC_C_PME_TJLU_CH , TIC_C_PME_TJEJP, TIC_C_PME_TJEJP_SD, TIC_C_PME_TJEJP_PM, TIC_C_PME_TJEJP_HH, TIC_C_PME_HTA5, TIC_C_PME_HTA8, TIC_C_EME_A5_BASE, TIC_C_EME_A8_BASE, TIC_C_EME_A5_EJP, TIC_C_EME_A8_EJP, TIC_C_EME_A8_MOD, TIC_C_MAX };
-const char kTicContractCode[] PROGMEM =             "|"    "TH.."   "|"     "HC.."  "|"    "EJP."  "|"     "BBR"    "|"    "BASE"   "|" "H PLEINE/CREUSE" "|"   "HC-12H30"   "|"     "EJP"  "|"    "TEMPO"   "|"  "BT 4 SUP36"   "|"   "BT 5 SUP36"  "|"   "TV A5 BASE"   "|"   "TV A8 BASE"    "|"     "TJ MU"    "|"    "TJ LU-SD"   "|"    "TJ LU-P"   "|"    "TJ LU-PH"   "|"    "TJ LU-CH"   "|"    "TJ EJP"  "|"    "TJ EJP-SD"  "|"    "TJ EJP-PM"  "|"    "TJ EJP-HH"  "|"   "HTA 5"   "|"   "HTA 8"   "|"    "BASE_A5"   "|"   "BASE_A8"    "|"    "EJP_A5"   "|"   "EJP_A8"    "|"    "MOD";
-const char kTicContractName[] PROGMEM =             "|"    "Base"   "|"    "HC/HP"  "|"    "EJP"   "|"    "Tempo"   "|"    "Base"   "|"      "HC/HP"      "|"  "HC/HP 12h30" "|"     "EJP"  "|"    "Tempo"   "|"  "BT>36kVA 4p." "|"  "BT>36kVA 5p." "|"  "Vert A5 Base"  "|"  "Vert A8 Base"   "|"  "Jaune Moyen" "|" "Jaune Long SD" "|" "Jaune Long P" "|" "Jaune Long PH" "|" "Jaune Long CH" "|"  "Jaune EJP" "|"  "Jaune EJP SD" "|"  "Jaune EJP PM" "|"  "Jaune EJP HH" "|"  "HTA 5p."  "|"  "HTA 8p."  "|"    "A5 Base"   "|"   "A8 Base"    "|"    "A5 EJP"   "|"   "A8 EJP"    "|"  "A8 Mod.";
+enum TicContract                      { TIC_C_UNKNOWN, TIC_C_HIS_BASE, TIC_C_HIS_HCHP, TIC_C_HIS_EJP, TIC_C_HIS_TEMPO, TIC_C_STD_BASE,   TIC_C_STD_HCHP    , TIC_C_STD_HCHP12H, TIC_C_STD_EJP, TIC_C_STD_TEMPO, TIC_C_STD_TEMPOAP7, TIC_C_STD_POINTEMOBILE, TIC_C_STD_SUPCREUSE , TIC_C_STD_WEEKEND, TIC_C_STD_HCWEEKEND, TIC_C_PME_BT4SUP36, TIC_C_PME_BT5SUP36, TIC_C_PME_TVA5_BASE, TIC_C_PME_TVA8_BASE,   TIC_C_PME_TJMU  , TIC_C_PME_TJLU_SD , TIC_C_PME_TJLU_P , TIC_C_PME_TJLU_PH , TIC_C_PME_TJLU_CH , TIC_C_PME_TJEJP, TIC_C_PME_TJEJP_SD, TIC_C_PME_TJEJP_PM, TIC_C_PME_TJEJP_HH, TIC_C_PME_HTA5, TIC_C_PME_HTA8, TIC_C_EME_A5_BASE, TIC_C_EME_A8_BASE, TIC_C_EME_A5_EJP, TIC_C_EME_A8_EJP, TIC_C_EME_A8_MOD, TIC_C_MAX };
+const char kTicContractCode[] PROGMEM =             "|"    "TH.."   "|"     "HC.."  "|"    "EJP."  "|"     "BBR"    "|"    "BASE"   "|" "H PLEINE/CREUSE" "|"   "HC-12H30"   "|"     "EJP"  "|"    "TEMPO"   "|"   "TEMP00AP7"   "|"    "Pointe Mobile"  "|" "H SUPER CREUSES" "|"    "Week-End"  "|" "HC et Week-End" "|"  "BT 4 SUP36"   "|"   "BT 5 SUP36"  "|"   "TV A5 BASE"   "|"   "TV A8 BASE"    "|"     "TJ MU"    "|"    "TJ LU-SD"   "|"    "TJ LU-P"   "|"    "TJ LU-PH"   "|"    "TJ LU-CH"   "|"    "TJ EJP"  "|"    "TJ EJP-SD"  "|"    "TJ EJP-PM"  "|"    "TJ EJP-HH"  "|"   "HTA 5"   "|"   "HTA 8"   "|"    "BASE_A5"   "|"   "BASE_A8"    "|"    "EJP_A5"   "|"   "EJP_A8"    "|"    "MOD";
+const char kTicContractName[] PROGMEM =             "|"    "Base"   "|"    "HC/HP"  "|"    "EJP"   "|"    "Tempo"   "|"    "Base"   "|"      "HC/HP"      "|"  "HC/HP 12h30" "|"     "EJP"  "|"    "Tempo"   "|"   "Tempo AP7"   "|"    "Pointe Mobile"  "|"  "Super Creuses"  "|"    "Week-End"  "|" "HC et Week-End" "|"   "BT>36kVA 4p" "|"   "BT>36kVA 5p" "|"  "Vert A5 Base"  "|"  "Vert A8 Base"   "|"  "Jaune Moyen" "|" "Jaune Long SD" "|" "Jaune Long P" "|" "Jaune Long PH" "|" "Jaune Long CH" "|"  "Jaune EJP" "|"  "Jaune EJP SD" "|"  "Jaune EJP PM" "|"  "Jaune EJP HH" "|"   "HTA 5p"  "|"   "HTA 8p"  "|"    "A5 Base"   "|"   "A8 Base"    "|"    "A5 EJP"   "|"   "A8 EJP"    "|"   "A8 Mod";
 
 // association between contract index and list of periods
-const char *const arr_kTicPeriod[] PROGMEM = { kTicPeriodUnknown,     // TIC_C_UNKNOWN
-                                               kTicPeriodHistoBase,   // TIC_C_HIS_BASE
-                                               kTicPeriodHistoHcHp,   // TIC_C_HIS_HCHP
-                                               kTicPeriodHistoEjp,    // TIC_C_HIS_EJP
-                                               kTicPeriodHistoTempo,  // TIC_C_HIS_TEMPO
-                                               kTicPeriodStdBase,     // TIC_C_STD_BASE
-                                               kTicPeriodStdHcHp,     // TIC_C_STD_HCHP
-                                               kTicPeriodStdHcHp12h,  // TIC_C_STD_HCHP12H
-                                               kTicPeriodStdEjp,      // TIC_C_STD_EJP
-                                               kTicPeriodStdTempo,    // TIC_C_STD_TEMPO
-                                               kTicPeriodPmePmi,      // TIC_C_PME_BT4SUP36
-                                               kTicPeriodPmePmi,      // TIC_C_PME_BT5SUP36
-                                               kTicPeriodPmePmi,      // TIC_C_PME_TVA5_BASE
-                                               kTicPeriodPmePmi,      // TIC_C_PME_TVA8_BASE
-                                               kTicPeriodPmePmi,      // TIC_C_PME_TJMU
-                                               kTicPeriodPmePmi,      // TIC_C_PME_TJLU_SD
-                                               kTicPeriodPmePmi,      // TIC_C_PME_TJLU_P
-                                               kTicPeriodPmePmi,      // TIC_C_PME_TJLU_PH
-                                               kTicPeriodPmePmi,      // TIC_C_PME_TJLU_CH
-                                               kTicPeriodPmePmi,      // TIC_C_PME_TJEJP
-                                               kTicPeriodPmePmi,      // TIC_C_PME_TJEJP_SD
-                                               kTicPeriodPmePmi,      // TIC_C_PME_TJEJP_PM
-                                               kTicPeriodPmePmi,      // TIC_C_PME_TJEJP_HH
-                                               kTicPeriodPmePmi,      // TIC_C_PME_HTA5
-                                               kTicPeriodPmePmi,      // TIC_C_PME_HTA8
-                                               kTicPeriodEmeraude,    // TIC_C_EME_A5_BASE
-                                               kTicPeriodEmeraude,    // TIC_C_EME_A8_BASE
-                                               kTicPeriodEmeraude,    // TIC_C_EME_A5_EJP
-                                               kTicPeriodEmeraude,    // TIC_C_EME_A8_EJP
-                                               kTicPeriodEmeraude };  // TIC_C_EME_A8_MOD
+const char *const arr_kTicPeriod[] PROGMEM = { kTicPeriodUnknown,           // TIC_C_UNKNOWN
+                                               kTicPeriodHistoBase,         // TIC_C_HIS_BASE
+                                               kTicPeriodHistoHcHp,         // TIC_C_HIS_HCHP
+                                               kTicPeriodHistoEjp,          // TIC_C_HIS_EJP
+                                               kTicPeriodHistoTempo,        // TIC_C_HIS_TEMPO
+                                               kTicPeriodStdBase,           // TIC_C_STD_BASE
+                                               kTicPeriodStdHcHp,           // TIC_C_STD_HCHP
+                                               kTicPeriodStdHcHp12h,        // TIC_C_STD_HCHP12H
+                                               kTicPeriodStdEjp,            // TIC_C_STD_EJP
+                                               kTicPeriodStdTempo,          // TIC_C_STD_TEMPO
+                                               kTicPeriodStdTempoAP7,       // TIC_C_STD_TEMPOAP7
+                                               kTicPeriodStdPointeMobile,   // TIC_C_STD_POINTEMOBILE
+                                               kTicPeriodStdSupCreuse,      // TIC_C_STD_SUPCREUSE
+                                               kTicPeriodStdWeekEnd,        // TIC_C_STD_WEEKEND
+                                               kTicPeriodStdHCWeekEnd,      // TIC_C_STD_HCWEEKEND
+                                               kTicPeriodPmePmi,            // TIC_C_PME_BT4SUP36
+                                               kTicPeriodPmePmi,            // TIC_C_PME_BT5SUP36
+                                               kTicPeriodPmePmi,            // TIC_C_PME_TVA5_BASE
+                                               kTicPeriodPmePmi,            // TIC_C_PME_TVA8_BASE
+                                               kTicPeriodPmePmi,            // TIC_C_PME_TJMU
+                                               kTicPeriodPmePmi,            // TIC_C_PME_TJLU_SD
+                                               kTicPeriodPmePmi,            // TIC_C_PME_TJLU_P
+                                               kTicPeriodPmePmi,            // TIC_C_PME_TJLU_PH
+                                               kTicPeriodPmePmi,            // TIC_C_PME_TJLU_CH
+                                               kTicPeriodPmePmi,            // TIC_C_PME_TJEJP
+                                               kTicPeriodPmePmi,            // TIC_C_PME_TJEJP_SD
+                                               kTicPeriodPmePmi,            // TIC_C_PME_TJEJP_PM
+                                               kTicPeriodPmePmi,            // TIC_C_PME_TJEJP_HH
+                                               kTicPeriodPmePmi,            // TIC_C_PME_HTA5
+                                               kTicPeriodPmePmi,            // TIC_C_PME_HTA8
+                                               kTicPeriodEmeraude,          // TIC_C_EME_A5_BASE
+                                               kTicPeriodEmeraude,          // TIC_C_EME_A8_BASE
+                                               kTicPeriodEmeraude,          // TIC_C_EME_A5_EJP
+                                               kTicPeriodEmeraude,          // TIC_C_EME_A8_EJP
+                                               kTicPeriodEmeraude };        // TIC_C_EME_A8_MOD
 
 /****************************************\
  *                 Data
@@ -391,23 +429,25 @@ const char *const arr_kTicPeriod[] PROGMEM = { kTicPeriodUnknown,     // TIC_C_U
 // teleinfo : configuration
 // ------------------------
 
-static struct {                   // 38 bytes
-  uint8_t  battery      = 0;                            // device is running on battery
-  uint8_t  percent      = 100;                          // maximum acceptable power in percentage of contract power
-  uint8_t  policy       = TIC_POLICY_TELEMETRY;         // data publishing policy
-  uint8_t  meter        = 1;                            // publish METER & PROD section
-  uint8_t  energy       = 0;                            // publish ENERGY section
-  uint8_t  tic          = 0;                            // publish TIC topic
-  uint8_t  live         = 0;                            // publish LIVE topic
-  uint8_t  skip         = 2;                            // number of frames to skip while publishing TIC or LIVE
-  uint8_t  calendar     = 1;                            // publish CALENDAR section
-  uint8_t  relay        = 1;                            // publish RELAY section
-  uint8_t  contract     = 1;                            // publish CONTRACT section
-  uint8_t  error        = 0;                            // force display of errors on home page 
-  uint8_t  cal_hexa     = 1;                            // flag to set format of period profiles as hexa
-  uint8_t  led_period   = 0;                            // adjust LED color according to period color 
-  long     prod_trigger = 0;                            // average production power to trigger production relay 
-  long     param[TIC_CONFIG_MAX];                       // generic params
+struct {                   // 38 bytes
+  bool    display  = false;                           // display data on main page
+  bool    battery  = false;                           // device is running on battery
+  bool    meter    = true;                            // publish METER & PROD section
+  bool    energy   = false;                           // publish ENERGY section
+  bool    tic      = false;                           // publish TIC topic
+  bool    live     = false;                           // publish LIVE topic
+  bool    calendar = true;                            // publish CALENDAR section
+  bool    relay    = true;                            // publish RELAY section
+  bool    error    = false;                           // force display of errors on home page 
+  bool    cal_hexa = true;                            // flag to set format of period profiles as hexa
+  bool    led      = false;                           // adjust LED color according to period color 
+  bool    arr_main[TIC_DISPLAY_MAX];                  // display flags for sections on main page
+  uint8_t policy       = TIC_POLICY_TELEMETRY;        // data publishing policy
+  uint8_t percent      = 100;                         // maximum acceptable power in percentage of contract power
+  uint8_t skip         = 2;                           // number of frames to skip while publishing TIC or LIVE
+  uint8_t brightness   = 0;
+  long    prod_max     = 0;                           // maximum power produced
+  long    prod_trigger = 0;                           // average production power to trigger production relay
 } teleinfo_config;
 
 // teleinfo : calendar
@@ -421,12 +461,12 @@ struct tic_cal_day {               // 53 bytes
 
 tic_cal_day teleinfo_calendar[TIC_DAY_MAX];             // today, tomorrow and day after calendar, 169 bytes
 
-// teleinfo : current message
-// --------------------------
+// teleinfo : message
+// ------------------
 
 struct tic_line {                 // esp8266 37 bytes, esp32 125 bytes
-  char str_etiquette[TIC_KEY_MAX];                      // line etiquette
-  char str_donnee[TIC_DATA_MAX];                        // line donnee
+  char str_etiquette[TIC_ETIQUETTE_SIZE];               // line etiquette
+  char str_donnee[TIC_DONNEE_SIZE];                     // line donnee
   char checksum;                                        // line checksum
 };
 
@@ -435,109 +475,113 @@ struct tic_pointe {               // 8 bytes
   uint32_t stop;                                // stop date with slot
 };
 
-struct tic_stge {                 // 4 bytes
-  uint8_t  over_load;                           // currently overloaded
-  uint8_t  over_volt;                           // voltage overload on one phase
-  uint8_t  pointe;                              // current pointe mobile
-  uint8_t  preavis;                             // pointe mobile preavis
-};
-
-static struct {                   // esp8266 4469 bytes, esp32 18825 bytes
-  uint8_t  injection = 0;                       // flag to detect injection part of message (Emeraude 4 quadrand)
-  uint8_t  error     = 0;                       // error during current message reception
-  uint8_t  period    = UINT8_MAX;               // period index in current message
-  uint32_t timestamp_last = UINT32_MAX;         // timestamp of last message (ms)
-  int      line_idx  = 0;                       // index of current received message line
-  int      line_last = 0;                       // number of lines in last message
-  int      line_max  = 0;                       // max number of lines in a message
-  long     duration  = 1000;                    // average duration of between 2 message (ms)
-  char     str_contract[TIC_CODE_SIZE];         // contract name in current message
-  char     str_period[TIC_CODE_SIZE];           // period name in current message
-  char     str_line[TIC_LINE_SIZE];             // reception buffer for current line
-  tic_stge    stge;                             // STGE data
-  tic_pointe  arr_pointe[TIC_POINTE_MAX];       // array of pointe dates, 24 bytes
-  tic_line    arr_line[TIC_LINE_QTY];           // array of lines in current message, esp8266 2072 bytes, esp32 9250 bytes
-  tic_line    arr_last[TIC_LINE_QTY];           // array of lines in last message received, esp8266 2072 bytes, esp32 9250 bytes
-  tic_cal_day cal_default;                      // default daily profile
-  tic_cal_day cal_pointe;                       // pointe daily profile
+struct {                   // esp8266 4469 bytes, esp32 18825 bytes
+  uint8_t     injection      = 0;                     // flag to detect injection part of message (Emeraude 4 quadrand)
+  uint8_t     error          = 0;                     // error during current message reception
+  uint8_t     period         = UINT8_MAX;             // period index in current message
+  uint32_t    timestamp_last = UINT32_MAX;            // timestamp of last message (ms)
+  int         index_line     = 0;                     // index of current received message line
+  int         index_last     = 0;                     // number of lines in last message
+  int         index_max      = 0;                     // max number of lines in a message
+  long        duration       = 1000;                  // average duration of between 2 message (ms)
+  char        str_total[12];                          // meter total index 
+  char        str_contract[TIC_CONTRACT_CODE_SIZE];   // contract name in current message
+  char        str_period[TIC_PERIOD_CODE_SIZE];       // period name in current message
+  char        str_line[TIC_LINE_SIZE];                // reception buffer for current line
+  tic_pointe  arr_pointe[TIC_POINTE_MAX];             // array of pointe dates, 24 bytes
+  tic_line    arr_line[TIC_LINE_QTY];                 // array of lines in current message, esp8266 2072 bytes, esp32 9250 bytes
+  tic_line    arr_last[TIC_LINE_QTY];                 // array of lines in last message received, esp8266 2072 bytes, esp32 9250 bytes
+  tic_cal_day cal_default;                            // default daily profile
+  tic_cal_day cal_pointe;                             // pointe daily profile
 } teleinfo_message;
 
 // teleinfo : contract
 // -------------------
 
-struct tic_period {               // 11 bytes
-  uint8_t valid;                                // period validity
+struct { 
+  bool    changed    = false;                   // flag to indicate that contract has changed
+  uint8_t unit       = TIC_UNIT_NONE;           // default contract unit
+  uint8_t mode       = TIC_MODE_UNKNOWN;        // meter mode (historic, standard)
+  uint8_t period     = UINT8_MAX;               // current period index
+  uint8_t phase      = 1;                       // number of phases
+  long    isousc     = 0;                       // contract max current per phase
+  long    ssousc     = 0;                       // contract max power per phase
+  char    str_period[TIC_PERIOD_CODE_SIZE];     // code of current period
+} teleinfo_contract;
+
+struct tic_period {               // 39 bytes
+  bool    valid;                                // period validity
   uint8_t level;                                // period level
   uint8_t hchp;                                 // period hp flag
-  String  str_code;                             // period code
-  String  str_label;                            // period label
+  char    str_code[TIC_PERIOD_CODE_SIZE];       // period code
+  char    str_label[TIC_PERIOD_LABEL_SIZE];     // period label
 };
 
-static struct {                   // 209 bytes
-  uint8_t   changed    = 0;                     // flag to indicate that contract has changed
-  uint8_t   unit       = TIC_UNIT_NONE;         // default contract unit
-  uint8_t   index      = UINT8_MAX;             // actual contract index
-  uint8_t   mode       = TIC_MODE_UNKNOWN;      // meter mode (historic, standard)
+struct {
+  uint8_t type       = UINT8_MAX;               // contract family index
+  uint8_t period_qty = 0;                       // number of periods in contract
+  char    str_code[TIC_CONTRACT_CODE_SIZE];     // code of current contract
+  tic_period arr_period[TIC_PERIOD_MAX];        // periods in the contract
+} teleinfo_contract_db;
 
-  uint8_t   period     = UINT8_MAX;             // period - current index
-  uint8_t   period_qty = 0;                     // period - number of indexes
-
-  uint8_t   phase      = 1;                     // number of phases
-  long      isousc     = 0;                     // contract max current per phase
-  long      ssousc     = 0;                     // contract max power per phase
-
-  char       str_code[TIC_CODE_SIZE];           // code of current contract
-  char       str_period[TIC_CODE_SIZE];         // code of current period
-  tic_period arr_period[TIC_INDEX_MAX];         // periods in the contract, 154 bytes
-} teleinfo_contract;
+#ifdef ESP32
+RTC_DATA_ATTR struct {            // 2 bytes data in NVRAM to survive deepsleep
+#else
+struct {
+#endif
+  uint8_t day;                                  // current day of month
+  uint8_t nb_change;                            // number of message since contract change
+} teleinfo_sleep;
 
 // teleinfo : meter
 // ----------------
 
-struct tic_preavis {                // 13 bytes
-  uint8_t  level;                               // level of current preavis
-  uint32_t timeout;                             // timeout of current preavis
-  char     str_label[8];                        // label of current preavis
+struct tic_alert {                // 10 bytes
+  uint32_t timeout;                             // timeout of current alert
+  char     str_source[TIC_ALERT_SRC_SIZE];      // source of current alert
 };
 
 struct tic_json {                   // 3 bytes
-  uint8_t data;                                 // flag to publish ALERT, METER, RELAY, CONTRACT or CAL
-  uint8_t tic;                                  // flag to publish TIC
-  uint8_t live;                                 // flag to publish LIVE
+  bool data;                                    // flag to publish ALERT, METER, RELAY, CONTRACT or CAL
+  bool tic;                                     // flag to publish TIC
+  bool live;                                    // flag to publish LIVE
 };
 
-static struct {                     // 71 bytes
-  char      sep_line   = 0;                     // detected line separator
-  uint8_t   company    = 0;                     // manufacturer of the meter
-  uint8_t   model      = 0;                     // model of the meter
-  uint8_t   serial     = TIC_SERIAL_INIT;       // serial port status
-  uint8_t   reception  = TIC_RECEPTION_NONE;    // reception phase
-  uint8_t   use_sinsts = 0;                     // flag to use sinsts etiquette for papp
-  uint8_t   day        = 0;                     // current day of month
-  uint8_t   slot       = UINT8_MAX;             // current slot
-  uint16_t  year       = 0;                     // year of manufacturing of the meter
-  uint32_t  date       = 0;                     // current date with slot
-  uint32_t  last_msg   = 0;                     // timestamp of last trasnmitted message
+struct {                     // 71 bytes
+  bool      contact     = false;                // dry contact
+  bool      pact_minus  = false;                // negative active energy
+  char      sep_line    = 0;                    // detected line separator
+  uint8_t   pointe      = 0;                    // current pointe mobile
+  uint8_t   company     = 0;                    // manufacturer of the meter
+  uint8_t   model       = 0;                    // model of the meter
+  uint8_t   serial      = TIC_SERIAL_INIT;      // serial port status
+  uint8_t   reception   = TIC_RECEPTION_LINE;   // reception phase
+  uint8_t   use_sinsts  = 0;                    // flag to use sinsts etiquette for papp
+  uint8_t   slot        = UINT8_MAX;            // current slot
+  uint16_t  year        = 0;                    // year of manufacturing of the meter
+  uint32_t  date        = 0;                    // current date with slot
+  uint32_t  arr_web_ts[TIC_WEB_MAX];            // timestamp of next web access
 
-  long      nb_message = 0;                     // total number of messages sent by the meter
-  long      nb_reset   = 0;                     // total number of message reset sent by the meter
-  long      nb_skip    = 0;                     // index of last non skipped live message
-  long long nb_line    = 0;                     // total number of received lines
-  long long nb_error   = 0;                     // total number of checksum errors
-  long long ident      = 0;                     // meter identification number
-  tic_json    json;                             // JSON publication flags
-  tic_preavis preavis;                          // Current preavis
+  long      nb_message  = 0;                    // total number of messages sent by the meter
+  long      nb_reset    = 0;                    // total number of message reset sent by the meter
+  long      nb_skip     = 0;                    // index of last non skipped live message
+  long long nb_line     = 0;                    // total number of received lines
+  long long nb_error    = 0;                    // total number of checksum errors
+  long long ident       = 0;                    // meter identification number
+  tic_json  json;                               // JSON publication flags
+  tic_alert arr_alert[TIC_ALERT_MAX];           // array of alerts
 } teleinfo_meter;
 
 // teleinfo : LED management
 // -------------------------
 
-static struct {                     // 11 bytes
-  uint8_t  state     = TIC_LED_PWR_OFF;         // current LED state
-  uint8_t  status    = TIC_LED_STEP_NONE;       // meter LED status
-  uint8_t  level     = TIC_LEVEL_NONE;          // period level
-  uint32_t msg_time  = UINT32_MAX;              // timestamp of last reception 
-  uint32_t upd_time  = UINT32_MAX;              // timestamp of last LED update 
+struct {                     // 11 bytes
+  bool     present   = false;                   // LED declared
+  bool     state     = false;                   // current LED state
+  uint32_t upd_stamp = UINT8_MAX;               // timestamp of last LED update
+  uint8_t  red   = 0;
+  uint8_t  green = 0;
+  uint8_t  blue  = 0;
 } teleinfo_led;
 
 // teleinfo : conso mode
@@ -565,15 +609,14 @@ struct tic_phase {                  // 34 bytes
   long  cosphi;                                 // current cos phi (x1000)
 };
 
-static struct {                     // 441 bytes
-  uint8_t relay      = 0;                       // consoi virtual relays status
+struct {                     // 441 bytes
+  bool    enabled    = false;                   // flag of conso status
+  uint8_t relay      = 0;                       // linky virtual relays status
 
   long  papp         = 0;                       // current conso apparent power (VA)
   long  pact         = 0;                       // current conso active power (W)
   long  delta_mwh    = 0;                       // active conso delta since last total (milli Wh)
   long  delta_mvah   = 0;                       // apparent power counter increment (milli VAh)
-  long  today_wh     = 0;                       // active power conso today (Wh)
-  long  yesterday_wh = 0;                       // active power conso testerday (Wh)
   
   long  papp_now     = LONG_MAX;                // apparent power current counter (in vah)
   long  papp_prev    = LONG_MAX;                // apparent power previous counter (in vah)
@@ -588,34 +631,94 @@ static struct {                     // 441 bytes
   long  preact_stamp = LONG_MAX;                // timestamp of previous reactive power measure
   long  cosphi_stamp = LONG_MAX;                // timestamp of last cos phi calculation
 
-  long long midnight_wh  = 0;                   // global active conso total at previous midnight (Wh)
-  long long total_wh     = 0;                   // global active conso total (Wh)
-  long long index_wh[TIC_INDEX_MAX];            // array of conso total of different tarif periods (Wh)
-
   tic_cosphi cosphi;                            // global cosphi data 
   tic_phase  phase[TIC_PHASE_MAX];              // phases data, 102 bytes
 } teleinfo_conso;
 
+#ifdef ESP32
+RTC_DATA_ATTR struct {            // 136 bytes data in NVRAM to survive deepsleep
+#else
+struct {
+#endif
+  long      today;                               // active power conso today (Wh)
+  long      yesterday;                           // active power conso testerday (Wh)
+  long long midnight;                            // global active conso total at previous midnight (Wh)
+  long long total;                               // global active conso total (Wh)
+  long long index[TIC_PERIOD_MAX];               // array of conso total of different tarif periods (Wh)
+} teleinfo_conso_wh;
+
 // teleinfo : production mode
 // --------------------------
 
-static struct {                     // 191 bytes
-  uint8_t relay         = 0;                   // production relay status
-  float   pact_avg      = 0;                   // average produced active power
+struct {
+  bool  enabled         = false;               // flag of production status
+  bool  relay           = false;               // production relay status
 
-  long    papp          = 0;                   // production instant apparent power 
-  long    papp_last     = 0;                   // last published apparent power
-  long    pact          = 0;                   // production instant active power
-  long    delta_mwh     = 0;                   // active conso delta since last total (milli Wh)
-  long    delta_mvah    = 0;                   // apparent power counter increment (milli VAh)
-  long    today_wh      = 0;                   // active power produced today (Wh)
-  long    yesterday_wh  = 0;                   // active power produced yesterday (Wh)
+  float pact_avg        = 0;                   // average produced active power
+  long  papp            = 0;                   // production instant apparent power 
+  long  pact            = 0;                   // production instant active power
+  long  pact_last       = 0;                   // last published active power
+  long  delta_mwh       = 0;                   // active conso delta since last total (milli Wh)
+  long  delta_mvah      = 0;                   // apparent power counter increment (milli VAh)
 
-  long long midnight_wh = 0;                   // active power total last midnight (Wh)
-  long long total_wh    = 0;                   // active power total
-
-  tic_cosphi cosphi;                            // global cosphi data 
+  tic_cosphi cosphi;                           // global cosphi data 
 } teleinfo_prod;
 
-#endif      // USE_TELEINFO
-#endif      // USE_ENERGY_SENSOR
+#ifdef ESP32
+RTC_DATA_ATTR struct {            // 24 bytes data in NVRAM to survive deepsleep
+#else
+struct {
+#endif
+  long  today;                                  // active power produced today (Wh)
+  long  yesterday;                              // active power produced yesterday (Wh)
+  long long midnight;                           // active power total last midnight (Wh)
+  long long total;                              // active power total
+} teleinfo_prod_wh;
+
+// solar production
+// ----------------
+
+struct {                     // esp8266 13 bytes, esp32 34 bytes
+  bool      enabled      = false;             // flag of solar production status
+  long      pact         = 0;                 // solar production instant active power
+  long long total_wh     = 0;                 // active power total
+
+#ifdef ESP32
+  uint8_t   hour         = UINT8_MAX;         // current hour
+  uint32_t  pact_time    = UINT32_MAX;        // timestamp of last received active power
+  long      today_wh     = 0;                 // active power produced today (Wh)
+  long      yesterday_wh = 0;                 // active power produced yesterday (Wh)
+  long long midnight_wh  = 0;                 // active power total last midnight (Wh)
+#endif   // ESP32
+
+} teleinfo_solar;
+
+// solar forecast status
+struct solar_day {                  // 98 bytes
+  uint16_t total;                             // total production (wh)
+  uint16_t arr_pact[24];                      // hourly instant production (w)
+  uint16_t arr_wh[24];                        // hourly total production (wh)
+};
+
+struct {                     // esp8266 13 bytes, esp32 300 bytes
+  bool      enabled      = false;
+  long      pact         = 0;                 // solar production instant active power
+  long long total_wh     = 0;                 // active power total
+
+#ifdef ESP32
+  uint8_t   declination  = 45;                // solar panel declination
+  int16_t   azimuth      = 0;                 // solar panel azimuth
+  uint16_t  credit_total = 0;                 // remaining request
+  uint16_t  credit_left  = 0;                 // credit request
+  uint32_t  time_publish = UINT32_MAX;        // timestamp of next publication
+  uint32_t  time_update  = UINT32_MAX;        // timestamp of next update
+  char      str_apikey[24];                   // forecast API key
+  char      str_place[64];                    // place given by API
+  solar_day today;                            // today's data
+  solar_day tomorrow;                         // tomorrow's data
+#endif   // ESP32
+
+} teleinfo_forecast;
+
+#endif   // USE_TELEINFO
+#endif   // USE_ENERGY_SENSOR

@@ -6,6 +6,9 @@
   Copyright (C) 2025  Nicolas Bernaerts
     15/02/2025 v1.0 - Creation
     10/07/2025 v2.0 - Refactoring based on Tasmota 15
+    15/08/2025 v2.1 - Add Cosphi
+    07/09/2025 v2.2 - Limit publications to 1 per sec.
+    23/09/2025 v2.3 - Handle publication for Winky with deepsleep on super capa
 
   Configuration values are stored in :
 
@@ -17,6 +20,7 @@
   - Settings->rf_code[12][4] : Flag to display calendar
   - Settings->rf_code[12][5] : Flag to display today's conso
   - Settings->rf_code[12][6] : Flag to display today's production
+  - Settings->rf_code[12][7] : Flag to display cosphi
 
   TextSettings :
   - SET_TIC_AW_URL           : URL to access Awtrix display
@@ -35,6 +39,7 @@
 
 #ifdef ESP32
 #ifdef USE_TELEINFO
+#ifdef USE_TELEINFO_AWTRIX
 
 #include <ArduinoJson.h>
 
@@ -57,11 +62,11 @@
 // display type
 enum TeleinfoAwtrixMode    { TIC_AWTRIX_MODE_CONSO, TIC_AWTRIX_MODE_PROD, TIC_AWTRIX_MODE_MAX };
 enum TeleinfoAwtrixType    { TIC_AWTRIX_TYPE_SETTING, TIC_AWTRIX_TYPE_CUSTOM, TIC_AWTRIX_TYPE_MAX };
-enum TeleinfoAwtrixDisplay { TIC_AWTRIX_INSTANT, TIC_AWTRIX_CONSO_WH, TIC_AWTRIX_PROD_WH, TIC_AWTRIX_CALENDAR, TIC_AWTRIX_MAX };
+enum TeleinfoAwtrixDisplay { TIC_AWTRIX_INSTANT, TIC_AWTRIX_CONSO_WH, TIC_AWTRIX_PROD_WH, TIC_AWTRIX_CALENDAR, TIC_AWTRIX_COSPHI, TIC_AWTRIX_MAX };
 
 // awtrix commands
-const char kTeleinfoAwtrixCommands[]         PROGMEM =   "awtrix|"             "|"       "_addr"        "|"         "_lumi"        "|"       "_delai"        "|"          "_inst"        "|"          "_cwh"         "|"           "_pwh"       "|"          "_cal"          "|"        "_pmax";
-void (* const TeleinfoAwtrixCommand[])(void) PROGMEM = { &CmndTeleinfoAwtrixHelp, &CmndTeleinfoAwtrixAddr, &CmndTeleinfoAwtrixBright, &CmndTeleinfoAwtrixDelay, &CmndTeleinfoAwtrixInstant, &CmndTeleinfoAwtrixConsoWh, &CmndTeleinfoAwtrixProdWh, &CmndTeleinfoAwtrixCalendar, &CmndTeleinfoAwtrixProdMax };
+const char kTeleinfoAwtrixCommands[]         PROGMEM =   "awtrix|"             "|"       "_addr"        "|"         "_lumi"        "|"       "_delai"        "|"          "_inst"        "|"          "_cos"        "|"          "_cwh"         "|"           "_pwh"       "|"          "_cal"            ;
+void (* const TeleinfoAwtrixCommand[])(void) PROGMEM = { &CmndTeleinfoAwtrixHelp, &CmndTeleinfoAwtrixAddr, &CmndTeleinfoAwtrixBright, &CmndTeleinfoAwtrixDelay, &CmndTeleinfoAwtrixInstant, &CmndTeleinfoAwtrixCosphi, &CmndTeleinfoAwtrixConsoWh, &CmndTeleinfoAwtrixProdWh, &CmndTeleinfoAwtrixCalendar};
 
 // awtrix conso bar graph colors
 const char kTeleinfoAwtrixTextColors[]  PROGMEM = "#FFFFFF|#FFFFFF|#000000|#FFFFFF";                                   // conso : undef, blue, white, red
@@ -75,14 +80,16 @@ const char kTeleinfoAwtrixUnitColor[]   PROGMEM = "#808080";                    
  *         Data
 \************************/
 
-static struct {
-  uint8_t  delay     = AWTRIX_DELAY_DEFAULT;         // delay between page display
-  uint8_t  dis_page  = UINT8_MAX;                    // current displayed data page
-  uint8_t  bri_setup = 0;                            // brightness update needed
-  long     prod_max  = AWTRIX_PROD_MAX_DEFAULT;      // maximum produced power
-  uint32_t dis_time  = UINT32_MAX;                   // timestamp of next page display switch
-  uint8_t  arr_flag[TIC_AWTRIX_MAX];                 // array of display flags
+struct {
+  uint8_t  delay     = AWTRIX_DELAY_DEFAULT;        // delay between page display
+  uint8_t  bri_setup = 0;                           // brightness update needed
+  bool     arr_flag[TIC_AWTRIX_MAX];                // array of display flags
 } teleinfo_awtrix;
+
+RTC_DATA_ATTR struct {                              // data in NVRAM to survive deepsleep
+  uint8_t  dis_page;                                // current displayed data page
+  uint32_t dis_time;                                // timestamp of next page display switch
+} teleinfo_awtrix_sleep;
 
 /***********************************************\
  *                  Commands
@@ -93,31 +100,33 @@ void CmndTeleinfoAwtrixHelp ()
 {
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Commandes d'affichage Awtrix :"));
   AddLog (LOG_LEVEL_INFO, PSTR ("  awtrix_addr <addr>  = Adresse IP du device Awtrix"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("  awtrix_delai [%u]    = Délai entre 2 pages (min. 2s)"), teleinfo_awtrix.delay);
-  AddLog (LOG_LEVEL_INFO, PSTR ("  awtrix_lumi  [%u]    = Luminosité (1..100%%), 0=auto"),   teleinfo_awtrix.bri_setup);
-  AddLog (LOG_LEVEL_INFO, PSTR ("  awtrix_inst  [%u]    = Puissance instantanée"), teleinfo_awtrix.arr_flag[TIC_AWTRIX_INSTANT]);
-  AddLog (LOG_LEVEL_INFO, PSTR ("  awtrix_cwh   [%u]    = Consommation du jour"),  teleinfo_awtrix.arr_flag[TIC_AWTRIX_CONSO_WH]);
-  AddLog (LOG_LEVEL_INFO, PSTR ("  awtrix_pwh   [%u]    = Production du jour"),    teleinfo_awtrix.arr_flag[TIC_AWTRIX_PROD_WH]);
-  AddLog (LOG_LEVEL_INFO, PSTR ("  awtrix_cal   [%u]    = Calendrier"),            teleinfo_awtrix.arr_flag[TIC_AWTRIX_CALENDAR]);
-  AddLog (LOG_LEVEL_INFO, PSTR ("  awtrix_pmax  [%d] = Puissance produite max"),   teleinfo_awtrix.prod_max);
+  AddLog (LOG_LEVEL_INFO, PSTR ("  awtrix_delai <%u>   = Délai entre 2 pages (min. 2s)"),          teleinfo_awtrix.delay);
+  AddLog (LOG_LEVEL_INFO, PSTR ("  awtrix_lumi  <%u>    = Luminosité (1..100%%), 0=auto"),         teleinfo_awtrix.bri_setup);
+  AddLog (LOG_LEVEL_INFO, PSTR ("  awtrix_inst  <0/1>  = Publication puissance instantanée [%u]"), teleinfo_awtrix.arr_flag[TIC_AWTRIX_INSTANT]);
+  AddLog (LOG_LEVEL_INFO, PSTR ("  awtrix_cos   <0/1>  = Publication Cos φ [%u]"),                 teleinfo_awtrix.arr_flag[TIC_AWTRIX_COSPHI]);
+  AddLog (LOG_LEVEL_INFO, PSTR ("  awtrix_cwh   <0/1>  = Publication consommation du jour [%u]"),  teleinfo_awtrix.arr_flag[TIC_AWTRIX_CONSO_WH]);
+  AddLog (LOG_LEVEL_INFO, PSTR ("  awtrix_pwh   <0/1>  = Publication production du jour [%u]"),    teleinfo_awtrix.arr_flag[TIC_AWTRIX_PROD_WH]);
+  AddLog (LOG_LEVEL_INFO, PSTR ("  awtrix_cal   <0/1>  = Publication calendrier [%u]"),            teleinfo_awtrix.arr_flag[TIC_AWTRIX_CALENDAR]);
   ResponseCmndDone();
 }
 
 void CmndTeleinfoAwtrixAddr ()
 {
   if (XdrvMailbox.data_len > 0) SettingsUpdateText (SET_TIC_AW_URL, XdrvMailbox.data);
+
   ResponseCmndChar (SettingsText (SET_TIC_AW_URL));
 }
 
 void CmndTeleinfoAwtrixBright ()
 {
   // if brightness is valid, update and set
-  if ((XdrvMailbox.payload >= 0) && (XdrvMailbox.payload <= 100))
+  if ((XdrvMailbox.data_len > 0) && (XdrvMailbox.payload >= 0) && (XdrvMailbox.payload <= 100))
   {
     teleinfo_awtrix.bri_setup = (uint8_t)XdrvMailbox.payload;
     TeleinfoAwtrixSaveConfig ();
     TeleinfoAwtrixSetBrightness ();
   }
+
   ResponseCmndNumber (teleinfo_awtrix.bri_setup);
 }
 
@@ -128,34 +137,35 @@ void CmndTeleinfoAwtrixDelay ()
     if (XdrvMailbox.payload > 1) teleinfo_awtrix.delay = (uint8_t)XdrvMailbox.payload;
     TeleinfoAwtrixSaveConfig ();
   }
+  
   ResponseCmndNumber (teleinfo_awtrix.delay);
-}
-
-void CmndTeleinfoAwtrixProdMax ()
-{
-  if (XdrvMailbox.data_len > 0)
-  {
-    if (XdrvMailbox.payload > 99) teleinfo_awtrix.prod_max = (long)(XdrvMailbox.payload / 100) * 100;
-    TeleinfoAwtrixSaveConfig ();
-  }
-  ResponseCmndNumber (teleinfo_awtrix.prod_max);
 }
 
 void CmndTeleinfoAwtrixInstant ()
 {
   if (XdrvMailbox.data_len > 0)
   {
-    teleinfo_awtrix.arr_flag[TIC_AWTRIX_INSTANT] = (uint8_t)atoi (XdrvMailbox.data);
+    teleinfo_awtrix.arr_flag[TIC_AWTRIX_INSTANT] = (atoi (XdrvMailbox.data) != 0);
     TeleinfoAwtrixSaveConfig ();
   }
   ResponseCmndNumber (teleinfo_awtrix.arr_flag[TIC_AWTRIX_INSTANT]);
+}
+
+void CmndTeleinfoAwtrixCosphi ()
+{
+  if (XdrvMailbox.data_len > 0)
+  {
+    teleinfo_awtrix.arr_flag[TIC_AWTRIX_COSPHI] = (atoi (XdrvMailbox.data) != 0);
+    TeleinfoAwtrixSaveConfig ();
+  }
+  ResponseCmndNumber (teleinfo_awtrix.arr_flag[TIC_AWTRIX_COSPHI]);
 }
 
 void CmndTeleinfoAwtrixConsoWh ()
 {
   if (XdrvMailbox.data_len > 0)
   {
-    teleinfo_awtrix.arr_flag[TIC_AWTRIX_CONSO_WH] = (uint8_t)atoi (XdrvMailbox.data);
+    teleinfo_awtrix.arr_flag[TIC_AWTRIX_CONSO_WH] = (atoi (XdrvMailbox.data) != 0);
     TeleinfoAwtrixSaveConfig ();
   }
   ResponseCmndNumber (teleinfo_awtrix.arr_flag[TIC_AWTRIX_CONSO_WH]);
@@ -165,7 +175,7 @@ void CmndTeleinfoAwtrixProdWh ()
 {
   if (XdrvMailbox.data_len > 0)
   {
-    teleinfo_awtrix.arr_flag[TIC_AWTRIX_PROD_WH] = (uint8_t)atoi (XdrvMailbox.data);
+    teleinfo_awtrix.arr_flag[TIC_AWTRIX_PROD_WH] = (atoi (XdrvMailbox.data) != 0);
     TeleinfoAwtrixSaveConfig ();
   }
   ResponseCmndNumber (teleinfo_awtrix.arr_flag[TIC_AWTRIX_PROD_WH]);
@@ -175,7 +185,7 @@ void CmndTeleinfoAwtrixCalendar ()
 {
   if (XdrvMailbox.data_len > 0)
   {
-    teleinfo_awtrix.arr_flag[TIC_AWTRIX_CALENDAR] = (uint8_t)atoi (XdrvMailbox.data);
+    teleinfo_awtrix.arr_flag[TIC_AWTRIX_CALENDAR] = (atoi (XdrvMailbox.data) != 0);
     TeleinfoAwtrixSaveConfig ();
   }
   ResponseCmndNumber (teleinfo_awtrix.arr_flag[TIC_AWTRIX_CALENDAR]);
@@ -189,18 +199,14 @@ void TeleinfoAwtrixLoadConfig ()
 {
   uint8_t index;
 
-  // general data
-  teleinfo_awtrix.delay     = Settings->rf_code[12][0];
-  teleinfo_awtrix.prod_max  = (long)Settings->rf_code[12][1] * 100;
+  // load data from settings
+  teleinfo_awtrix.delay = Settings->rf_code[12][0];
+  if (teleinfo_awtrix.delay == 0) teleinfo_awtrix.delay = AWTRIX_DELAY_DEFAULT;
   teleinfo_awtrix.bri_setup = Settings->rf_code[12][2];
-
-  // set default values
-  if (teleinfo_awtrix.delay    == 0) teleinfo_awtrix.delay    = AWTRIX_DELAY_DEFAULT;
-  if (teleinfo_awtrix.prod_max == 0) teleinfo_awtrix.prod_max = AWTRIX_PROD_MAX_DEFAULT;
   if (teleinfo_awtrix.bri_setup > 100) teleinfo_awtrix.bri_setup = 0;
 
-  // display pages
-  for (index = 0; index < TIC_AWTRIX_MAX; index ++) teleinfo_awtrix.arr_flag[index] = Settings->rf_code[12][index + 3];
+  // load display flags from settings
+  for (index = 0; index < TIC_AWTRIX_MAX; index ++) teleinfo_awtrix.arr_flag[index] = (bool)Settings->rf_code[12][index + 3];
 }
 
 void TeleinfoAwtrixSaveConfig ()
@@ -209,11 +215,10 @@ void TeleinfoAwtrixSaveConfig ()
 
   // general data
   Settings->rf_code[12][0] = teleinfo_awtrix.delay;
-  Settings->rf_code[12][1] = (uint8_t)(teleinfo_awtrix.prod_max / 100);
   Settings->rf_code[12][2] = teleinfo_awtrix.bri_setup;
 
   // display pages
-  for (index = 0; index < TIC_AWTRIX_MAX; index ++) Settings->rf_code[12][index + 3] = teleinfo_awtrix.arr_flag[index];
+  for (index = 0; index < TIC_AWTRIX_MAX; index ++) Settings->rf_code[12][index + 3] = (uint8_t)teleinfo_awtrix.arr_flag[index];
 }
 
 /**************************************************\
@@ -325,7 +330,7 @@ void TeleinfoAwtrixPublish (const uint8_t type)
   delete phttp_client;
 
   // log
-  AddLog (LOG_LEVEL_DEBUG, PSTR ("AWT: Update - %s"), ResponseData ());
+  AddLog (LOG_LEVEL_DEBUG, PSTR ("AWT: %s"), ResponseData ());
   ResponseClear ();
   yield ();
 }
@@ -362,32 +367,37 @@ void TeleinfoAwtrixPublishInstant ()
 
   // check environment
   if (teleinfo_prod.pact > 0) mode = TIC_AWTRIX_MODE_PROD;
-  else if ((teleinfo_conso.total_wh > 0) && (teleinfo_contract.ssousc > 0)) mode = TIC_AWTRIX_MODE_CONSO;
+  else if (teleinfo_conso.enabled && (teleinfo_contract.ssousc > 0)) mode = TIC_AWTRIX_MODE_CONSO;
   else return;
 
-  // set number of phases
-  if (mode == TIC_AWTRIX_MODE_PROD) nb_phase = 1;
-    else nb_phase = teleinfo_contract.phase;
-
-  // set display parameters according to number of phases to display
+  // set environment
   bar_left = 26;
-  if (mode == TIC_AWTRIX_MODE_PROD) power = teleinfo_awtrix.prod_max;
-    else power = teleinfo_contract.ssousc;
-  if (mode == TIC_AWTRIX_MODE_PROD) { bar_width = 6; bar_unit = power / 48; }
-    else if (nb_phase == 1) { bar_width = 6; bar_unit = power / 48; }
-      else { bar_width = 2; bar_unit = power / 16; }
-
-  // display power value
-  if (mode == TIC_AWTRIX_MODE_PROD) power = teleinfo_prod.pact;
-    else power = teleinfo_conso.pact;
-  offset = TeleinfoAwtrixGenerateDigit (power, str_digit, sizeof (str_digit), str_unit, sizeof (str_unit));
-str_unit[0] = 0x93;
-str_unit[1] = 0x00;
-  Response_P (PSTR ("{\"textOffset\":%u,\"textCase\":2,\"center\":false,\"text\":[{\"t\":\"%s\"},{\"t\":\"%s\",\"c\":\"%s\"}]"), offset, str_digit, str_unit, kTeleinfoAwtrixUnitColor);
-
-  // conso : calculate color of bargraph
-  if (mode == TIC_AWTRIX_MODE_CONSO)
+  if (mode == TIC_AWTRIX_MODE_PROD) 
   {
+    // set phase and bar width
+    nb_phase = 1;
+    bar_width = 6; 
+    bar_unit = teleinfo_config.prod_max / 48;
+
+    // get current power
+    power = teleinfo_prod.pact;
+
+    // set bar colors
+    strcpy_P (str_bkgrd, kTeleinfoAwtrixProdBckgrd);
+    strcpy_P (str_color, kTeleinfoAwtrixProdColor);
+  }
+
+  else
+  {
+    // set phase and bar width
+    nb_phase = teleinfo_contract.phase;
+    if (nb_phase == 1) { bar_width = 6; bar_unit = teleinfo_contract.ssousc / 48; }
+      else { bar_width = 2; bar_unit = teleinfo_contract.ssousc / 16; }
+
+    // get current power
+    power = teleinfo_conso.pact;
+
+    // set bar colors
     level  = TeleinfoPeriodGetLevel ();
     hphc   = TeleinfoPeriodGetHP ();
     offset = 2 * level + hphc;
@@ -395,14 +405,11 @@ str_unit[1] = 0x00;
     GetTextIndexed (str_color, sizeof (str_color), offset, kTeleinfoAwtrixConsoColors);  
   }
 
-  // prod : set color of bargraph
-  else
-  {
-    strcpy_P (str_bkgrd, kTeleinfoAwtrixProdBckgrd);
-    strcpy_P (str_color, kTeleinfoAwtrixProdColor);
-  }
+  // display power value
+  offset = TeleinfoAwtrixGenerateDigit (power, str_digit, sizeof (str_digit), str_unit, sizeof (str_unit));
+  Response_P (PSTR ("{\"textOffset\":%u,\"textCase\":2,\"center\":false,\"text\":[{\"t\":\"%s\"},{\"t\":\"%s\",\"c\":\"%s\"}]"), offset, str_digit, str_unit, kTeleinfoAwtrixUnitColor);
 
-  // start of diplay
+  // start of display
   ResponseAppend_P (PSTR (",\"draw\":[{\"df\":[%d,%d,%d,%d,\"%s\"]}"), bar_left, 0, bar_left + 6, 8, str_bkgrd);
   
   // loop thru phase
@@ -424,8 +431,64 @@ str_unit[1] = 0x00;
     bar_left += bar_width; 
   }
 
-  // end of diplay
+  // end of display
   ResponseAppend_P (PSTR ("]}"));
+
+  // publish
+  TeleinfoAwtrixPublish (TIC_AWTRIX_TYPE_CUSTOM);
+}
+
+// send cosphi to Awtrix display
+void TeleinfoAwtrixPublishCosphi ()
+{
+  uint8_t level, hphc, offset;
+  long    cosphi, height;
+  char    str_bkgrd[8];
+  char    str_color[8];
+
+  // if in production mode
+  if (teleinfo_prod.pact > 0)
+  {
+    cosphi = teleinfo_prod.cosphi.value;
+    strcpy_P (str_bkgrd, kTeleinfoAwtrixProdBckgrd);
+    strcpy_P (str_color, kTeleinfoAwtrixProdColor);
+  }
+
+  // else if in conso mode
+  else if (teleinfo_conso.enabled && (teleinfo_contract.ssousc > 0))
+    {
+    cosphi = teleinfo_conso.cosphi.value;
+    level  = TeleinfoPeriodGetLevel ();
+    hphc   = TeleinfoPeriodGetHP ();
+    offset = 2 * level + hphc;
+    GetTextIndexed (str_bkgrd, sizeof (str_bkgrd), level,  kTeleinfoAwtrixConsoBckgrd);
+    GetTextIndexed (str_color, sizeof (str_color), offset, kTeleinfoAwtrixConsoColors);  
+  }
+
+  // else ignore
+  else return;
+
+  // start of display
+  Response_P (PSTR ("{"));
+
+  // display cosphi value
+  ResponseAppend_P (PSTR ("\"textOffset\":3,\"textCase\":2,\"center\":false,\"text\":[{\"t\":\"%d.%02d\"}]"), cosphi / 1000, cosphi % 1000 / 10);
+
+  // start of draw
+  ResponseAppend_P (PSTR (",\"draw\":["));
+
+  // display phi unit
+  ResponseAppend_P (PSTR ("{\"dl\":[19,1,19,2,\"#404040\"]},{\"dl\":[20,3,22,3,\"#404040\"]},{\"dl\":[21,1,21,5,\"#404040\"]},{\"dl\":[22,1,23,2,\"#404040\"]}"));
+
+  // display bargraph
+  height = 8 * cosphi / 1000;
+  ResponseAppend_P (PSTR (",{\"df\":[27,0,4,8,\"%s\"]},{\"df\":[27,%d,4,%d,\"%s\"]}"), str_bkgrd, 8 - height, height, str_color);
+
+  // end of draw
+  ResponseAppend_P (PSTR ("]"));
+
+  // end of display
+  ResponseAppend_P (PSTR ("}"));
 
   // publish
   TeleinfoAwtrixPublish (TIC_AWTRIX_TYPE_CUSTOM);
@@ -438,7 +501,7 @@ void TeleinfoAwtrixPublishConsoWh ()
   char    str_digit[8];
 
   // calculate value to display
-  offset = TeleinfoAwtrixGenerateDigit (teleinfo_conso.today_wh, str_digit, sizeof (str_digit), str_unit, sizeof (str_unit));
+  offset = TeleinfoAwtrixGenerateDigit (teleinfo_conso_wh.today, str_digit, sizeof (str_digit), str_unit, sizeof (str_unit));
 
   // display value
   Response_P (PSTR ("{\"textOffset\":%u,\"textCase\":2,\"center\":false,\"text\":[{\"t\":\"%s\"},{\"t\":\"%sh\",\"c\":\"%s\"}]}"), offset, str_digit, str_unit, kTeleinfoAwtrixUnitColor);
@@ -454,7 +517,7 @@ void TeleinfoAwtrixPublishProdWh ()
   char    str_digit[8];
 
   // calculate value to display
-  offset = TeleinfoAwtrixGenerateDigit (teleinfo_prod.today_wh, str_digit, sizeof (str_digit), str_unit, sizeof (str_unit));
+  offset = TeleinfoAwtrixGenerateDigit (teleinfo_prod_wh.today, str_digit, sizeof (str_digit), str_unit, sizeof (str_unit));
 
   // display value
   Response_P (PSTR ("{\"textOffset\":%u,\"textCase\":2,\"center\":false,\"text\":[{\"t\":\"%s\",\"c\":\"%s\"},{\"t\":\"%sh\",\"c\":\"%s\"}]}"), offset, str_digit, kTeleinfoAwtrixProdColor, str_unit, kTeleinfoAwtrixUnitColor);
@@ -470,7 +533,6 @@ void TeleinfoAwtrixPublishCalendar ()
   TIME_T   time_dst;
   char     str_label[4];
   char     str_color[8];
-
 
   // get time
   current_time = LocalTime ();
@@ -516,49 +578,60 @@ void TeleinfoAwtrixPublishCalendar ()
   TeleinfoAwtrixPublish (TIC_AWTRIX_TYPE_CUSTOM);
 }
 
+void TeleinfoAwtrixDisplayNextPage ()
+{
+  uint8_t index;
+
+  // loop to find next data to display
+  for (index = 0; index < TIC_AWTRIX_MAX; index ++)
+  {
+    teleinfo_awtrix_sleep.dis_page ++;
+    teleinfo_awtrix_sleep.dis_page = teleinfo_awtrix_sleep.dis_page % TIC_AWTRIX_MAX;
+    if (teleinfo_awtrix.arr_flag[teleinfo_awtrix_sleep.dis_page]) break;
+  }
+
+  if (teleinfo_awtrix.arr_flag[teleinfo_awtrix_sleep.dis_page])
+    switch (teleinfo_awtrix_sleep.dis_page)
+    {
+      case TIC_AWTRIX_INSTANT:  TeleinfoAwtrixPublishInstant ();  break;
+      case TIC_AWTRIX_CONSO_WH: TeleinfoAwtrixPublishConsoWh ();  break;
+      case TIC_AWTRIX_PROD_WH:  TeleinfoAwtrixPublishProdWh ();   break;
+      case TIC_AWTRIX_CALENDAR: TeleinfoAwtrixPublishCalendar (); break;
+      case TIC_AWTRIX_COSPHI:   TeleinfoAwtrixPublishCosphi ();   break;
+    }
+
+  // set next update and declare publication
+  teleinfo_awtrix_sleep.dis_time = LocalTime () + (uint32_t)teleinfo_awtrix.delay;
+  TeleinfoDriverWebDeclare (TIC_WEB_HTTP);
+}
+
 // send realtime conso to Awtrix display
 void TeleinfoAwtrixEverySecond ()
 {
-  bool    publish = false;
+  bool    publish;
   uint8_t index;
 
   // if disabled, running on battery or no reception, ignore
-  if (teleinfo_meter.nb_message == 0) return;
+  if (teleinfo_meter.nb_message < TIC_MESSAGE_MIN) return;
   if (!RtcTime.valid) return;
 
   // check if one data has to be published
-  for (index = 0; index < TIC_AWTRIX_MAX; index ++) if (teleinfo_awtrix.arr_flag[index]) publish = true;
+  publish = false;
+  for (index = 0; index < TIC_AWTRIX_MAX; index ++) publish |= teleinfo_awtrix.arr_flag[index];
   if (!publish) return;
 
-  // first update
-  if (teleinfo_awtrix.dis_time == UINT32_MAX) teleinfo_awtrix.dis_time = LocalTime ();
+  // first boot update
+  if (teleinfo_awtrix_sleep.dis_time == 0)
+  {
+    teleinfo_awtrix_sleep.dis_time = LocalTime ();
+    teleinfo_awtrix_sleep.dis_page = 0;
+  }
 
   // if needed, update awtrix brightness
   if (RtcTime.second % 30 == 1) TeleinfoAwtrixSetBrightness ();
 
   // update display every xx seconds
-  else if (teleinfo_awtrix.dis_time < LocalTime ())
-  {
-    // loop to find next data to display
-    for (index = 0; index < TIC_AWTRIX_MAX; index ++)
-    {
-      teleinfo_awtrix.dis_page ++;
-      teleinfo_awtrix.dis_page = teleinfo_awtrix.dis_page % TIC_AWTRIX_MAX;
-      if (teleinfo_awtrix.arr_flag[teleinfo_awtrix.dis_page] == 1) break;
-    }
-
-    if (teleinfo_awtrix.arr_flag[teleinfo_awtrix.dis_page] == 1)
-      switch (teleinfo_awtrix.dis_page)
-      {
-        case TIC_AWTRIX_INSTANT:  TeleinfoAwtrixPublishInstant (); break;
-        case TIC_AWTRIX_CONSO_WH: TeleinfoAwtrixPublishConsoWh ();  break;
-        case TIC_AWTRIX_PROD_WH:  TeleinfoAwtrixPublishProdWh ();   break;
-        case TIC_AWTRIX_CALENDAR: TeleinfoAwtrixPublishCalendar (); break;
-      }
-
-    // set next update
-    teleinfo_awtrix.dis_time = LocalTime () + (uint32_t)teleinfo_awtrix.delay;
-  }
+  else if (TeleinfoDriverWebAllow (TIC_WEB_HTTP) && (teleinfo_awtrix_sleep.dis_time <= LocalTime ())) TeleinfoAwtrixDisplayNextPage ();
 }
 
 /*********************************************\
@@ -570,7 +643,7 @@ void TeleinfoAwtrixEverySecond ()
 // Append InfluxDB configuration button
 void TeleinfoAwtrixWebConfigButton ()
 {
-  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>Afficheur Awtrix</button></form></p>\n"), PSTR (AWTRIX_PAGE_CFG));
+  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), PSTR (AWTRIX_PAGE_CFG), PSTR ("Afficheur Awtrix"));
 }
 
 // Teleinfo web page
@@ -588,11 +661,11 @@ void TeleinfoAwtrixWebPageConfigure ()
     if (Webserver->hasArg (F ("addr")))  { WebGetArg (PSTR ("addr"),  str_value, sizeof (str_value)); SettingsUpdateText (SET_TIC_AW_URL, str_value); }
     if (Webserver->hasArg (F ("delai"))) { WebGetArg (PSTR ("delai"), str_value, sizeof (str_value)); teleinfo_awtrix.delay     = (uint8_t)atoi (str_value); }
     if (Webserver->hasArg (F ("lumi")))  { WebGetArg (PSTR ("lumi"),  str_value, sizeof (str_value)); teleinfo_awtrix.bri_setup = (uint8_t)atoi (str_value); }
-    if (Webserver->hasArg (F ("pmax")))  { WebGetArg (PSTR ("pmax"),  str_value, sizeof (str_value)); teleinfo_awtrix.prod_max  = (long)atol (str_value); }
-    if (Webserver->hasArg (F ("inst")))  teleinfo_awtrix.arr_flag[TIC_AWTRIX_INSTANT]  = 1; else teleinfo_awtrix.arr_flag[TIC_AWTRIX_INSTANT]  = 0;
-    if (Webserver->hasArg (F ("cwh")))   teleinfo_awtrix.arr_flag[TIC_AWTRIX_CONSO_WH] = 1; else teleinfo_awtrix.arr_flag[TIC_AWTRIX_CONSO_WH] = 0;
-    if (Webserver->hasArg (F ("pwh")))   teleinfo_awtrix.arr_flag[TIC_AWTRIX_PROD_WH]  = 1; else teleinfo_awtrix.arr_flag[TIC_AWTRIX_PROD_WH]  = 0;
-    if (Webserver->hasArg (F ("cal")))   teleinfo_awtrix.arr_flag[TIC_AWTRIX_CALENDAR] = 1; else teleinfo_awtrix.arr_flag[TIC_AWTRIX_CALENDAR] = 0;
+    teleinfo_awtrix.arr_flag[TIC_AWTRIX_INSTANT]  = Webserver->hasArg (F ("inst"));
+    teleinfo_awtrix.arr_flag[TIC_AWTRIX_COSPHI]   = Webserver->hasArg (F ("cos"));
+    teleinfo_awtrix.arr_flag[TIC_AWTRIX_CONSO_WH] = Webserver->hasArg (F ("cwh"));
+    teleinfo_awtrix.arr_flag[TIC_AWTRIX_PROD_WH]  = Webserver->hasArg (F ("pwh"));
+    teleinfo_awtrix.arr_flag[TIC_AWTRIX_CALENDAR] = Webserver->hasArg (F ("cal"));
 
     // save config and set brightness
     TeleinfoAwtrixSaveConfig ();
@@ -629,12 +702,13 @@ void TeleinfoAwtrixWebPageConfigure ()
   WSContentSend_P (PSTR ("<fieldset><legend>Paramètres</legend>\n"));
   WSContentSend_P (PSTR ("<p class='dat'><span class='head'>Luminosité <small>(0=auto)</small></span><span class='val'><input type='number' name='lumi' min=0 max=100 step=1 value=%u></span><span class='unit'>%%</span></p>\n"), teleinfo_awtrix.bri_setup);
   WSContentSend_P (PSTR ("<p class='dat'><span class='head'>Délai entre pages</span><span class='val'><input type='number' name='delai' min=2 max=255 step=1 value=%u></span><span class='unit'>sec.</span></p>\n"), teleinfo_awtrix.delay);
-  WSContentSend_P (PSTR ("<p class='dat'><span class='head'>Production max.</span><span class='val'><input type='number' name='pmax' min=100 max=32000 step=100 value=%d></span><span class='unit'>W</span></p>\n"), teleinfo_awtrix.prod_max);
   WSContentSend_P (PSTR ("</fieldset>\n"));
 
   WSContentSend_P (PSTR ("<fieldset><legend>Données affichées</legend>\n"));
   if (teleinfo_awtrix.arr_flag[TIC_AWTRIX_INSTANT]) strcpy_P (str_value, PSTR ("checked")); else str_value[0] = 0;  
   WSContentSend_P (PSTR ("<p class='dat'><input type='checkbox' name='%s' %s><label for='%s'>%s</label></p>\n"), PSTR ("inst"), str_value, PSTR ("inst"), PSTR ("Puissance instantanée"));
+  if (teleinfo_awtrix.arr_flag[TIC_AWTRIX_COSPHI]) strcpy_P (str_value, PSTR ("checked")); else str_value[0] = 0;  
+  WSContentSend_P (PSTR ("<p class='dat'><input type='checkbox' name='%s' %s><label for='%s'>%s</label></p>\n"), PSTR ("cos"), str_value,  PSTR ("cos"),  PSTR ("Cos φ"));
   if (teleinfo_awtrix.arr_flag[TIC_AWTRIX_CONSO_WH]) strcpy_P (str_value, PSTR ("checked")); else str_value[0] = 0;  
   WSContentSend_P (PSTR ("<p class='dat'><input type='checkbox' name='%s' %s><label for='%s'>%s</label></p>\n"), PSTR ("cwh"),  str_value, PSTR ("cwh"),  PSTR ("Consommation du jour"));
   if (teleinfo_awtrix.arr_flag[TIC_AWTRIX_PROD_WH]) strcpy_P (str_value, PSTR ("checked")); else str_value[0] = 0;  
@@ -669,7 +743,7 @@ bool XdrvTeleinfoAwtrix (const uint32_t function)
   bool result = false;
 
   // swtich according to context
-  if (TeleinfoDriverIsPowered ()) switch (function)
+  switch (function)
   {
     case FUNC_COMMAND:
       result = DecodeCommand (kTeleinfoAwtrixCommands, TeleinfoAwtrixCommand);
@@ -697,5 +771,6 @@ bool XdrvTeleinfoAwtrix (const uint32_t function)
   return result;
 }
 
+#endif      // USE_TELEINFO_AWTRIX
 #endif      // USE_TELEINFO
 #endif      // ESP32
