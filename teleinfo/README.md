@@ -145,23 +145,6 @@ Si votre charge moyenne CPU est trop élevée, une commande **sleep** avec une v
 
     sleep 200
 
-## Alertes
-
-Ce firmware publie plusieurs types d'alertes dans la section **ALERT** du topic **SENSOR** :
-
-    {"ALERT":{"volt"="","load"="DEP2","period"="PM3"}
-    
-    {"ALERT":{"volt"="STGE","load"="","period"="PM1"}
-    
-    {"ALERT":{"volt"="265","load"="","period"=""}
-
-Les alertes sont de 3 types :
-  * **volt** : cette clé signale un problème de tension sur l'une des phases. Elle peut contenir **STGE** si le défaut est indiqué par le Linky ou la **valeur de la tension mesurée** sur l'une des phase si elle est de +/-10% par rapport à la tension normalisée de 230 V.
-  * **load** : cette clé est renseignée si le compteur annonce un dépassement de puissance. La valeur peut être **STGE**, **ADPS**, **ADIR**, **ADIR1**, **ADIR2**, **ADIR3** en fonction du type d'annonce faite par le Linky. Si une surconsommation est détéctée par rapport au pourcentage acceptable défini dans les options de configuration, cla clé est renseignée avec **MAX1**, **MAX2** ou **MAX3** suivant la phase en dépassement.
-  * **period** : cette clé est renseignée si le compteur annonce une période de pointe. Elle peut valoir **PM1**, **PM2** ou **PM3** suivant l'annonce du compteur.
-
-Suite à sa publication, une alerte est levée si elle n'est plus annoncée pendant 5 secondes.
-
 ## Configuration
 
 Ce firmware propose différentes options de configuration. Essayez de ne configurer que les options nécessaires afin d'avoir un système optimisé et un ESP réactif.
@@ -372,6 +355,23 @@ En mode console, les commandes disponibles sont listées avec la commande **awtr
       awtrix_pwh   [1]   = Production du jour
       awtrix_cal   [0]   = Calendrier
       awtrix_pmax  [200] = Puissance produite max
+
+## Alertes
+
+Ce firmware publie plusieurs types d'alertes dans la section **ALERT** du topic **SENSOR** :
+
+    {"ALERT":{"volt"="","load"="DEP2","period"="PM3"}
+    
+    {"ALERT":{"volt"="STGE","load"="","period"="PM1"}
+    
+    {"ALERT":{"volt"="265","load"="","period"=""}
+
+Les alertes sont de 3 types :
+  * **volt** : cette clé signale un problème de tension sur l'une des phases. Elle peut contenir **STGE** si le défaut est indiqué par le Linky ou la **valeur de la tension mesurée** sur l'une des phase si elle est de +/-10% par rapport à la tension normalisée de 230 V.
+  * **load** : cette clé est renseignée si le compteur annonce un dépassement de puissance. La valeur peut être **STGE**, **ADPS**, **ADIR**, **ADIR1**, **ADIR2**, **ADIR3** en fonction du type d'annonce faite par le Linky. Si une surconsommation est détéctée par rapport au pourcentage acceptable défini dans les options de configuration, cla clé est renseignée avec **MAX1**, **MAX2** ou **MAX3** suivant la phase en dépassement.
+  * **period** : cette clé est renseignée si le compteur annonce une période de pointe. Elle peut valoir **PM1**, **PM2** ou **PM3** suivant l'annonce du compteur.
+
+Suite à sa publication, une alerte est levée si elle n'est plus annoncée pendant 5 secondes.
 
 ## Production Solaire
 
