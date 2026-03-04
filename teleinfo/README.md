@@ -347,6 +347,32 @@ Les données des calendriers RTE sont publiées sur le topic **.../tele/RTE** ap
 
 Dès l'activation de l'option **tempo**, les API **Open DPE** seront activées pour bénéficier des prévisions sur 7 jours.
 
+## Afficheur Awtrix
+
+Ce firmware permet de gérer un affichage déporté des principales données sur un afficheur [**Ulanzi Awtrix**](https://www.ulanzi.com/products/ulanzi-pixel-smart-clock-2882?ref=28e02dxl) :
+  * Puissance instantanée et Cos φ (consommation ou production)
+  * Total de la consommation et/ou production du jour
+  * Calendrier des périodes Tempo à venir (bleu, blanc ou rouge)
+
+L'afficheur doit au préalable avoir été flashé avec le firmware Open-Source [**Awtrix3**](https://blueforcer.github.io/awtrix3/#/README).
+
+<img src="./screen/teleinfo-awtrix-puissance.png" width=400 alt="Puissance instantanée">  <img src="./screen/teleinfo-awtrix-calendrier.png" width=400 alt="Calendrier Tempo">
+
+Le paramétrage peut être réalisé en mode console ou via le menu **Configuration / Afficheur Awtrix**.
+
+En mode console, les commandes disponibles sont listées avec la commande **awtrix** :
+
+    HLP: Commandes d'affichage Awtrix :
+      awtrix_addr <addr> = Adresse IP du device Awtrix
+      awtrix_delai [4]   = Délai entre 2 pages (min. 2s)
+      awtrix_lumi  [0]   = Luminosité (1..100%), 0=auto
+      awtrix_inst  [1]   = Puissance instantanée
+      awtrix_cos   [1]   = Cos φ
+      awtrix_cwh   [1]   = Consommation du jour
+      awtrix_pwh   [1]   = Production du jour
+      awtrix_cal   [0]   = Calendrier
+      awtrix_pmax  [200] = Puissance produite max
+
 ## Production Solaire
 
 Ce firmware intègre un module assez basique de gestion de la production solaire. Il fournit :
@@ -420,30 +446,6 @@ Les commandes sont les suivantes :
 Coté client FTP, vous devez utiliser les login / mot de passe suivants : **teleinfo** / **teleinfo**
 
 Ce serveur FTP ne peut accepter qu'une seule connexion simultanée. Vous devez donc configurer votre client FTP avec une limite de type : **simultaneous connexions = 1**. Sinon, la connexion sera en erreur.
-
-## Afficheur Awtrix
-
-Ce firmware permet de gérer un affichage déporté des principales données sur un afficheur [**Ulanzi Awtrix**](https://www.ulanzi.com/products/ulanzi-pixel-smart-clock-2882?ref=28e02dxl) :
-  * Puissance instantanée et Cos φ (consommation ou production)
-  * Calendrier du jour et du lendemain (bleu, blanc ou rouge)
-  * Total de la consommation et/ou production du jour
-
-L'afficheur doit au préalable avoir été flashé avec le firmware Open-Source [**Awtrix3**](https://blueforcer.github.io/awtrix3/#/README).
-
-<img src="./screen/teleinfo-awtrix-puissance.png" width=400 alt="Puissance instantanée">  <img src="./screen/teleinfo-awtrix-calendrier.png" width=400 alt="Calendrier Tempo">
-
-Le paramétrage est réalisé en mode console. Les commandes disponibles sont listées avec la commande **awtrix** :
-
-    HLP: Commandes d'affichage Awtrix :
-      awtrix_addr <addr> = Adresse IP du device Awtrix
-      awtrix_delai [4]   = Délai entre 2 pages (min. 2s)
-      awtrix_lumi  [0]   = Luminosité (1..100%), 0=auto
-      awtrix_inst  [1]   = Puissance instantanée
-      awtrix_cos   [1]   = Cos φ
-      awtrix_cwh   [1]   = Consommation du jour
-      awtrix_pwh   [1]   = Production du jour
-      awtrix_cal   [0]   = Calendrier
-      awtrix_pmax  [200] = Puissance produite max
 
 ## Carte Winky
 
