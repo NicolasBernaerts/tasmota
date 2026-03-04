@@ -197,9 +197,9 @@ Cette option vous permet de définir la fréquence de publication des données.
 
 <img align="right" src="./screen/teleinfo-config-publication.png" width=300>
 
-  - **A chaque télémétrie** : Publication à chaque déclenchement de la télémétrie, configurée par **Période télémétrie**.
-  - **Evolution de +-** : Publication chaque fois que la puissance varie de la valeur configurée sur l'une des phases. C'est mon option de prédilection.
-  - **A chaque message reçu** : Publication à chaque trame publiée par le compteur, soit toutes les 1 à 2 secondes. Cette option n'est à utiliser que dans des cas très particuliers car elle stresse fortement l'ESP.
+  - **A chaque télémétrie** : Publication à chaque déclenchement de la télémétrie. La télémétrie est gérée par Tasmota et est configurable via le menu **Configuration / Configuration du journal / Période télémétrie**. Par défaut elle est configurée à 5 mn (300 sec.).
+  - **Evolution de +-** : Publication chaque fois que la puissance varie de la valeur configurée sur l'une des phases. Ainsi, les données ne sont pas publiées à intervalle fixe, mais dès que les valeurs évoluent d'un certain seuil. C'est mon option de prédilection car elle garantie de suivre les évolutions au plus près.
+  - **A chaque message reçu** : Publication à chaque trame publiée par le compteur, soit toutes les 1 à 2 secondes. Cette option est à éviter car elle stresse fortement l'ESP.
 
 ## Intégration
 
