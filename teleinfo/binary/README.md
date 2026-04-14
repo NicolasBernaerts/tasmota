@@ -2,18 +2,18 @@ You'll find here pre-compiled binaries for Teleinfo project.
 
 These binaries are ready to be flashed on ESP8266 or ESP32. Each binary has its own specificities :
 
-|         Firmware           |          Target             | LittleFS |           Notice               |
-| -------------------------- | --------------------------- | -------- | ------------------------------ |
-| tasmota-teleinfo           | **ESP8266 with 1M memory**  |   none   |                                |
-| tasmota-teleinfo-4m        | **ESP8266 with 4M memory**  |   2 Mb   |                                |
-| tasmota-teleinfo-16m       | **SP8266 with 16M memory**  |   14 Mb  |                                |
-| tasmota32-teleinfo         | **ESP32 with 4M memory**    | 1.34 Mb  | It handles Ethernet boards     |
-| tasmota32-teleinfo-denkyd4 | **DenkyD4**                 |          |                                |
-| tasmota32c3-teleinfo       | **ESP32C3 with 4M memory**  | 1.34 Mb  | Sonoff basic R4                |
-| tasmota32c6-teleinfo-winky | **Winky**                   | 1.34 Mb  | Integrate deepsleep management |
-| tasmota32s2-teleinfo       | **ESP32S2 with 4M memory**  | 1.34 Mb  |                                |
-| tasmota32s3-teleinfo       | **ESP32S3 with 4M memory**  | 1.34 Mb  |                                |
-| tasmota32s3-teleinfo-16m   | **ESP32S3 with 16M memory** |   10 Mb  |                                |
+|         Firmware           |          Target             | LittleFS |           Notice                |
+| -------------------------- | --------------------------- | -------- | ------------------------------- |
+| tasmota-teleinfo           | **ESP8266 with 1M memory**  |   none   |                                 |
+| tasmota-teleinfo-4m        | **ESP8266 with 4M memory**  |   2 Mb   |                                 |
+| tasmota-teleinfo-16m       | **SP8266 with 16M memory**  |   14 Mb  |                                 |
+| tasmota32-teleinfo         | **ESP32 with 4M memory**    | 1.34 Mb  | To use with Ethernet boards     |
+| tasmota32-teleinfo-denkyd4 | **DenkyD4**                 |          |                                 |
+| tasmota32c3-teleinfo       | **ESP32C3 with 4M memory**  | 1.34 Mb  | Sonoff basic R4                 |
+| tasmota32c6-teleinfo-winky | **Winky**                   | 1.34 Mb  | Integrates deepsleep management |
+| tasmota32s2-teleinfo       | **ESP32S2 with 4M memory**  | 1.34 Mb  |                                 |
+| tasmota32s3-teleinfo       | **ESP32S3 with 4M memory**  | 1.34 Mb  |                                 |
+| tasmota32s3-teleinfo-16m   | **ESP32S3 with 16M memory** |   10 Mb  |                                 |
 
 Here are the flash method to use under Linux :
 
