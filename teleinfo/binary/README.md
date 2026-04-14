@@ -19,8 +19,8 @@ Here are the flash method to use under Linux :
 
 |        Flash method        |       ESP8266      |         ESP32         |
 | -------------------------- | ------------------ | --------------------- |
-| Serial flash (**esptool**) |   firmware.bin     |  firmware.factory.bin | 
-|        **OTA**             |   firmware.bin.gz  |  firmware.bin         | 
+| Serial flash (esptool)     |   firmware.bin     |  firmware.factory.bin | 
+| OTA                        |   firmware.bin.gz  |  firmware.bin         | 
 
 **Important** : If your ESP runs another firmware than this one (for example official Tasmota build), as partitioning is not identical, it is **very** important to do a full serial flash first to avoid any boot loop or crashes.
 
