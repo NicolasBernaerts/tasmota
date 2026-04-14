@@ -12,8 +12,8 @@ You'll find here some ESP8266 and ESP32 Tasmota firmware extensions :
 
 # ESP8266 & ESP32 tools
 
-In the **tools** folder you get 2 simple tools :
-  * **tasmota-discover** to list all devices (tasmota and others) available on the same LAN.
+In the **tools** folder you get 2 simple tools for Linux users :
+  * **tasmota-discover** to list all tasmota devices available on the same LAN.
   * **tasmota-flash** to erase and/or flash ESP8266 and ESP32 devices.
 
 # Analyse des usages
