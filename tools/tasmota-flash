@@ -1,19 +1,21 @@
 #!/bin/bash
 # ----------------------------------------------------------
+#
 # Helper script to flash ESP8266 or ESP32
 # Serial port is auto discovered if only 1 device connected
 #
 # Revision history :
-#   01/11/2020, V1.0 - Creation by N. Bernaerts
-#   25/04/2021, V1.1 - Update --erase to use blank files
-#   27/08/2021, V1.2 - Add --partition conversion from CSV to BIN
-#   08/09/2021, V1.3 - Simplify options for ESP32
+#   01/11/2020, v1.0 - Creation by N. Bernaerts
+#   25/04/2021, v1.1 - Update --erase to use blank files
+#   27/08/2021, v1.2 - Add --partition conversion from CSV to BIN
+#   08/09/2021, v1.3 - Simplify options for ESP32
 #                      Download ESP32 default files from Github
-#   07/11/2021, V1.4 - Handle --erase for 16Mb chips (limit erase to 4MB)
-#   31/01/2022, V1.5 - Use esptool.py to fully handle 16 Mb chips
-#   08/07/2022, V1.6 - Use .factory.bin for ESP32, drop partition management
-#   22/08/2022, V1.7 - Change ESP32 flash to -fm dio
-#   25/04/2024, v1.8 - Change mktemp options for MacOS compatibility
+#   07/11/2021, v1.4 - Handle --erase for 16Mb chips (limit erase to 4MB)
+#   31/01/2022, v1.5 - Use esptool.py to fully handle 16 Mb chips
+#   08/07/2022, v1.6 - Use .factory.bin for ESP32, drop partition management
+#   22/08/2022, v1.7 - Change ESP32 flash to -fm dio
+#   15/04/2026, v1.8 - esptool 5.2 compatibility
+#
 # ----------------------------------------------------------
 
 # default files and images
@@ -25,7 +27,6 @@ then
 	echo "Script to flash Tasmota devices"
 	echo "Default device is ESP8266. You should provide the .bin image"
 	echo "Options are :"
-	echo "  --esp32             Flash ESP32 device. For initial flash, use .factory.bin images"
 	echo "  --query             Query device specs"
 	echo "  --erase             Erase device before flash"
 	echo "  --flash <file.bin>  Path to image file"
@@ -36,19 +37,19 @@ then
 fi
 
 # check tools availability
-command -v esptool.py >/dev/null 2>&1 || { zenity --error --text="Please install esptool.py"; exit 1; }
+command -v esptool >/dev/null 2>&1 || { zenity --error --text="Please install esptool"; exit 1; }
 
 # iterate thru parameters
 while test ${#} -gt 0
 do
 	case $1 in
-	--esp32) DEVICE="ESP32"; shift; ;;
-	--query) QUERY="ok"; shift; ;;
-	--erase) QUERY="ok"; ERASE="ok"; shift; ;;
-	--flash) QUERY="ok"; FLASH="ok"; shift; IMAGE="$1"; shift; ;;
-	--port) shift; PORT="$1"; shift; ;;
-	--baud) shift; BAUD="$1"; shift; ;;
-	--noreset) NORESET="ok"; shift; ;;
+	--esp32)   shift; DEVICE="ESP32"; ;;
+	--query)   shift; QUERY="ok"; ;;
+	--erase)   shift; QUERY="ok"; ERASE="ok"; ;;
+	--flash)   shift; QUERY="ok"; FLASH="ok"; IMAGE="$1"; shift; ;;
+	--port)    shift; PORT="$1"; shift; ;;
+	--baud)    shift; BAUD="$1"; shift; ;;
+	--noreset) shift; NORESET="ok"; ;;
 	*) shift; ;;
     esac
 done
@@ -56,26 +57,31 @@ done
 # check if files exist
 [ "${FLASH}" = "ok" -a ! -f "${IMAGE}" ] && { echo "[error] Image file ${IMAGE} missing"; exit 1; }
 
-# general options
-ARR_PARAM=( )
-[ "${PORT}" != "" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "--port" "${PORT}" )
-[ "${BAUD}" != "" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "--baud" "${BAUD}" )
-[ "${NORESET}" = "ok" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "--before" "no_reset" )
-
 # generate temporary files and directory
-TMP_DIR=$(mktemp -d -t "flash-XXXXXXXX")
+TMP_DIR=$(mktemp -t -d "flash-XXXXXXXX")
 TMP_CHIP="${TMP_DIR}/chip.txt"
 
-# get device specs
-# if erase
+# -----------
+#   options
+# -----------
+
+ARR_PARAM=( )
+[ "${PORT}" != "" ]     && ARR_PARAM=( "${ARR_PARAM[@]}" "--port" "${PORT}" )
+[ "${BAUD}" != "" ]     && ARR_PARAM=( "${ARR_PARAM[@]}" "--baud" "${BAUD}" )
+[ "${NORESET}" = "ok" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "--before" "no_reset" )
+
+# ----------
+#   query
+# ----------
+
 if [ "${QUERY}" = "ok" ]
 then
 	# query chipset
-	esptool.py "${ARR_PARAM[@]}" "flash_id" > "${TMP_CHIP}"
-	MODEL=$(cat "${TMP_CHIP}" | grep "Chip is" | cut -d' ' -f3-)
-	SIZE=$(cat "${TMP_CHIP}" | grep "flash size:" | cut -d':' -f2 | xargs)
-	MAC=$(cat "${TMP_CHIP}" | grep "MAC:" | cut -d':' -f2- | xargs)
-
+	esptool "${ARR_PARAM[@]}" "flash-id" > "${TMP_CHIP}"
+	MODEL=$(cat "${TMP_CHIP}"  | grep "Chip type"     | cut -d':' -f2 | xargs)
+	SIZE=$(cat "${TMP_CHIP}"   | grep "flash size:" | cut -d':' -f2  | xargs)
+	FEATURE=$(cat "${TMP_CHIP}"   | grep "Features:" | cut -d':' -f2  | xargs)
+	MAC=$(cat "${TMP_CHIP}"    | grep "MAC:"        | cut -d':' -f2- | xargs)
 	IS_ESP32=$(echo "${MODEL}" | grep -i "ESP32")
 	[ "${IS_ESP32}" != "" ] && DEVICE="ESP32"
 
@@ -84,33 +90,43 @@ then
 	echo "----- Device -----"
 	echo "Model : ${MODEL}"
 	echo "Size  : ${SIZE}"
+	echo "Size  : ${FEATURE}"
 	echo "MAC   : ${MAC}"
 fi
 
-# if erase
+# ----------
+#   erase
+# ----------
+
 if [ "${ERASE}" = "ok" ]
 then
-	# erase device with file filed with 0
 	echo ""
 	echo "----- Erase ${DEVICE} -----"
-	esptool.py "${ARR_PARAM[@]}" "erase_flash"
+	
+	echo "esptool ${ARR_PARAM[@]} erase-flash"
+        esptool "${ARR_PARAM[@]}" "erase-flash"
 	sleep 2
 fi
 
-# if flash
+# ----------
+#   flash
+# ----------
+
 if [ "${FLASH}" = "ok" ]
 then
-	# wait for program mode
 	echo ""
 	echo "----- Flash ${DEVICE} -----"
 
 	# options
-	[ "${DEVICE}" = "ESP32" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "write_flash" "-fs" "detect" "-fm" "dio" "0x00000" ) \
-                                  || ARR_PARAM=( "${ARR_PARAM[@]}" "write_flash" "-fs" "detect" "0x00000" )
+	ARR_PARAM=( "${ARR_PARAM[@]}" "write-flash" "--flash-size" "detect" )
+	[ "${DEVICE}" = "ESP32" ] && ARR_PARAM=( "${ARR_PARAM[@]}" "--flash-mode" "keep" )
+	ARR_PARAM=( "${ARR_PARAM[@]}" "0x00000" )
 
 	# flash image
-	esptool.py "${ARR_PARAM[@]}" "${IMAGE}"
+	echo "esptool ${ARR_PARAM[@]} ${IMAGE}"
+        esptool "${ARR_PARAM[@]}" "${IMAGE}"
 fi
 
 # remove temporary directory
 rm -r "${TMP_DIR}"
+
