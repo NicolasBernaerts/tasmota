@@ -4,7 +4,7 @@
 
 ⚠️ Ce firmware n'est pas le firmware officiel **Teleinfo** de **Tasmota**, c'est une version, originellement développée **from scratch** pour mes propres besoins. 
 
-Mais, grâce aux bienfaits du monde de l'Open source, ce projet a fortement évolué, en particulier gâce à **Charles Hallard** (à l'origine du port officiel Teleinfo de Tasmota) et à **Jérôme Ferrari** (université de Grenoble, GE2lab). 
+Mais, grâce aux bienfaits du monde de l'Open source, ce projet a fortement évolué, en particulier grâce à **Charles Hallard** (à l'origine du port officiel Teleinfo de Tasmota) et à **Jérôme Ferrari** (université de Grenoble, GE2lab). 
 
 L'association avec un concepteur hardware hors pair (Charles) et un universitaire travaillant pour des projets européens (Jérôme) a permis à ce fork de se développer et de coller au plus près aux besoins de notre transition énergétique. Cette aventure est autant humaine que technologique. Longue vie à l' **Open Source** !
 
