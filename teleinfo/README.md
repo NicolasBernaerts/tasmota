@@ -2,7 +2,9 @@
 
 <img src="./screen/teleinfo-intro-power.png" width=500 height=300> <img src="./screen/teleinfo-intro-histo.png" width=500 height=300>
 
-⚠️ Ce firmware n'est pas le firmware officiel **Teleinfo** de **Tasmota** publié en 2020 par Charles Hallard. 
+⚠️ Ce firmware n'est pas le firmware officiel **Teleinfo** de **Tasmota**.
+
+C'est une version développée **from scratch**, conjointement avec **Charles Hallard** (à l'origine du port officiel Teleinfo de Tasmota) et **Jérôme Ferrari** (université de Grenoble, GE2lab). 
 
 ## Presentation
 
