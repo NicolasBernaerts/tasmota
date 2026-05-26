@@ -2,9 +2,11 @@
 
 <img src="./screen/teleinfo-intro-power.png" width=500 height=300> <img src="./screen/teleinfo-intro-histo.png" width=500 height=300>
 
-⚠️ Ce firmware n'est pas le firmware officiel **Teleinfo** de **Tasmota**.
+⚠️ Ce firmware n'est pas le firmware officiel **Teleinfo** de **Tasmota**, c'est une version, originellement développée **from scratch** pour mes propres besoins. 
 
-C'est une version développée **from scratch**, conjointement avec **Charles Hallard** (à l'origine du port officiel Teleinfo de Tasmota) et **Jérôme Ferrari** (université de Grenoble, GE2lab). 
+Mais, grâce aux bienfaits du monde de l'Open source, ce projet a fortement évolué, en particulier gâce à **Charles Hallard** (à l'origine du port officiel Teleinfo de Tasmota) et à **Jérôme Ferrari** (université de Grenoble, GE2lab). 
+
+L'association avec un concepteur hardware hors pair (Charles) et un universitaire travaillant pour des projets européens (Jérôme) a permis à ce fork de se développer et de coller au plus près aux besoins de notre transition énergétique. Cette aventure est autant humaine que technologique. Longue vie à l' **Open Source** !
 
 ## Presentation
 
@@ -18,6 +20,7 @@ Cette évolution du firmware **Tasmota** permet de :
   * visualiser les trames reçues en temps réel
   * fournir des graphs de suivi (VA, W, V et cosφ)
   * suivre l'historique de consommation/production
+  * suivre une production de type **revente** ou de type **cacsi**
   * publier pour **Domoticz**, **Home Assistant**, **Homie** et **Thingsboard**
   * alimenter une base **InfluxDB**
   * s'abonner aux API RTE **TempoLight**, **Tempo**, **Pointe** et **Ecowatt**
@@ -39,7 +42,7 @@ Il a été compilé et testé sur les ESP suivants :
 
   * **ESP8266** (1Mb, 4Mb et 16Mb)
   * **ESP32** (4Mb) et **ESP32 Denky D4** (8Mb)
-  * **ESP32C3** (4Mb) et **Winky ESP32C3 / ESP32C6** auto-alimenté (4Mb)
+  * **ESP32C3** (4Mb) et **Winky ESP32C6** auto-alimenté (4Mb)
   * **ESP32S2** (4Mb) et **ESP32S3** (4Mb et 16Mb)
 
 Sur la page d'acceuil, chaque section peut être minimisée ou maximisée par un simple clic de souris.
@@ -67,6 +70,7 @@ Voici un tableau récapitulatif des fonctionnalités par famille d'ESP :
 | Trames temps réel             |     x      |      x      |      x      |                  |
 | Graph temps réel              |    live    |    live     |      x      |                  |
 | Historique de conso/prod      |            |      x      |      x      |                  |
+| Estimation production CACSI   |     x      |      x      |      x      |         x        |
 | Serveur TCP                   |     x      |      x      |      x      |                  |
 | Serveur FTP                   |            |             |      x      |                  |
 | Intégration Home Assistant    |     x      |      x      |      x      |         x        |
