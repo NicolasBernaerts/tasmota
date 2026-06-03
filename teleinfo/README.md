@@ -474,8 +474,9 @@ La liste des commandes de configuration du winky est accessible via la commande 
                              1.00 a 9.99 : multiplicateur duree eveil
                              10 ou +     : duree fixe (max 120)
      - winky_max <val>     = nbre de trames avant deepsleep [3]
+                             0      : attente tension basse
                              2 ou + : valeurs acceptables
-     - winky_start <volt>  = ension min. démarrage [4.50]
+     - winky_start <volt>  = tension min. démarrage [4.50]
      - winky_stop <volt>   = tension min. arrêt [3.90]
      - winky_ref <farad>   = capacité super capa (F) [1.50]
      - winky_coeff         = raz coefficients ajustement des tensions
