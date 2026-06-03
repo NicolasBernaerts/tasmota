@@ -12,6 +12,7 @@
     03/07/2025 v1.5 - Rename to xsns_126_teleinfo_domoticz.ino
     10/07/2025 v2.0 - Refactoring based on Tasmota 15
     07/09/2025 v2.1 - Limit publications to 1 per sec.
+    17/03/2026 v2.2 - Publish production excess for CACSI contract
 
   Configuration values are stored in :
 
@@ -345,7 +346,8 @@ uint8_t TeleinfoDomoticzPublishNext ()
       // prod
       case DOMO_DATA_METER_PROD:
         lltoa (teleinfo_prod_wh.total, str_total_1, 10);
-        if (teleinfo_domoticz.use_va) value = teleinfo_prod.papp;
+        if (teleinfo_prod.cacsi) value = teleinfo_prod.papp;
+          else if (teleinfo_domoticz.use_va) value = teleinfo_prod.papp;
           else value = teleinfo_prod.pact;
         sprintf_P (str_svalue, PSTR ("%s;%s;0;0;%d;0"), str_total_1, str_total_2, value);
         break;
@@ -353,7 +355,7 @@ uint8_t TeleinfoDomoticzPublishNext ()
       // current hc / hp
       case DOMO_DATA_ALERT_HCHP:
         nvalue = 1;
-        if (TeleinfoPeriodGetHP ()) nvalue = 0;
+        if (TeleinfoContractGetPeriodHP ()) nvalue = 0;
         if (nvalue == 0) strcpy_P (str_svalue, PSTR ("Heure Pleine")); 
           else strcpy_P (str_svalue, PSTR ("Heure Creuse"));
         break;

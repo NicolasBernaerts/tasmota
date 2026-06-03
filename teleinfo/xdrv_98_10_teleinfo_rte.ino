@@ -570,12 +570,10 @@ void TeleinfoRteLoadData ()
           file.read ((uint8_t*)&rte_pointe_status,  sizeof (rte_pointe_status));
         }
       }
+      else AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Attention, format de stockage different. Configuration RTE réinitialisée !"));
 
       // close file
       file.close ();
-
-      // log
-      AddLog (LOG_LEVEL_DEBUG, PSTR ("RTE: Config loaded from %s, renamed to %s"), PSTR_RTE_CFG, PSTR_RTE_OLD);
     }
   }
 
@@ -1842,10 +1840,10 @@ void TeleinfoRteInit ()
   TeleinfoRteLoadData ();
   
   // log help command
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: tapez rte pour avoir de l'aide sur le module RTE"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Run rte to get help on RTE integration"));
 
   // log RTE key missing
-  if (strlen (rte_config.str_private_key) == 0) AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Clé privée Base64 manquante"));
+  if (strlen (rte_config.str_private_key) == 0) AddLog (LOG_LEVEL_INFO, PSTR ("RTE: Private key missing (base64)"));
 }
 
 // called every second

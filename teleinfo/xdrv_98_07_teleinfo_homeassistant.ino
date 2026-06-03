@@ -18,6 +18,7 @@
     22/09/2025 v2.2 - Add solar production and solar forecast
     21/11/2025 v2.3 - Add volt and load ALERT
     29/11/2025 v2.4 - Handle suppression of retain data according to publication selection
+    28/02/2026 v2.5 - Handle suppression of prod data according to production status
 
   Configuration values are stored in :
     - Settings->rf_code[16][0]  : Flag en enable/disable integration
@@ -292,20 +293,20 @@ void TeleinfoHomeAssistantPublish (const uint8_t stage, const uint8_t index)
     case TIC_PUB_CALENDAR_TOMRW:  pstr_param = HOMEASSISTANT_PUB_CALENDAR_TOMRW;  break;
 
     // production
-    case TIC_PUB_PROD_P:          pstr_param = HOMEASSISTANT_PUB_PROD_P;          break;
-    case TIC_PUB_PROD_W:          pstr_param = HOMEASSISTANT_PUB_PROD_W;          break;
-    case TIC_PUB_PROD_C:          pstr_param = HOMEASSISTANT_PUB_PROD_C;          break;
-    case TIC_PUB_PROD_YTDAY:      pstr_param = HOMEASSISTANT_PUB_PROD_YTDAY;      break;
-    case TIC_PUB_PROD_TODAY:      pstr_param = HOMEASSISTANT_PUB_PROD_TODAY;      break;
+    case TIC_PUB_PROD_P:          pstr_param = HOMEASSISTANT_PUB_PROD_P;     publish = (teleinfo_prod.enabled || teleinfo_prod.cacsi); break;
+    case TIC_PUB_PROD_W:          pstr_param = HOMEASSISTANT_PUB_PROD_W;     publish = teleinfo_prod.enabled; break;
+    case TIC_PUB_PROD_C:          pstr_param = HOMEASSISTANT_PUB_PROD_C;     publish = teleinfo_prod.enabled; break;
+    case TIC_PUB_PROD_YTDAY:      pstr_param = HOMEASSISTANT_PUB_PROD_YTDAY; publish = teleinfo_prod.enabled; break;
+    case TIC_PUB_PROD_TODAY:      pstr_param = HOMEASSISTANT_PUB_PROD_TODAY; publish = teleinfo_prod.enabled; break;
 
     // conso
-    case TIC_PUB_CONSO_U:         pstr_param = HOMEASSISTANT_PUB_CONSO_U;         break;
-    case TIC_PUB_CONSO_I:         pstr_param = HOMEASSISTANT_PUB_CONSO_I;         break;
-    case TIC_PUB_CONSO_P:         pstr_param = HOMEASSISTANT_PUB_CONSO_P;         break;
-    case TIC_PUB_CONSO_W:         pstr_param = HOMEASSISTANT_PUB_CONSO_W;         break;
-    case TIC_PUB_CONSO_C:         pstr_param = HOMEASSISTANT_PUB_CONSO_C;         break;
-    case TIC_PUB_CONSO_YTDAY:     pstr_param = HOMEASSISTANT_PUB_CONSO_YTDAY;     break;
-    case TIC_PUB_CONSO_TODAY:     pstr_param = HOMEASSISTANT_PUB_CONSO_TODAY;     break;
+    case TIC_PUB_CONSO_U:         pstr_param = HOMEASSISTANT_PUB_CONSO_U;     break;
+    case TIC_PUB_CONSO_I:         pstr_param = HOMEASSISTANT_PUB_CONSO_I;     break;
+    case TIC_PUB_CONSO_P:         pstr_param = HOMEASSISTANT_PUB_CONSO_P;     break;
+    case TIC_PUB_CONSO_W:         pstr_param = HOMEASSISTANT_PUB_CONSO_W;     break;
+    case TIC_PUB_CONSO_C:         pstr_param = HOMEASSISTANT_PUB_CONSO_C;     break;
+    case TIC_PUB_CONSO_YTDAY:     pstr_param = HOMEASSISTANT_PUB_CONSO_YTDAY; break;
+    case TIC_PUB_CONSO_TODAY:     pstr_param = HOMEASSISTANT_PUB_CONSO_TODAY; break;
 
     // 3 phases
     case TIC_PUB_PH1_U: pstr_param = HOMEASSISTANT_PUB_PH1_U; publish = (teleinfo_contract.phase > 1); break;
@@ -333,7 +334,7 @@ void TeleinfoHomeAssistantPublish (const uint8_t stage, const uint8_t index)
       break;
 
     // production counter
-    case TIC_PUB_TOTAL_PROD:  pstr_param = HOMEASSISTANT_PUB_TOTAL_PROD;  break;
+    case TIC_PUB_TOTAL_PROD:  pstr_param = HOMEASSISTANT_PUB_TOTAL_PROD; publish = teleinfo_prod.enabled; break;
 
     // conso global counter
     case TIC_PUB_TOTAL_CONSO: pstr_param = HOMEASSISTANT_PUB_TOTAL_CONSO; break;
@@ -341,10 +342,10 @@ void TeleinfoHomeAssistantPublish (const uint8_t stage, const uint8_t index)
     // loop thru conso period counters
     case TIC_PUB_TOTAL_INDEX:
       pstr_param = HOMEASSISTANT_PUB_TOTAL_PERIOD;
-      TeleinfoPeriodGetLabel (str_text2, sizeof (str_text2), index);
+      TeleinfoContractGetPeriodLabel (str_text2, sizeof (str_text2), index);
       sprintf_P (str_name, GetTextIndexed (str_text1, sizeof (str_text1), 0, pstr_param), str_text2);
       sprintf_P (str_id,   GetTextIndexed (str_text1, sizeof (str_text1), 1, pstr_param), index);
-      TeleinfoPeriodGetCode (str_text2, sizeof (str_text2), index);
+      TeleinfoContractGetPeriodCode (str_text2, sizeof (str_text2), index);
       sprintf_P (str_key,  GetTextIndexed (str_text1, sizeof (str_text1), 2, pstr_param), str_text2);
       break;
 
@@ -354,8 +355,8 @@ void TeleinfoHomeAssistantPublish (const uint8_t stage, const uint8_t index)
 
 #ifdef USE_TELEINFO_SOLAR
     // solar
-    case TIC_PUB_SOLAR_W:        pstr_param = HOMEASSISTANT_PUB_SOLAR_W;        publish = teleinfo_solar.enabled;    break;
-    case TIC_PUB_SOLAR_TOTAL:    pstr_param = HOMEASSISTANT_PUB_SOLAR_TOTAL;    publish = teleinfo_solar.enabled;    break;
+    case TIC_PUB_SOLAR_W:        pstr_param = HOMEASSISTANT_PUB_SOLAR_W;        publish = teleinfo_solar.enabled; break;
+    case TIC_PUB_SOLAR_TOTAL:    pstr_param = HOMEASSISTANT_PUB_SOLAR_TOTAL;    publish = teleinfo_solar.enabled; break;
 
     // forecast
     case TIC_PUB_FORECAST_W:     pstr_param = HOMEASSISTANT_PUB_FORECAST_W;     publish = teleinfo_forecast.enabled; break;

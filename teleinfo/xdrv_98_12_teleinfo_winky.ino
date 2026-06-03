@@ -14,6 +14,7 @@
                       Conversion from sensor to driver
     01/08/2025 v3.1 - Add winky_display command
     19/09/2025 v3.2 - Hide and Show with click on main page display
+    12/10/2025 v3.3 - Change on winky_max command
 
   Configuration values are stored in :
     - Settings->knx_GA_addr[0..2] : multiplicator
@@ -161,7 +162,7 @@ void CmndTeleinfoWinkyHelp ()
   AddLog (LOG_LEVEL_INFO, PSTR ("                         0           : calcul base sur la tension"));
   AddLog (LOG_LEVEL_INFO, PSTR ("                         1.00 a 9.99 : multiplicateur duree eveil"));
   AddLog (LOG_LEVEL_INFO, PSTR ("                         10 ou +     : duree fixe (max %us)"), WINKY_SLEEP_MAXIMUM / 1000);
-  AddLog (LOG_LEVEL_INFO, PSTR (" - winky_max <val>     = nbre de trames avant deepsleep [%u]"), teleinfo_winky.meter.max_msg);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - winky_max <val>     = nbre de trames avant deepsleep [%d]"), teleinfo_winky.meter.max_msg);
   AddLog (LOG_LEVEL_INFO, PSTR ("                         0      : attente tension basse"));
   AddLog (LOG_LEVEL_INFO, PSTR ("                         %u ou + : valeurs acceptables"), TIC_MESSAGE_MIN);
   AddLog (LOG_LEVEL_INFO, PSTR (" - winky_start <volt>  = tension min. démarrage [%u.%02u]"), teleinfo_winky.volt.start / 1000, (teleinfo_winky.volt.start % 1000) / 10);
@@ -195,14 +196,14 @@ void CmndTeleinfoWinkySleep ()
 // Set maximum number of messages before deepsleep
 void CmndTeleinfoWinkyMax ()
 {
-  if (XdrvMailbox.data_len > 0)
+  if (XdrvMailbox.payload >= 0)
   {
     // set value
     teleinfo_winky.meter.max_msg = (long)XdrvMailbox.payload;
     if ((teleinfo_winky.meter.max_msg > 0) && (teleinfo_winky.meter.max_msg < TIC_MESSAGE_MIN)) teleinfo_winky.meter.max_msg = TIC_MESSAGE_MIN;
 
     // save value
-    Settings->knx_GA_addr[8] = (uint16_t)XdrvMailbox.payload;
+    Settings->knx_GA_addr[8] = (uint16_t)teleinfo_winky.meter.max_msg;
     SettingsSave (0);
   }
   
@@ -705,8 +706,8 @@ void TeleinfoWinkyEverySecond ()
 #endif    // USE_TELEINFO_INFLUXDBD
 
 #ifdef USE_TELEINFO_AWTRIX
-      // display next Awtrix page
-      TeleinfoAwtrixDisplayNextPage ();
+      // update Awtrix data
+      TeleinfoAwtrixUpdatePage ();
 #endif    // USE_TELEINFO_AWTRIX
 
       // calculate deepsleep time to go to sleep
@@ -718,25 +719,6 @@ void TeleinfoWinkyEverySecond ()
   }
 }
 
-/*
-// called every second to check meter max volatge level
-void TeleinfoWinkyCheckMaxVoltage ()
-{
-  bool save = false;
-
-  // if max voltage reached, save new max
-  if (teleinfo_winky.meter.volt < teleinfo_winky.linky.volt)
-  {
-    teleinfo_winky.meter.volt = teleinfo_winky.linky.volt;
-    Settings->knx_GA_addr[7]  = (uint16_t)teleinfo_winky.meter.volt;
-    save = true;
-   }
-
-  // if needed, save config
-  if (save) SettingsSave (0);
-}
-*/
-
 // called to append winky InfluxDB data
 void TeleinfoWinkyInfluxDbAppendData ()
 {
@@ -745,10 +727,6 @@ void TeleinfoWinkyInfluxDbAppendData ()
   // number of received messages
   snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u\n"), PSTR ("winky"), TasmotaGlobal.hostname, PSTR ("msg"), teleinfo_meter.nb_message);
   TasmotaGlobal.mqtt_data += str_line;
-
-  // number of calculated cosphi
-//  snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%d\n"), PSTR ("winky"), TasmotaGlobal.hostname, PSTR ("nb-cos"), teleinfo_conso.cosphi.quantity + teleinfo_prod.cosphi.quantity);
-//  TasmotaGlobal.mqtt_data += str_line;
 
   // capacitor reference
   snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u.%02u\n"), PSTR ("winky"), TasmotaGlobal.hostname, PSTR ("capa"), teleinfo_winky.farad.ref / 1000, teleinfo_winky.farad.ref % 1000 / 10);

@@ -10,6 +10,7 @@
     30/04/2025 v2.1 - Optimize memory usage for ESP8266 
     10/07/2025 v3.0 - Refactoring based on Tasmota 15
     22/08/2025 v3.1 - Add solar production active power
+    17/03/2026 v3.2 - Display production excess for CACSI contract
 
   RAM : esp8266 2239 bytes
         esp32   19283 bytes
@@ -32,8 +33,6 @@
 /*************************************************\
  *               Variables
 \*************************************************/
-
-#define GRAPH_VERSION                 2               // saved data version
 
 #define GRAPH_LIVE_DURATION           15              // live recording delay (in minutes)
 
@@ -67,6 +66,7 @@ const char PSTR_GRAPH_PAGE_DATA[]     PROGMEM = "/data.upd";
 const char PSTR_GRAPH_PAGE_CURVE[]    PROGMEM = "/curve.upd";
 
 // data file
+#define GRAPH_VERSION                 2               // saved data version
 const char PSTR_GRAPH_DATA_FILE[]     PROGMEM = "/teleinfo-graph.dat";
 
 // graph resolution and periods
@@ -343,6 +343,7 @@ void TeleinfoGraphInit ()
       file.read ((uint8_t*)&time_save,      sizeof (time_save));
       file.read ((uint8_t*)&tic_graph_slot, sizeof (tic_graph_slot));
     }
+    else AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Attention, format de stockage different. Configuration Courbes réinitialisée !"));
     file.close ();
   }
 #endif    // USE_UFILESYS
@@ -457,7 +458,7 @@ void TeleinfoGraphDisplayUnits (const uint8_t data_type)
 // Append Teleinfo curve button to main page
 void TeleinfoGraphWebMainButton ()
 {
-  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s %s</button></form></p>\n"), PSTR_GRAPH_PAGE, PSTR (TIC_TELEINFO), PSTR ("Courbes"));
+  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), PSTR_GRAPH_PAGE, PSTR ("Courbes compteur"));
 }
 
 // Display graph time marks
@@ -570,8 +571,8 @@ void TeleinfoGraphDisplayCurve (const uint8_t data, const uint8_t period, const 
   if (graph_status.max_power == 0) return;
   if (data >= TELEINFO_UNIT_MAX) return;
   if (phase >= TIC_PHASE_END) return;
-  if ((phase == TIC_PHASE_PROD) && !teleinfo_prod.enabled) return;
   if ((phase == TIC_PHASE_PROD) && (data == TELEINFO_UNIT_V)) return;
+  if ((phase == TIC_PHASE_PROD) && (data != TELEINFO_UNIT_VA) && (!teleinfo_prod.enabled && !teleinfo_prod.cacsi)) return;
   if ((phase == TIC_PHASE_SOLAR) && !teleinfo_solar.enabled) return;
   if ((phase == TIC_PHASE_SOLAR) && (data != TELEINFO_UNIT_W)) return;
   if ((phase == TIC_PHASE_FORECAST) && !teleinfo_forecast.enabled) return;
@@ -1028,7 +1029,7 @@ void TeleinfoGraphWebDisplayPage ()
   }
 
   // production
-  if (teleinfo_prod.enabled && (graph_status.data != TELEINFO_UNIT_V)) 
+  if (teleinfo_prod.enabled || (teleinfo_prod.cacsi && (graph_status.data == TELEINFO_UNIT_VA)))
   {
     // display context
     mask = 0x01 << 2;
@@ -1140,7 +1141,8 @@ void TeleinfoGraphWebUpdateData ()
   {
     // check if data should be displayed
     display  = (phase < teleinfo_contract.phase);
-    display |= ((phase == TIC_PHASE_PROD) && teleinfo_prod.enabled);
+    display |= ((phase == TIC_PHASE_PROD) && (teleinfo_prod.enabled || teleinfo_prod.cacsi));
+//    display |= (phase == TIC_PHASE_PROD);
     display |= ((phase == TIC_PHASE_SOLAR) && teleinfo_solar.enabled);
     display |= ((phase == TIC_PHASE_FORECAST) && teleinfo_forecast.enabled);
 
@@ -1175,10 +1177,10 @@ void TeleinfoGraphWebUpdateCurve ()
   {
     // check if curve should be displayed
     display = false;
-    if (phase < TIC_PHASE_PROD) display = (teleinfo_conso.enabled && (graph_status.display & (0x01 << (phase + 3))));
-    else if (phase == TIC_PHASE_PROD) display = (teleinfo_prod.enabled && (graph_status.display & (0x01 << 2)));
-    else if (phase == TIC_PHASE_SOLAR) display = (teleinfo_solar.enabled && (graph_status.display & (0x01 << 1)));
-    else if (phase == TIC_PHASE_FORECAST) display = (teleinfo_forecast.enabled && (graph_status.display & (0x01 << 0)));
+    if (phase < TIC_PHASE_PROD)           display = ((graph_status.display & (0x01 << (phase + 3))) && teleinfo_conso.enabled);
+    else if (phase == TIC_PHASE_PROD)     display = ((graph_status.display & (0x01 << 2))           && (teleinfo_prod.enabled || teleinfo_prod.cacsi));
+    else if (phase == TIC_PHASE_SOLAR)    display = ((graph_status.display & (0x01 << 1))           && teleinfo_solar.enabled);
+    else if (phase == TIC_PHASE_FORECAST) display = ((graph_status.display & (0x01 << 0))           && teleinfo_forecast.enabled);
     
     // if needed, display curve
     if (display) TeleinfoGraphDisplayCurve (graph_status.data, graph_status.period, phase);

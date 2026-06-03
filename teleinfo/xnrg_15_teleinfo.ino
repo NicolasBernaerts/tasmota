@@ -117,6 +117,11 @@
                           Detect Week-end period as HC
                           Save data at midnight and on period change (to avoid spikes on reboot)
                           Rework of ALERT section to separate volt, load and period
+    17/03/2026 - v15.2  - Estimate production excess for CACSI contract
+                          Disable baudrate auto-detect, set to 1200 by default (mode Historique)
+
+  Configuration :
+      Settings->rf_code[15][8] : connexion speed
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -141,9 +146,8 @@
 
 bool TeleinfoEnergyHandleCommand ()
 {
-  bool    serviced  = true;
-  bool    to_save   = false;
-  bool    to_reboot = false;
+  bool    serviced = true;
+  bool    to_save  = false;
   uint8_t result;
   int     index;
   long    value;
@@ -158,24 +162,25 @@ bool TeleinfoEnergyHandleCommand ()
     // if no parameter, show configuration
     if (XdrvMailbox.data_len == 0) 
     {
-      AddLog (LOG_LEVEL_INFO, PSTR ("EnergyConfig Teleinfo parameters :"));
+      AddLog (LOG_LEVEL_INFO, PSTR ("Paramètres EnergyConfig :"));
       AddLog (LOG_LEVEL_INFO, PSTR ("  reset          raz des donnees du contrat (nécessite un redémarrage)"));
       AddLog (LOG_LEVEL_INFO, PSTR ("  historique     mode historique (redémarrage)"));
       AddLog (LOG_LEVEL_INFO, PSTR ("  standard       mode standard (redémarrage)"));
-      AddLog (LOG_LEVEL_INFO, PSTR ("  prod=%d      puissance produite maximum (W)"), teleinfo_config.prod_max);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  speed=%u     vitesse série spécifique (redémarrage)"), teleinfo_config.baudrate);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  detect         detection de la vitesse (redémarrage)"));
       AddLog (LOG_LEVEL_INFO, PSTR ("  display=%u      affichage sur page acceuil [0/1]"), teleinfo_config.display);
       AddLog (LOG_LEVEL_INFO, PSTR ("  stats          statistiques de reception"));
-      AddLog (LOG_LEVEL_INFO, PSTR ("  noraw          pas d'emission trame TIC"));
-      AddLog (LOG_LEVEL_INFO, PSTR ("  full           emission du topic TIC"));
-      AddLog (LOG_LEVEL_INFO, PSTR ("  live=%u         emission du topic LIVE [0/1]"), teleinfo_config.live);
       AddLog (LOG_LEVEL_INFO, PSTR ("  calraz         remise a 0 des plages du calendrier"));
-      AddLog (LOG_LEVEL_INFO, PSTR ("  calhexa=%u      format des plages horaires Linky [0:decimal/1:hexa]"), teleinfo_config.cal_hexa);
-      AddLog (LOG_LEVEL_INFO, PSTR ("  skip=%u         emet les topic TIC/LIVE toutes les xx trames"), teleinfo_config.skip);
-      AddLog (LOG_LEVEL_INFO, PSTR ("  error=%u        affiche les compteurs d'erreurs [0/1]"), teleinfo_config.error);
-      AddLog (LOG_LEVEL_INFO, PSTR ("  percent=%u    puissance maximale acceptable (%% du contrat)"), teleinfo_config.percent);
-      AddLog (LOG_LEVEL_INFO, PSTR ("  trigger=%d   puissance produite déclenchant le relai de production (W)"), teleinfo_config.prod_trigger);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  calhexa=%u      format plages horaires Linky [0:decimal/1:hexa]"), teleinfo_config.cal_hexa);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  error=%u        affichage compteurs d'erreurs [0/1]"), teleinfo_config.error);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  percent=%u    pourcentage acceptable du contrat (%%)"), teleinfo_config.percent);
+
+      AddLog (LOG_LEVEL_INFO, PSTR ("Production :"));
+      AddLog (LOG_LEVEL_INFO, PSTR ("  prod=%d        puissance maximum (W)"), teleinfo_config.prod_max);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  trigger=%d     puissance déclenchant relai de production (W)"), teleinfo_config.prod_trigger);
 
       // publishing policy
+      AddLog (LOG_LEVEL_INFO, PSTR ("Publication :"));
       strcpy_P (str_line, PSTR (""));
       for (index = 0; index < TIC_POLICY_MAX; index++)
       {
@@ -184,14 +189,17 @@ bool TeleinfoEnergyHandleCommand ()
         if (strlen (str_line) > 0) strcat_P (str_line, PSTR (", "));
         strlcat (str_line, str_item, sizeof (str_line));
       }
-      AddLog (LOG_LEVEL_INFO, PSTR ("  policy=%u       politique de publication : %s"), teleinfo_config.policy, str_line);
-
-      // publishing type
-      AddLog (LOG_LEVEL_INFO, PSTR ("  meter=%u        publication sections METER & CONTRACT [0/1]"), teleinfo_config.meter);
-      AddLog (LOG_LEVEL_INFO, PSTR ("  calendar=%u     publication section CAL [0/1]"), teleinfo_config.calendar);
-      AddLog (LOG_LEVEL_INFO, PSTR ("  relay=%u        publication section RELAY [0/1]"), teleinfo_config.relay);
-      AddLog (LOG_LEVEL_INFO, PSTR ("  period=%u       affichage couleur periode en cours [0/1]"), teleinfo_config.led);
-      AddLog (LOG_LEVEL_INFO, PSTR ("  bright=%u      luminosite d'affichage LED [0..100]"), teleinfo_config.brightness);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  policy=%u       %s"), teleinfo_config.policy, str_line);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  meter=%u        sections METER & CONTRACT [0/1]"), teleinfo_config.meter);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  calendar=%u     section CAL [0/1]"), teleinfo_config.calendar);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  relay=%u        section RELAY [0/1]"), teleinfo_config.relay);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  noraw          pas d'emission trame TIC"));
+      AddLog (LOG_LEVEL_INFO, PSTR ("  full           emission topic TIC"));
+      AddLog (LOG_LEVEL_INFO, PSTR ("  live=%u         emission topic LIVE [0/1]"), teleinfo_config.live);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  skip=%u         TIC/LIVE toutes les xx trames"), teleinfo_config.skip);
+      AddLog (LOG_LEVEL_INFO, PSTR ("LED :"));
+      AddLog (LOG_LEVEL_INFO, PSTR ("  period=%u       couleur de la periode en cours [0/1]"), teleinfo_config.led);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  bright=%u     luminosite [0..100]"), teleinfo_config.brightness);
     }
 
     // else some configuration params are given
@@ -214,21 +222,16 @@ bool TeleinfoEnergyHandleCommand ()
         index = GetCommandCode (str_item, sizeof(str_item), pstr_key, kTeleinfoEnergyCommands);
         if (pstr_value != nullptr) value = atol (pstr_value);
           else value = LONG_MAX;
-        result = TeleinfoEnergyExecuteCommand (index, value);
-
-        // handle result
-        if (result != TIC_COMMAND_NOTHING) to_save   = true;
-        if (result == TIC_COMMAND_REBOOT)  to_reboot = true;
+        to_save |= TeleinfoEnergyExecuteCommand (index, value);
       } 
       while (pstr_next != nullptr);
     }
 
-    // if needed, restart or save settings
-    if (to_reboot) TasmotaGlobal.restart_flag = 2;
-    else if (to_save) 
+    if (to_save) 
     {
-      TeleinfoDriverSaveSettings ();
       TeleinfoDriverSaveData ();
+      TeleinfoDriverSaveSettings ();
+//      SettingsSave (0);
     }
   }
 
@@ -238,13 +241,13 @@ bool TeleinfoEnergyHandleCommand ()
 // execute one energyconfig command
 //   1st param : command index
 //   2nd param : argument (LONG_MAX if undefined)
-uint8_t TeleinfoEnergyExecuteCommand (const int command, const long value)
+bool TeleinfoEnergyExecuteCommand (const int command, const long value)
 {
-  bool    status;
-  bool    to_save   = false;
-  bool    to_reboot = false;
-  uint8_t result, day;
-  long    counter;
+  bool     status;
+  bool     to_save   = false;
+  uint8_t  day;
+  uint32_t baudrate;
+  long     counter;
 
   // handle command
   switch (command)
@@ -261,20 +264,40 @@ uint8_t TeleinfoEnergyExecuteCommand (const int command, const long value)
       break;
 
     case TIC_CMND_HISTORIQUE:
-      to_reboot = true;
-      TasmotaGlobal.baudrate = 1200;
-      Settings->baudrate = TasmotaGlobal.baudrate / 300;
-      AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Historique (%d bauds)"), TasmotaGlobal.baudrate);
+      to_save = true;
+      TeleinfoContractChange ();
+      TeleinfoSetSpeed (1200);
       break;
 
     case TIC_CMND_STANDARD:
-      to_reboot = true;
-      TasmotaGlobal.baudrate = 9600;
-      Settings->baudrate = TasmotaGlobal.baudrate / 300;
-      AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Standard (%d bauds)"), TasmotaGlobal.baudrate);
+      to_save = true;
+      TeleinfoContractChange ();
+      TeleinfoSetSpeed (9600);
       break;
 
-    case TIC_CMND_NORAW:
+    case TIC_CMND_SPEED:
+      to_save = true;
+      TeleinfoContractChange ();
+      TeleinfoSetSpeed ((uint16_t)value);
+      break;
+
+    case TIC_CMND_DETECT:
+      to_save = true;
+      baudrate = TeleinfoEnergyDetectBaudRate ();
+      if (teleinfo_config.baudrate != baudrate)
+      {
+        TeleinfoContractChange ();
+        TeleinfoSetSpeed (baudrate);
+      }
+      break;
+
+    case TIC_CMND_RESET:
+      to_save = true;
+      TeleinfoContractChange ();
+      TeleinfoSetSpeed (TIC_DEFAULT_SPEED);
+      break;
+
+      case TIC_CMND_NORAW:
       to_save = teleinfo_config.tic;
       teleinfo_config.tic = false;
       AddLog (LOG_LEVEL_INFO, PSTR ("TIC: tic=0"));
@@ -309,11 +332,6 @@ uint8_t TeleinfoEnergyExecuteCommand (const int command, const long value)
       to_save = (teleinfo_config.error != (value != 0));
       if (to_save) teleinfo_config.error = (value != 0);
       AddLog (LOG_LEVEL_INFO, PSTR ("TIC: error=%u"), teleinfo_config.error);
-      break;
-
-    case TIC_CMND_RESET:
-      to_reboot = true;
-      TeleinfoContractChange ();
       break;
 
     case TIC_CMND_CALRAZ:
@@ -391,12 +409,8 @@ uint8_t TeleinfoEnergyExecuteCommand (const int command, const long value)
       break;
     }
 
-  // set result
-  if (to_reboot) result = TIC_COMMAND_REBOOT;
-    else if (to_save) result = TIC_COMMAND_SAVE;
-    else result = TIC_COMMAND_NOTHING;
-
-  return result;
+  //  return result;
+  return to_save;
 }
 
 /*********************************************\
@@ -411,7 +425,7 @@ bool TeleinfoEnergySerialIsStarted ()
 // Start serial reception
 void TeleinfoEnergySerialStart ()
 {
-  bool     is_ready = false;
+  bool is_ready = false;
   uint32_t baudrate;
 
   // if serial reception already active, ignore
@@ -423,18 +437,19 @@ void TeleinfoEnergySerialStart ()
   // GPIO selection step
   teleinfo_meter.serial = TIC_SERIAL_GPIO;
 
-  // if needed, detect teleinfo speed
-  baudrate = TasmotaGlobal.baudrate;
-  if (baudrate == 115200) baudrate = TeleinfoEnergyDetectBaudRate ();
-  if (baudrate != TasmotaGlobal.baudrate)
+  // check teleinfo baudrate validity
+  baudrate = (uint32_t)Settings->rf_code[15][8] * 300;
+  if ((baudrate == 0) || (baudrate > 19200))
   {
-    TasmotaGlobal.baudrate = baudrate;
-    Settings->baudrate = (uint16_t)(baudrate / 300);
-    SettingsSave (0);
-  }
+    // get default UART baudrate
+    baudrate = Settings->baudrate * 300;
 
-  // if baud rate is not valid, ignore
-  if (baudrate > 19200) return;
+    // if still not valid, set historique mode speed
+    if ((baudrate == 0) || (baudrate > 19200)) baudrate = TIC_DEFAULT_SPEED;
+
+    // set teleinfo baudrate
+    TeleinfoSetSpeed (baudrate);
+  }
 
   // GPIO selection step
   teleinfo_meter.serial = TIC_SERIAL_SPEED;
@@ -448,9 +463,11 @@ void TeleinfoEnergySerialStart ()
   teleinfo_serial = new TasmotaSerial (Pin (GPIO_TELEINFO_RX), -1, 1, 0);
 #endif
 
+  // serial port should not exist
   is_ready = (teleinfo_serial != nullptr);
 
-  if (is_ready) is_ready = teleinfo_serial->begin (TasmotaGlobal.baudrate, SERIAL_7E1);
+  // start and config serial port
+  if (is_ready) is_ready = teleinfo_serial->begin (baudrate, SERIAL_7E1);
 
   if (is_ready) 
   {
@@ -459,14 +476,14 @@ void TeleinfoEnergySerialStart ()
       teleinfo_serial->setRxBufferSize (TIC_RX_BUFFER);
 
       // log
-      AddLog (LOG_LEVEL_INFO, PSTR("TIC: Serial UART %d démarré à %ubps (buffer %u)"), teleinfo_serial->getUart (), TasmotaGlobal.baudrate, teleinfo_serial->getRxBufferSize ());
+      AddLog (LOG_LEVEL_INFO, PSTR("TIC: Serial UART %d démarré à %ubps (buffer %u)"), teleinfo_serial->getUart (), baudrate, teleinfo_serial->getRxBufferSize ());
 
 #else       // ESP8266
     // claim hardware serial port
     if (teleinfo_serial->hardwareSerial ()) ClaimSerial();
 
     // log
-    AddLog (LOG_LEVEL_INFO, PSTR("TIC: Serial démarré à %ubps (buffer %d)"), TasmotaGlobal.baudrate, teleinfo_serial->getRxBufferSize ());
+    AddLog (LOG_LEVEL_INFO, PSTR("TIC: Serial démarré à %ubps (buffer %d)"), baudrate, teleinfo_serial->getRxBufferSize ());
 #endif      // ESP32 & ESP8266
 
     // flush serial data
@@ -492,7 +509,7 @@ uint32_t TeleinfoEnergyDetectBaudRate ()
   int64_t  ts_low, ts_length, ts_mini, ts_window;
 
   // if TinfoRx pin not set, return current baud rate
-  if (!PinUsed (GPIO_TELEINFO_RX)) return TasmotaGlobal.baudrate;
+  if (!PinUsed (GPIO_TELEINFO_RX)) return teleinfo_config.baudrate;
 
   // set TinfoRx as input
   pinMode (Pin (GPIO_TELEINFO_RX), INPUT);
@@ -502,7 +519,7 @@ uint32_t TeleinfoEnergyDetectBaudRate ()
   level_now  = digitalRead (pin_rx);
   level_prev = level_now;
 
-  // init timings
+  // set maximum detection time to 500ms
   time_stop = millis () + 500;
 
   // loop to detect speed
@@ -550,14 +567,16 @@ uint32_t TeleinfoEnergyDetectBaudRate ()
   }
 
   // calculate baud rate according to low level signal length (19200 = 52 µs, 9600 = 104 µs, 4800 = 208 µs, 2400 = 416 µs and 1200 = 833 µs)
-  if (ts_mini == 0) baudrate = 115200;
-    else if (ts_mini <= 170) baudrate = 9600;
-    else if (ts_mini <= 340) baudrate = 4800;
-    else if (ts_mini <= 646) baudrate = 2400;
+  if (ts_mini == 0) baudrate = teleinfo_config.baudrate;
+    else if (ts_mini <= 60)  baudrate = 19200;
+    else if (ts_mini <= 120) baudrate = 9600;
+    else if (ts_mini <= 240) baudrate = 4800;
+    else if (ts_mini <= 450) baudrate = 2400;
     else baudrate = 1200;
 
   // log
-  if (baudrate <= 19200) AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Teleinfo detected at %u bauds (%u µs)"), baudrate, (uint32_t)ts_mini);
+  if (ts_mini == 0) AddLog (LOG_LEVEL_INFO, PSTR ("TIC: No data received, keeping %u bauds"), baudrate);
+    else AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Speed detected at %u bauds (%u µs)"), baudrate, (uint32_t)ts_mini);
 
   return baudrate;
 }
@@ -930,8 +949,12 @@ void TeleinfoEnergyConsoGlobalCounterUpdate ()
   // else update counters
   else
   {
+    // update total counter
     teleinfo_conso.delta_mwh += 1000 * (long)(total - teleinfo_conso_wh.total);
     teleinfo_conso_wh.total = total;
+
+    // calculate today's counter
+    if (teleinfo_conso_wh.total < teleinfo_conso_wh.midnight) teleinfo_conso_wh.midnight = teleinfo_conso_wh.total;
     teleinfo_conso_wh.today = (long)(teleinfo_conso_wh.total - teleinfo_conso_wh.midnight);
   }
 }
@@ -950,6 +973,7 @@ void TeleinfoEnergyProdGlobalCounterUpdate (const char* pstr_value)
 
   // production is enabled
   teleinfo_prod.enabled = true;
+  teleinfo_prod.cacsi   = false;
 
   // if total not defined, update total
   if (teleinfo_prod_wh.total == 0) teleinfo_prod_wh.total = total;
@@ -1295,12 +1319,38 @@ long TeleinfoTimestampDelay (const long stamp_start, const long stamp_stop)
 \*********************************************/
 
 // handle contract change
+void TeleinfoSetSpeed (const uint32_t baudrate)
+{
+  uint32_t setting;
+  char     str_mode[12];
+
+  // if O or > 19200 or no speed change, ignore
+  if ((baudrate == 0) || (baudrate > 19200)) return;
+
+  // check normalized rate
+  setting = baudrate / 300;
+
+  // if no change, ignore
+  if (Settings->rf_code[15][8] == (uint8_t)setting) return;
+
+  // set and log baud rate
+  teleinfo_config.baudrate = setting * 300;
+
+  // log
+  if (teleinfo_config.baudrate == 1200) strcpy_P (str_mode, PSTR ("Historique"));
+    else if (teleinfo_config.baudrate == 1200) strcpy_P (str_mode, PSTR ("Standard"));
+    else strcpy_P (str_mode, PSTR ("Spécifique"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Bascule en mode %s (%u bauds)"), str_mode, teleinfo_config.baudrate);
+  AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Redémarrage nécessaire"));
+
+  // save settings
+  Settings->rf_code[15][8] = (uint8_t)setting;
+  SettingsSave (0);
+}
+
+// handle contract change
 void TeleinfoContractChange ()
 {
-  // set auto-detect baud rate
-  TasmotaGlobal.baudrate = 115200;
-  Settings->baudrate = TasmotaGlobal.baudrate / 300;
-
   // reset contract data
   TeleinfoContractInit ();
 
@@ -1309,8 +1359,8 @@ void TeleinfoContractChange ()
   TeleinfoGraphDataInit ();
 #endif    // USE_TELEINFO_GRAPH
 
-  // log
-  AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Contrat remis à zéro, auto-détection activée"));
+// log
+  AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Type de contrat réinitialisé"));
 }
 
 // init contract management data
@@ -1354,6 +1404,7 @@ void TeleinfoContractInit ()
 
   // init prod data
   teleinfo_prod.enabled = false;
+  teleinfo_prod.cacsi   = false;
   TeleinfoEnergyProdReset ();
 }
 
@@ -1432,7 +1483,7 @@ bool TeleinfoContractUpdate ()
 }
 
 // detect HC or HP from period code
-uint8_t TeleinfoPeriodDetectHcHp (const char* pstr_name)
+uint8_t TeleinfoContractDetectPeriodHcHp (const char* pstr_name)
 {
   uint8_t hchp = 1;
 
@@ -1443,7 +1494,7 @@ uint8_t TeleinfoPeriodDetectHcHp (const char* pstr_name)
   return hchp;
 }
 
-uint8_t TeleinfoPeriodDetectLevel (const char* pstr_name)
+uint8_t TeleinfoContractDetectPeriodLevel (const char* pstr_name)
 {
   uint8_t level = TIC_LEVEL_BLUE;       // by default, blue period
 
@@ -1464,7 +1515,7 @@ uint8_t TeleinfoPeriodDetectLevel (const char* pstr_name)
 }
 
 // update contract period
-void TeleinfoPeriodUpdate ()
+void TeleinfoContractUpdatePeriod ()
 {
   bool    new_period = false;
   uint8_t index, period, hchp, level;
@@ -1481,8 +1532,8 @@ void TeleinfoPeriodUpdate ()
   if (period == UINT8_MAX) 
   {
     // detect period specs
-    level = TeleinfoPeriodDetectLevel (teleinfo_message.str_period);
-    hchp  = TeleinfoPeriodDetectHcHp  (teleinfo_message.str_period);
+    level = TeleinfoContractDetectPeriodLevel (teleinfo_message.str_period);
+    hchp  = TeleinfoContractDetectPeriodHcHp  (teleinfo_message.str_period);
 
     // if dealing with generic TEMPO contract, set period according to standard Tempo periods
     if ((teleinfo_contract_db.type == TIC_C_STD_TEMPO) && (level > TIC_LEVEL_NONE)) period = 2 * level - 2 + hchp;
@@ -1655,8 +1706,8 @@ void TeleinfoContractGetName (char* pstr_name, size_t size_name)
 }
 
 // get period profile
-void TeleinfoPeriodGetProfile (char* pstr_profile, size_t size_profile) { TeleinfoPeriodGetProfile (pstr_profile, size_profile, teleinfo_contract.period); }
-void TeleinfoPeriodGetProfile (char* pstr_profile, size_t size_profile, const uint8_t period)
+void TeleinfoContractGetPeriodProfile (char* pstr_profile, size_t size_profile) { TeleinfoContractGetPeriodProfile (pstr_profile, size_profile, teleinfo_contract.period); }
+void TeleinfoContractGetPeriodProfile (char* pstr_profile, size_t size_profile, const uint8_t period)
 {
   char str_level[4];
 
@@ -1677,8 +1728,8 @@ void TeleinfoPeriodGetProfile (char* pstr_profile, size_t size_profile, const ui
 }
 
 // get period code
-void TeleinfoPeriodGetCode (char* pstr_code, size_t size_code) { TeleinfoPeriodGetCode (pstr_code, size_code, teleinfo_contract.period); }
-void TeleinfoPeriodGetCode (char* pstr_code, size_t size_code, const uint8_t period)
+void TeleinfoContractGetPeriodCode (char* pstr_code, size_t size_code) { TeleinfoContractGetPeriodCode (pstr_code, size_code, teleinfo_contract.period); }
+void TeleinfoContractGetPeriodCode (char* pstr_code, size_t size_code, const uint8_t period)
 {
   // check parameter
   if (pstr_code == nullptr) return;
@@ -1692,8 +1743,8 @@ void TeleinfoPeriodGetCode (char* pstr_code, size_t size_code, const uint8_t per
 }
 
 // get period name
-void TeleinfoPeriodGetLabel (char* pstr_name, const size_t size_name) { TeleinfoPeriodGetLabel (pstr_name, size_name, teleinfo_contract.period); }
-void TeleinfoPeriodGetLabel (char* pstr_name, const size_t size_name, const uint8_t period)
+void TeleinfoContractGetPeriodLabel (char* pstr_name, const size_t size_name) { TeleinfoContractGetPeriodLabel (pstr_name, size_name, teleinfo_contract.period); }
+void TeleinfoContractGetPeriodLabel (char* pstr_name, const size_t size_name, const uint8_t period)
 {
   // check parameter
   if (pstr_name == nullptr) return;
@@ -1706,8 +1757,8 @@ void TeleinfoPeriodGetLabel (char* pstr_name, const size_t size_name, const uint
 }
 
 // get period level
-uint8_t TeleinfoPeriodGetLevel () { return TeleinfoPeriodGetLevel (teleinfo_contract.period); }
-uint8_t TeleinfoPeriodGetLevel (const uint8_t period)
+uint8_t TeleinfoContractGetPeriodLevel () { return TeleinfoContractGetPeriodLevel (teleinfo_contract.period); }
+uint8_t TeleinfoContractGetPeriodLevel (const uint8_t period)
 {
   uint8_t value;
 
@@ -1720,8 +1771,8 @@ uint8_t TeleinfoPeriodGetLevel (const uint8_t period)
 }
 
 // get period HP status
-uint8_t TeleinfoPeriodGetHP () { return TeleinfoPeriodGetHP (teleinfo_contract.period); }
-uint8_t TeleinfoPeriodGetHP (const uint8_t period)
+uint8_t TeleinfoContractGetPeriodHP () { return TeleinfoContractGetPeriodHP (teleinfo_contract.period); }
+uint8_t TeleinfoContractGetPeriodHP (const uint8_t period)
 {
   uint8_t value;
 
@@ -1839,7 +1890,7 @@ void TeleinfoConsoCalculateActivePower_VA_Wh ()
   {
     sinsts = 0;
     for (phase = 0; phase < teleinfo_contract.phase; phase++) sinsts += teleinfo_conso.phase[phase].sinsts;
-    if (abs (sinsts - teleinfo_conso.papp) <= 5) teleinfo_meter.use_sinsts = 1;
+    if (abs (sinsts - teleinfo_conso.papp) <= 5) teleinfo_meter.use_sinsts = true;
   }  
 
   // loop thru phase to update apparent power
@@ -2088,6 +2139,38 @@ void TeleinfoConsoCalculateApparentandActivePower_VAh_Varh ()
   teleinfo_conso.last_stamp = LONG_MAX;
 }
 
+// estimate excess of power injected on the grid if not in production mode
+void TeleinfoConsoDetectCacsiProduction ()
+{
+  bool    detected;
+  uint8_t phase;
+  long    prod_papp;
+
+  // if production mode declared, ignore
+  if (teleinfo_prod.enabled) return;
+
+  // loop thru phase to detect CACSI mode : if no power and current, we are in CACSI mode
+  prod_papp = 0;
+  for (phase = 0; phase < teleinfo_contract.phase; phase++)
+    if ((teleinfo_conso.phase[phase].sinsts == 0) && (teleinfo_conso.phase[phase].current > 0))
+    {
+      // calculate average power produced on phase removing 0.5A from current to average (2A -> 1.5A)
+      prod_papp += 230 * (teleinfo_conso.phase[phase].current - 500) / 1000;
+
+      // set conso current to 0
+      teleinfo_conso.phase[phase].current = 0;
+    }
+
+  // if production power detected, CACSI mode detected
+  if (prod_papp > 0)
+  {
+    teleinfo_prod.cacsi = true;
+    teleinfo_prod.papp  = prod_papp;
+  }
+
+  // else, production is null
+  else if (teleinfo_prod.cacsi) teleinfo_prod.papp = 0;
+}
  
 // Prod : calcultate Cosphi and Active Power (W)
 //   from Instant Apparent Power (VA) and Active Power counters (Wh)
@@ -2095,8 +2178,8 @@ void TeleinfoProdCalculateActivePower_VA_Wh ()
 {
   long cosphi;
 
-  // if total is O, ignore
-  if (teleinfo_prod_wh.total == 0) return;
+  // if not in production mode, ignore
+  if (!teleinfo_prod.enabled) return;
 
   // add apparent power increment according to message time window
   teleinfo_prod.delta_mvah += teleinfo_message.duration * teleinfo_prod.papp / 36;
@@ -2135,8 +2218,8 @@ void TeleinfoProdCalculateAverageActivePower ()
   bool  relay;
   float power;
 
-  // if no production, ignore
-  if (teleinfo_prod_wh.total == 0) return;
+  // if not in production mode, ignore
+  if (!teleinfo_prod.enabled) return;
 
   // calculate average active production power
   power = (float)teleinfo_prod.pact;
@@ -2218,7 +2301,7 @@ void TeleinfoReceptionMessageStop ()
   timestamp = millis ();
 
   // handle contract type and period update
-  if (TeleinfoContractUpdate ()) TeleinfoPeriodUpdate ();
+  if (TeleinfoContractUpdate ()) TeleinfoContractUpdatePeriod ();
 
   // if needed, apply message index according to new period
   if (teleinfo_message.str_total[0] != 0) TeleinfoEnergyConsoIndexCounterUpdate (teleinfo_message.str_total, teleinfo_contract.period);
@@ -2230,7 +2313,6 @@ void TeleinfoReceptionMessageStop ()
   // set quantity of messages to use to average message duration
   if (teleinfo_meter.nb_message > 50) quantity = 50;
     else quantity = (int32_t)teleinfo_meter.nb_message;
-
 
   // if at least one full message received,
   if ((teleinfo_message.timestamp_last != UINT32_MAX) && (quantity > 2))
@@ -2252,8 +2334,8 @@ void TeleinfoReceptionMessageStop ()
   // update message timestamp
   teleinfo_message.timestamp_last = timestamp;
 
-  // ----------------------
   // counter global indexes
+  // ----------------------
 
   // save data from last message and init current message
   TeleinfoEnergyMessageSaveLast ();
@@ -2266,8 +2348,8 @@ void TeleinfoReceptionMessageStop ()
   strcpy_P (teleinfo_message.str_line,  PSTR(""));
   strcpy_P (teleinfo_message.str_total, PSTR(""));
 
-  // ----------------------
   // counter global indexes
+  // ----------------------
 
   // if needed, calculate max contract power from max phase current
   if ((teleinfo_contract.ssousc == 0) && (teleinfo_contract.isousc != 0)) teleinfo_contract.ssousc = teleinfo_contract.isousc * TIC_VOLTAGE_REF;
@@ -2288,18 +2370,24 @@ void TeleinfoReceptionMessageStop ()
     // ------------------------------------------------------------------------------------------------
     case TIC_MODE_HISTORIC:
     case TIC_MODE_STANDARD:
+      // if not in production mode, detect excess of self production (CACSI)
+      if (!teleinfo_prod.enabled) TeleinfoConsoDetectCacsiProduction ();
+
+      // calculate active power from apparent power and Wh total
       TeleinfoConsoCalculateActivePower_VA_Wh ();
       break;
 
     // PME/PMI : use apparent power and active power increments, timestamp from published time
     // ---------------------------------------------------------------------------------------
     case TIC_MODE_PMEPMI:
+      // calculate apparent and active power from VAh and Wh increments
       TeleinfoConsoCalculateApparentandActivePower_VAh_Wh ();
       break;
 
     // Emeraude : use active power and reactive power increments, timestamp from published time
     // ----------------------------------------------------------------------------------------
     case TIC_MODE_EMERAUDE:
+      // calculate apparent and active power from VAh and Varh increments
       TeleinfoConsoCalculateApparentandActivePower_VAh_Varh ();
       break;
   }
@@ -2311,6 +2399,8 @@ void TeleinfoReceptionMessageStop ()
 
   TeleinfoProdCalculateActivePower_VA_Wh ();
   TeleinfoProdCalculateAverageActivePower ();
+
+  // else detect
 
   // -----------------------------
   //    update publication flags
@@ -2932,9 +3022,6 @@ void TeleinfoEnergyInit ()
     else AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Partition could not be mounted"));
 #endif  // USE_UFILESYS
 
-  // remove serial logging
-  TasmotaGlobal.seriallog_timer = 0;
-
   // remove standard energy display
   bitWrite (Settings->sensors[1][0], 3, 0);
 
@@ -2994,6 +3081,7 @@ void TeleinfoEnergyInit ()
 
   // prod data
   teleinfo_prod.enabled           = false;
+  teleinfo_prod.cacsi             = false;
   teleinfo_prod.cosphi.quantity   = 0;
   teleinfo_prod.cosphi.index      = 0;
   teleinfo_prod.cosphi.page       = 0;
@@ -3035,6 +3123,7 @@ void TeleinfoEnergyEverySecond ()
   // if needed, set contract change
   if (teleinfo_sleep.nb_change > TIC_NEW_CONTRACT_TRIGGER)
   {
+    TeleinfoSetSpeed (TIC_DEFAULT_SPEED);
     TeleinfoContractChange ();
     TasmotaGlobal.restart_flag = 2;
   }

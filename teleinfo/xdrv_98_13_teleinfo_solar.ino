@@ -1,5 +1,5 @@
 /*
-xdrv_98_13_teleinfo_solar.ino - Handle access to solar production forecast
+xdrv_98_13_teleinfo_solar.ino - Handle access to solar production and forecast
 
   Only compatible with ESP32
 
@@ -9,10 +9,12 @@ xdrv_98_13_teleinfo_solar.ino - Handle access to solar production forecast
     07/09/2025 v1.2 - Set https timeout to 3 sec
                       Limit publications to 1 per sec.
     19/09/2025 v1.3 - Hide and Show with click on main page display
+                      Add MQTT to solar production update
 
   solar production API is accessible thru :
 
-    your.device.ip.addr/solar?power=xxxx&total=yyyyy
+    HTTP Get : your.device.ip.addr/solar?power=xxxx&total=yyyyy
+    MQTT     : topic and key for instant production (W) and total production (Wh)
 
   Production forecast is done thru connection to https://api.forecast.solar/
 
@@ -59,22 +61,34 @@ xdrv_98_13_teleinfo_solar.ino - Handle access to solar production forecast
 
 // commands
 #define D_CMND_SOLAR                  "solar"
-#define D_CMND_SOLAR_ENABLE           "enable"
-#define D_CMND_SOLAR_FORECAST         "forecast"
-#define D_CMND_SOLAR_UPDATE           "update"
-#define D_CMND_SOLAR_KEY              "key"
-#define D_CMND_SOLAR_DECLINATION      "dec"
-#define D_CMND_SOLAR_AZIMUTH          "az"
+#define D_CMND_SOLAR_API              "api"
+#define D_CMND_SOLAR_MQTT             "mqtt"
+#define D_CMND_SOLAR_TOPIC            "topic"
+#define D_CMND_SOLAR_PKEY             "pkey"
+#define D_CMND_SOLAR_TTOPIC           "ttopic"
+#define D_CMND_SOLAR_TKEY             "tkey"
+#define D_CMND_FORECAST               "fcast"
+#define D_CMND_FORECAST_POWER         "power"
+#define D_CMND_FORECAST_DECLIN        "dec"
+#define D_CMND_FORECAST_AZIMUT        "az"
+#define D_CMND_FORECAST_KEY           "key"
+#define D_CMND_FORECAST_UPDATE        "update"
+
+#define D_SOLAR_CONFIGURE             "Solaire"
 
 // path and url
 #define TIC_SOLAR_PAGE_API            "/solar"
+#define TIC_SOLAR_PAGE_CONFIG         "/solar-cfg"
 
 static const char PSTR_SOLAR_DATA_FILE[] PROGMEM = "/teleinfo-solar.dat";
-static const char PSTR_SOLAR_URL[]       PROGMEM = "https://api.forecast.solar/%sestimate/%d.%06d/%d.%06d/%u/%d/%d.%03d?limit=2&resolution=60";
+static const char PSTR_FORECAST_URL[]    PROGMEM = "https://api.forecast.solar/%sestimate/%d.%06d/%d.%06d/%u/%d/%d.%03d?limit=2&resolution=60";
 
 // Commands
-static const char kSolarCommands[]       PROGMEM = D_CMND_SOLAR "|"   "|_" D_CMND_SOLAR_ENABLE  "|_" D_CMND_SOLAR_FORECAST  "|_" D_CMND_SOLAR_UPDATE  "|_" D_CMND_SOLAR_KEY  "|_" D_CMND_SOLAR_DECLINATION  "|_"  D_CMND_SOLAR_AZIMUTH    ;
-void (* const SolarCommand[])(void)      PROGMEM = { &CmndTeleinfoSolar, &CmndTeleinfoSolarEnable, &CmndTeleinfoSolarForecast, &CmndTeleinfoSolarUpdate, &CmndTeleinfoSolarKey, &CmndTeleinfoSolarDeclination, &CmndTeleinfoSolarAzimuth };
+static const char kSolarCommands[]       PROGMEM = D_CMND_SOLAR "|"          "|_" D_CMND_SOLAR_API  "|_" D_CMND_SOLAR_MQTT  "|_"  D_CMND_SOLAR_TOPIC "|_" D_CMND_SOLAR_PKEY  "|_"  D_CMND_SOLAR_TTOPIC "|_" D_CMND_SOLAR_TKEY    ;
+void (* const SolarCommand[])(void)      PROGMEM = {        &CmndTeleinfoSolar, &CmndTeleinfoSolarAPI, &CmndTeleinfoSolarMQTT, &CmndTeleinfoSolarTopic, &CmndTeleinfoSolarPKey, &CmndTeleinfoSolarTTopic, &CmndTeleinfoSolarTKey};
+
+static const char kForecastCommands[]    PROGMEM = D_CMND_FORECAST "|"          "|_"    D_CMND_FORECAST_DECLIN    "|_"  D_CMND_FORECAST_AZIMUT  "|_"  D_CMND_FORECAST_KEY "|_"  D_CMND_FORECAST_UPDATE    ;
+void (* const ForecastCommand[])(void)   PROGMEM = {        &CmndTeleinfoForecast, &CmndTeleinfoForecastDeclination, &CmndTeleinfoForecastAzimuth, &CmndTeleinfoForecastKey, &CmndTeleinfoForecastUpdate };
 
 /************************************\
  *           Commands
@@ -83,89 +97,101 @@ void (* const SolarCommand[])(void)      PROGMEM = { &CmndTeleinfoSolar, &CmndTe
 // Help
 void CmndTeleinfoSolar ()
 {
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: commands about Solar Production Forecast"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - solar_enable <%u> = enable solar production"), teleinfo_solar.enabled);
-  AddLog (LOG_LEVEL_INFO, PSTR (" - solar_forecast <%u> = enable solar forecast"), teleinfo_forecast.enabled);
-  AddLog (LOG_LEVEL_INFO, PSTR (" - solar_key <%s> = API key (null to remove)"), teleinfo_forecast.str_apikey);
-  AddLog (LOG_LEVEL_INFO, PSTR (" - solar_dec <%u> = solar panel declination"), teleinfo_forecast.declination);
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: commands about Solar Production"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - solar_api 0/1      = enable API [%u]"),                     teleinfo_solar.use_api);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - solar_mqtt 0/1     = enable MQTT [%u]"),                    teleinfo_solar.use_mqtt);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - solar_topic <val>  = MQTT W topic (null to remove) [%s]"),  teleinfo_solar.str_topic);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - solar_pkey <val>   = MQTT W key (null to remove) [%s]"),    teleinfo_solar.str_pkey);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - solar_ttopic <val> = MQTT Wh topic (null to remove) [%s]"), teleinfo_solar.str_ttopic);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - solar_tkey <val>   = MQTT Wh key (null to remove) [%s]"),   teleinfo_solar.str_tkey);
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: commands about Solar Forecast"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - fcast 0/1          = enable forecast [%u]"),                teleinfo_forecast.enabled);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - fcast_dec <val>    = solar panel declination [%d]"),        teleinfo_forecast.declination);
   AddLog (LOG_LEVEL_INFO, PSTR ("        0 : horizontal"));
   AddLog (LOG_LEVEL_INFO, PSTR ("       90 : vertical"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - solar_az <%d> = solar panel azimuth"), teleinfo_forecast.azimuth);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - fcast_az <val>     = solar panel azimuth [%d]"),            teleinfo_forecast.azimuth);
   AddLog (LOG_LEVEL_INFO, PSTR ("     -180 : north"));
   AddLog (LOG_LEVEL_INFO, PSTR ("      -90 : east"));
   AddLog (LOG_LEVEL_INFO, PSTR ("        0 : south"));
   AddLog (LOG_LEVEL_INFO, PSTR ("       90 : west"));
   AddLog (LOG_LEVEL_INFO, PSTR ("      180: north"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - solar_update = force forecast data update"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - fcast_key <key>    = forecast API key (null to remove) [%s]"), teleinfo_forecast.str_apikey);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - fcast_update       = force update"));
   ResponseCmndDone ();
 }
 
 // Enable solar production API
-void CmndTeleinfoSolarEnable ()
+void CmndTeleinfoSolarAPI ()
 {
-  if (XdrvMailbox.data_len > 0)
-  {
-    teleinfo_solar.enabled = (XdrvMailbox.payload == 1);
-    TeleinfoSolarSaveConfig ();
-  }
+  if (MiscCommandUpdateFlag (XdrvMailbox.data, teleinfo_solar.use_api)) TeleinfoSolarSaveConfig ();
+  ResponseCmndNumber (teleinfo_solar.use_api);
+}
 
-  ResponseCmndNumber (teleinfo_solar.enabled);
+// Enable solar production MQTT
+void CmndTeleinfoSolarMQTT ()
+{
+  if (MiscCommandUpdateFlag (XdrvMailbox.data, teleinfo_solar.use_mqtt)) TeleinfoSolarSaveConfig ();
+  ResponseCmndNumber (teleinfo_solar.use_mqtt);
+}
+
+// MQTT topics and keys
+void CmndTeleinfoSolarTopic ()
+{
+  if (MiscCommandUpdateString (XdrvMailbox.data, teleinfo_solar.str_topic, sizeof (teleinfo_solar.str_topic))) TeleinfoSolarSaveConfig ();
+  ResponseCmndChar (teleinfo_solar.str_topic);
+}
+
+void CmndTeleinfoSolarPKey ()
+{
+  if (MiscCommandUpdateString (XdrvMailbox.data, teleinfo_solar.str_pkey, sizeof (teleinfo_solar.str_pkey))) TeleinfoSolarSaveConfig ();
+  ResponseCmndChar (teleinfo_solar.str_pkey);
+}
+
+void CmndTeleinfoSolarTTopic ()
+{
+  if (MiscCommandUpdateString (XdrvMailbox.data, teleinfo_solar.str_ttopic, sizeof (teleinfo_solar.str_ttopic))) TeleinfoSolarSaveConfig ();
+  ResponseCmndChar (teleinfo_solar.str_ttopic);
+}
+
+void CmndTeleinfoSolarTKey ()
+{
+  if (MiscCommandUpdateString (XdrvMailbox.data, teleinfo_solar.str_tkey, sizeof (teleinfo_solar.str_tkey))) TeleinfoSolarSaveConfig ();
+  ResponseCmndChar (teleinfo_solar.str_tkey);
 }
 
 // Enable solar forecast
-void CmndTeleinfoSolarForecast ()
+void CmndTeleinfoForecast ()
 {
-  if (XdrvMailbox.data_len > 0)
-  {
-    teleinfo_forecast.enabled = (XdrvMailbox.payload == 1);
-    TeleinfoSolarSaveConfig ();
-  }
-
+  if (MiscCommandUpdateFlag (XdrvMailbox.data, teleinfo_forecast.enabled)) TeleinfoSolarSaveConfig ();
   ResponseCmndNumber (teleinfo_forecast.enabled);
 }
 
-// Update data
-void CmndTeleinfoSolarUpdate ()
+// set forecast solar panel declination
+void CmndTeleinfoForecastDeclination ()
 {
-  teleinfo_forecast.time_update = LocalTime ();
-  ResponseCmndDone ();
+  if (MiscCommandUpdateInteger (XdrvMailbox.data, teleinfo_forecast.declination, 0, 90)) TeleinfoSolarSaveConfig ();
+  ResponseCmndNumber (teleinfo_forecast.declination);
 }
 
-// Forecast API key
-void CmndTeleinfoSolarKey ()
+// set forecast solar panel declination
+void CmndTeleinfoForecastAzimuth ()
 {
-  if (XdrvMailbox.data_len > 0)
-  {
-    if (strcmp_P (XdrvMailbox.data, PSTR ("null")) == 0) teleinfo_forecast.str_apikey[0] = 0;
-      else strlcpy (teleinfo_forecast.str_apikey, XdrvMailbox.data, sizeof (teleinfo_forecast.str_apikey));
-    TeleinfoSolarSaveConfig ();
-  }
-  
+  if (MiscCommandUpdateInteger (XdrvMailbox.data, teleinfo_forecast.azimuth, -180, 180)) TeleinfoSolarSaveConfig ();
+  ResponseCmndNumber (teleinfo_forecast.azimuth);
+}
+
+// set forecast API key
+void CmndTeleinfoForecastKey ()
+{
+  if (MiscCommandUpdateString (XdrvMailbox.data, teleinfo_forecast.str_apikey, sizeof (teleinfo_forecast.str_apikey))) TeleinfoSolarSaveConfig ();
   ResponseCmndChar (teleinfo_forecast.str_apikey);
 }
 
-// Forecast solar panel declination
-void CmndTeleinfoSolarDeclination ()
+// Update forecast data
+void CmndTeleinfoForecastUpdate ()
 {
-  if ((XdrvMailbox.data_len > 0) && (XdrvMailbox.payload >= 0) && (XdrvMailbox.payload <= 90))
-  {
-    teleinfo_forecast.declination = (uint8_t)XdrvMailbox.payload;
-    TeleinfoSolarSaveConfig ();
-  }
-  
-  ResponseCmndNumber ((int)teleinfo_forecast.declination);
-}
-
-// Forecast solar panel declination
-void CmndTeleinfoSolarAzimuth ()
-{
-  if ((XdrvMailbox.data_len > 0) && (XdrvMailbox.payload >= -180) && (XdrvMailbox.payload <= 180))
-  {
-    teleinfo_forecast.azimuth = (int16_t)XdrvMailbox.payload;
-    TeleinfoSolarSaveConfig ();
-  }
-  
-  ResponseCmndNumber (teleinfo_forecast.azimuth);
+  teleinfo_forecast.time_update = LocalTime ();
+  ResponseCmndDone ();
 }
 
 /****************************************\
@@ -216,10 +242,12 @@ void TeleinfoSolarLoadConfig ()
     file.read ((uint8_t*)&version, sizeof (version));
     if (version == SOLAR_VERSION)
     {
-      file.read ((uint8_t*)&time_save, sizeof (time_save));
-      file.read ((uint8_t*)&teleinfo_solar, sizeof (teleinfo_solar));
-      file.read ((uint8_t*)&teleinfo_forecast, sizeof (teleinfo_forecast));
+      file.read ((uint8_t*)&time_save,          sizeof (time_save));
+      file.read ((uint8_t*)&teleinfo_solar,     sizeof (teleinfo_solar));
+      file.read ((uint8_t*)&teleinfo_forecast,  sizeof (teleinfo_forecast));
     }
+    else AddLog (LOG_LEVEL_INFO, PSTR ("SOL: Attention, format de stockage different. Configuration Solaire réinitialisée !"));
+
     file.close ();
   }
 }
@@ -231,6 +259,9 @@ void TeleinfoSolarSaveConfig ()
   char     str_filename[24];
   File     file;
 
+  // update production enabled flag
+  teleinfo_solar.enabled = (teleinfo_solar.use_api || teleinfo_solar.use_mqtt);
+
   // init data
   version  = SOLAR_VERSION;
   time_now = LocalTime ();
@@ -240,14 +271,14 @@ void TeleinfoSolarSaveConfig ()
   file = ffsp->open (str_filename, "w");
   if (file > 0)
   {
-    file.write ((uint8_t*)&version, sizeof (version));
-    file.write ((uint8_t*)&time_now, sizeof (time_now));
-    file.write ((uint8_t*)&teleinfo_solar, sizeof (teleinfo_solar));
-    file.write ((uint8_t*)&teleinfo_forecast, sizeof (teleinfo_forecast));
+    file.write ((uint8_t*)&version,            sizeof (version));
+    file.write ((uint8_t*)&time_now,           sizeof (time_now));
+    file.write ((uint8_t*)&teleinfo_solar,     sizeof (teleinfo_solar));
+    file.write ((uint8_t*)&teleinfo_forecast,  sizeof (teleinfo_forecast));
     file.close ();
   }
 
-  // plan update in 1 mn
+  // plan update with new configuration
   teleinfo_forecast.time_update = LocalTime () + SOLAR_DELAY_UPDATE;
 }
 
@@ -306,7 +337,6 @@ bool TeleinfoSolarForecastUpdate ()
   char     str_key[28];
   char     str_text[128];
   String   str_result;
-//  DynamicJsonDocument json_result(3072);
   JsonDocument     json_result;
   HTTPClientLight *phttp = nullptr;
 
@@ -331,7 +361,7 @@ bool TeleinfoSolarForecastUpdate ()
 
     // generate URL
     if (strlen (teleinfo_forecast.str_apikey) > 0) sprintf_P (str_key, PSTR ("%s/"), teleinfo_forecast.str_apikey); else str_key[0] = 0;
-    sprintf_P (str_text, PSTR_SOLAR_URL, str_key, latitude_int, latitude_dec, longitude_int, longitude_dec, teleinfo_forecast.declination, teleinfo_forecast.azimuth, teleinfo_config.prod_max / 1000, teleinfo_config.prod_max % 1000); 
+    sprintf_P (str_text, PSTR_FORECAST_URL, str_key, latitude_int, latitude_dec, longitude_int, longitude_dec, teleinfo_forecast.declination, teleinfo_forecast.azimuth, teleinfo_config.prod_max / 1000, teleinfo_config.prod_max % 1000); 
     AddLog (LOG_LEVEL_DEBUG, PSTR ("SOL: Forecast: %s"), str_text);
 
     // start connexion
@@ -453,10 +483,14 @@ void TeleinfoSolarMidnight ()
 void TeleinfoSolarInit ()
 {
   // init data
-  teleinfo_forecast.str_apikey[0] = 0;
-  teleinfo_forecast.str_place[0]  = 0;
   memset (&teleinfo_forecast.today,    0, sizeof (solar_day));
   memset (&teleinfo_forecast.tomorrow, 0, sizeof (solar_day));
+  teleinfo_forecast.str_apikey[0] = 0;
+  teleinfo_forecast.str_place[0]  = 0;
+  teleinfo_solar.str_topic[0]  = 0;
+  teleinfo_solar.str_ttopic[0] = 0;
+  teleinfo_solar.str_pkey[0]   = 0;
+  teleinfo_solar.str_tkey[0]   = 0;
 
   // load configuration file
   TeleinfoSolarLoadConfig ();
@@ -522,6 +556,85 @@ void TeleinfoSolarTeleperiod ()
   if (teleinfo_forecast.enabled) teleinfo_forecast.time_publish = LocalTime () + SOLAR_DELAY_TELEPERIOD;
 }
 
+// check and update MQTT power subsciption after disconnexion
+void TeleinfoSolarMqttSubscribe ()
+{
+  // if not enabled, ignore
+  if (!teleinfo_solar.use_mqtt) return;
+
+  // if generic topic is defined
+  if (strlen (teleinfo_solar.str_topic) > 0)
+  {
+    MqttSubscribe (teleinfo_solar.str_topic);
+    AddLog (LOG_LEVEL_INFO, PSTR ("SOL: Subscribed to %s"), teleinfo_solar.str_topic);
+  }
+
+  // if total topic is defined and different from generic topic
+  if ((strlen (teleinfo_solar.str_ttopic) > 0) && (strcmp (teleinfo_solar.str_topic, teleinfo_solar.str_ttopic) != 0))
+  {
+    MqttSubscribe (teleinfo_solar.str_ttopic);
+    AddLog (LOG_LEVEL_INFO, PSTR ("SOL: Subscribed to %s"), teleinfo_solar.str_ttopic);
+  }
+}
+
+// read received MQTT data to instant power (w) and total power (wh)
+bool TeleinfoSolarMqttData ()
+{
+  bool found = false;
+  JsonDocument json_result;
+
+  // if not enabled, ignore
+  if (!teleinfo_solar.use_mqtt) return false;
+
+  // if dealing with generic topic
+  if (strcmp (XdrvMailbox.topic, teleinfo_solar.str_topic) == 0)
+  {
+    // log
+    AddLog (LOG_LEVEL_INFO, PSTR ("SOL: Received %s : %s"), XdrvMailbox.topic, XdrvMailbox.data);
+    found = true;
+
+    // if instant key defined, deserialize and analyse
+    if (strlen (teleinfo_solar.str_pkey) > 0) 
+    {
+      // deserialize
+      deserializeJson (json_result, (const char*)XdrvMailbox.data);
+
+      // look for power instant key
+      if (!json_result[teleinfo_solar.str_pkey].isNull ()) teleinfo_solar.pact = json_result[teleinfo_solar.str_pkey].as<const long>();
+
+      // look for power total key
+      if (strlen (teleinfo_solar.str_tkey) > 0)
+        if (!json_result[teleinfo_solar.str_tkey].isNull ()) teleinfo_solar.total_wh = (long long)json_result[teleinfo_solar.str_tkey].as<const long>();
+    }
+
+    // else, get raw value 
+    else teleinfo_solar.pact = atol (XdrvMailbox.data);
+  }
+
+  // check for total topic
+  else if (strcmp (XdrvMailbox.topic, teleinfo_solar.str_ttopic) == 0)
+  {
+    // log
+    AddLog (LOG_LEVEL_INFO, PSTR ("SOL: Received %s : %s"), XdrvMailbox.topic, XdrvMailbox.data);
+    found = true;
+
+    // if instant key defined, deserialize and analyse
+    if (strlen (teleinfo_solar.str_tkey) > 0) 
+    {
+      // deserialize
+      deserializeJson (json_result, (const char*)XdrvMailbox.data);
+
+      // look for total key
+      if (!json_result[teleinfo_solar.str_tkey].isNull ()) teleinfo_solar.total_wh = (long long)json_result[teleinfo_solar.str_tkey].as<const long>();
+    }
+
+    // else get raw value
+    else teleinfo_solar.total_wh = atoll (XdrvMailbox.data);
+  }
+
+  return found;
+}
+
 /***********************************************\
  *                    Web
 \***********************************************/
@@ -552,9 +665,6 @@ void TeleinfoSolarWebAPI ()
     teleinfo_solar.today_wh = (long)(teleinfo_solar.total_wh - teleinfo_solar.midnight_wh);
     result = true;
   }
-
-  // set solar production status
-  if (result) teleinfo_solar.enabled = true;
 
   // answer
   WSContentBegin (200, CT_PLAIN);
@@ -632,6 +742,156 @@ void TeleinfoSolarWebSensor ()
   }
 }
 
+// Append Teleinfo solar configuration button
+void TeleinfoSolarWebConfigButton ()
+{
+  WSContentSend_P (PSTR ("\n<p><form action='%s' method='get'><button>Production solaire</button></form></p>\n"), PSTR (TIC_SOLAR_PAGE_CONFIG));
+}
+
+// Solar production configuration web page
+void TeleinfoSolarWebPageConfigure ()
+{
+  bool  changed = false;
+  bool  reboot  = false;
+  float value;
+  char  str_text[16];
+  String str_value;
+
+  // if access not allowed, close
+  if (!HttpCheckPriviledgedAccess ()) return;
+
+  // page comes from save button on configuration page
+  if (Webserver->hasArg (F ("save")))
+  {
+    // get production api and mqtt usage
+    changed |= MiscWebGetArgFlag (PSTR ("api"), teleinfo_solar.use_api);
+    reboot  |= MiscWebGetArgFlag (PSTR ("mqtt"), teleinfo_solar.use_mqtt);
+
+    // get production MQTT topics and keys
+    reboot |= MiscWebGetArgString (PSTR (D_CMND_SOLAR_TOPIC),  teleinfo_solar.str_topic,  sizeof (teleinfo_solar.str_topic));
+    reboot |= MiscWebGetArgString (PSTR (D_CMND_SOLAR_TTOPIC), teleinfo_solar.str_ttopic, sizeof (teleinfo_solar.str_ttopic));
+    reboot |= MiscWebGetArgString (PSTR (D_CMND_SOLAR_PKEY),   teleinfo_solar.str_pkey,   sizeof (teleinfo_solar.str_pkey));
+    reboot |= MiscWebGetArgString (PSTR (D_CMND_SOLAR_TKEY),   teleinfo_solar.str_tkey,   sizeof (teleinfo_solar.str_tkey));
+
+    // production forecast
+    changed |= MiscWebGetArgFlag    (PSTR (D_CMND_FORECAST),        teleinfo_forecast.enabled);
+    changed |= MiscWebGetArgInteger (PSTR (D_CMND_FORECAST_POWER),  teleinfo_config.prod_max, 0L, 50000L);
+    changed |= MiscWebGetArgInteger (PSTR (D_CMND_FORECAST_DECLIN), teleinfo_forecast.declination, 0, 90);
+    changed |= MiscWebGetArgInteger (PSTR (D_CMND_FORECAST_AZIMUT), teleinfo_forecast.azimuth, -180, 180);
+    changed |= MiscWebGetArgString  (PSTR (D_CMND_FORECAST_KEY),    teleinfo_forecast.str_apikey, sizeof (teleinfo_forecast.str_apikey));
+
+    // latitude
+    value = (float)Settings->latitude / 1000000;
+    changed |= MiscWebGetArgFloat (PSTR ("lat"), value, 0,  90);
+    Settings->latitude = (int)(value * 1000000);
+
+    // longitude
+    value = (float)Settings->longitude / 1000000;
+    changed |= MiscWebGetArgFloat (PSTR ("long"), value, -180, 180);
+    Settings->longitude = (int)(value * 1000000);
+
+    // save configuration and reboot if needed
+    if (changed || reboot) TeleinfoSolarSaveConfig ();
+    if (reboot) WebRestart (1);
+  }
+
+  // beginning of form
+  WSContentStart_P (PSTR (D_SOLAR_CONFIGURE));
+  WSContentSendStyle ();
+
+  // specific style
+  WSContentSend_P (PSTR ("\n<style>\n"));
+  WSContentSend_P (PSTR ("p,br,hr {clear:both;}\n")); 
+  WSContentSend_P (PSTR ("fieldset {background:#333;margin:15px 0px;border:none;border-radius:8px;}\n")); 
+  WSContentSend_P (PSTR ("fieldset.config {border-color:#888;background:%s;margin-left:12px;margin-top:4px;padding:8px 4px 0px 4px;}\n"), PSTR (COLOR_BACKGROUND)); 
+  WSContentSend_P (PSTR ("fieldset.config legend {font-weight:normal;}\n"));
+  WSContentSend_P (PSTR ("legend {font-weight:bold;margin-bottom:-30px;padding:5px;color:#888;background:transparent;}\n")); 
+  WSContentSend_P (PSTR ("legend:after {content:'';display:block;height:1px;margin:15px 0px;}\n"));
+  WSContentSend_P (PSTR ("input,select {margin-bottom:10px;text-align:center;border:none;border-radius:4px;}\n")); 
+  WSContentSend_P (PSTR ("input[type='checkbox'] {margin:0px 15px;}\n")); 
+  WSContentSend_P (PSTR ("input[type='text'] {text-align:left;}\n"));
+  WSContentSend_P (PSTR ("p.dat {padding:0px 2px;margin:0px;}\n")); 
+  WSContentSend_P (PSTR ("span {float:left;}\n"));
+  WSContentSend_P (PSTR ("span.short {width:20%%;}\n")); 
+  WSContentSend_P (PSTR ("span.head {width:50%%;}\n")); 
+  WSContentSend_P (PSTR ("span.val {width:35%%;padding:0px;}\n")); 
+  WSContentSend_P (PSTR ("span.unit {width:15%%;text-align:center;}\n"));
+  WSContentSend_P (PSTR ("span.text {width:75%%;text-align:left;}\n")); 
+  WSContentSend_P (PSTR ("</style>\n"));
+
+  // form
+  WSContentSend_P (PSTR ("<form method='get' action='%s'>\n"), PSTR (TIC_SOLAR_PAGE_CONFIG));
+
+  // ------------------------
+  //       Production  
+  // ------------------------
+
+  WSContentSend_P (PSTR ("<fieldset><legend>%s</legend>\n"), PSTR ("☀️ Production"));
+
+  if (teleinfo_solar.use_api) strcpy_P (str_text, PSTR ("checked")); else str_text[0] = 0;
+  WSContentSend_P (PSTR ("<p class='dat'><input type='checkbox' id='%s' name='%s' %s><label for='%s'>%s</label></p><br>\n"), PSTR (D_CMND_SOLAR_API), PSTR (D_CMND_SOLAR_API), str_text, PSTR (D_CMND_SOLAR_API), PSTR ("Utilisation API"));
+
+  if (teleinfo_solar.use_mqtt) strcpy_P (str_text, PSTR ("checked")); else str_text[0] = 0;
+  WSContentSend_P (PSTR ("<p class='dat'><input type='checkbox' id='%s' name='%s' onchange='onChange()' %s><label for='%s'>%s</label></p><br>\n"), PSTR (D_CMND_SOLAR_MQTT), PSTR (D_CMND_SOLAR_MQTT), str_text, PSTR (D_CMND_SOLAR_MQTT), PSTR ("Utilisation MQTT"));
+
+  WSContentSend_P (PSTR ("<fieldset class='config' id='%s'><legend>%s</legend>\n"), PSTR ("icfg"), PSTR ("Production instantanée (W)"));
+  WSContentSend_P (PSTR ("<p class='dat'><span class='short'>%s</span><span class='text'><input type='text' name='%s' value='%s'></span></p>\n"), PSTR ("Topic"), PSTR (D_CMND_SOLAR_TOPIC), teleinfo_solar.str_topic);
+  WSContentSend_P (PSTR ("<p class='dat'><span class='short'>%s</span><span class='val'><input type='text' name='%s' value='%s' title='%s'></span></p>\n"), PSTR ("Clé"), PSTR (D_CMND_SOLAR_PKEY), teleinfo_solar.str_pkey, PSTR ("Nécessaire uniquement si le topic publie un JSON"));
+  WSContentSend_P (PSTR ("</fieldset>\n"));
+
+  WSContentSend_P (PSTR ("<fieldset class='config' id='%s'><legend>%s</legend>\n"), PSTR ("tcfg"), PSTR ("Production totale (Wh)"));
+  WSContentSend_P (PSTR ("<p class='dat'><span class='short'>%s</span><span class='text'><input type='text' name='%s' value='%s' title='%s'></span></p>\n"), PSTR ("Topic"), PSTR (D_CMND_SOLAR_TTOPIC), teleinfo_solar.str_ttopic, PSTR ("Ne pas saisir si identique au topic précédent"));
+  WSContentSend_P (PSTR ("<p class='dat'><span class='short'>%s</span><span class='val'><input type='text' name='%s' value='%s' title='%s'></span></p>\n"), PSTR ("Clé"), PSTR (D_CMND_SOLAR_TKEY), teleinfo_solar.str_tkey, PSTR ("Nécessaire uniquement si le topic publie un JSON"));
+  WSContentSend_P (PSTR ("</fieldset>\n"));
+
+  WSContentSend_P (PSTR ("</fieldset>\n"));
+
+  // ------------------------
+  //       Forecast  
+  // ------------------------
+
+
+  WSContentSend_P (PSTR ("<fieldset><legend>%s</legend>\n"), PSTR ("🌤️ Prévision"));
+
+  if (teleinfo_forecast.enabled) strcpy_P (str_text, PSTR ("checked")); else str_text[0] = 0;
+  WSContentSend_P (PSTR ("<p class='dat'><input type='checkbox' id='%s' name='%s' onchange='onChange()' %s><label for='%s'>%s</label></p><br>\n"), PSTR ("fcast"), PSTR ("fcast"), str_text, PSTR ("fcast"), PSTR ("Activation"));
+
+  WSContentSend_P (PSTR ("<fieldset class='config' id='%s'>\n"), PSTR ("fcfg"));
+  WSContentSend_P (PSTR ("<p class='dat'><span class='head'>%s</span><span class='val'><input type='number' name='%s' min=%d max=%d step=%d value=%d></span><span class='unit'>%s</span></p>\n"), PSTR ("Puissance max."), PSTR (D_CMND_FORECAST_POWER), 0, 50000, 50, teleinfo_config.prod_max, PSTR ("W"));
+  value = (float)Settings->latitude / 1000000;
+  str_value = String (value, 6);
+  WSContentSend_P (PSTR ("<p class='dat'><span class='head'>%s</span><span class='val'><input type='number' name='%s' min=%d max=%d step=0.000001 value=%s></span><span class='unit'>%s</span></p>\n"), PSTR ("Latitude"), PSTR ("lat"), -90, 90, str_value.c_str (), PSTR ("°"));
+  value = (float)Settings->longitude / 1000000;
+  str_value = String (value, 6);
+  WSContentSend_P (PSTR ("<p class='dat'><span class='head'>%s</span><span class='val'><input type='number' name='%s' min=%d max=%d step=0.000001 value=%s></span><span class='unit'>%s</span></p>\n"), PSTR ("Longitude"), PSTR ("long"), -180, 180, str_value.c_str (), PSTR ("°"));
+  WSContentSend_P (PSTR ("<p class='dat'><span class='head'>%s</span><span class='val'><input type='number' name='%s' min=%d max=%d step=%d value=%d></span><span class='unit'>%s</span></p>\n"), PSTR ("Déclinaison"), PSTR (D_CMND_FORECAST_DECLIN), 0, 90, 1, teleinfo_forecast.declination, PSTR ("°"));
+  WSContentSend_P (PSTR ("<p class='dat'><span class='head'>%s</span><span class='val'><input type='number' name='%s' min=%d max=%d step=%d value=%d></span><span class='unit'>%s</span></p>\n"), PSTR ("Azimuth"), PSTR (D_CMND_FORECAST_AZIMUT), -180, 180, 1, teleinfo_forecast.azimuth, PSTR ("°"));
+  WSContentSend_P (PSTR ("<p class='dat'><span class='short'>%s</span><span class='text'><input type='text' name='%s' value='%s'></span></p>\n"), PSTR ("Clé"), PSTR (D_CMND_FORECAST_KEY), teleinfo_forecast.str_apikey);
+  WSContentSend_P (PSTR ("</fieldset>\n"));
+  WSContentSend_P (PSTR ("</fieldset>\n"));
+
+  // display script
+  WSContentSend_P (PSTR ("<script type='text/javascript'>\n"));
+  WSContentSend_P (PSTR ("function onChange() {\n"));
+  WSContentSend_P (PSTR ("document.getElementById('icfg').style.display=document.getElementById('prod').checked?'block':'none';\n"));
+  WSContentSend_P (PSTR ("document.getElementById('tcfg').style.display=document.getElementById('prod').checked?'block':'none';\n"));
+  WSContentSend_P (PSTR ("document.getElementById('fcfg').style.display=document.getElementById('fcast').checked?'block':'none';\n"));
+  WSContentSend_P (PSTR ("}\n"));
+  WSContentSend_P (PSTR ("onChange();\n"));
+  WSContentSend_P (PSTR ("</script>\n"));
+
+  // save button  
+  // -----------
+  WSContentSend_P (PSTR ("<br><p><button name='save' type='submit' class='button bgrn'>%s</button></p>\n"), D_SAVE);
+  WSContentSend_P (PSTR ("</form>\n"));
+
+  // configuration button
+  WSContentSpaceButton (BUTTON_CONFIGURATION);
+
+  // end of page
+  WSContentStop ();
+}
+
 #endif  // USE_WEBSERVER
 
 /***************************************\
@@ -665,9 +925,22 @@ bool XdrvTeleinfoSolar (const uint32_t function)
       if (TasmotaGlobal.tele_period == 0) TeleinfoSolarTeleperiod ();
       break;
 
+    case FUNC_MQTT_SUBSCRIBE:
+      TeleinfoSolarMqttSubscribe ();
+      break;
+
+    case FUNC_MQTT_DATA:
+      result = TeleinfoSolarMqttData ();
+      break;
+
 #ifdef USE_WEBSERVER
-    case FUNC_WEB_ADD_HANDLER:
-      Webserver->on (F (TIC_SOLAR_PAGE_API), TeleinfoSolarWebAPI);
+    case FUNC_WEB_ADD_BUTTON:
+      TeleinfoSolarWebConfigButton ();
+      break;
+
+      case FUNC_WEB_ADD_HANDLER:
+      Webserver->on (F (TIC_SOLAR_PAGE_CONFIG), TeleinfoSolarWebPageConfigure);
+      if (teleinfo_solar.use_api) Webserver->on (F (TIC_SOLAR_PAGE_API), TeleinfoSolarWebAPI);
       break;
 
     case FUNC_WEB_SENSOR:

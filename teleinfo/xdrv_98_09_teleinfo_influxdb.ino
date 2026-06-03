@@ -12,6 +12,7 @@
     10/07/2025 v2.0 - Refactoring based on Tasmota 15
     07/09/2025 v2.1 - Limit publications to 1 per sec.
     26/12/2025 v2.2 - Add data to publication
+    17/03/2026 v2.3 - Publish production excess for CACSI contract
 
   Configuration values are stored in :
 
@@ -113,26 +114,26 @@ void TeleinfoInfluxDbAppendData ()
   snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%d\n"), PSTR ("wifi"), TasmotaGlobal.hostname, PSTR ("rssi"), WiFi.RSSI ());
   TasmotaGlobal.mqtt_data += str_line;
 
-  // if needed, add contract data
+  // dry contact
+  snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u\n"), PSTR ("meter"), TasmotaGlobal.hostname, PSTR ("contact"), (uint8_t)teleinfo_meter.contact);
+  TasmotaGlobal.mqtt_data += str_line;
+
+  // active energy flag
+  snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u\n"), PSTR ("meter"), TasmotaGlobal.hostname, PSTR ("negatif"), (uint8_t)teleinfo_meter.pact_minus);
+  TasmotaGlobal.mqtt_data += str_line;
+
+  // contract name
+  TeleinfoContractGetName (str_value, sizeof (str_value));
+  snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=\"%s\"\n"), PSTR ("label"), TasmotaGlobal.hostname, PSTR ("contract"), str_value);
+  TasmotaGlobal.mqtt_data += str_line;
+
+  // contract mode
+  snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u\n"), PSTR ("contract"), TasmotaGlobal.hostname, PSTR ("mode"), teleinfo_contract.mode);
+  TasmotaGlobal.mqtt_data += str_line;
+
+  // add contract data
   if (teleinfo_conso.enabled)
   {
-    // dry contact
-    snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u\n"), PSTR ("meter"), TasmotaGlobal.hostname, PSTR ("contact"), (uint8_t)teleinfo_meter.contact);
-    TasmotaGlobal.mqtt_data += str_line;
-
-    // active energy flag
-    snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u\n"), PSTR ("meter"), TasmotaGlobal.hostname, PSTR ("negatif"), (uint8_t)teleinfo_meter.pact_minus);
-    TasmotaGlobal.mqtt_data += str_line;
-
-    // contract name
-    TeleinfoContractGetName (str_value, sizeof (str_value));
-    snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=\"%s\"\n"), PSTR ("label"), TasmotaGlobal.hostname, PSTR ("contract"), str_value);
-    TasmotaGlobal.mqtt_data += str_line;
-
-    // contract mode
-    snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u\n"), PSTR ("contract"), TasmotaGlobal.hostname, PSTR ("mode"), teleinfo_contract.mode);
-    TasmotaGlobal.mqtt_data += str_line;
-
     // contract number of periods
     snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u\n"), PSTR ("contract"), TasmotaGlobal.hostname, PSTR ("periods"), teleinfo_contract_db.period_qty);
     TasmotaGlobal.mqtt_data += str_line;
@@ -142,78 +143,86 @@ void TeleinfoInfluxDbAppendData ()
     TasmotaGlobal.mqtt_data += str_line;
 
     // color
-    snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u\n"), PSTR ("contract"), TasmotaGlobal.hostname, PSTR ("color"), TeleinfoPeriodGetLevel ());
+    snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u\n"), PSTR ("contract"), TasmotaGlobal.hostname, PSTR ("color"), TeleinfoContractGetPeriodLevel ());
     TasmotaGlobal.mqtt_data += str_line;
 
     // hc/hp
-    snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u\n"), PSTR ("contract"), TasmotaGlobal.hostname, PSTR ("hp"), TeleinfoPeriodGetHP ());
+    snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u\n"), PSTR ("contract"), TasmotaGlobal.hostname, PSTR ("hp"), TeleinfoContractGetPeriodHP ());
     TasmotaGlobal.mqtt_data += str_line;
   }
 
-  // if needed, add conso data
-  if (teleinfo_conso.enabled && teleinfo_config.meter)
+  // meter data
+  if (teleinfo_config.meter)
   {
-    // conso global total
-    lltoa (teleinfo_conso_wh.total, str_value, 10);
-    snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%s\n"), PSTR ("conso"), TasmotaGlobal.hostname, PSTR ("total"), str_value);
-    TasmotaGlobal.mqtt_data += str_line;
-    
-    // conso indexes total
-    for (index = 0; index < teleinfo_contract_db.period_qty; index++)
+    // add conso data
+    if (teleinfo_conso.enabled)
     {
-      lltoa (teleinfo_conso_wh.index[index], str_value, 10);
-      snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s%u value=%s\n"), PSTR ("conso"), TasmotaGlobal.hostname, PSTR ("index"), index + 1, str_value);
+      // conso global total
+      lltoa (teleinfo_conso_wh.total, str_value, 10);
+      snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%s\n"), PSTR ("conso"), TasmotaGlobal.hostname, PSTR ("total"), str_value);
+      TasmotaGlobal.mqtt_data += str_line;
+      
+      // conso indexes total
+      for (index = 0; index < teleinfo_contract_db.period_qty; index++)
+      {
+        lltoa (teleinfo_conso_wh.index[index], str_value, 10);
+        snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s%u value=%s\n"), PSTR ("conso"), TasmotaGlobal.hostname, PSTR ("index"), index + 1, str_value);
+        TasmotaGlobal.mqtt_data += str_line;
+      }
+
+      // loop thru phases
+      for (phase = 0; phase < teleinfo_contract.phase; phase++)
+      {
+        // set phase index
+        if ((phase == 0) && (teleinfo_contract.phase == 1)) str_value[0] = 0;
+          else sprintf_P (str_value, PSTR ("%u"), phase + 1);
+
+        // current
+        snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s%s value=%d.%03d\n"), PSTR ("conso"), TasmotaGlobal.hostname, PSTR ("I"), str_value, teleinfo_conso.phase[phase].current / 1000, teleinfo_conso.phase[phase].current % 1000);
+        TasmotaGlobal.mqtt_data += str_line;
+
+        // voltage
+        snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s%s value=%d\n"), PSTR ("conso"), TasmotaGlobal.hostname, PSTR ("U"), str_value, teleinfo_conso.phase[phase].voltage);
+        TasmotaGlobal.mqtt_data += str_line;
+
+        // apparent power
+        snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s%s value=%d\n"), PSTR ("conso"), TasmotaGlobal.hostname, PSTR ("VA"), str_value, teleinfo_conso.phase[phase].papp);
+        TasmotaGlobal.mqtt_data += str_line;
+
+        // active power
+        snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s%s value=%d\n"), PSTR ("conso"), TasmotaGlobal.hostname, PSTR ("W"), str_value, teleinfo_conso.phase[phase].pact);
+        TasmotaGlobal.mqtt_data += str_line;
+      }
+
+      // cos phi
+      snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%d.%02d\n"), PSTR ("conso"), TasmotaGlobal.hostname, PSTR ("cosphi"), teleinfo_conso.cosphi.value / 1000, teleinfo_conso.cosphi.value % 1000 / 10);
       TasmotaGlobal.mqtt_data += str_line;
     }
 
-    // loop thru phases
-    for (phase = 0; phase < teleinfo_contract.phase; phase++)
+    // add prod apparent power
+    if (teleinfo_prod.enabled || teleinfo_prod.cacsi)
     {
-      // set phase index
-      if ((phase == 0) && (teleinfo_contract.phase == 1)) str_value[0] = 0;
-        else sprintf_P (str_value, PSTR ("%u"), phase + 1);
-
-      // current
-      snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s%s value=%d.%03d\n"), PSTR ("conso"), TasmotaGlobal.hostname, PSTR ("I"), str_value, teleinfo_conso.phase[phase].current / 1000, teleinfo_conso.phase[phase].current % 1000);
-      TasmotaGlobal.mqtt_data += str_line;
-
-      // voltage
-      snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s%s value=%d\n"), PSTR ("conso"), TasmotaGlobal.hostname, PSTR ("U"), str_value, teleinfo_conso.phase[phase].voltage);
-      TasmotaGlobal.mqtt_data += str_line;
-
       // apparent power
-      snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s%s value=%d\n"), PSTR ("conso"), TasmotaGlobal.hostname, PSTR ("VA"), str_value, teleinfo_conso.phase[phase].papp);
-      TasmotaGlobal.mqtt_data += str_line;
-
-      // active power
-      snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s%s value=%d\n"), PSTR ("conso"), TasmotaGlobal.hostname, PSTR ("W"), str_value, teleinfo_conso.phase[phase].pact);
+      snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%d\n"), PSTR ("prod"), TasmotaGlobal.hostname, PSTR ("VA"), teleinfo_prod.papp);
       TasmotaGlobal.mqtt_data += str_line;
     }
 
-    // cos phi
-    snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%d.%02d\n"), PSTR ("conso"), TasmotaGlobal.hostname, PSTR ("cosphi"), teleinfo_conso.cosphi.value / 1000, teleinfo_conso.cosphi.value % 1000 / 10);
-    TasmotaGlobal.mqtt_data += str_line;
-  }
+    // add prod data if in production mode
+    if (teleinfo_prod.enabled)
+    {
+      // active power
+      snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%d\n"), PSTR ("prod"), TasmotaGlobal.hostname, PSTR ("W"),  teleinfo_prod.pact);
+      TasmotaGlobal.mqtt_data += str_line;
 
-  // if needed, add prod data
-  if (teleinfo_prod.enabled && teleinfo_config.meter)
-  {
-    // prod global total
-    lltoa (teleinfo_prod_wh.total, str_value, 10);
-    snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%s\n"), PSTR ("prod"), TasmotaGlobal.hostname, PSTR ("total"), str_value);
-    TasmotaGlobal.mqtt_data += str_line;
+      // cos phi
+      snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%d.%02d\n"), PSTR ("prod"), TasmotaGlobal.hostname, PSTR ("cosphi"), teleinfo_prod.cosphi.value / 1000, teleinfo_prod.cosphi.value % 1000 / 10);
+      TasmotaGlobal.mqtt_data += str_line;
 
-    // apparent power
-    snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%d\n"), PSTR ("prod"), TasmotaGlobal.hostname, PSTR ("VA"), teleinfo_prod.papp);
-    TasmotaGlobal.mqtt_data += str_line;
-
-    // active power
-    snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%d\n"), PSTR ("prod"), TasmotaGlobal.hostname, PSTR ("W"),  teleinfo_prod.pact);
-    TasmotaGlobal.mqtt_data += str_line;
-
-    // cos phi
-    snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%d.%02d\n"), PSTR ("prod"), TasmotaGlobal.hostname, PSTR ("cosphi"), teleinfo_prod.cosphi.value / 1000, teleinfo_prod.cosphi.value % 1000 / 10);
-    TasmotaGlobal.mqtt_data += str_line;
+      // prod global total
+      lltoa (teleinfo_prod_wh.total, str_value, 10);
+      snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%s\n"), PSTR ("prod"), TasmotaGlobal.hostname, PSTR ("total"), str_value);
+      TasmotaGlobal.mqtt_data += str_line;
+    }
   }
 }
 
@@ -291,8 +300,8 @@ void TeleinfoInfluxDbInit ()
   teleinfo_influxdb.ready &= (Settings->influxdb_port > 0);
 
   // log help command
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Run Ifx_tic <0/1> to disable/enable InfluxDB publication"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Run Ifx_ver <1/2> to set InfluxDB version"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Run ifx_tic <0/1> to manage InfluxDB publication"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Run ifx_ver <1/2> to set InfluxDB version"));
 }
 
 // called every second

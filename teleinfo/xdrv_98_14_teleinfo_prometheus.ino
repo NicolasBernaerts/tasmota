@@ -114,10 +114,10 @@ void TeleinfoPrometheusAppendMeter ()
   }
   
   // production 
+  if (teleinfo_prod.enabled || teleinfo_prod.cacsi) WSContentSend_P (PSTR ("prod_apparent_voltamperes %d\n"), teleinfo_prod.papp);
   if (teleinfo_prod.enabled)
   {
     // prod : global values
-    WSContentSend_P (PSTR ("prod_apparent_voltamperes %d\n"), teleinfo_prod.papp);
     WSContentSend_P (PSTR ("prod_active_watts %d\n"), teleinfo_prod.pact);
 
     // prod : cosphi
@@ -146,7 +146,7 @@ void TeleinfoPrometheusAppendGeneral ()
   lltoa (teleinfo_meter.ident, str_serial, 10);
   TeleinfoContractGetName (str_contract, sizeof (str_contract));
   TeleinfoPrometheusCleanupString (str_contract);
-  TeleinfoPeriodGetLabel (str_period, sizeof (str_period));
+  TeleinfoContractGetPeriodLabel (str_period, sizeof (str_period));
   TeleinfoPrometheusCleanupString (str_period);
 
   // meter general data
@@ -159,10 +159,10 @@ void TeleinfoPrometheusAppendGeneral ()
     WSContentSend_P (PSTR ("meter_period_index %u\n"), teleinfo_contract.period + 1);
 
     // period level
-    WSContentSend_P (PSTR ("meter_level_index %u\n"), TeleinfoPeriodGetLevel ());
+    WSContentSend_P (PSTR ("meter_level_index %u\n"), TeleinfoContractGetPeriodLevel ());
 
     // period type
-    WSContentSend_P (PSTR ("meter_hchp_index %u\n"), TeleinfoPeriodGetHP ());
+    WSContentSend_P (PSTR ("meter_hchp_index %u\n"), TeleinfoContractGetPeriodHP ());
 
     // total conso counter
     lltoa (teleinfo_conso_wh.total, str_value, 10);

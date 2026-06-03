@@ -10,6 +10,7 @@
     10/07/2025 v2.0 - Refactoring based on Tasmota 15
     25/08/2025 v2.1 - Add PAVG (production average active power) and PR (production relay)
     07/09/2025 v2.2 - Limit publications to 1 per sec.
+    17/03/2026 v2.3 - Publish production excess for CACSI contract
                         
   Configuration values are stored in :
     - Settings->rf_code[16][3]  : Flag en enable/disable integration
@@ -163,7 +164,6 @@ void TeleinfoThingsboardPublishData ()
         value = phase + 1;
         ResponseAppend_P (PSTR (",\"U%u\":%d,\"I%u\":%d.%02d"), value, teleinfo_conso.phase[phase].voltage, value, teleinfo_conso.phase[phase].current / 1000, teleinfo_conso.phase[phase].current % 1000 / 10);
         ResponseAppend_P (PSTR (",\"P%u\":%d,\"W%u\":%d"), value, teleinfo_conso.phase[phase].papp, value, teleinfo_conso.phase[phase].pact);
-//        if (teleinfo_conso.cosphi.quantity > 1) ResponseAppend_P (PSTR (",\"C%u\":%d.%02d"), value, teleinfo_conso.phase[phase].cosphi / 1000, teleinfo_conso.phase[phase].cosphi % 1000 / 10);
       }
     } 
 
@@ -179,17 +179,20 @@ void TeleinfoThingsboardPublishData ()
     // loop to publish conso counters
     for (index = 0; index < teleinfo_contract_db.period_qty; index ++)
     {
-      TeleinfoPeriodGetProfile (str_text, sizeof (str_text), index);
+      TeleinfoContractGetPeriodProfile (str_text, sizeof (str_text), index);
       lltoa (teleinfo_conso_wh.index[index], str_value, 10);
       ResponseAppend_P (PSTR (",\"%s\":%s"), str_text, str_value);
     }
   }
-  
-  // production 
+
+  // prod : apparent power injected
+  if (teleinfo_prod.enabled || teleinfo_prod.cacsi) ResponseAppend_P (PSTR (",\"PP\":%d"), teleinfo_prod.papp);
+
+  // if in production mode 
   if (teleinfo_prod.enabled)
   {
     // prod : global values
-    ResponseAppend_P (PSTR (",\"PP\":%d,\"PW\":%d"), teleinfo_prod.papp, teleinfo_prod.pact);
+    ResponseAppend_P (PSTR (",\"PW\":%d"), teleinfo_prod.pact);
 
     // prod : cosphi
     if (teleinfo_prod.cosphi.quantity > 1) ResponseAppend_P (PSTR (",\"PC\":%d.%02d"), teleinfo_prod.cosphi.value / 1000, teleinfo_prod.cosphi.value % 1000 / 10);
@@ -225,16 +228,16 @@ void TeleinfoThingsboardPublishData ()
   ResponseAppend_P (PSTR (",\"NAME\":\"%s\""), str_value);
 
   // period profile
-  TeleinfoPeriodGetProfile (str_value, sizeof (str_value));
+  TeleinfoContractGetPeriodProfile (str_value, sizeof (str_value));
   ResponseAppend_P (PSTR (",\"PERIOD\":\"%s\""), str_value);
 
   // period color
-  index = TeleinfoPeriodGetLevel ();
+  index = TeleinfoContractGetPeriodLevel ();
   GetTextIndexed (str_value, sizeof (str_value), index, kTeleinfoLevelLabel);
   ResponseAppend_P (PSTR (",\"COLOR\":\"%s\""), str_value);
 
   // period hour type
-  index = TeleinfoPeriodGetHP ();
+  index = TeleinfoContractGetPeriodHP ();
   GetTextIndexed (str_value, sizeof (str_value), index, kTeleinfoHourLabel);
   ResponseAppend_P (PSTR (",\"HOUR\":\"%s\""), str_value);
 

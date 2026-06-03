@@ -245,15 +245,16 @@ void TeleinfoHomieEvery250ms ()
     if ((teleinfo_homie.stage != TIC_PUB_RELAY_DATA) && (teleinfo_homie.stage != TIC_PUB_TOTAL_INDEX)) teleinfo_homie.sub_stage = 0; 
 
     // handle data publication
-    if ((teleinfo_homie.stage == TIC_PUB_CALENDAR)    && !teleinfo_config.calendar     ) teleinfo_homie.stage = TIC_PUB_PROD;
-    if ((teleinfo_homie.stage == TIC_PUB_PROD)        && !teleinfo_config.meter        ) teleinfo_homie.stage = TIC_PUB_RELAY;
-    if ((teleinfo_homie.stage == TIC_PUB_PROD)        && !teleinfo_prod.enabled        ) teleinfo_homie.stage = TIC_PUB_CONSO;
-    if ((teleinfo_homie.stage == TIC_PUB_CONSO)       && !teleinfo_conso.enabled       ) teleinfo_homie.stage = TIC_PUB_RELAY;
-    if ((teleinfo_homie.stage == TIC_PUB_PH1)         && (teleinfo_contract.phase == 1)) teleinfo_homie.stage = TIC_PUB_RELAY;
-    if ((teleinfo_homie.stage == TIC_PUB_RELAY)       && !teleinfo_config.relay        ) teleinfo_homie.stage = TIC_PUB_TOTAL;
-    if ((teleinfo_homie.stage == TIC_PUB_TOTAL)       && !teleinfo_config.meter        ) teleinfo_homie.stage = TIC_PUB_ALERT;
-    if ((teleinfo_homie.stage == TIC_PUB_TOTAL_PROD)  && !teleinfo_prod.enabled        ) teleinfo_homie.stage = TIC_PUB_TOTAL_CONSO;
-    if ((teleinfo_homie.stage == TIC_PUB_TOTAL_CONSO) && !teleinfo_conso.enabled       ) teleinfo_homie.stage = TIC_PUB_ALERT;
+    if ((teleinfo_homie.stage == TIC_PUB_CALENDAR)    && !teleinfo_config.calendar)                        teleinfo_homie.stage = TIC_PUB_PROD;
+    if ((teleinfo_homie.stage == TIC_PUB_PROD)        && !teleinfo_config.meter)                           teleinfo_homie.stage = TIC_PUB_RELAY;
+    if ((teleinfo_homie.stage == TIC_PUB_PROD)        && (!teleinfo_prod.enabled && !teleinfo_prod.cacsi)) teleinfo_homie.stage = TIC_PUB_CONSO;
+    if ((teleinfo_homie.stage == TIC_PUB_PROD_W)      && !teleinfo_prod.enabled)                           teleinfo_homie.stage = TIC_PUB_CONSO;
+    if ((teleinfo_homie.stage == TIC_PUB_CONSO)       && !teleinfo_conso.enabled)                          teleinfo_homie.stage = TIC_PUB_RELAY;
+    if ((teleinfo_homie.stage == TIC_PUB_PH1)         && (teleinfo_contract.phase == 1))                   teleinfo_homie.stage = TIC_PUB_RELAY;
+    if ((teleinfo_homie.stage == TIC_PUB_RELAY)       && !teleinfo_config.relay)                           teleinfo_homie.stage = TIC_PUB_TOTAL;
+    if ((teleinfo_homie.stage == TIC_PUB_TOTAL)       && !teleinfo_config.meter)                           teleinfo_homie.stage = TIC_PUB_ALERT;
+    if ((teleinfo_homie.stage == TIC_PUB_TOTAL_PROD)  && !teleinfo_prod.enabled)                           teleinfo_homie.stage = TIC_PUB_TOTAL_CONSO;
+    if ((teleinfo_homie.stage == TIC_PUB_TOTAL_CONSO) && !teleinfo_conso.enabled)                          teleinfo_homie.stage = TIC_PUB_ALERT;
     if  (teleinfo_homie.stage == TIC_PUB_END)
     {
       teleinfo_homie.stage     = UINT8_MAX;
@@ -320,9 +321,10 @@ void TeleinfoHomieDataConsoProd ()
   // ask for data publication
   teleinfo_homie.data = 0;
 
-  // conso data
+  // conso
   if (teleinfo_conso.enabled)
   {
+    // conso data
     for (index = TIC_PUB_CONSO_P; index <= TIC_PUB_CONSO_TODAY; index++) teleinfo_homie.arr_data[index] = 1;
     if (teleinfo_contract.phase > 1)
     {
@@ -330,19 +332,22 @@ void TeleinfoHomieDataConsoProd ()
       for (index = TIC_PUB_PH2_U; index <= TIC_PUB_PH3_W; index++) teleinfo_homie.arr_data[index] = 1;
       for (index = TIC_PUB_PH3_U; index <= TIC_PUB_PH3_W; index++) teleinfo_homie.arr_data[index] = 1;
     }
-  }
 
-  // production data
-  if (teleinfo_prod.enabled)
-    for (index = TIC_PUB_PROD_P; index <= TIC_PUB_PROD_TODAY; index++) teleinfo_homie.arr_data[index] = 1;
-
-  // total data
-  if (teleinfo_conso.enabled)
-  {
+    // conso total
     teleinfo_homie.arr_data[TIC_PUB_TOTAL_CONSO] = 1;
     teleinfo_homie.arr_data[TIC_PUB_TOTAL_INDEX] = 1;
   }
-  if (teleinfo_prod.enabled) teleinfo_homie.arr_data[TIC_PUB_TOTAL_PROD] = 1;
+
+  // production data
+  if (teleinfo_prod.cacsi) teleinfo_homie.arr_data[TIC_PUB_PROD_P] = 1;
+  else if (teleinfo_prod.enabled)
+  {
+    // prod data
+    for (index = TIC_PUB_PROD_P; index <= TIC_PUB_PROD_TODAY; index++) teleinfo_homie.arr_data[index] = 1;
+
+    // prod total
+    teleinfo_homie.arr_data[TIC_PUB_TOTAL_PROD] = 1;
+  }
 }
 
 void TeleinfoHomieDataCalendar ()
@@ -495,7 +500,7 @@ bool TeleinfoHomiePublishSubStage (const uint8_t stage, const uint8_t index, con
     case TIC_PUB_TOTAL_INDEX: 
       pstr_param = PSTR_HOMIE_PUB_TOTAL_PERIOD;
       sprintf_P (str_id, GetTextIndexed (str_temp, sizeof (str_temp), 0, pstr_param), index);
-      TeleinfoPeriodGetLabel (str_name, sizeof (str_name), index);
+      TeleinfoContractGetPeriodLabel (str_name, sizeof (str_name), index);
       if (data == 0) sprintf_P (str_text, GetTextIndexed (str_temp, sizeof (str_temp), data, pstr_param), index);
       else if (data == 1) sprintf_P (str_text, GetTextIndexed (str_temp, sizeof (str_temp), data, pstr_param), str_name);
       break;
@@ -529,9 +534,9 @@ bool TeleinfoHomiePublishSubStage (const uint8_t stage, const uint8_t index, con
     case TIC_PUB_CONTRACT_SERIAL: lltoa (teleinfo_meter.ident, str_text, 10); Response_P (PSTR ("%s"), str_text);            break;
 
     // calendar
-    case TIC_PUB_CALENDAR_PERIOD: TeleinfoPeriodGetLabel (str_text, sizeof (str_text)); Response_P (PSTR ("%s"), str_text); break;
-    case TIC_PUB_CALENDAR_COLOR:  GetTextIndexed (str_text, sizeof (str_text), TeleinfoPeriodGetLevel (), kTeleinfoLevelLabel); Response_P (PSTR ("%s"), str_text); break;
-    case TIC_PUB_CALENDAR_HOUR:   GetTextIndexed (str_text, sizeof (str_text), TeleinfoPeriodGetHP (), kTeleinfoHourLabel);  Response_P (PSTR ("%s"), str_text); break;
+    case TIC_PUB_CALENDAR_PERIOD: TeleinfoContractGetPeriodLabel (str_text, sizeof (str_text)); Response_P (PSTR ("%s"), str_text); break;
+    case TIC_PUB_CALENDAR_COLOR:  GetTextIndexed (str_text, sizeof (str_text), TeleinfoContractGetPeriodLevel (), kTeleinfoLevelLabel); Response_P (PSTR ("%s"), str_text); break;
+    case TIC_PUB_CALENDAR_HOUR:   GetTextIndexed (str_text, sizeof (str_text), TeleinfoContractGetPeriodHP (), kTeleinfoHourLabel);  Response_P (PSTR ("%s"), str_text); break;
     case TIC_PUB_CALENDAR_TODAY:  GetTextIndexed (str_text, sizeof (str_text), TeleinfoDriverCalendarGetLevel (TIC_DAY_TODAY, 12 * 2, true), kTeleinfoLevelLabel); Response_P (PSTR ("%s"), str_text); break;
     case TIC_PUB_CALENDAR_TOMRW:  GetTextIndexed (str_text, sizeof (str_text), TeleinfoDriverCalendarGetLevel (TIC_DAY_TMROW, 12 * 2, true), kTeleinfoLevelLabel); Response_P (PSTR ("%s"), str_text); break;
 

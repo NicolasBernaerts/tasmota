@@ -199,6 +199,7 @@ void TeleinfoHistoFileCleanup ()
       if (TeleinfoHistoFileIsCandidate (file.name (), file.getLastWrite (), time_target)) str_target = str_root + file.name ();
       file = directory.openNextFile ();
     }
+    directory.close ();
 
 #else     // ESP8266
     Dir directory = ffsp->openDir (str_root.c_str ());
@@ -557,6 +558,7 @@ bool TeleinfoHistoFileLoadPeriod (const uint8_t period, const uint32_t timestamp
     // do a yield every 500 lines
     if (line_current % 500 == 0) yield ();
   }
+  file.close ();
 
   // log data loading
   if (line_first == 0) strcpy_P (str_current, PSTR ("no data"));
@@ -621,7 +623,7 @@ void TeleinfoHistoLoadConfig ()
       file.read ((uint8_t*)&time_save, sizeof (time_save));
       file.read ((uint8_t*)&histo_status, sizeof (histo_status));
     }
-
+    else AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Attention, format de stockage different. Configuration Historique réinitialisée !"));
     file.close ();
   }
 }
@@ -717,7 +719,7 @@ void TeleinfoHistoDisplayUnits ()
 // Append histo button to main page
 void TeleinfoHistoWebMainButton ()
 {
-  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s %s</button></form></p>\n"), PSTR_PAGE_HISTO, PSTR (TIC_TELEINFO), PSTR (TIC_HISTO));
+  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), PSTR_PAGE_HISTO, PSTR ("Historisation compteur"));
 }
 
 // Display bar graph
@@ -1279,7 +1281,7 @@ void TeleinfoHistoWebPage ()
   }
 
   // production button
-  if (teleinfo_prod.enabled)
+  if (teleinfo_prod.enabled || teleinfo_prod.cacsi)
   {
     choice = TeleinfoHistoButtonStatus (1, str_status, sizeof (str_status));
     GetTextIndexed (str_text, sizeof (str_text), TIC_LEVEL_PROD, kTeleinfoLevelLabel);
@@ -1291,7 +1293,7 @@ void TeleinfoHistoWebPage ()
     if (teleinfo_conso_wh.index[index] > 0)
     {
       choice = TeleinfoHistoButtonStatus (2 + index, str_status, sizeof (str_status));
-      TeleinfoPeriodGetLabel (str_text, sizeof (str_text), index);
+      TeleinfoContractGetPeriodLabel (str_text, sizeof (str_text), index);
       WSContentSend_P (PSTR ("<a href='%s?%s=%u'><div class='item c%u%s'>%s</div></a>\n"), PSTR_PAGE_HISTO, PSTR (CMND_HISTO_DISPLAY), choice, index, str_status, str_text);
     }
 

@@ -10,6 +10,7 @@
 
     - Settings->rf_code[10][0..8]
     - Settings->rf_code[11][0..2] : Main screen display flags
+    - Settings->rf_code[15][8]    : Teleinfo baud rate
     - Settings->rf_code[16][0]    : Home Assistant integration flag
     - Settings->rf_code[16][2]    : Domoticz integration flag
     - Settings->rf_code[16][1]    : Homie integration flag
@@ -48,10 +49,9 @@ TasmotaSerial *teleinfo_serial = nullptr;
  *              Constant
 \****************************************/
 
-#define TIC_AVERAGE_PROD_SAMPLE     200       // average production samples
+#define TIC_DEFAULT_SPEED           1200      // default speed (historique mode)
 
-// result of command
-enum TeleinfoCommandResult { TIC_COMMAND_NOTHING, TIC_COMMAND_SAVE, TIC_COMMAND_REBOOT, TIC_COMMAND_MAX };
+#define TIC_AVERAGE_PROD_SAMPLE     200       // average production samples
 
 // TIC reception
 #define TIC_LINE_SIZE               128       // maximum size of a received TIC line
@@ -136,7 +136,6 @@ const char PSTR_DRIVER_DATA_FILE[]  PROGMEM = "/teleinfo-contract.dat";
 // interface strings
 #define TIC_TELEINFO                "Teleinfo"
 #define TIC_MESSAGE                 "Messages"
-#define TIC_HISTO                   "Historique"
 
 // web URL
 #define TIC_PAGE_CONFIG             "/tic-cfg"
@@ -148,8 +147,8 @@ const char PSTR_DRIVER_DATA_FILE[]  PROGMEM = "/teleinfo-contract.dat";
 #define TIC_BRIGHT_DEFAULT          50        // default LED brightness
 
 // EnergyConfig commands
-const char kTeleinfoEnergyCommands[] PROGMEM =    "historique"   "|"   "standard"   "|"   "noraw"   "|"   "full"   "|"   "period"   "|"   "live"   "|"   "skip"   "|"   "bright"   "|"   "percent"   "|"   "stats"   "|"   "error"   "|"   "reset"   "|"    "calraz"   "|"   "calhexa"   "|"   "prod"   "|"   "trigger"   "|"    "display"   "|" CMND_TIC_POLICY "|" CMND_TIC_METER "|" CMND_TIC_CALENDAR "|" CMND_TIC_RELAY;
-enum TeleinfoEnergyCommand                   { TIC_CMND_HISTORIQUE, TIC_CMND_STANDARD, TIC_CMND_NORAW, TIC_CMND_FULL, TIC_CMND_PERIOD, TIC_CMND_LIVE, TIC_CMND_SKIP, TIC_CMND_BRIGHT, TIC_CMND_PERCENT, TIC_CMND_STATS, TIC_CMND_ERROR, TIC_CMND_RESET,  TIC_CMND_CALRAZ, TIC_CMND_CALHEXA, TIC_CMND_PROD, TIC_CMND_TRIGGER,  TIC_CMND_DISPLAY,  TIC_CMND_POLICY  ,  TIC_CMND_METER  ,  TIC_CMND_CALENDAR  ,  TIC_CMND_RELAY};
+const char kTeleinfoEnergyCommands[] PROGMEM =    "historique"   "|"   "standard"   "|"   "speed"   "|"   "detect"   "|"   "noraw"   "|"   "full"   "|"   "period"   "|"   "live"   "|"   "skip"   "|"   "bright"   "|"   "percent"   "|"   "stats"   "|"   "error"   "|"   "reset"   "|"    "calraz"   "|"   "calhexa"   "|"   "prod"   "|"   "trigger"   "|"    "display"   "|" CMND_TIC_POLICY "|" CMND_TIC_METER "|" CMND_TIC_CALENDAR "|" CMND_TIC_RELAY;
+enum TeleinfoEnergyCommand                   { TIC_CMND_HISTORIQUE, TIC_CMND_STANDARD, TIC_CMND_SPEED, TIC_CMND_DETECT, TIC_CMND_NORAW, TIC_CMND_FULL, TIC_CMND_PERIOD, TIC_CMND_LIVE, TIC_CMND_SKIP, TIC_CMND_BRIGHT, TIC_CMND_PERCENT, TIC_CMND_STATS, TIC_CMND_ERROR, TIC_CMND_RESET,  TIC_CMND_CALRAZ, TIC_CMND_CALHEXA, TIC_CMND_PROD, TIC_CMND_TRIGGER,  TIC_CMND_DISPLAY,  TIC_CMND_POLICY  ,  TIC_CMND_METER  ,  TIC_CMND_CALENDAR  ,  TIC_CMND_RELAY};
 
 // Data publication commands
 static const char kTeleinfoDriverCommands[]  PROGMEM =          "|tic";
@@ -298,15 +297,15 @@ const char kTicManufacturer80to89[]   PROGMEM = "|Sagem / Sagemcom|Landis & Gyr 
 // Models
 // ------
 
-const char kTicModel00to09[]   PROGMEM = "|Bleu mono. BBR,Gen1|Poste HTA/BT,Gen3|||Bleu monophasé,Gen1|Jaune tarif modulable|PRISME ou ICE|Sauter modifié EURIDIS|Bleu triphasé,Gen1";
-const char kTicModel10to19[]   PROGMEM = "Jaune,Gen2|Bleu mono. FERRARIS|Prisme|||Bleu mono. sans BBR";
-const char kTicModel20to29[]   PROGMEM = "Bleu mono. ½taux,Gen1|Bleu tri. ½taux,Gen1|Bleu monophasé,Gen2|Bleu mono. ½taux,Gen2||Bleu monophasé,Gen2|Bleu triphasé,Gen2|Bleu tri. ½taux,Gen2|Bleu monophasé,Gen3|Bleu mono. ½taux,Gen3";
-const char kTicModel30to39[]   PROGMEM = "Bleu triphasé,Gen3|Bleu tri. ½taux,Gen3|Bleu tri. télétotalisation|Jaune branchement direct|ICE 4 quadrants|Trimaran 2P classe 0,2s|PME-PMI BT > 36kva|Prépaiement|HXE34 de HECL tri.";
-const char kTicModel40to49[]   PROGMEM = "||ACTARIS mono. export|ACTARIS mono. export|ACTARIS tri. export|ACTARIS / AECL tri. export";
-const char kTicModel60to69[]   PROGMEM = "Linky monophasé 60A,Gen1|Linky monophasé 60A,Gen3|Linky monophasé 90A,Gen1|Linky triphasé 60A,Gen1|Linky monophasé 60A,Gen3|Linky mono. 90A CPL,Gen3||Linky monophasé 90A,Gen1|Linky triphasé 60A,Gen1";
-const char kTicModel70to79[]   PROGMEM = "Linky monophasé 60A,Gen3|Linky triphasé 60A,Gen3|HXE12K mono. 10-80A 4 tarifs||HXE34K tri. 10-80A 4 tarifs|Linky monophasé 90A,Gen3|Linky triphasé 60A,Gen3";
-const char kTicModel80to89[]   PROGMEM = "||||||SEI mono. 60A 60Hz,Gen3|SEI tri. 60A 60Hz,Gen3|ACTARIS mono. PLC DSMR2.2|ACTARIS tri. PLC DSMR2.2";
-const char kTicModel90to99[]   PROGMEM = "Monophasé CPL intégré,Gen1|Triphasé CPL intégré,Gen2|Linky ORES mono. 90A,Gen3|Linky ORES tri. 60A 3fils,Gen3|Linky ORES tri. 60A 4fils,Gen3";
+const char kTicModel00to09[]   PROGMEM = "|Bleu Mono. BBR,Gen1|Poste HTA/BT,Gen3|||Bleu Monophasé,Gen1|Jaune Tarif Modulable|PRISME ou ICE|Sauter modifié EURIDIS|Bleu Triphasé,Gen1";
+const char kTicModel10to19[]   PROGMEM = "Jaune,Gen2|Bleu Mono. FERRARIS|Prisme|||Bleu Mono. sans BBR";
+const char kTicModel20to29[]   PROGMEM = "Bleu Mono. ½taux,Gen1|Bleu Tri. ½taux,Gen1|Bleu Monophasé,Gen2|Bleu Mono. ½taux,Gen2||Bleu Monophasé,Gen2|Bleu Triphasé,Gen2|Bleu Tri. ½taux,Gen2|Bleu Monophasé,Gen3|Bleu Mono. ½taux,Gen3";
+const char kTicModel30to39[]   PROGMEM = "Bleu Triphasé,Gen3|Bleu Tri. ½taux,Gen3|Bleu Tri. Télétotalisation|Jaune Branchement Direct|ICE 4 Quadrants|Trimaran 2P classe 0,2s|PME-PMI BT > 36kva|Prépaiement|HXE34 de HECL Tri.";
+const char kTicModel40to49[]   PROGMEM = "||ACTARIS Mono. Export|ACTARIS Mono. Export|ACTARIS Tri. Export|ACTARIS / AECL Tri. Export";
+const char kTicModel60to69[]   PROGMEM = "Linky Monophasé 60A,Gen1|Linky Monophasé 60A,Gen3|Linky Monophasé 90A,Gen1|Linky Triphasé 60A,Gen1|Linky Monophasé 60A,Gen3|Linky Mono. 90A CPL,Gen3||Linky Monophasé 90A,Gen1|Linky Triphasé 60A,Gen1";
+const char kTicModel70to79[]   PROGMEM = "Linky Monophasé 60A,Gen3|Linky Triphasé 60A,Gen3|HXE12K Mono. 10-80A 4 Tarifs||HXE34K Tri. 10-80A 4 tarifs|Linky Monophasé 90A,Gen3|Linky Triphasé 60A,Gen3";
+const char kTicModel80to89[]   PROGMEM = "||||||SEI Mono. 60A 60Hz,Gen3|SEI Tri. 60A 60Hz,Gen3|ACTARIS Mono. PLC DSMR2.2|ACTARIS Tri. PLC DSMR2.2";
+const char kTicModel90to99[]   PROGMEM = "Monophasé CPL intégré,Gen1|Triphasé CPL intégré,Gen2|Linky ORES Mono. 90A,Gen3|Linky ORES Tri. 60A 3fils,Gen3|Linky ORES Tri. 60A 4fils,Gen3";
 
 // Contracts & Periods
 // --------------------
@@ -364,16 +363,16 @@ const char kTicPeriodStdWeekEnd[]      PROGMEM = "1|1|0|HEURE WEEK-END|Week-end"
 const char kTicPeriodStdHCWeekEnd[]    PROGMEM = "1|1|0|HEURE CREUSE|Creuses"    "|"  "2|1|1|HEURE PLEINE|Pleines"  "|" "3|1|0|HEURE WEEK-END|Week-end";
 
 // PME/PMI 
-const char kTicPeriodPmePmi[]          PROGMEM =  "1|3|1|P|Pointe"                  "|"  "2|3|1|M|Pointe Mobile"
+const char kTicPeriodPmePmi[]          PROGMEM =  "1|3|1|P|Pointe Fixe"             "|"  "2|3|1|M|Pointe Mobile"
                                               "|" "3|1|0|HH|Hiver"
                                               "|" "4|1|1|HP|Pleines"                "|"  "5|1|0|HC|Creuses"
-                                              "|" "6|1|1|HPH|Pleines Hiver"         "|"  "7|1|0|HCH|Creuses Hiver"
+                                              "|" "6|2|1|HPH|Pleines Hiver"         "|"  "7|2|0|HCH|Creuses Hiver"
                                               "|" "8|1|1|HPE|Pleines Eté"           "|"  "9|1|0|HCE|Creuses Eté"
                                               "|" "10|1|1|HPD|Pleines demi-saison"  "|"  "11|1|0|HCD|Creuses demi-saison"
                                               "|" "12|1|0|JA|Juillet-Août";
 
 // Emeraude 2 quadrants - A5 Base, A8 Basen A5 EJP, A8 EJP, A8 Modulable
-const char kTicPeriodEmeraude[]        PROGMEM = "1|3|1|P|Pointe"                "|"  "2|3|1|PM|Pointe Mobile"     
+const char kTicPeriodEmeraude[]        PROGMEM = "1|3|1|P|Pointe Fixe"           "|"  "2|3|1|PM|Pointe Mobile"     
                                               "|" "3|1|1|HPH|Pleines Hiver"      "|"  "4|1|1|HPD|Pleines demi-saison"
                                               "|" "5|1|0|HCH|Creuses Hiver"      "|"  "6|1|0|HCD|Creuses demi-saison"
                                               "|" "7|1|1|HPE|Pleines Ete"        "|"  "8|1|0|HCE|Creuses Ete"
@@ -430,24 +429,25 @@ const char *const arr_kTicPeriod[] PROGMEM = { kTicPeriodUnknown,           // T
 // ------------------------
 
 struct {                   // 38 bytes
-  bool    display  = false;                           // display data on main page
-  bool    battery  = false;                           // device is running on battery
-  bool    meter    = true;                            // publish METER & PROD section
-  bool    energy   = false;                           // publish ENERGY section
-  bool    tic      = false;                           // publish TIC topic
-  bool    live     = false;                           // publish LIVE topic
-  bool    calendar = true;                            // publish CALENDAR section
-  bool    relay    = true;                            // publish RELAY section
-  bool    error    = false;                           // force display of errors on home page 
-  bool    cal_hexa = true;                            // flag to set format of period profiles as hexa
-  bool    led      = false;                           // adjust LED color according to period color 
-  bool    arr_main[TIC_DISPLAY_MAX];                  // display flags for sections on main page
-  uint8_t policy       = TIC_POLICY_TELEMETRY;        // data publishing policy
-  uint8_t percent      = 100;                         // maximum acceptable power in percentage of contract power
-  uint8_t skip         = 2;                           // number of frames to skip while publishing TIC or LIVE
-  uint8_t brightness   = 0;
-  long    prod_max     = 0;                           // maximum power produced
-  long    prod_trigger = 0;                           // average production power to trigger production relay
+  bool     display  = false;                           // display data on main page
+  bool     battery  = false;                           // device is running on battery
+  bool     meter    = true;                            // publish METER & PROD section
+  bool     energy   = false;                           // publish ENERGY section
+  bool     tic      = false;                           // publish TIC topic
+  bool     live     = false;                           // publish LIVE topic
+  bool     calendar = true;                            // publish CALENDAR section
+  bool     relay    = true;                            // publish RELAY section
+  bool     error    = false;                           // force display of errors on home page 
+  bool     cal_hexa = true;                            // flag to set format of period profiles as hexa
+  bool     led      = false;                           // adjust LED color according to period color 
+  bool     arr_main[TIC_DISPLAY_MAX];                  // display flags for sections on main page
+  uint8_t  policy       = TIC_POLICY_TELEMETRY;        // data publishing policy
+  uint8_t  percent      = 100;                         // maximum acceptable power in percentage of contract power
+  uint8_t  skip         = 2;                           // number of frames to skip while publishing TIC or LIVE
+  uint8_t  brightness   = 0;
+  uint16_t baudrate     = 0;
+  long     prod_max     = 0;                           // maximum power produced
+  long     prod_trigger = 0;                           // average production power to trigger production relay
 } teleinfo_config;
 
 // teleinfo : calendar
@@ -556,7 +556,7 @@ struct {                     // 71 bytes
   uint8_t   model       = 0;                    // model of the meter
   uint8_t   serial      = TIC_SERIAL_INIT;      // serial port status
   uint8_t   reception   = TIC_RECEPTION_LINE;   // reception phase
-  uint8_t   use_sinsts  = 0;                    // flag to use sinsts etiquette for papp
+  bool      use_sinsts  = false;                // flag to use sinsts etiquette for papp
   uint8_t   slot        = UINT8_MAX;            // current slot
   uint16_t  year        = 0;                    // year of manufacturing of the meter
   uint32_t  date        = 0;                    // current date with slot
@@ -652,6 +652,7 @@ struct {
 
 struct {
   bool  enabled         = false;               // flag of production status
+  bool  cacsi           = false;               // flag of cacsi production detected
   bool  relay           = false;               // production relay status
 
   float pact_avg        = 0;                   // average produced active power
@@ -679,18 +680,23 @@ struct {
 // ----------------
 
 struct {                     // esp8266 13 bytes, esp32 34 bytes
-  bool      enabled      = false;             // flag of solar production status
+  bool      enabled      = false;
   long      pact         = 0;                 // solar production instant active power
   long long total_wh     = 0;                 // active power total
 
-#ifdef ESP32
+#ifdef USE_TELEINFO_SOLAR
+  bool      use_api      = false;             // flag for solar production API usage
+  bool      use_mqtt     = false;             // flag for solar production MQTT usage
   uint8_t   hour         = UINT8_MAX;         // current hour
   uint32_t  pact_time    = UINT32_MAX;        // timestamp of last received active power
   long      today_wh     = 0;                 // active power produced today (Wh)
   long      yesterday_wh = 0;                 // active power produced yesterday (Wh)
   long long midnight_wh  = 0;                 // active power total last midnight (Wh)
-#endif   // ESP32
-
+  char      str_topic[32];                    // general mqtt topic (W and Wh)
+  char      str_ttopic[32];                   // mqtt topic for total production (Wh)
+  char      str_pkey[16];                     // mqtt key for instant production (W)
+  char      str_tkey[16];                     // mqtt key for total production (Wh)
+#endif   // USE_TELEINFO_SOLAR
 } teleinfo_solar;
 
 // solar forecast status
@@ -705,19 +711,18 @@ struct {                     // esp8266 13 bytes, esp32 300 bytes
   long      pact         = 0;                 // solar production instant active power
   long long total_wh     = 0;                 // active power total
 
-#ifdef ESP32
-  uint8_t   declination  = 45;                // solar panel declination
-  int16_t   azimuth      = 0;                 // solar panel azimuth
+#ifdef USE_TELEINFO_SOLAR
   uint16_t  credit_total = 0;                 // remaining request
   uint16_t  credit_left  = 0;                 // credit request
   uint32_t  time_publish = UINT32_MAX;        // timestamp of next publication
   uint32_t  time_update  = UINT32_MAX;        // timestamp of next update
+  int       declination  = 45;                // solar panel declination
+  int       azimuth      = 0;                 // solar panel azimuth
   char      str_apikey[24];                   // forecast API key
   char      str_place[64];                    // place given by API
   solar_day today;                            // today's data
   solar_day tomorrow;                         // tomorrow's data
-#endif   // ESP32
-
+#endif   // USE_TELEINFO_SOLAR
 } teleinfo_forecast;
 
 #endif   // USE_TELEINFO
