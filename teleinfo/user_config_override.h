@@ -202,6 +202,17 @@
                         Rewrite RGB LED management
                         Add Prometheus API metrics
                         Add RTE Tempo Light management
+    28/02/2026 - v15.2  Handle suppression of prod data according to production status
+                        Complete rework of Awtrix management (api/mqtt, colors, ...)
+                        Add MQTT to solar production update
+                        Estimate production excess for CACSI contract
+                        Introduce autoconf for ESP32 family
+                        Replace ethernet board management by autoconf
+                        Remove baudrate auto-detect
+                        Switch to historique mode by default
+    24/06/2026 - v15.5  Based on Tasmota 15.5
+                        Complete rewrite of Winky deepsleep triggers and calculation
+                        Flush reception buffer at start
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License aStart STGE managements published by
@@ -245,10 +256,14 @@
 // extension description
 #define EXTENSION_NAME    "Teleinfo"              // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts"     // author
-#define EXTENSION_VERSION "15.1"                  // version
+#define EXTENSION_VERSION "15.5beta2"             // version
 
 // complementary modules
-#define USE_MISC_OPTION                           // Add IP and common options configuration page
+#define USE_MISC_OPTION                          // Add IP and common options configuration page
+#define USE_CPU_LOAD                             // CPU load display
+
+// display wifi level on status line
+#define USE_WEB_STATUS_LINE_WIFI
 
 // teleinfo modules
 #define USE_TELEINFO_TCP                          // Enable TCP server to forward meter stream to network
@@ -257,13 +272,13 @@
 #define USE_TELEINFO_RELAY                        // Enable Teleinfo period and virtual relay association to local relays
 
 // integration modules
-#define USE_TELEINFO_HASS                         // Home Assistant integration
-#define USE_TELEINFO_DOMOTICZ                     // Domoticz integration
-#define USE_TELEINFO_HOMIE                        // Homie integration
-#define USE_TELEINFO_PROMETHEUS                   // Prometheus metrics API
+#define USE_TELEINFO_HASS                         // Teleinfo Home Assistant integration
+#define USE_TELEINFO_DOMOTICZ                     // Teleinfo Domoticz integration
+#define USE_TELEINFO_HOMIE                        // Teleinfo Homie integration
+#define USE_TELEINFO_PROMETHEUS                   // Teleinfo Prometheus metrics API
 
 #ifdef ESP32
-  #define USE_TELEINFO_THINGSBOARD                // Thingsboard integration
+  #define USE_TELEINFO_THINGSBOARD                // Teleinfo Thingsboard integration
 #endif    // ESP32
 
 // teleinfo display is in French
@@ -277,10 +292,12 @@
 // build
 #ifdef BUILD_ESP32S3_16M
   #define EXTENSION_BUILD "esp32s3-16m"
+  #define USER_TEMPLATE "{\"NAME\":\"ESP32S3\",\"GPIO\":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,1,1,1,1,1,1,5632,1,1,1,1376],\"FLAG\":0,\"BASE\":1}"
   #define MQTT_TOPIC "teleinfo_%06X"
 
 #elif BUILD_ESP32S3_4M
   #define EXTENSION_BUILD "esp32s3-4m"
+  #define USER_TEMPLATE "{\"NAME\":\"ESP32S3\",\"GPIO\":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,1,1,1,1,1,1,5632,1,1,1,1376],\"FLAG\":0,\"BASE\":1}"
   #define MQTT_TOPIC "teleinfo_%06X"
 
 #elif BUILD_ESP32S2
@@ -289,12 +306,12 @@
 
 #elif BUILD_ESP32_DENKYD4
   #define EXTENSION_BUILD "denkyd4-8m"
-  #define USER_TEMPLATE "{\"NAME\":\"Denky D4\",\"GPIO\":[32,0,0,0,1,0,0,0,0,1,1376,1,0,0,0,0,0,640,608,0,0,0,0,0,0,0,5632,0,0,0,0,0,0,0,0,0],\"FLAG\":0,\"BASE\":1}" 
+  #define USER_TEMPLATE "{\"NAME\":\"Denky D4\",\"GPIO\":[32,3200,0,3232,1,0,0,0,0,1,1376,1,0,0,0,0,0,640,608,0,0,0,0,0,0,0,5632,0,0,0,0,0,0,0,0,0],\"FLAG\":0,\"BASE\":1}" 
   #define MQTT_TOPIC "denky_%06X"
 
 #elif BUILD_ESP32_WINKYC6
   #define EXTENSION_BUILD "winkyc6-4m"
-  #define USER_TEMPLATE "{\"NAME\":\"Winky C6\",\"GPIO\":[1,4704,1376,4705,5632,4706,640,608,1,32,1,0,0,0,0,0,0,0,1,1,1,1,1,4096,0,0,0,0,0,0,0],\"FLAG\":0,\"BASE\":1}"
+  #define USER_TEMPLATE "{\"NAME\":\"Winky C6\",\"GPIO\":[1,4704,1376,4705,5632,4706,640,608,1,32,1,0,0,0,0,0,0,0,1,1,1,1,3840,4096,0,0,0,0,0,0,0],\"FLAG\":0,\"BASE\":1}"
   #define MQTT_TOPIC "winky_%06X"
 
 #elif BUILD_ESP32_WINKYC3
@@ -325,29 +342,19 @@
 #endif
 
 // MQTT default
-#undef MQTT_HOST
-#define MQTT_HOST          "mqtt.local"
-#undef MQTT_PORT
-#define MQTT_PORT          1883              
-#undef MQTT_USER
-#define MQTT_USER          ""
-#undef MQTT_PASS
-#define MQTT_PASS          ""
-#undef MQTT_FULLTOPIC
+#ifdef MQTT_FULLTOPIC
+  #undef MQTT_FULLTOPIC
+#endif
 #define MQTT_FULLTOPIC     "%topic%/%prefix%/"
-#undef FRIENDLY_NAME
-#define FRIENDLY_NAME      "Teleinfo"
 
-// disable serial log
-#undef SERIAL_LOG_LEVEL
-#define SERIAL_LOG_LEVEL LOG_LEVEL_NONE       // disable SerialLog
+#ifdef FRIENDLY_NAME
+  #undef FRIENDLY_NAME
+#endif
+#define FRIENDLY_NAME      "Teleinfo"
 
 // ----------------------
 // Common ESP8266 & ESP32
 // ----------------------
-
-#define USE_WEB_STATUS_LINE_WIFI              // enable wifi icon
-#define USE_WEB_STATUS_LINE_LOAD              // enable load icon
 
 #define MDNS_ENABLE false                     // disable multicast DNS
 
@@ -374,15 +381,15 @@
 #undef USE_DISCOVERY                          // Discovery services for both MQTT and web server
 #undef MQTT_HOST_DISCOVERY                    // Find MQTT host serTeleinfoContractUpdatever (overrides MQTT_HOST if found)
 
-#undef USE_TIMERS                            // support for up to 16 timers
-#undef USE_TIMERS_WEB                        // support for timer webpage
-#undef USE_SUNRISE                           // support for Sunrise and sunset tools
+#undef USE_TIMERS                             // support for up to 16 timers
+#undef USE_TIMERS_WEB                         // support for timer webpage
+#undef USE_SUNRISE                            // support for Sunrise and sunset tools
 
 #undef USE_SCRIPT                             // Add support for script (+17k code)
 
-#undef USE_RULES                             // Support for rules
-  #undef USE_EXPRESSION                      // Add support for expression evaluation in rules (+3k2 code, +64 bytes mem)  
-    #undef SUPPORT_IF_STATEMENT              // Add support for IF statement in rules (+4k2 code, -332 bytes mem)  
+#define USE_RULES                             // Support for rules
+  #define USE_EXPRESSION                      // Add support for expression evaluation in rules (+3k2 code, +64 bytes mem)  
+    #define SUPPORT_IF_STATEMENT              // Add support for IF statement in rules (+4k2 code, -332 bytes mem)  
 
 #undef ROTARY_V1                              // Add support for Rotary Encoder as used in MI Desk Lamp (+0k8 code)
 #undef USE_SONOFF_RF                          // Add support for Sonoff Rf Bridge (+3k2 code)
@@ -433,12 +440,12 @@
 
 #undef USE_COUNTER                            // Enable inputs as counter (+0k8 code)
 
-#undef USE_DS18x20                           // Add support for DS18x20 sensors with id sort, single scan and read retry (+2k6 code)
-#undef USE_I2C                               // Enable all I2C sensors and devices
-#undef USE_SHT                               // [I2cDriver8] Enable SHT1X sensor (+1k4 code)
-#undef USE_SHT3X                             // [I2cDriver15] Enable SHT3x (I2C address 0x44 or 0x45) or SHTC3 (I2C address 0x70) sensor (+0k7 code)
-#undef USE_HTU                               // [I2cDriver9] Enable HTU21/SI7013/SI7020/SI7021 sensor (I2C address 0x40) (+1k5 code)
-#undef USE_BMP                               // [I2cDriver10] Enable BMP085/BMP180/BMP280/BME280 sensors (I2C addresses 0x76 and 0x77) (+4k4 code)
+#undef USE_DS18x20                            // Add support for DS18x20 sensors with id sort, single scan and read retry (+2k6 code)
+#undef USE_I2C                                // Enable all I2C sensors and devices
+#undef USE_SHT                                // [I2cDriver8] Enable SHT1X sensor (+1k4 code)
+#undef USE_SHT3X                              // [I2cDriver15] Enable SHT3x (I2C address 0x44 or 0x45) or SHTC3 (I2C address 0x70) sensor (+0k7 code)
+#undef USE_HTU                                // [I2cDriver9] Enable HTU21/SI7013/SI7020/SI7021 sensor (I2C address 0x40) (+1k5 code)
+#undef USE_BMP                                // [I2cDriver10] Enable BMP085/BMP180/BMP280/BME280 sensors (I2C addresses 0x76 and 0x77) (+4k4 code)
 
 #undef USE_BME68X                             // Enable support for BME680/BME688 sensor using Bosch BME68x library (+6k9 code)
 #undef USE_BH1750                             // [I2cDriver11] Enable BH1750 sensor (I2C address 0x23 or 0x5C) (+0k5 code)
@@ -591,37 +598,37 @@
 #define USE_ENERGY_SENSOR                     // Add support for Energy Monitors (+14k code)
 #undef USE_ENERGY_MARGIN_DETECTION            // Add support for Energy Margin detection (+1k6 code)
 #undef USE_ENERGY_POWER_LIMIT                 // Add additional support for Energy Power Limit detection (+1k2 code)
-#undef USE_ENERGY_DUMMY                         // Add support for dummy Energy monitor allowing user values (+0k7 code)
-#undef USE_HLW8012                              // Add support for HLW8012, BL0937 or HJL-01 Energy Monitor for Sonoff Pow and WolfBlitz
-#undef USE_CSE7766                              // Add support for CSE7766 Energy Monitor for Sonoff S31 and Pow R2
-#undef USE_PZEM004T                             // Add support for PZEM004T Energy monitor (+2k code)
-#undef USE_PZEM_AC                              // Add support for PZEM014,016 Energy monitor (+1k1 code)
-#undef USE_PZEM_DC                              // Add support for PZEM003,017 Energy monitor (+1k1 code)
-#undef USE_MCP39F501                            // Add support for MCP39F501 Energy monitor as used in Shelly 2 (+3k1 code)
-#undef USE_SDM72                                // Add support for Eastron SDM72-Modbus energy monitor (+0k3 code)
-#undef USE_SDM120                               // Add support for Eastron SDM120-Modbus energy monitor (+1k1 code)
-#undef USE_SDM230                               // Add support for Eastron SDM230-Modbus energy monitor (+1k6 code)
-#undef USE_SDM630                               // Add support for Eastron SDM630-Modbus energy monitor (+0k6 code)
-#undef USE_DDS2382                              // Add support for Hiking DDS2382 Modbus energy monitor (+0k6 code)
-#undef USE_DDSU666                              // Add support for Chint DDSU666 Modbus energy monitor (+0k6 code)
-#undef USE_SOLAX_X1                             // Add support for Solax X1 series Modbus log info (+3k1 code)
+#undef USE_ENERGY_DUMMY                       // Add support for dummy Energy monitor allowing user values (+0k7 code)
+#undef USE_HLW8012                            // Add support for HLW8012, BL0937 or HJL-01 Energy Monitor for Sonoff Pow and WolfBlitz
+#undef USE_CSE7766                            // Add support for CSE7766 Energy Monitor for Sonoff S31 and Pow R2
+#undef USE_PZEM004T                           // Add support for PZEM004T Energy monitor (+2k code)
+#undef USE_PZEM_AC                            // Add support for PZEM014,016 Energy monitor (+1k1 code)
+#undef USE_PZEM_DC                            // Add support for PZEM003,017 Energy monitor (+1k1 code)
+#undef USE_MCP39F501                          // Add support for MCP39F501 Energy monitor as used in Shelly 2 (+3k1 code)
+#undef USE_SDM72                              // Add support for Eastron SDM72-Modbus energy monitor (+0k3 code)
+#undef USE_SDM120                             // Add support for Eastron SDM120-Modbus energy monitor (+1k1 code)
+#undef USE_SDM230                             // Add support for Eastron SDM230-Modbus energy monitor (+1k6 code)
+#undef USE_SDM630                             // Add support for Eastron SDM630-Modbus energy monitor (+0k6 code)
+#undef USE_DDS2382                            // Add support for Hiking DDS2382 Modbus energy monitor (+0k6 code)
+#undef USE_DDSU666                            // Add support for Chint DDSU666 Modbus energy monitor (+0k6 code)
+#undef USE_SOLAX_X1                           // Add support for Solax X1 series Modbus log info (+3k1 code)
 #undef SOLAXX1_PV2                            // Solax X1 using second PV
-#undef USE_LE01MR                               // Add support for F&F LE-01MR Modbus energy monitor (+1k code)
-#undef USE_BL09XX                               // Add support for various BL09XX Energy monitor as used in Blitzwolf SHP-10 or Sonoff Dual R3 v2 (+1k6 code)
+#undef USE_LE01MR                             // Add support for F&F LE-01MR Modbus energy monitor (+1k code)
+#undef USE_BL09XX                             // Add support for various BL09XX Energy monitor as used in Blitzwolf SHP-10 or Sonoff Dual R3 v2 (+1k6 code)
 
-#define USE_TELEINFO                             // Add support for Teleinfo via serial RX interface (+5k2 code, +168 RAM + SmartMeter LinkedList Values RAM)
+#define USE_TELEINFO                          // Add support for Teleinfo via serial RX interface (+5k2 code, +168 RAM + SmartMeter LinkedList Values RAM)
 
-#undef USE_IEM3000                              // Add support for Schneider Electric iEM3000-Modbus series energy monitor (+0k8 code)
-#undef USE_WE517                                // Add support for Orno WE517-Modbus energy monitor (+1k code)
-#undef USE_MODBUS_ENERGY                        // Add support for generic modbus energy monitor using a user file in rule space (+5k)
+#undef USE_IEM3000                            // Add support for Schneider Electric iEM3000-Modbus series energy monitor (+0k8 code)
+#undef USE_WE517                              // Add support for Orno WE517-Modbus energy monitor (+1k code)
+#undef USE_MODBUS_ENERGY                      // Add support for generic modbus energy monitor using a user file in rule space (+5k)
 #undef USE_SONOFF_SPM
 
-#undef USE_DHT                                  // Add support for DHT11, AM2301 (DHT21, DHT22, AM2302, AM2321) and SI7021 Temperature and Humidity sensor (1k6 code)
+#undef USE_DHT                                // Add support for DHT11, AM2301 (DHT21, DHT22, AM2302, AM2321) and SI7021 Temperature and Humidity sensor (1k6 code)
 
-#undef USE_MAX31855                             // Add support for MAX31855/MAX6675 K-Type thermocouple sensor using softSPI
-#undef USE_MAX31865                             // Add support for MAX31865 RTD sensors using softSPI
-#undef USE_LMT01                                // Add support for TI LMT01 temperature sensor, count pulses on single GPIO (+0k5 code)
-#undef USE_WIEGAND                              // Add support for 24/26/32/34 bit RFID Wiegand interface (D0/D1) (+1k7 code)
+#undef USE_MAX31855                           // Add support for MAX31855/MAX6675 K-Type thermocouple sensor using softSPI
+#undef USE_MAX31865                           // Add support for MAX31865 RTD sensors using softSPI
+#undef USE_LMT01                              // Add support for TI LMT01 temperature sensor, count pulses on single GPIO (+0k5 code)
+#undef USE_WIEGAND                            // Add support for 24/26/32/34 bit RFID Wiegand interface (D0/D1) (+1k7 code)
 
 #undef USE_AC_ZERO_CROSS_DIMMER
 
@@ -634,7 +641,7 @@
 #undef USE_IR_RECEIVE                         // Support for IR receiver (+7k2 code, 264 iram)
 
 // -- SD Card support -----------------------------
-#undef USE_SDCARD                               // mount SD Card, requires configured SPI pins and setting of `SDCard CS` gpio
+#undef USE_SDCARD                             // mount SD Card, requires configured SPI pins and setting of `SDCard CS` gpio
 #undef SDC_HIDE_INVISIBLES                    // hide hidden directories from the SD Card, which prevents crashes when dealing SD created on MacOS
 
 // -- Zigbee interface ----------------------------
@@ -646,33 +653,33 @@
 
 // -- Other sensors/drivers -----------------------
 
-#undef USE_SHIFT595                             // Add support for 74xx595 8-bit shift registers (+0k7 code)
-#undef USE_TM1638                               // Add support for TM1638 switches copying Switch1 .. Switch8 (+1k code)
+#undef USE_SHIFT595                           // Add support for 74xx595 8-bit shift registers (+0k7 code)
+#undef USE_TM1638                             // Add support for TM1638 switches copying Switch1 .. Switch8 (+1k code)
 #undef TM1638_USE_AS_BUTTON                   // Add support for buttons
 #undef TM1638_USE_AS_SWITCH                   // Add support for switches (default)
-#undef USE_HX711                                // Add support for HX711 load cell (+1k5 code)
+#undef USE_HX711                              // Add support for HX711 load cell (+1k5 code)
 #undef USE_HX711_GUI                          // Add optional web GUI to HX711 as scale (+1k8 code)
-#undef USE_DINGTIAN_RELAY                       // Add support for the Dingian board using 74'595 et 74'165 shift registers
-#undef USE_TX20_WIND_SENSOR                     // Add support for La Crosse TX20 anemometer (+2k6/0k8 code)
-#undef USE_TX23_WIND_SENSOR                     // Add support for La Crosse TX23 anemometer (+2k7/1k code)
-#undef USE_WINDMETER                            // Add support for analog anemometer (+2k2 code)
-#undef USE_FTC532                               // Add support for FTC532 8-button touch controller (+0k6 code)
-#undef USE_RC_SWITCH                            // Add support for RF transceiver using library RcSwitch (+2k7 code, 460 iram)
-#undef USE_RF_SENSOR                            // Add support for RF sensor receiver (434MHz or 868MHz) (+0k8 code)
+#undef USE_DINGTIAN_RELAY                     // Add support for the Dingian board using 74'595 et 74'165 shift registers
+#undef USE_TX20_WIND_SENSOR                   // Add support for La Crosse TX20 anemometer (+2k6/0k8 code)
+#undef USE_TX23_WIND_SENSOR                   // Add support for La Crosse TX23 anemometer (+2k7/1k code)
+#undef USE_WINDMETER                          // Add support for analog anemometer (+2k2 code)
+#undef USE_FTC532                             // Add support for FTC532 8-button touch controller (+0k6 code)
+#undef USE_RC_SWITCH                          // Add support for RF transceiver using library RcSwitch (+2k7 code, 460 iram)
+#undef USE_RF_SENSOR                          // Add support for RF sensor receiver (434MHz or 868MHz) (+0k8 code)
 #undef USE_THEO_V2                            // Add support for decoding Theo V2 sensors as documented on https://sidweb.nl using 434MHz RF sensor receiver (+1k4 code)
 #undef USE_ALECTO_V2                          // Add support for decoding Alecto V2 sensors like ACH2010, WS3000 and DKW2012 weather stations using 868MHz RF sensor receiver (+1k7 code)
-#undef USE_HRE                                  // Add support for Badger HR-E Water Meter (+1k4 code)
-#undef USE_A4988_STEPPER                        // Add support for A4988/DRV8825 stepper-motor-driver-circuit (+10k5 code)
-#undef USE_PROMETHEUS                           // Add support for https://prometheus.io/ metrics exporting over HTTP /metrics endpoint
-#undef USE_NEOPOOL                              // Add support for Sugar Valley NeoPool Controller - also known under brands Hidrolife, Aquascenic, Oxilife, Bionet, Hidroniser, UVScenic, Station, Brilix, Bayrol and Hay (+14k flash, +120 mem)
-#undef USE_FLOWRATEMETER                        // Add support for water flow meter YF-DN50 and similary (+1k7 code)
+#undef USE_HRE                                // Add support for Badger HR-E Water Meter (+1k4 code)
+#undef USE_A4988_STEPPER                      // Add support for A4988/DRV8825 stepper-motor-driver-circuit (+10k5 code)
+#undef USE_PROMETHEUS                         // Add support for https://prometheus.io/ metrics exporting over HTTP /metrics endpoint
+#undef USE_NEOPOOL                            // Add support for Sugar Valley NeoPool Controller - also known under brands Hidrolife, Aquascenic, Oxilife, Bionet, Hidroniser, UVScenic, Station, Brilix, Bayrol and Hay (+14k flash, +120 mem)
+#undef USE_FLOWRATEMETER                      // Add support for water flow meter YF-DN50 and similary (+1k7 code)
 
 // -- Thermostat control ----------------------------
-#undef USE_THERMOSTAT                           // Add support for Thermostat
+#undef USE_THERMOSTAT                         // Add support for Thermostat
 
 // -- PID and Timeprop ------------------------------ // Both together will add +12k1 code
-#undef USE_TIMEPROP                            // Add support for the timeprop feature (+9k1 code)
-#undef USE_PID                                 // Add suport for the PID  feature (+11k2 code)
+#undef USE_TIMEPROP                           // Add support for the timeprop feature (+9k1 code)
+#undef USE_PID                                // Add suport for the PID  feature (+11k2 code)
 #undef USE_DRV_FILE_JSON_DEMO
 
 // ----------------------
@@ -702,8 +709,8 @@
 
   // rules
   #define USE_RULES                             // Support for rules
-  #define USE_EXPRESSION                      // Add support for expression evaluation in rules (+3k2 code, +64 bytes mem)  
-    #define SUPPORT_IF_STATEMENT              // Add support for IF statement in rules (+4k2 code, -332 bytes mem)  
+  #define USE_EXPRESSION                        // Add support for expression evaluation in rules (+3k2 code, +64 bytes mem)  
+    #define SUPPORT_IF_STATEMENT                // Add support for IF statement in rules (+4k2 code, -332 bytes mem)  
 
   // watchdog
   #define USE_ESP32_WDT
@@ -711,6 +718,10 @@
   // berry and autoconf
   #define USE_AUTOCONF                         // Enable Esp32 autoconf feature
   #define USE_BERRY                            // Enable Berry scripting langage
+  #define USE_WEBCLIENT_HTTPS                  // HTTPs for InfluxDB
+  #define USE_TLS                              // for safeboot and BearSSL
+  #define USE_MQTT_TLS                         // enable mqtts connexion
+  #define USE_LIB_SSL_ENGINE
 
   // FTP server
   #define USE_FTP                              // Embeded FTP server
@@ -723,12 +734,7 @@
   #undef  USE_DISPLAY_TM1621_SONOFF
 
   #define USE_INFLUXDB                         // InfluxDB integration
-  #define USE_WEBCLIENT_HTTPS                  // HTTPs for InfluxDB
   #define USE_WIREGUARD                        // Wireguard VPN client
-
-  #define USE_TLS                              // for safeboot and BearSSL
-  #define USE_MQTT_TLS                         // enable mqtts connexion
-  #define USE_LIB_SSL_ENGINE
 
   // conso LED status
   #define USE_LIGHT                            // Add support for light control
