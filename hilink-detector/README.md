@@ -28,16 +28,16 @@ You should see a graphical target range display on the main page with your devic
 Run **hlk** command to get help on available device commands.
 
 ```
-  hlk_device <dev>  = set device type
-    none LD1115 LD1125 LD2401 LD2402 LD2410 LD2410s LD2420 LD2450
-  hlk_log <val>     = log policy [off]
-    off recv sent all
-  hlk_param         = read sensor parameters
-  hlk_delay delay   = detection timeout [5 s]
-  hlk_min dist      = minimum detection distance [0 cm]
-  hlk_max pres,move = maximum detection distance
-    pres : 1 .. 600 [600 cm]
-    move : 1 .. 600 [600 cm]
+hlk_device <dev>  = set device type
+ none LD1115 LD1125 LD2401 LD2402 LD2410 LD2410s LD2420 LD2450
+hlk_log <val>     = log policy [off]
+  off recv sent all
+hlk_param         = read sensor parameters
+hlk_delay delay   = detection timeout [5 s]
+hlk_min dist      = minimum detection distance [0 cm]
+hlk_max pres,move = maximum detection distance
+  pres : 1 .. 600 [600 cm]
+  move : 1 .. 600 [600 cm]
 ```
 **hlk-device** allows you to declare your connected device.
 
