@@ -39,6 +39,11 @@ Hi-Link detector commands :
     pres : 1 .. 600 [600 cm]
     move : 1 .. 600 [600 cm]
 ```
+**hlk-device** allows you to declare your connected device.
+
+**hlk_log** command will log hexadecimal values of received data or of commands. It may be very useful to check is your device is properly connected with the proper speed.
+
+**hlk_param** query all parameters important for your device.
 
 # HLK-LD1115
 
