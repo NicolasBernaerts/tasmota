@@ -29,7 +29,7 @@ Run **hlk** command to get help on available device commands.
 
 ```
 hlk_device <dev>  = set device type
- none LD1115 LD1125 LD2401 LD2402 LD2410 LD2410s LD2420 LD2450
+  none LD1115 LD1125 LD2401 LD2402 LD2410 LD2410s LD2420 LD2450
 hlk_log <val>     = log policy [off]
   off recv sent all
 hlk_param         = read sensor parameters
