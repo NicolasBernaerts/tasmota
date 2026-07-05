@@ -28,7 +28,7 @@ You should see a graphical target range display on the main page with your devic
 You can get some help on available commands thru **hlk** command :
 ```
 Hi-Link detector commands :
-  hlk_device <dev>  = set device type [LD2401]
+  hlk_device <dev>  = set device type
     none LD1115 LD1125 LD2401 LD2402 LD2410 LD2410s LD2420 LD2450
   hlk_log <val>     = log policy [off]
     off recv sent all
