@@ -19,7 +19,6 @@ Each devices has its own specificities, but the driver provides some generic com
 
 You can get some help on available commands thru **hlk** command :
 ```
-hlk
 Hi-Link detector commands :
   hlk_device <dev>  = set device type [LD2401]
     none LD1115 LD1125 LD2401 LD2402 LD2410 LD2410s LD2420 LD2450
