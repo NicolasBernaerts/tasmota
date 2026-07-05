@@ -7,7 +7,7 @@ Devices currently handled are :
   * HLK-LD1115
   * HLK-LD1125
   * HLK-LD2401
-  * HLK-LD1402
+  * HLK-LD2402
   * HLK-LD2410b
   * HLK-LD2410s
   * HLK-LD2420
