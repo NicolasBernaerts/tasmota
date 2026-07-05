@@ -15,6 +15,15 @@ Devices currently handled are :
 
 Each devices has its own specificities, but the driver provides some generic commands to select and manage the connected device.
 
+Hilink detector should be declared as :
+  * Tx 2410
+  * Rx 2410
+
+You can then select your specific decice with **hlk_device** command.
+After reboot, your detector should be recognised and operationnal.
+
+You should see a graphical target range display on the main page with your device type.
+
 # Generic commands
 
 You can get some help on available commands thru **hlk** command :
