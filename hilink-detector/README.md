@@ -40,10 +40,28 @@ Hi-Link detector commands :
     move : 1 .. 600 [600 cm]
 ```
 
-# HLK-LD2401
+# HLK-LD1115
+
+LD1115 specific commands are :
 
 ```
-LD2401 specific commands :
+
+```
+
+# HLK-LD1125
+
+LD1125 specific commands are :
+
+```
+
+```
+
+
+# HLK-LD2401
+
+LD2401 specific commands are :
+
+```
   hlk_version   = get sensor version
   hlk_auto      = auto calibrate sensitivity
   hlk_restart   = restart sensor
@@ -59,3 +77,43 @@ LD2401 specific commands :
     motion : 0 .. 100
 ```
 
+# HLK-LD2402
+
+LD2402 specific commands are :
+
+```
+
+```
+
+# HLK-LD2410b
+
+LD1115 specific commands are :
+
+```
+
+```
+
+# HLK-LD2410s
+
+LD2410s specific commands are :
+
+```
+
+```
+
+
+# HLK-LD2420
+
+LD2420 specific commands are :
+
+```
+
+```
+
+# HLK-LD2450
+
+LD2450 specific commands are :
+
+```
+
+```
