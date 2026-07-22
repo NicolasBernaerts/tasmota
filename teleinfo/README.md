@@ -82,7 +82,7 @@ Voici un tableau récapitulatif des fonctionnalités par famille d'ESP :
 | Prévision openDPE             |            |             |      x      |                  |
 | API Production Solaire        |            |             |      x      |                  |
 | Prévision Production Solaire  |            |             |      x      |                  |
-| Pilotage afficheur Awtrix     |            |             |      x      |                  |
+| Pilotage afficheur Awtrix 3   |            |             |      x      |                  |
 | Taille max d'une étiquette    |    28      |    28       |     112     |       112        |
 | Nombre max d'étiquettes       |    56      |    56       |     74      |       74         |
 
