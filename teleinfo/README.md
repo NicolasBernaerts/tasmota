@@ -190,6 +190,14 @@ Cette option vous permet de définir la fréquence de publication des données.
   - **Evolution de +-** : Publication chaque fois que la puissance varie de la valeur configurée sur l'une des phases. Ainsi, les données ne sont pas publiées à intervalle fixe, mais dès que les valeurs évoluent d'un certain seuil. C'est mon option de prédilection car elle garantie de suivre les évolutions au plus près sans stresser inutilement l'ESP.
   - **A chaque message reçu** : Publication à chaque trame publiée par le compteur, soit toutes les 1 à 2 secondes. Cette option est à éviter car elle stresse fortement l'ESP.
 
+## Mode CACSI
+
+Le mode **CACSI** est un mode non officiellement documenté par ENEDIS vis à vis des compteurs Linky, qui permet d'avoir une **estimation** de l'énergie renvoyée sur le réseau ENEDIS en cas d'auto-consommation sans contrat officiel.
+
+En fait, sans contrat de producteur, en cas d'injection sur le réseau, le compteur linky annonce un courant de consommation, mais une puissance consommée nulle. Cette publication permet d'estimer à  la puissance renvoyée sur le réseau. Le vrai soucis est que le courant étant à 1A près, l'estimation est à 330 VA près.
+
+Ce mode a été testé sur 3 compteurs différents, en mode historique et standard (mono-phasé et tri-phasé). En cas d'injection CACSI, la puissance produite est publiée.
+
 ## Intégration
 
 <img align="right" src="./screen/teleinfo-config-integration.png" width=300>
@@ -361,14 +369,6 @@ En mode console, les commandes disponibles sont listées avec la commande **awtr
       awtrix_pwh   [1]   = Production du jour
       awtrix_cal   [0]   = Calendrier
       awtrix_pmax  [200] = Puissance produite max
-
-## Mode CACSI
-
-Le mode **CACSI** est un mode non officiellement documenté par ENEDIS vis à vis des compteurs Linky, qui permet d'avoir une **estimation** de l'énergie renvoyée sur le réseau ENEDIS en cas d'auto-consommation sans contrat officiel.
-
-En fait, sans contrat de producteur, en cas d'injection sur le réseau, le compteur linky annonce un courant de consommation, mais une puissance consommée nulle. Cette publication permet d'estimer à  la puissance renvoyée sur le réseau. Le vrai soucis est que le courant étant à 1A près, l'estimation est à 330 VA près.
-
-Ce mode a été testé sur 3 compteurs différents, en mode historique et standard (mono-phasé et tri-phasé). En cas d'injection CACSI, la puissance produite est publiée.
 
 ## Alertes
 
