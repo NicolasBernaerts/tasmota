@@ -192,11 +192,13 @@ Cette option vous permet de définir la fréquence de publication des données.
 
 ## Mode CACSI
 
-Le mode **CACSI** est un mode non officiellement documenté par ENEDIS vis à vis des compteurs Linky, qui permet d'avoir une **estimation** de l'énergie renvoyée sur le réseau ENEDIS en cas d'auto-consommation sans contrat officiel.
+En complément du contrat **CRAE**, il est possible de produire en auto consommation sur le base d'un contrat **CACSI**.
 
-En fait, sans contrat de producteur, en cas d'injection sur le réseau, le compteur linky annonce un courant de consommation, mais une puissance consommée nulle. Cette publication permet d'estimer à  la puissance renvoyée sur le réseau. Le vrai soucis est que le courant étant à 1A près, l'estimation est à 230 VA près.
+Officiellement, ENEDIS ne fourni aucun donnée de production avec ces contrats. Mais les compteurs Linky permettent de récupérer une estimation de l'énergie renvoyée sur les réseau via un mode non officiellement documenté par ENEDIS.
 
-En cas de détection d'injection CACSI, la puissance produite est publiée sur l'étiquette de production standard.
+En fait, sans contrat de producteur **CRAE**, en cas d'injection sur le réseau, le compteur linky annonce un courant de consommation, mais une puissance consommée et une puissance produite nulle sur la phase concernée. Cette publication aberrante permet d'estimer la puissance renvoyée sur le réseau. Le vrai soucis est que le courant étant à 1A près, l'estimation est à 230 VA près.
+
+Ainsi, en cas de détection d'injection CACSI, la puissance produite est publiée contre une production classique, sur l'étiquette de production standard.
 
 Ce mode a été testé sur 3 compteurs différents, en mode historique et standard (mono-phasé et tri-phasé).
 
