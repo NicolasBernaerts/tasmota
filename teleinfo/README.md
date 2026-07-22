@@ -196,7 +196,9 @@ Le mode **CACSI** est un mode non officiellement documenté par ENEDIS vis à vi
 
 En fait, sans contrat de producteur, en cas d'injection sur le réseau, le compteur linky annonce un courant de consommation, mais une puissance consommée nulle. Cette publication permet d'estimer à  la puissance renvoyée sur le réseau. Le vrai soucis est que le courant étant à 1A près, l'estimation est à 230 VA près.
 
-Ce mode a été testé sur 3 compteurs différents, en mode historique et standard (mono-phasé et tri-phasé). En cas d'injection CACSI, la puissance produite est publiée.
+En cas de détection d'injection CACSI, la puissance produite est publiée sur l'étiquette de production standard.
+
+Ce mode a été testé sur 3 compteurs différents, en mode historique et standard (mono-phasé et tri-phasé).
 
 ## Intégration
 
