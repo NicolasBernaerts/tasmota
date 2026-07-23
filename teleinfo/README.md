@@ -190,18 +190,6 @@ Cette option vous permet de définir la fréquence de publication des données.
   - **Evolution de +-** : Publication chaque fois que la puissance varie de la valeur configurée sur l'une des phases. Ainsi, les données ne sont pas publiées à intervalle fixe, mais dès que les valeurs évoluent d'un certain seuil. C'est mon option de prédilection car elle garantie de suivre les évolutions au plus près sans stresser inutilement l'ESP.
   - **A chaque message reçu** : Publication à chaque trame publiée par le compteur, soit toutes les 1 à 2 secondes. Cette option est à éviter car elle stresse fortement l'ESP.
 
-## Mode CACSI
-
-En complément du contrat **CRAE**, il est possible de produire en auto consommation sur le base d'un contrat **CACSI**.
-
-Officiellement, ENEDIS ne fourni aucun donnée de production avec ces contrats. Mais les compteurs Linky permettent de récupérer une estimation de l'énergie renvoyée sur les réseau via un mode non officiellement documenté par ENEDIS.
-
-En fait, sans contrat de producteur **CRAE**, en cas d'injection sur le réseau, le compteur linky annonce un courant de consommation, mais une puissance consommée et une puissance produite nulle sur la phase concernée. Cette publication aberrante permet d'estimer la puissance renvoyée sur le réseau. Le vrai soucis est que le courant étant à 1A près, l'estimation est à 230 VA près.
-
-Ainsi, en cas de détection d'injection CACSI, la puissance produite est publiée comme une production classique, sur l'étiquette de production standard.
-
-Ce mode a été testé sur 3 compteurs différents, en mode historique et standard (mono-phasé et tri-phasé).
-
 ## Intégration
 
 <img align="right" src="./screen/teleinfo-config-integration.png" width=300>
@@ -282,6 +270,35 @@ Les données sont publiées dans un format spécifique reconnu nativement par la
 L'intégration Thingsboard peut également être activée en mode console : 
 
     thingsboard 1
+
+## Calcul de la puissance active et du Cos φ
+
+Le Linky ne fournit pas à ce jour la puissance active (W) mais uniquement la puissance apparente (VA) consommée ou injectée sur le réseau.
+
+Ce firmware calcule en quasi-temps réel le **cos φ** de la consommation et de l'injection en se basant sur :
+  * le compteur en Wh
+  * la puissance apparente
+
+A chaque publication de trame par le compteur la puissance est calculée en VAh sur la base du temps entre 2 trames (la durée est moyennée, mais très régulière).
+Dès qu'un incrément de compteur de 1 Wh est publié, le **cos φ** de la période est calculé et moyenné avec la valeur précédente.
+
+Sachant que chaque équipement peut avoir des cos φ très différents, celui-ci est calculé sur 20 plages de consommation différentes. Cela permet par exemple, lorsque vous allumez un radiateur ou une climatisation de repartir du dernier cos φ calculé avant son extinction. Cela évite les abbérations de calcul lors d'un changement brutal de puissance. 
+
+Cette approche n'est pas équivalente à une vraie de mesure de puissance active par le compteur, mais elle permet d'avoir une estimation de la puissance active assez précise. Lors de mes tests, en faisant une comparaison avec un watt-mètre, le taux d'erreur était quasiment tout le temps en dessous de 5%.
+
+Il est à noter qu'en cas de très faible consommation/production, la mise à jour peut prendre plusieurs secondes (elle a besoin d'un delta de 1 Wh). Mais le but étant de suivre sa consommation ou production réelle, la réactivité en cas de très faible valeur n'est pas à mon sens un vrai problème.
+
+## Mode CACSI
+
+En complément du contrat **CRAE**, il est possible de produire en auto consommation sur le base d'un contrat **CACSI**.
+
+Officiellement, ENEDIS ne fourni aucun donnée de production avec ces contrats. Mais les compteurs Linky permettent de récupérer une estimation de l'énergie renvoyée sur les réseau via un mode non officiellement documenté par ENEDIS.
+
+En fait, sans contrat de producteur **CRAE**, en cas d'injection sur le réseau, le compteur linky annonce un courant de consommation, mais une puissance consommée et une puissance produite nulle sur la phase concernée. Cette publication aberrante permet d'estimer la puissance renvoyée sur le réseau. Le vrai soucis est que le courant étant à 1A près, l'estimation est à 230 VA près.
+
+Ainsi, en cas de détection d'injection CACSI, la puissance produite est publiée comme une production classique, sur l'étiquette de production standard.
+
+Ce mode a été testé sur 3 compteurs différents, en mode historique et standard (mono-phasé et tri-phasé).
 
 ## Calendriers RTE et OpenDPE : Tempo, Pointe & Ecowatt
 
