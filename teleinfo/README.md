@@ -191,20 +191,22 @@ Cette option vous permet de définir la fréquence de publication des données.
   - **A chaque message reçu** : Publication à chaque trame publiée par le compteur, soit toutes les 1 à 2 secondes. Cette option est à éviter car elle stresse fortement l'ESP.
 
 
-## Calcul de la puissance active et du Cos φ
+## Calcul de la puissance active W et du Cos φ
 
-Le Linky ne fournit pas à ce jour la puissance active (W) mais uniquement la puissance apparente (VA) consommée ou injectée sur le réseau.
+Le Linky ne fournit pas à ce jour la puissance active (W) mais uniquement la puissance apparente (VA) consommée ou injectée.
 
-Ce firmware calcule en quasi-temps réel le **cos φ** de la consommation et de l'injection en se basant sur :
-  * le compteur en Wh
-  * la puissance apparente
+Ceci est assez génant étant donné que la facturation se fait sur la base de la consommation en Wh.
+
+Afin de faciliter le suivi de la consommation réelle, ce firmware calcule le **cos φ** de la consommation et de l'injection en se basant sur :
+  * l'index compteur en Wh
+  * la puissance apparente instantanée
 
 A chaque publication de trame par le compteur la puissance est calculée en VAh sur la base du temps entre 2 trames (la durée est moyennée, mais très régulière).
-Dès qu'un incrément de compteur de 1 Wh est publié, le **cos φ** de la période est calculé et moyenné avec la valeur précédente.
+Dès qu'un incrément de compteur de 1 Wh est publié, le **cos φ** de la période est calculé. Ca calcul intègre un moyennage avec la valeur précédente.
 
-Sachant que chaque équipement peut avoir des cos φ très différents, celui-ci est calculé sur 20 plages de consommation différentes. Cela permet par exemple, lorsque vous allumez un radiateur ou une climatisation de repartir du dernier cos φ calculé avant son extinction. Cela évite les abbérations de calcul lors d'un changement brutal de puissance. 
+Sachant que chaque équipement peut avoir des cos φ très différents, celui-ci est calculé en se basant sur 20 plages de puissance différentes. Cela permet par exemple, lorsque vous allumez un radiateur ou une climatisation de repartir du dernier cos φ calculé avant son extinction. Cela évite les abbérations de calcul lors d'un changement brutal de puissance. 
 
-Cette approche n'est pas équivalente à une vraie de mesure de puissance active par le compteur, mais elle permet d'avoir une estimation de la puissance active assez précise. Lors de mes tests, en faisant une comparaison avec un watt-mètre, le taux d'erreur était quasiment tout le temps en dessous de 5%.
+Cette approche n'est pas équivalente à une vraie de mesure de puissance active par le compteur, mais elle permet d'avoir une estimation de la puissance active et du cos φ assez précise. Lors de mes tests, en faisant une comparaison avec un watt-mètre, le taux d'erreur était quasiment systématiquement en dessous de 5%.
 
 Il est à noter qu'en cas de très faible consommation/production, la mise à jour peut prendre plusieurs secondes (elle a besoin d'un delta de 1 Wh). Mais le but étant de suivre sa consommation ou production réelle, la réactivité en cas de très faible valeur n'est pas à mon sens un vrai problème.
 
