@@ -406,8 +406,9 @@ En complément du contrat **CRAE** où le réseau vous rachète votre production
 Quelque que soit le contrat, en cas de sur-production, votre excédent est renvoyé sur le réseau public. Officiellement, ENEDIS ne fourni aucun donnée permettant de savoir si l'on renvoie de l'énergie sur le réseau. Mais les compteurs Linky permettent de détecter cette situation et de récupérer une estimation de l'énergie renvoyée sur les réseau via un mode non documenté par ENEDIS.
 
 En fait, en cas de sur-production, sans contrat producteur **CRAE**, le compteur linky fournit des données abbérantes :
-  * une consommation en A
-  * aucune puissance consommée sur la phase concernée
+  * une consommation en A sur une phase
+  * aucune puissance consommée sur cette phase
+
 Cette publication aberrante permet de détecter l'injection et d'estimer la puissance renvoyée sur le réseau sur la base du courant annoncé. Le vrai soucis est que le courant étant à 1A près, l'estimation est à 230 VA près.
 
 Grâce à cette estimation, il est toutefois possible de déclencher un consommateur afin d'auto-consommer le plus possible. En cas de détection d'injection CACSI, la puissance produite est publiée en VA comme une production classique, mais sa précision est de +- 115 VA.
