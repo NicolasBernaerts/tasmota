@@ -2,11 +2,11 @@
 
 <img src="./screen/teleinfo-intro-power.png" width=500 height=300> <img src="./screen/teleinfo-intro-histo.png" width=500 height=300>
 
-⚠️ Ce firmware n'est pas le firmware officiel **Teleinfo** de **Tasmota**, c'est une version, originellement développée **from scratch** pour mes propres besoins. 
+⚠️ Ce firmware n'est pas le firmware officiel **Teleinfo** de **Tasmota**, c'est une version, originellement développée pour mes propres besoins, **from scratch**. 
 
-Mais, grâce aux bienfaits du monde de l'Open source, ce projet a fortement évolué, en particulier grâce à **Charles Hallard** (à l'origine du port officiel Teleinfo de Tasmota) et à **Jérôme Ferrari** (université de Grenoble, GE2lab). 
+Grâce à son approche Open source, ce projet a fortement évolué, en particulier grâce à **Charles Hallard** (à l'origine du port officiel Teleinfo de Tasmota) et à **Jérôme Ferrari** (université de Grenoble, GE2lab). L'association avec un concepteur hardware hors pair (Charles) et un universitaire travaillant pour des projets européens (Jérôme) a permis à ce fork de se développer et de coller au plus près des besoins de notre transition énergétique.
 
-L'association avec un concepteur hardware hors pair (Charles) et un universitaire travaillant pour des projets européens (Jérôme) a permis à ce fork de se développer et de coller au plus près aux besoins de notre transition énergétique. Cette aventure est autant humaine que technologique. Longue vie à l' **Open Source** !
+Ce projet est donc une aventure autant humaine que technologique. Open Source is freedom !
 
 ## Presentation
 
@@ -90,9 +90,7 @@ Voici un tableau récapitulatif des fonctionnalités par famille d'ESP :
 
 Des versions pré-compilées pour différentes familles d'ESP sont disponibles dans le répertoire [**binary**](./binary).
 
-Certaines variantes de ce firmware (ESP avec au moins 4Mo de ROM) utilisent une partition **LittleFS** pour stocker les données historisées qui servent à générer les graphs de suivi. Tasmota officiel utilise 320k pour le FS, alors que ce build utilise 1.3M.
-
-Pour la famille des **ESP8266 4M+** et **ESP32 4M+**, merci de faire systématiquement un premier flash en mode **Série** afin de regénérer le partitionnement et d'éviter tout dysfonctionnement. Vous pourrez alors faire toutes les mises à jour suivantes en mode **OTA**.
+⚠️ Tous les **ESP8266 4M+** et les **ESP32** utilisent une partition **LittleFS** pour stocker les données historisées qui servent à générer les graphs de suivi. Le firmware Tasmota officiel utilise **320k** pour le FS, alors que ce build le maximise à **1.3M**. Cela signifie que vous devez faire systématiquement un premier flash en mode **Série** afin de regénérer le partitionnement et d'éviter tout dysfonctionnement. Si vous ne faites pas ce flash série, vous risquez des reboot intempestifs et inexpliqués !
 
 Typiquement pour flasher ce firmware depuis un Tasmota officiel, il faut réaliser les opérations suivantes :
   * **reset 1** en mode console pour revenir en configuration usine
@@ -100,11 +98,7 @@ Typiquement pour flasher ce firmware depuis un Tasmota officiel, il faut réalis
   * paramétrage wifi via le hotspot de l'ESP
   * paramétrage du module
 
-Vous devriez ensuite avoir un firmware Teleinfo totalement opérationnel.
-
-Si votre ESP est un **Denky D4**, vous pouvez flasher directement le firmware Denky D4 en mode **Upload** ou **OTA**.
-
-⚠️ La version 14.10+ intègre une refonte complète des données historiques qui gère maintenant la production et les différentes périodes (Tempo par exemple). Le nouveau format de fichier est différent du format précédent. Après mise à jour de cette version, vous ne pourrez plus visualiser les anciennes données historisées. Elles seront toujours disponible dans le fichier CSV sur le FS.
+Une fois votre ESP flashé avec ce fork, vous pouvez alors réaliser toutes les mises à jour en mode **Upload** ou **OTA** depuis l'interface Web.
 
 ## Commandes
 
