@@ -210,18 +210,6 @@ Cette approche n'est pas équivalente à une vraie de mesure de puissance active
 
 Il est à noter qu'en cas de très faible consommation/production, la mise à jour peut prendre plusieurs secondes (elle a besoin d'un delta de 1 Wh). Mais le but étant de suivre sa consommation ou production réelle, la réactivité en cas de très faible valeur n'est pas à mon sens un vrai problème.
 
-## Mode CACSI
-
-En complément du contrat **CRAE**, il est possible de produire en auto consommation sur le base d'un contrat **CACSI**.
-
-Officiellement, ENEDIS ne fourni aucun donnée de production avec ces contrats. Mais les compteurs Linky permettent de récupérer une estimation de l'énergie renvoyée sur les réseau via un mode non officiellement documenté par ENEDIS.
-
-En fait, sans contrat de producteur **CRAE**, en cas d'injection sur le réseau, le compteur linky annonce un courant de consommation, mais une puissance consommée et une puissance produite nulle sur la phase concernée. Cette publication aberrante permet d'estimer la puissance renvoyée sur le réseau. Le vrai soucis est que le courant étant à 1A près, l'estimation est à 230 VA près.
-
-Ainsi, en cas de détection d'injection CACSI, la puissance produite est publiée comme une production classique, sur l'étiquette de production standard.
-
-Ce mode a été testé sur 3 compteurs différents, en mode historique et standard (mono-phasé et tri-phasé).
-
 ## Intégration
 
 <img align="right" src="./screen/teleinfo-config-integration.png" width=300>
@@ -410,6 +398,21 @@ Les alertes sont de 3 types :
   * **period** : cette clé est renseignée si le compteur annonce une période de pointe. Elle peut valoir **PM1**, **PM2** ou **PM3** suivant l'annonce du compteur.
 
 Suite à sa publication, une alerte est levée si elle n'est plus annoncée pendant 5 secondes.
+
+## Production en mode CACSI
+
+En complément du contrat **CRAE** où le réseau vous rachète votre production, il est possible de produire avec une cible d'auto consommation totale sur le base d'un contrat **CACSI**.
+
+Quelque que soit le contrat, en cas de sur-production, votre excédent est renvoyé sur le réseau public. Officiellement, ENEDIS ne fourni aucun donnée permettant de savoir si l'on renvoie de l'énergie sur le réseau. Mais les compteurs Linky permettent de détecter cette situation et de récupérer une estimation de l'énergie renvoyée sur les réseau via un mode non documenté par ENEDIS.
+
+En fait, en cas de sur-production, sans contrat producteur **CRAE**, le compteur linky fournit des données abbérantes :
+  * une consommation en A
+  * aucune puissance consommée sur la phase concernée
+Cette publication aberrante permet de détecter l'injection et d'estimer la puissance renvoyée sur le réseau sur la base du courant annoncé. Le vrai soucis est que le courant étant à 1A près, l'estimation est à 230 VA près.
+
+Grâce à cette estimation, il est toutefois possible de déclencher un consommateur afin d'auto-consommer le plus possible. En cas de détection d'injection CACSI, la puissance produite est publiée en VA comme une production classique, mais sa précision est de +- 115 VA.
+
+Ce mode a été testé sur 3 compteurs différents, en mode historique et standard (mono-phasé et tri-phasé).
 
 ## Production Solaire
 
