@@ -50,7 +50,14 @@ hlk_max pres,move = maximum detection distance
 LD1115 specific commands are :
 
 ```
-
+hlk_reset      = reset parameters to default
+hlk_save       = save parameters to sensor
+hlk_th idx val = sensor threshold (%)
+  idx  : 1 .. 3      (sensor index)
+  val  : 1 .. 100000 (sensor threshold)
+hlk_sn type num = set samples to average
+  type : occ (presence), mov (motion)
+  num  : number of samples
 ```
 
 # HLK-LD1125
