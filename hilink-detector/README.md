@@ -65,7 +65,11 @@ hlk_sn type num = set samples to average
 LD1125 specific commands are :
 
 ```
-
+hlk_reset      = reset parameters to default
+hlk_save       = save parameters to sensor
+hlk_th idx val = sensor threshold (%)
+  idx  : 1 .. 3      (sensor index)
+  val  : 1 .. 100000 (sensor threshold)
 ```
 
 
@@ -74,19 +78,23 @@ LD1125 specific commands are :
 LD2401 specific commands are :
 
 ```
-  hlk_version   = get sensor version
-  hlk_auto      = auto calibrate sensitivity
-  hlk_restart   = restart sensor
-  hlk_reset     = reset sensor
-  hlk_mac       = read MAC address
-  hlk_mode 0/1  = set energy mode
-  hlk_delay val = detection delay (sec.)
-  hlk_bluetooth 0/1   = set bluetooth
-  hlk_password pass   = set bluetooth password
-  hlk_gate gate pres,motion = gate sensitivity (%)
-    gate   : 1 .. 8
-    pres   : 0 .. 100
-    motion : 0 .. 100
+hlk_restart        = restart sensor
+hlk_reset          = reset sensor
+hlk_auto           = auto calibrate sensitivity
+hlk_energy <0/1>   = set energy mode (default)
+hlk_delay <val>    = detection delay (sec.)
+hlk_width <20/75>  = gate width (cm)
+hlk_bt <0/1> <pwd> = bluetooth status and password
+hlk_out <0/1>      = output level on detection
+hlk_gate gate pres,motion = gate sensitivity (%)
+  gate   : 1 .. 8
+  pres   : 0 .. 100
+  motion : 0 .. 100
+hlk_light <conf> <thres>  = light sensitivity control
+  conf  : off             disabled
+          below           detection on low light
+          above           detection on high light
+  thres : trigger level   0..100%
 ```
 
 # HLK-LD2402
@@ -94,7 +102,17 @@ LD2401 specific commands are :
 LD2402 specific commands are :
 
 ```
-
+hlk_save         = save parameters
+hlk_energy <0/1> = set energy mode (defaut)
+hlk_gain         = auto gain adjustment
+hlk_auto trig,keep,micr = start auto level detection
+  trig : trigger coefficient    1..20 [2]
+  keep : keep coefficient       1..20 [3]
+  micr : micro move coefficient 1..20 [2]
+hlk_gate gate move,micr = gate sensitivity (dB)
+  gate : gate number      1..16
+  move : motion level     0.00..95.00
+  micr : micro move level 0.00..95.00
 ```
 
 # HLK-LD2410b
