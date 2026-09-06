@@ -117,10 +117,25 @@ hlk_gate gate move,micr = gate sensitivity (dB)
 
 # HLK-LD2410b
 
-LD1115 specific commands are :
+LD2410b specific commands are :
 
 ```
-
+hlk_reset          = reset sensor
+hlk_restart        = restart sensor
+hlk_auto           = start auto level detection
+hlk_energy <0/1>   = set data energy (default)
+hlk_bt <0/1> <pwd> = bluetooth status and password
+hlk_width <val>    = set gate width cm (20 or 75)
+hlk_out <0/1>      = output level on detection
+hlk_gate gate presence,motion = gate sensitivity (%)
+  gate     : 1..8
+  presence : 1..100
+  motion   : 1..100
+hlk_light <conf> <thres> = light sensitivity control
+  conf  : off             disabled
+          below           detection on low light
+          above           detection on high light
+  thres : trigger level   0..100%
 ```
 
 # HLK-LD2410s
@@ -128,7 +143,20 @@ LD1115 specific commands are :
 LD2410s specific commands are :
 
 ```
-
+hlk_reset        = reset coefficients to factory
+hlk_restart      = restart device
+hlk_serial <sn>  = set serial number
+hlk_energy <0/1> = set energy mode (default)
+hlk_freq <val>   = update data frequency (Hz)
+  val     : 0.5 .. 8
+hlk_auto time,trig,ret = start auto level detection
+  time : scanning time in sec. [60]
+  trig : trigger factor [2]
+  ret  : retention factor [1]
+hlk_gate gate trig,hold = gate sensitivity (%)
+  gate : gate number   1 .. 16
+  trig : trigger level 0 .. 100
+  hold : holding level 0 .. 100
 ```
 
 
@@ -137,7 +165,14 @@ LD2410s specific commands are :
 LD2420 specific commands are :
 
 ```
-
+hlk_restart      = restart sensor
+hlk_reset        = reset sensor
+hlk_serial <sn>  = set serial number
+hlk_energy <0/1> = set energy mode
+hlk_gate gate trigger,hold = gate sensitivity (%)
+  gate    : 1 .. 12
+  trigger : 0.00 .. 100
+  hold    : 0.00 .. 100
 ```
 
 # HLK-LD2450
@@ -145,5 +180,20 @@ LD2420 specific commands are :
 LD2450 specific commands are :
 
 ```
-
+hlk_reset       = reset detector (will restart)
+hlk_restart     = restart detector
+hlk_bt <0/1>    = set bluetooth
+hlk_zone        = query detection zone
+hlk_mode <mode> = target mode
+  single : single target mode
+  multi  : multi target mode
+hlk_zone <cmnd>     = set zone detection behaviour
+  reset : reset all detection zone
+  off   : disable zones
+  inc   : detection within zones
+  exc   : detection outside zones
+hlk_zone id x1,y1,x2,y2 = set detection zone
+  id    : 1..3
+  x1,x2 : -600..600 (cm)
+  y1,y2 : 0..600 (cm)
 ```
