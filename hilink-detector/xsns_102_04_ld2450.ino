@@ -263,8 +263,8 @@ switch (command)
       hilink_status.baudrate   = LD2450_DATA_RATE;
       hilink_status.gate_qty   = LD2450_GATE_QUANTITY;
       hilink_status.gate_width = LD2450_GATE_WIDTH;
-      hilink_status.dist_limit = LD2450_DISTANCE_MAX;
-      hilink_config.dist_min   = LD2450_DISTANCE_MIN;
+      if (hilink_config.dist_min   < LD2450_DISTANCE_MIN) hilink_config.dist_min   = LD2450_DISTANCE_MIN;
+      if (hilink_status.dist_limit > LD2450_DISTANCE_MAX) hilink_status.dist_limit = LD2450_DISTANCE_MAX;
 
       // set presence and motion detection status
       hilink_static.enabled = false;
@@ -340,27 +340,6 @@ switch (command)
  *                  Functions
 \**************************************************/
 
-/*
-// driver initialisation
-void LD2450AppendInitCommand ()
-{
-  // default config at startup
-  hilink_reception.data   = true;
-  hilink_reception.energy = false;
-  hilink_command.mode     = false;
-
-  // set initial delay
-  HilinkSetCommandDelay (LD2450_START_DELAY);
-
-  // get device general config
-  LD2450DeviceCommand (HILINK_CMND_INFO, 0);
-  LD2450DeviceCommand (HILINK_CMND_PARAM, 0);
-
-  // set bluetooth
-  (hilink_config.param.bluetooth == 1) ? HilinkAppendCommand (LD2450_CMND_BLUETOOTH_ON) : HilinkAppendCommand (LD2450_CMND_BLUETOOTH_OFF);
-}
-*/
-
 // convert LD2450 coordinate format to MSB and LSB
 void LD2450ConvertCoordinate2LsbMsb (const int16_t coordinate, uint8_t &lsb, uint8_t &msb)
 {
@@ -372,21 +351,6 @@ void LD2450ConvertCoordinate2LsbMsb (const int16_t coordinate, uint8_t &lsb, uin
 
   msb = (uint8_t)(value / 256);
   lsb = (uint8_t)(value % 256);
-}
-
-// convert data LSB and MSB according to LD2450 signed value format
-int16_t LD2450ConvertLsbMsb2Value (const uint8_t lsb, const uint8_t msb)
-{
-  int32_t value, coordinate;
-
-  // calculate value from MSB and LSB
-  value  = 256 * (int32_t)msb + (int32_t)lsb;
-
-  // convert according to higher bit
-  if (value >= 32768) coordinate = value - 32768;
-    else coordinate = - value;
-
-  return (int16_t)coordinate;
 }
 
 void LD2450SetDetectionZone (const uint8_t zone, const char* pstr_param)
@@ -661,10 +625,10 @@ void LD2450HandleReceivedCommand ()
         for (index = 0; index < LD2450_MAX_ZONE; index ++)
         {
           shift = 12 + index * 8;
-          hilink_zone.arr_zone[index].x1 = LD2450ConvertLsbMsb2Value (hilink_reception.arr_body[shift++], hilink_reception.arr_body[shift++]) / 10;
-          hilink_zone.arr_zone[index].y1 = LD2450ConvertLsbMsb2Value (hilink_reception.arr_body[shift++], hilink_reception.arr_body[shift++]) / 10;
-          hilink_zone.arr_zone[index].x2 = LD2450ConvertLsbMsb2Value (hilink_reception.arr_body[shift++], hilink_reception.arr_body[shift++]) / 10;
-          hilink_zone.arr_zone[index].y2 = LD2450ConvertLsbMsb2Value (hilink_reception.arr_body[shift++], hilink_reception.arr_body[shift++]) / 10;
+          hilink_zone.arr_zone[index].x1 = HilinkConvertLsbMsb2Value (hilink_reception.arr_body[shift++], hilink_reception.arr_body[shift++]) / 10;
+          hilink_zone.arr_zone[index].y1 = HilinkConvertLsbMsb2Value (hilink_reception.arr_body[shift++], hilink_reception.arr_body[shift++]) / 10;
+          hilink_zone.arr_zone[index].x2 = HilinkConvertLsbMsb2Value (hilink_reception.arr_body[shift++], hilink_reception.arr_body[shift++]) / 10;
+          hilink_zone.arr_zone[index].y2 = HilinkConvertLsbMsb2Value (hilink_reception.arr_body[shift++], hilink_reception.arr_body[shift++]) / 10;
           AddLog (LOG_LEVEL_INFO, PSTR ("HLK: %s zone %u is [%d,%d,%d,%d]"), hilink_status.str_model, index + 1, hilink_zone.arr_zone[index].x1, hilink_zone.arr_zone[index].y1, hilink_zone.arr_zone[index].x2, hilink_zone.arr_zone[index].y2);
         }
         break;
@@ -699,9 +663,9 @@ void LD2450HandleReceivedData ()
     start = 4 + index * 8;
 
     // read x, y
-    x     = (int32_t)LD2450ConvertLsbMsb2Value (hilink_reception.arr_body[start++], hilink_reception.arr_body[start++]) / 10;
-    y     = (int32_t)LD2450ConvertLsbMsb2Value (hilink_reception.arr_body[start++], hilink_reception.arr_body[start++]) / 10;
-    speed = LD2450ConvertLsbMsb2Value (hilink_reception.arr_body[start++], hilink_reception.arr_body[start++]);
+    x     = (int32_t)HilinkConvertLsbMsb2Value (hilink_reception.arr_body[start++], hilink_reception.arr_body[start++]) / 10;
+    y     = (int32_t)HilinkConvertLsbMsb2Value (hilink_reception.arr_body[start++], hilink_reception.arr_body[start++]) / 10;
+    speed = HilinkConvertLsbMsb2Value (hilink_reception.arr_body[start++], hilink_reception.arr_body[start++]);
     dist  = (uint16_t)sqrt ((float)(x * x + y * y));
     hilink_motion.arr_target[index].active = (dist >= hilink_config.dist_min);
 

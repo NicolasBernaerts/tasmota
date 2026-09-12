@@ -297,7 +297,7 @@ void LD2401DeviceCommand (const uint8_t command, const uint8_t context)
       AddLog (LOG_LEVEL_INFO, PSTR ("  hlk_width <20/75>  = gate width (cm)"));
       AddLog (LOG_LEVEL_INFO, PSTR ("  hlk_bt <0/1> <pwd> = bluetooth status and password"));
       AddLog (LOG_LEVEL_INFO, PSTR ("  hlk_out <0/1>      = output level on detection"));
-      AddLog (LOG_LEVEL_INFO, PSTR ("  hlk_gate gate pres,motion = gate sensitivity (%)"));
+      AddLog (LOG_LEVEL_INFO, PSTR ("  hlk_gate gate pres,motion = gate sensitivity (%%)"));
       AddLog (LOG_LEVEL_INFO, PSTR ("    gate   : 1 .. %u"), hilink_status.gate_qty);
       AddLog (LOG_LEVEL_INFO, PSTR ("    pres   : 0 .. 100"));
       AddLog (LOG_LEVEL_INFO, PSTR ("    motion : 0 .. 100"));
@@ -314,7 +314,7 @@ void LD2401DeviceCommand (const uint8_t command, const uint8_t context)
       hilink_status.baudrate   = LD2401_DATA_RATE;
       hilink_status.gate_qty   = LD2401_GATE_QUANTITY;
       hilink_status.gate_width = LD2401_GATE_WIDTH_HIGH;
-      hilink_status.dist_limit = LD2401_DIST_MAX;
+      if (hilink_status.dist_limit > LD2401_DIST_MAX) hilink_status.dist_limit = LD2401_DIST_MAX;
 
       // set presence and motion detection status
       hilink_static.enabled = true;

@@ -217,7 +217,7 @@ void LD1115DeviceCommand (const uint8_t command, const uint8_t context)
       hilink_status.baudrate   = LD1115_DATA_RATE;
       hilink_status.gate_qty   = LD1115_GATE_QUANTITY;
       hilink_status.gate_width = LD1115_GATE_WIDTH;
-      hilink_status.dist_limit = LD1115_MOTION_DIST_MAX;
+      if (hilink_status.dist_limit > LD1115_MOTION_DIST_MAX) hilink_status.dist_limit = LD1115_MOTION_DIST_MAX;
 
       // set presence and motion detection status
       hilink_static.enabled = true;

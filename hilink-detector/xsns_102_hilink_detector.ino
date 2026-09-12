@@ -25,10 +25,11 @@
     - HLK-LD2412
     - HLK-LD2420
     - HLK-LD2450
+    - HLK-LD2454
 
   Configuration values are stored in :
     - Settings->rf_code[2][0] : type of Hilink detector
-    - Settings->rf_code[2][1] : misc data (bluetooth, output level, light policy and log policy)
+    - Settings->rf_code[2][1] : misc data (bluetooth, output level, light policy, log policy and tracking mode)
     - Settings->rf_code[2][2] : minimum detection distance
     - Settings->rf_code[2][3] : maximum presence detection distance
     - Settings->rf_code[2][4] : maximum motion detection distance
@@ -222,6 +223,10 @@ uint8_t HilinkGetDeviceIdent (const uint8_t device)
 #ifdef USE_HILINK_LD2450
     case HLK_DEVICE_LD2450: result = device; break;
 #endif    // USE_HILINK_LD2450
+
+#ifdef USE_HILINK_LD2454
+    case HLK_DEVICE_LD2454: result = device; break;
+#endif    // USE_HILINK_LD2450
   }
 
   return result;
@@ -271,6 +276,10 @@ void HilinkDeviceCommand (const uint8_t command, const uint8_t context)
 #ifdef USE_HILINK_LD2450
     case HLK_DEVICE_LD2450: LD2450DeviceCommand (command, context); break;
 #endif    // USE_HILINK_LD2450
+
+#ifdef USE_HILINK_LD2454
+    case HLK_DEVICE_LD2454: LD2454DeviceCommand (command, context); break;
+#endif    // USE_HILINK_LD2454
   }
 }
 
@@ -382,8 +391,6 @@ void CmndHilinkDevice ()
 
   // if device has chnaged, restart
   if (restart) TasmotaGlobal.restart_flag = 2;
-//  if (restart) WebRestart (1);
-   
 }
 
 // set detector log
@@ -477,6 +484,21 @@ void CmndHilinkDistMax ()
 /*********************************************\
  *                Conversion
 \*********************************************/
+
+// convert data LSB and MSB according to signed value format
+int16_t HilinkConvertLsbMsb2Value (const uint8_t lsb, const uint8_t msb)
+{
+  int32_t value, coordinate;
+
+  // calculate value from MSB and LSB
+  value  = 256 * (int32_t)msb + (int32_t)lsb;
+
+  // convert according to higher bit
+  if (value >= 32768) coordinate = value - 32768;
+    else coordinate = - value;
+
+  return (int16_t)coordinate;
+}
 
 uint8_t HilinkGateMin ()
 {
@@ -1137,7 +1159,7 @@ void HilinkWebMainButton ()
 
   // display radar button
   (hilink_status.radar2D) ? strcpy_P (str_link, PSTR_HILINK_PAGE_RADAR2D) : strcpy_P (str_link, PSTR_HILINK_PAGE_RADAR);
-  WSContentSend_P (PSTR ("<p><a href='%s'><button>Detector Map</button></a></p>\n"), str_link);
+  WSContentSend_P (PSTR ("<p><a href='%s'><button>Hilink Detector</button></a></p>\n"), str_link);
 }
 
 bool HilinkPresenceGetTarget (const uint8_t index, uint16_t &distance, uint8_t &power)
@@ -1537,6 +1559,61 @@ void HilinkGraphRadarUpdate ()
  *     2D Radar
 \********************/
 
+// Radar update
+void HilinkGraphRadar2dUpdate ()
+{
+  uint8_t index;
+  int32_t x, y, cx, cy, width, height;
+  char    str_class[12];
+  char    str_label[4];
+
+  // start of update page
+  WSContentBegin (200, CT_PLAIN);
+
+  // loop thru zones
+  GetTextIndexed (str_class, sizeof (str_class), hilink_zone.status, kHilinkZone);
+  for (index = 0; index < hilink_zone.max; index++)
+  {
+    // calculate x and y coordonates
+    x = 400 + (int32_t)hilink_zone.arr_zone[index].x1 * 400 / hilink_status.dist_limit;
+    y = 20  + (int32_t)hilink_zone.arr_zone[index].y1 * 400 / hilink_status.dist_limit;
+
+    // calculate width and height
+    width  = (int32_t)(hilink_zone.arr_zone[index].x2 - hilink_zone.arr_zone[index].x1) * 400 / hilink_status.dist_limit;
+    height = (int32_t)(hilink_zone.arr_zone[index].y2 - hilink_zone.arr_zone[index].y1) * 400 / hilink_status.dist_limit;
+
+    // display target
+    WSContentSend_P (PSTR ("z;%u;%d;%d;%d;%d;%s\n"), index, x, y, width, height, str_class);
+  }
+
+  // loop thru targets
+  for (index = 0; index < HILINK_MAX_MOTION; index++)
+  {
+    // calculate button style
+    if (hilink_motion.arr_target[index].active)
+    {
+      cx = 400 - hilink_motion.arr_target[index].x * 400 / hilink_status.dist_limit;
+      cy = 20  + hilink_motion.arr_target[index].y * 400 / hilink_status.dist_limit;
+      itoa (index + 1, str_label, 10);
+      strcpy_P (str_class, PSTR ("on"));
+    }
+    else 
+    {
+      cx = 0;
+      cy = 0;
+      str_label[0] = 0;
+      strcpy_P (str_class, PSTR ("off"));
+    }
+
+    // display target
+    WSContentSend_P (PSTR ("c;%u;%d;%d;%s\n"), index, cx, cy, str_class);
+    WSContentSend_P (PSTR ("t;%u;%d;%d;%s\n"), index, cx, cy + 5, str_label);
+  }
+
+  // end of update page
+  WSContentEnd ();
+}
+
 void HilinkGraphRadar2dJS ()
 {
   // start page as Javascript with cache enabled
@@ -1550,25 +1627,33 @@ void HilinkGraphRadar2dJS ()
   WSContentSend_P (PSTR (" httpData.onreadystatechange=function(){\n"));
   WSContentSend_P (PSTR ("  if (httpData.readyState===XMLHttpRequest.DONE){\n"));
   WSContentSend_P (PSTR ("   if (httpData.status===0 || (httpData.status>=200 && httpData.status<400)){\n"));
+
   WSContentSend_P (PSTR ("    arr_param=httpData.responseText.split('\\n');\n"));
-  WSContentSend_P (PSTR ("    for (i=0;i<%u;i++){\n"), hilink_zone.max);
+  WSContentSend_P (PSTR ("    for (i=0; i<arr_param.length; i++) {\n"));
   WSContentSend_P (PSTR ("     arr_value=arr_param[i].split(';');\n"));
-  WSContentSend_P (PSTR ("     document.getElementById('z'+i).classList.remove('off','inc','exc');\n"));
-  WSContentSend_P (PSTR ("     document.getElementById('z'+i).classList.add(arr_value[0]);\n"));
-  WSContentSend_P (PSTR ("     document.getElementById('z'+i).setAttribute('x',arr_value[1]);\n"));
-  WSContentSend_P (PSTR ("     document.getElementById('z'+i).setAttribute('y',arr_value[2]);\n"));
-  WSContentSend_P (PSTR ("     document.getElementById('z'+i).setAttribute('width',arr_value[3]);\n"));
-  WSContentSend_P (PSTR ("     document.getElementById('z'+i).setAttribute('height',arr_value[4]);\n"));
-  WSContentSend_P (PSTR ("    }\n"));
-  WSContentSend_P (PSTR ("    for (i=%u;i<%u;i++){\n"), hilink_zone.max, hilink_zone.max + HILINK_MAX_PRESENCE);
-  WSContentSend_P (PSTR ("     arr_value=arr_param[i].split(';');\n"));
-  WSContentSend_P (PSTR ("     document.getElementById('c'+i).classList.remove('off','on');\n"));
-  WSContentSend_P (PSTR ("     document.getElementById('c'+i).classList.add(arr_value[0]);\n"));
-  WSContentSend_P (PSTR ("     document.getElementById('c'+i).setAttribute('cx',arr_value[1]);\n"));
-  WSContentSend_P (PSTR ("     document.getElementById('c'+i).setAttribute('cy',arr_value[2]);\n"));
-  WSContentSend_P (PSTR ("     document.getElementById('t'+i).setAttribute('x',arr_value[1]);\n"));
-  WSContentSend_P (PSTR ("     document.getElementById('t'+i).setAttribute('y',arr_value[3]);\n"));
-  WSContentSend_P (PSTR ("     document.getElementById('t'+i).textContent=arr_value[4];\n"));
+
+  WSContentSend_P (PSTR ("     if (arr_value[0]==='z'){\n"));
+  WSContentSend_P (PSTR ("      document.getElementById('z'+arr_value[1]).setAttribute('x',arr_value[2]);\n"));
+  WSContentSend_P (PSTR ("      document.getElementById('z'+arr_value[1]).setAttribute('y',arr_value[3]);\n"));
+  WSContentSend_P (PSTR ("      document.getElementById('z'+arr_value[1]).setAttribute('width',arr_value[4]);\n"));
+  WSContentSend_P (PSTR ("      document.getElementById('z'+arr_value[1]).setAttribute('height',arr_value[5]);\n"));
+  WSContentSend_P (PSTR ("      document.getElementById('z'+arr_value[1]).classList.remove('off','inc','exc');\n"));
+  WSContentSend_P (PSTR ("      document.getElementById('z'+arr_value[1]).classList.add(arr_value[6]);\n"));
+  WSContentSend_P (PSTR ("     }\n"));
+
+  WSContentSend_P (PSTR ("     else if (arr_value[0]==='c'){\n"));
+  WSContentSend_P (PSTR ("      document.getElementById('c'+arr_value[1]).setAttribute('cx',arr_value[2]);\n"));
+  WSContentSend_P (PSTR ("      document.getElementById('c'+arr_value[1]).setAttribute('cy',arr_value[3]);\n"));
+  WSContentSend_P (PSTR ("      document.getElementById('c'+arr_value[1]).classList.remove('off','on');\n"));
+  WSContentSend_P (PSTR ("      document.getElementById('c'+arr_value[1]).classList.add(arr_value[4]);\n"));
+  WSContentSend_P (PSTR ("     }\n"));
+
+  WSContentSend_P (PSTR ("     else if (arr_value[0]==='t'){\n"));
+  WSContentSend_P (PSTR ("      document.getElementById('t'+arr_value[1]).setAttribute('x',arr_value[2]);\n"));
+  WSContentSend_P (PSTR ("      document.getElementById('t'+arr_value[1]).setAttribute('y',arr_value[3]);\n"));
+  WSContentSend_P (PSTR ("      document.getElementById('t'+arr_value[1]).textContent=arr_value[4];\n"));
+  WSContentSend_P (PSTR ("     }\n"));
+
   WSContentSend_P (PSTR ("    }\n"));
   WSContentSend_P (PSTR ("   }\n"));
   WSContentSend_P (PSTR ("   setTimeout(updateData,%u);\n"), 1000);               // ask for update every 1 sec
@@ -1684,7 +1769,7 @@ void HilinkGraphRadar2d ()
   // display targets
   for (index = 0; index < LD2450_MAX_TARGET; index++)
   {
-    WSContentSend_P (PSTR ("<circle id='c%d' class='abs' cx=%u cy=%u r=14 />\n"), index + hilink_zone.max, 0, 20);
+    WSContentSend_P (PSTR ("<circle id='c%d' class='off' cx=%u cy=%u r=14 />\n"), index + hilink_zone.max, 0, 20);
     WSContentSend_P (PSTR ("<text id='t%d' x=%u y=%u></text>\n"),                 index + hilink_zone.max, 0, 20);
   }
 
@@ -1697,60 +1782,6 @@ void HilinkGraphRadar2d ()
 
   // end of page
   WSContentStop ();
-}
-
-// Radar update
-void HilinkGraphRadar2dUpdate ()
-{
-  uint8_t index;
-  int32_t x, y, cx, cy, width, height;
-  char    str_class[12];
-  char    str_label[4];
-
-  // start of update page
-  WSContentBegin (200, CT_PLAIN);
-
-  // loop thru zones
-  GetTextIndexed (str_class, sizeof (str_class), hilink_zone.status, kHilinkZone);
-  for (index = 0; index < hilink_zone.max; index++)
-  {
-    // calculate x and y coordonates
-    x = 400 + (int32_t)hilink_zone.arr_zone[index].x1 * 400 / hilink_status.dist_limit;
-    y = 20  + (int32_t)hilink_zone.arr_zone[index].y1 * 400 / hilink_status.dist_limit;
-
-    // calculate width and height
-    width  = (int32_t)(hilink_zone.arr_zone[index].x2 - hilink_zone.arr_zone[index].x1) * 400 / hilink_status.dist_limit;
-    height = (int32_t)(hilink_zone.arr_zone[index].y2 - hilink_zone.arr_zone[index].y1) * 400 / hilink_status.dist_limit;
-
-    // display target
-    WSContentSend_P (PSTR ("%s;%d;%d;%d;%d\n"), str_class, x, y, width, height);
-  }
-
-  // loop thru targets
-  for (index = 0; index < HILINK_MAX_MOTION; index++)
-  {
-    // calculate button style
-    if (hilink_motion.arr_target[index].active)
-    {
-      cx = 400 - hilink_motion.arr_target[index].x * 400 / hilink_status.dist_limit;
-      cy = 20  + hilink_motion.arr_target[index].y * 400 / hilink_status.dist_limit;
-      itoa (index + 1, str_label, 10);
-      strcpy_P (str_class, PSTR ("on"));
-    }
-    else 
-    {
-      cx = 0;
-      cy = 0;
-      str_label[0] = 0;
-      strcpy_P (str_class, PSTR ("off"));
-    }
-
-    // display target
-    WSContentSend_P (PSTR ("%s;%d;%d;%d;%s\n"), str_class, cx, cy, cy + 5, str_label);
-  }
-
-  // end of update page
-  WSContentEnd ();
 }
 
 #endif      // USE_WEBSERVER
@@ -1851,6 +1882,10 @@ bool Xsns102 (const uint32_t function)
 #ifdef USE_HILINK_LD2450
     if (hilink_config.device == HLK_DEVICE_LD2450) result = XsnsHilinkLD2450 (function);
 #endif  // USE_HILINK_LD2450
+
+#ifdef USE_HILINK_LD2454
+    if (hilink_config.device == HLK_DEVICE_LD2454) result = XsnsHilinkLD2454 (function);
+#endif  // USE_HILINK_LD2454
   }
 
   return result;

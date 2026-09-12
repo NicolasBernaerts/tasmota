@@ -312,7 +312,7 @@ void LD2412DeviceCommand (const uint8_t command, const uint8_t context)
       hilink_status.baudrate   = LD2412_DATA_RATE;
       hilink_status.gate_qty   = LD2412_GATE_QUANTITY;
       hilink_status.gate_width = LD2412_GATE_WIDTH;
-      hilink_status.dist_limit = LD2412_DIST_MAX;
+      if (hilink_status.dist_limit > LD2412_DIST_MAX) hilink_status.dist_limit = LD2412_DIST_MAX;
 
       // set presence and motion detection status
       hilink_static.enabled = true;

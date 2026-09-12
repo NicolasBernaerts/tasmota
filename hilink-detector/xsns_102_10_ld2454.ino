@@ -45,7 +45,7 @@
 // constant
 #define LD2454_START_DELAY              5        // sensor startup delay
 
-#define LD2454_DISTANCE_MIN             0        // minimum detection distance (cm)
+#define LD2454_DISTANCE_MIN             5        // minimum detection distance (cm)
 #define LD2454_DISTANCE_MAX             600      // default minimum detection distance (cm)
 
 #define LD2454_DATA_RATE                256000
@@ -143,11 +143,12 @@ switch (command)
     // init device parameters
     case HILINK_CMND_INIT:
       // declare device
-      hilink_status.baudrate   = LD2454_DATA_RATE;
-      hilink_status.gate_qty   = LD2454_GATE_QUANTITY;
-      hilink_status.gate_width = LD2454_GATE_WIDTH;
-      hilink_status.dist_limit = LD2454_DISTANCE_MAX;
-      hilink_config.dist_min   = LD2454_DISTANCE_MIN;
+      hilink_status.baudrate        = LD2454_DATA_RATE;
+      hilink_status.gate_qty        = LD2454_GATE_QUANTITY;
+      hilink_status.gate_width      = LD2454_GATE_WIDTH;
+      hilink_config.param.bluetooth = 0;
+      if (hilink_config.dist_min   < LD2454_DISTANCE_MIN) hilink_config.dist_min   = LD2454_DISTANCE_MIN;
+      if (hilink_status.dist_limit > LD2454_DISTANCE_MAX) hilink_status.dist_limit = LD2454_DISTANCE_MAX;
 
       // set presence and motion detection status
       hilink_static.enabled = false;
@@ -212,38 +213,6 @@ switch (command)
       } 
       break;
   }
-}
-
-/**************************************************\
- *                  Functions
-\**************************************************/
-
-// convert LD2454 coordinate format to MSB and LSB
-void LD2454ConvertCoordinate2LsbMsb (const int16_t coordinate, uint8_t &lsb, uint8_t &msb)
-{
-  int32_t value;
-
-  // convert according to positive or negative value
-  if (coordinate >= 0) value = 32768 + (int32_t)coordinate;
-    else value = - (int32_t)coordinate;
-
-  msb = (uint8_t)(value / 256);
-  lsb = (uint8_t)(value % 256);
-}
-
-// convert data LSB and MSB according to LD2454 signed value format
-int16_t LD2454ConvertLsbMsb2Value (const uint8_t lsb, const uint8_t msb)
-{
-  int32_t value, coordinate;
-
-  // calculate value from MSB and LSB
-  value  = 256 * (int32_t)msb + (int32_t)lsb;
-
-  // convert according to higher bit
-  if (value >= 32768) coordinate = value - 32768;
-    else coordinate = - value;
-
-  return (int16_t)coordinate;
 }
 
 /*********************************************\
@@ -403,9 +372,9 @@ void LD2454HandleReceivedData ()
     start = 4 + index * 8;
 
     // read x, y
-    x     = (int32_t)LD2454ConvertLsbMsb2Value (hilink_reception.arr_body[start++], hilink_reception.arr_body[start++]) / 10;
-    y     = (int32_t)LD2454ConvertLsbMsb2Value (hilink_reception.arr_body[start++], hilink_reception.arr_body[start++]) / 10;
-    speed = LD2454ConvertLsbMsb2Value (hilink_reception.arr_body[start++], hilink_reception.arr_body[start++]);
+    x     = (int32_t)HilinkConvertLsbMsb2Value (hilink_reception.arr_body[start++], hilink_reception.arr_body[start++]) / 10;
+    y     = (int32_t)HilinkConvertLsbMsb2Value (hilink_reception.arr_body[start++], hilink_reception.arr_body[start++]) / 10;
+    speed = HilinkConvertLsbMsb2Value (hilink_reception.arr_body[start++], hilink_reception.arr_body[start++]);
     dist  = (uint16_t)sqrt ((float)(x * x + y * y));
     hilink_motion.arr_target[index].active = (dist > 0);
 
