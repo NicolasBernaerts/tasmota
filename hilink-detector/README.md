@@ -9,9 +9,11 @@ Devices currently handled are :
   * HLK-LD2401
   * HLK-LD2402
   * HLK-LD2410b
+  * HLK-LD2410c
   * HLK-LD2410s
   * HLK-LD2420
   * HLK-LD2450
+  * HLK-LD2454
 
 Each devices has its own specificities, but the driver provides some generic commands to select and manage the connected device.
 
@@ -115,9 +117,9 @@ hlk_gate gate move,micr = gate sensitivity (dB)
   micr : micro move level 0.00..95.00
 ```
 
-# HLK-LD2410b
+# HLK-LD2410b and HLK-LD2410c
 
-LD2410b specific commands are :
+LD2410b & LD2410c specific commands are :
 
 ```
 hlk_reset          = reset sensor
@@ -196,4 +198,16 @@ hlk_zone id x1,y1,x2,y2 = set detection zone
   id    : 1..3
   x1,x2 : -600..600 (cm)
   y1,y2 : 0..600 (cm)
+```
+
+# HLK-LD2454
+
+LD2454 specific commands are :
+
+```
+hlk_reset       = reset detector (will restart)
+hlk_restart     = restart detector
+hlk_mode <mode> = target mode
+  single : single target mode
+  multi  : multi target mode
 ```
