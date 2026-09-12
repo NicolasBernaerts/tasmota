@@ -604,12 +604,14 @@ void LD2450HandleReceivedCommand ()
         // header     | len |     |     |xx   |  footer
         if (hilink_reception.arr_body[10] == 2)
         {
-          hilink_status.char_green = 'M';
+          hilink_config.param.multi = 1;
+          hilink_status.char_green  = 'M';
           AddLog (LOG_LEVEL_INFO, PSTR ("HLK: %s is in Multi target mode"), hilink_status.str_model);
         }
         else
         {
-          hilink_status.char_green = 'S';
+          hilink_config.param.multi = 0;
+          hilink_status.char_green  = 'S';
           AddLog (LOG_LEVEL_INFO, PSTR ("HLK: %s is in Single target mode"), hilink_status.str_model);
         }
         break;

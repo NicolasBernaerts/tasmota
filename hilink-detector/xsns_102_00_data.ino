@@ -53,8 +53,8 @@ enum HilinkDetectorContext          { HILINK_JSON_GENERAL, HILINK_JSON_PRESENCE,
 enum HilinkDetectorCommands         { HILINK_CMND_HELP, HILINK_CMND_NAME, HILINK_CMND_INIT, HILINK_CMND_FIRST, HILINK_CMND_INFO, HILINK_CMND_PARAM, HILINK_CMND_DELAY, HILINK_CMND_DMIN, HILINK_CMND_DMAX, HILINK_CMND_JSON, HILINK_CMND_MAX };
 
 // hilink sensor list
-enum HilinkDetectorType             { HLK_DEVICE_NONE, HLK_DEVICE_LD1115, HLK_DEVICE_LD1125, HLK_DEVICE_LD2410B, HLK_DEVICE_LD2410C, HLK_DEVICE_LD2420, HLK_DEVICE_LD2450, HLK_DEVICE_LD2410S, HLK_DEVICE_LD2402, HLK_DEVICE_LD2401, HLK_DEVICE_LD2412, HLK_DEVICE_MAX };
-const char kHilinkModel[]   PROGMEM =      "none"   "|"    "LD1115"    "|"     "LD1125"   "|"     "LD2410b"   "|"     "LD2410c"   "|"     "LD2420"   "|"     "LD2450"   "|"     "LD2410s"   "|"     "LD2402"   "|"     "LD2401"    "|"     "LD2412"    ;
+enum HilinkDetectorType             { HLK_DEVICE_NONE, HLK_DEVICE_LD1115, HLK_DEVICE_LD1125, HLK_DEVICE_LD2410B, HLK_DEVICE_LD2410C, HLK_DEVICE_LD2420, HLK_DEVICE_LD2450, HLK_DEVICE_LD2410S, HLK_DEVICE_LD2402, HLK_DEVICE_LD2401, HLK_DEVICE_LD2412, HLK_DEVICE_LD2454, HLK_DEVICE_MAX };
+const char kHilinkModel[]   PROGMEM =      "none"   "|"    "LD1115"    "|"     "LD1125"   "|"     "LD2410b"   "|"     "LD2410c"   "|"     "LD2420"   "|"     "LD2450"   "|"     "LD2410s"   "|"     "LD2402"   "|"     "LD2401"    "|"    "LD2412"   "|"     "LD2454"                      ;
 
 // hilink log level
 enum HilinkLogLevel                  { HILINK_LOG_OFF, HILINK_LOG_RECV, HILINK_LOG_SENT, HILINK_LOG_ALL, HILINK_LOG_MAX };
@@ -92,7 +92,8 @@ struct hlk_cfg {
       uint8_t output    : 1;          // output pin level when detection
       uint8_t light     : 2;          // light detection policy
       uint8_t log       : 2;          // log level
-      uint8_t spare     : 2;          // spare bits
+      uint8_t multi     : 1;          // multi tracking mode
+      uint8_t spare     : 1;          // spare bit
     };
   };
 };
