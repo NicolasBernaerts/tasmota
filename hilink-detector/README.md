@@ -119,7 +119,7 @@ hlk_gate gate move,micr = gate sensitivity (dB)
 
 # HLK-LD2410b and HLK-LD2410c
 
-LD2410b & LD2410c specific commands are :
+LD2410b and LD2410c specific commands are :
 
 ```
 hlk_reset          = reset sensor
