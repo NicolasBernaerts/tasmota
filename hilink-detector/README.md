@@ -202,6 +202,8 @@ hlk_zone id x1,y1,x2,y2 = set detection zone
 
 # HLK-LD2454
 
+LD2454 is a simplified version of LD2450.
+
 LD2454 specific commands are :
 
 ```
