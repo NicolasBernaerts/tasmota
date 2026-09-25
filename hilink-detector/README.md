@@ -17,7 +17,17 @@ Devices currently handled are :
 
 Each devices has its own specificities, but the driver provides some generic commands to select and manage the connected device.
 
-Any Hilink detector should be connected thru Rx/Tx and declared as **Tx 2410** and **Rx 2410**
+# Wiring
+
+Any Hi-Link detector should be connected as follow :
+
+|  Device  |     Tasmota    |
+|    Rx    |     Tx 2410    |
+|    Tx    |     Rx 2410    |
+|    Gnd   |       Gnd      |
+|    Vcc   |  +3.3V or +5V  |
+
+Power supply voltage depends on Hi-Link device. Please check device documentation to select proper voltage.
 
 You can then select your specific decice with **hlk_device** command.
 
