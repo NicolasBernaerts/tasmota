@@ -31,7 +31,7 @@ Run **hlk** command to get help on available device commands.
 
 ```
 hlk_device <dev>  = set device type
-  none LD1115 LD1125 LD2401 LD2402 LD2410 LD2410s LD2420 LD2450
+  none LD1115 LD1125 LD2401 LD2402 LD2410 LD2410s LD2412 LD2420 LD2450 LD2454
 hlk_log <val>     = log policy [off]
   off recv sent all
 hlk_param         = read sensor parameters
@@ -49,7 +49,7 @@ hlk_max pres,move = maximum detection distance
 
 # HLK-LD1115
 
-LD1115 specific commands are :
+[LD1115](xsns_102_01_ld1115.ino) specific commands are :
 
 ```
 hlk_reset      = reset parameters to default
@@ -64,7 +64,7 @@ hlk_sn type num = set samples to average
 
 # HLK-LD1125
 
-LD1125 specific commands are :
+[LD1125](xsns_102_01_ld1125.ino) specific commands are :
 
 ```
 hlk_reset      = reset parameters to default
@@ -77,7 +77,7 @@ hlk_th idx val = sensor threshold (%)
 
 # HLK-LD2401
 
-LD2401 specific commands are :
+[LD2401](xsns_102_01_ld2401.ino) specific commands are :
 
 ```
 hlk_restart        = restart sensor
@@ -101,7 +101,7 @@ hlk_light <conf> <thres>  = light sensitivity control
 
 # HLK-LD2402
 
-LD2402 specific commands are :
+[LD2402](xsns_102_01_ld2402.ino) specific commands are :
 
 ```
 hlk_save         = save parameters
@@ -119,7 +119,7 @@ hlk_gate gate move,micr = gate sensitivity (dB)
 
 # HLK-LD2410b and HLK-LD2410c
 
-LD2410b and LD2410c specific commands are :
+[LD2410b and LD2410c](xsns_102_01_ld2410.ino) specific commands are :
 
 ```
 hlk_reset          = reset sensor
@@ -142,7 +142,7 @@ hlk_light <conf> <thres> = light sensitivity control
 
 # HLK-LD2410s
 
-LD2410s specific commands are :
+[LD2410s](xsns_102_01_ld2410s.ino) specific commands are :
 
 ```
 hlk_reset        = reset coefficients to factory
@@ -162,7 +162,7 @@ hlk_gate gate trig,hold = gate sensitivity (%)
 ```
 # HLK-LD2412
 
-LD2412 specific commands are :
+[LD2412](xsns_102_01_ld2412.ino) specific commands are :
 
 ```
 hlk_reset          = reset sensor
@@ -185,7 +185,7 @@ hlk_light <conf> <thres> = light sensitivity control
 
 # HLK-LD2420
 
-LD2420 specific commands are :
+[LD2420](xsns_102_01_ld2420.ino) specific commands are :
 
 ```
 hlk_restart      = restart sensor
@@ -200,7 +200,7 @@ hlk_gate gate trigger,hold = gate sensitivity (%)
 
 # HLK-LD2450
 
-LD2450 specific commands are :
+[LD2450](xsns_102_01_ld2450.ino) specific commands are :
 
 ```
 hlk_reset       = reset detector (will restart)
@@ -225,7 +225,7 @@ hlk_zone id x1,y1,x2,y2 = set detection zone
 
 LD2454 is a simplified version of LD2450.
 
-LD2454 specific commands are :
+[LD2454](xsns_102_01_ld2454.ino) specific commands are :
 
 ```
 hlk_reset       = reset detector (will restart)
