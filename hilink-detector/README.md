@@ -160,7 +160,28 @@ hlk_gate gate trig,hold = gate sensitivity (%)
   trig : trigger level 0 .. 100
   hold : holding level 0 .. 100
 ```
+# HLK-LD2412
 
+LD2412 specific commands are :
+
+```
+hlk_reset          = reset sensor
+hlk_restart        = restart sensor
+hlk_auto           = start auto level detection
+hlk_energy <0/1>   = set data energy (default)
+hlk_bt <0/1>       = bluetooth status
+hlk_width <val>    = set gate width cm (20, 50 or 75)
+hlk_out <0/1>      = output level on detection
+hlk_gate gate motion,static = gate sensitivity (%)
+  gate     : 1..14
+  presence : 1..100
+  motion   : 1..100
+hlk_light <conf> <thres> = light sensitivity control
+  conf  : off             disabled
+          below           detection on low light
+          above           detection on high light
+  thres : trigger level   0..100%
+```
 
 # HLK-LD2420
 
