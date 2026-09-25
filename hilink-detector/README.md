@@ -35,7 +35,8 @@ After reboot, your detector should be recognised and operationnal.
 You should see a graphical target range display on the main page with your device type.
 
 > [!WARNING]
-> Power supply voltage depends on Hi-Link device. Please check device documentation to connect proper voltage output.
+> Power supply voltage depends on Hi-Link device. \
+> Please check device documentation to connect proper voltage output.
 
 # Generic commands
 
