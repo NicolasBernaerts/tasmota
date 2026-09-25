@@ -21,7 +21,7 @@ Each devices has its own specificities, but the driver provides some generic com
 
 Any Hi-Link detector should be connected as follow :
 
-|  Device  |     Tasmota    |
+|  Device  |   Tasmota ESP  |
 | -------- | -------------- |
 |    Rx    |     Tx 2410    |
 |    Tx    |     Rx 2410    |
