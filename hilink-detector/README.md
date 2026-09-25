@@ -1,7 +1,6 @@
-Hilink presence detector drivers for Tasmota
--------
+# Hi-Link presence detector drivers for Tasmota
 
-You'll get here a generic Tasmota driver to handle different series of Hilink presence detectors.
+You'll get here a generic Tasmota driver to handle different series of Hi-Link presence detectors.
 
 Devices currently handled are :
   * HLK-LD1115
@@ -11,6 +10,7 @@ Devices currently handled are :
   * HLK-LD2410b
   * HLK-LD2410c
   * HLK-LD2410s
+  * HLK-LD2412
   * HLK-LD2420
   * HLK-LD2450
   * HLK-LD2454
