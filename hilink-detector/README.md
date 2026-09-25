@@ -28,7 +28,7 @@ Any Hi-Link detector should be connected as follow :
 |    Gnd   |       Gnd      |
 |    Vcc   |  +3.3V or +5V  |
 
-You can then select your specific decice with **hlk_device** command.
+You can then select your specific device with **hlk_device** command.
 
 After reboot, your detector should be recognised and operationnal.
 
