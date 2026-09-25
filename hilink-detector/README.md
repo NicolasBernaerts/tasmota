@@ -22,18 +22,20 @@ Each devices has its own specificities, but the driver provides some generic com
 Any Hi-Link detector should be connected as follow :
 
 |  Device  |     Tasmota    |
+| -------- | -------------- |
 |    Rx    |     Tx 2410    |
 |    Tx    |     Rx 2410    |
 |    Gnd   |       Gnd      |
 |    Vcc   |  +3.3V or +5V  |
-
-Power supply voltage depends on Hi-Link device. Please check device documentation to select proper voltage.
 
 You can then select your specific decice with **hlk_device** command.
 
 After reboot, your detector should be recognised and operationnal.
 
 You should see a graphical target range display on the main page with your device type.
+
+> [!WARNING]
+> Power supply voltage depends on Hi-Link device. Please check device documentation to select proper voltage.
 
 # Generic commands
 
