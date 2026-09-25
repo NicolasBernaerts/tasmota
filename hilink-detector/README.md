@@ -15,7 +15,7 @@ Devices currently handled are :
   * HLK-LD2450
   * HLK-LD2454
 
-Each devices has its own specificities, but the driver provides some generic commands to select and manage the connected device.
+Each device has its own specificities, but the driver provides some generic commands to select and manage the connected device.
 
 # Wiring
 
