@@ -19,7 +19,7 @@ Each device has its own specificities, but the driver provides some generic comm
 
 # Wiring
 
-Any Hi-Link detector should be connected as follow :
+Any Hi-Link detector should be connected as follows :
 
 |  Device  |   Tasmota ESP  |
 | -------- | -------------- |
