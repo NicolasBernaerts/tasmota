@@ -118,7 +118,7 @@ hlk_light <conf> <thres>  = light sensitivity control
 
 ```
 hlk_save         = save parameters
-hlk_energy <0/1> = set energy mode (defaut)
+hlk_energy <0/1> = set energy mode (default)
 hlk_gain         = auto gain adjustment
 hlk_auto trig,keep,micr = start auto level detection
   trig : trigger coefficient    1..20 [2]
