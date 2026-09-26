@@ -61,30 +61,31 @@ Suivant le type d'ESP utilisé, toutes les fonctionnalités ne sont pas disponib
 
 Voici un tableau récapitulatif des fonctionnalités par famille d'ESP :
 
-|       Fonctionnalité          |   ESP8266  | ESP8266 4M+ |  ESP32 4M+  |  Winky auto-alim |
-| ----------------------------- | ---------- | ----------- | ----------- | ---------------- |
-| IP fixe                       |     x      |      x      |      x      |         x        |
-| Calcul Cos φ                  |     x      |      x      |      x      |         x        |
-| Alertes dépassement           |     x      |      x      |      x      |         x        |
-| LED couleur contrat           |     x      |      x      |      x      |         x        |
-| Trames temps réel             |     x      |      x      |      x      |                  |
-| Graph temps réel              |    live    |    live     |      x      |                  |
-| Historique de conso/prod      |            |      x      |      x      |                  |
-| Estimation production CACSI   |     x      |      x      |      x      |         x        |
-| Serveur TCP                   |     x      |      x      |      x      |                  |
-| Serveur FTP                   |            |             |      x      |                  |
-| Intégration Home Assistant    |     x      |      x      |      x      |         x        |
-| Intégration Domoticz          |     x      |      x      |      x      |         x        |
-| Intégration Homie             |     x      |      x      |      x      |         x        |
-| Intégration Thingsboard       |     x      |      x      |      x      |         x        |
-| Intégration InfluxDB          |            |             |      x      |         x        |
-| Prévision calendrier RTE      |            |             |      x      |                  |
-| Prévision openDPE             |            |             |      x      |                  |
-| API Production Solaire        |            |             |      x      |                  |
-| Prévision Production Solaire  |            |             |      x      |                  |
-| Pilotage afficheur Awtrix 3   |            |             |      x      |                  |
-| Taille max d'une étiquette    |    28      |    28       |     112     |       112        |
-| Nombre max d'étiquettes       |    56      |    56       |     74      |       74         |
+|       Fonctionnalité             |   ESP8266  | ESP8266 4M+ |  ESP32 4M+  |  Winky auto-alim |
+| -------------------------------- | ---------- | ----------- | ----------- | ---------------- |
+| IP fixe                          |     x      |      x      |      x      |         x        |
+| Calcul Cos φ                     |     x      |      x      |      x      |         x        |
+| Alertes dépassement              |     x      |      x      |      x      |         x        |
+| LED couleur contrat              |     x      |      x      |      x      |         x        |
+| Trames temps réel                |     x      |      x      |      x      |                  |
+| Graph temps réel                 |    live    |    live     |      x      |                  |
+| Historique de conso/prod         |            |             |      x      |                  |
+| Estimation production CACSI      |     x      |      x      |      x      |         x        |
+| Serveur TCP                      |     x      |      x      |      x      |                  |
+| Serveur FTP                      |            |             |      x      |                  |
+| Intégration Home Assistant       |     x      |      x      |      x      |         x        |
+| Intégration Domoticz             |     x      |      x      |      x      |         x        |
+| Intégration Homie                |     x      |      x      |      x      |         x        |
+| Intégration Thingsboard          |            |             |      x      |         x        |
+| Intégration InfluxDB             |            |             |      x      |         x        |
+| Prévision calendrier RTE         |            |             |      x      |                  |
+| Prévision openDPE                |            |             |      x      |                  |
+| API Production Solaire           |            |             |      x      |                  |
+| Prévision Production Solaire     |            |             |      x      |                  |
+| Pilotage afficheur Awtrix 3      |            |             |      x      |                  |
+| Pilotage relais suivant période  |            |             |      x      |                  |
+| Taille max d'une étiquette       |    28      |    28       |     112     |       112        |
+| Nombre max d'étiquettes          |    56      |    56       |     74      |       74         |
 
 ## Flash ##
 
