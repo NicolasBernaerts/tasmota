@@ -87,6 +87,12 @@ Voici un tableau récapitulatif des fonctionnalités par famille d'ESP :
 | Taille max d'une étiquette       |    28      |    28       |     112     |       112        |
 | Nombre max d'étiquettes          |    56      |    56       |     74      |       74         |
 
+Le firmware **ESP32** gère différentes cartes Ethernet :
+  * WT32-Eth01
+  * W-ESP32
+  * Olimex Ethernet
+La configuration de la carte peut se faire directement à travers l'un des menus de configuration.
+
 ## Flash ##
 
 Des versions pré-compilées pour différentes familles d'ESP sont disponibles dans le répertoire [**binary**](./binary).
