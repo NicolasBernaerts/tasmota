@@ -1,8 +1,7 @@
 /*
-  xsns_102_102_detector.ino - Hi-Link movement and presence detector driver
-    Reading is possible from local or remote (MQTT topic/key) sensors
+  xsns_102_hilink_detector.ino - Hi-Link movement and presence detector driver
 
-  Copyright (C) 2020-2025  Nicolas Bernaerts
+  Copyright (C) 2020-2026  Nicolas Bernaerts
     26/06/2022 - v1.0 - Management of HLK-LD1115H and HLK-LD1125H sensors
     15/01/2023 - v1.1 - Add HLK-LD2410 sensor
     14/09/2024 - v1.2 - Add HLK-LD2450 sensor
@@ -13,6 +12,7 @@
     14/07/2026 - v2.4 - Add HLK-LD2412 sensor
     17/07/2026 - v2.5 - Set bluetooth and light sensitivity flags persistent
                         Separate LD2410B and LD2410C
+    20/09/2026 - v2.6 - Add HLK-LD2454 sensor
 
   Manage sensors connected thru serial port (Rx 2410 and Tx 2410) :
     - HLK-LD1115
@@ -148,13 +148,16 @@ void HilinkLoadConfig ()
   // load delay & light sensitivity
   hilink_config.delay       = HilinkConfig2Delay (Settings->rf_code[2][5]);
   hilink_config.light_thres = Settings->rf_code[2][6];
-  
+
   // check boudaries
   if (hilink_config.device >= HLK_DEVICE_MAX) hilink_config.device = HLK_DEVICE_NONE;
   if (hilink_config.delay    == 0) hilink_config.delay    = HILINK_DEFAULT_DELAY;
   if (hilink_config.pres_max == 0) hilink_config.pres_max = HILINK_DEFAULT_DISTANCE;
   if (hilink_config.move_max == 0) hilink_config.move_max = HILINK_DEFAULT_DISTANCE;
   if (hilink_config.dist_min >= hilink_config.pres_max) hilink_config.dist_min = 0;
+
+  // calculate dist_limit
+  hilink_status.dist_max = max (hilink_config.pres_max, hilink_config.move_max);
 }
 
 // Save configuration into flash memory
@@ -337,9 +340,9 @@ void CmndHilinkHelp ()
   AddLog (LOG_LEVEL_INFO, PSTR ("  hlk_device <dev>    = set device type [%s]"), str_text);
 
   // loop to get handled device name
-  for (index = 0; index < HLK_DEVICE_MAX; index ++)
+  for (index = 0; index < sizeof (HilinkModelOrder); index ++)
   {
-    device = HilinkGetDeviceIdent (index);
+    device = HilinkGetDeviceIdent (HilinkModelOrder[index]);
     if (device != UINT8_MAX) { GetTextIndexed (str_text, sizeof (str_text), device, kHilinkModel); str_list += ' '; str_list += str_text; }
   }
   AddLog (LOG_LEVEL_INFO, PSTR ("    %s"), str_list.c_str ());
@@ -353,8 +356,8 @@ void CmndHilinkHelp ()
   AddLog (LOG_LEVEL_INFO, PSTR ("  hlk_delay <val>     = detection timeout [%u s]"), hilink_config.delay);
   AddLog (LOG_LEVEL_INFO, PSTR ("  hlk_min <dist>      = minimum detection distance [%u cm]"), hilink_config.dist_min);
   AddLog (LOG_LEVEL_INFO, PSTR ("  hlk_max <pres,move> = maximum detection distance"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("    pres : 1 .. %u [%u cm]"), hilink_status.dist_limit, hilink_config.pres_max);
-  AddLog (LOG_LEVEL_INFO, PSTR ("    move : 1 .. %u [%u cm]"), hilink_status.dist_limit, hilink_config.move_max);
+  AddLog (LOG_LEVEL_INFO, PSTR ("    pres : 1 .. %u [%u cm]"), hilink_status.dist_max, hilink_config.pres_max);
+  AddLog (LOG_LEVEL_INFO, PSTR ("    move : 1 .. %u [%u cm]"), hilink_status.dist_max, hilink_config.move_max);
 
   // devices help
   HilinkDeviceCommand (HILINK_CMND_HELP);
@@ -1013,6 +1016,9 @@ void HilinkShowJSON ()
 {
   bool status;
 
+  // ignore if not teleperiod
+//  if (TasmotaGlobal.tele_period != 0) return; 
+
   // start of hilink section
   MiscOptionPrepareJsonSection ();
   ResponseAppend_P (PSTR ("\"Hlk\":{"));
@@ -1047,9 +1053,16 @@ void HilinkWebSensor ()
   uint32_t index, value, limit, unit, width, total;
   char     str_text[2] = {0, 0};
 
+//  WSContentSend_P (PSTR ("<div>DEVICE = %u, DIST = %u</div>\n"), hilink_config.device, hilink_status.dist_max);
+
   // check if enabled
-  if (hilink_config.device == HLK_DEVICE_NONE) return;
   if (hilink_status.pserial == nullptr) return;
+  if (hilink_config.device == HLK_DEVICE_NONE) return;
+  if (hilink_config.device >= HLK_DEVICE_MAX) return;
+//  if (hilink_status.dist_limit == 0) return;
+
+  // init max distance
+  limit = (uint32_t)max (hilink_config.pres_max, hilink_config.move_max);
 
   // section display
   WSContentSend_P (PSTR ("<div style='font-size:10px;text-align:center;margin:4px 0px;padding:2px 6px 8px 6px;background:#333333;border-radius:8px;'>\n"));
@@ -1066,7 +1079,7 @@ void HilinkWebSensor ()
   for (index = 0; index < HILINK_MAX_PRESENCE; index ++)
     if (hilink_static.arr_target[index].active)
     {
-      value = 23 + 70 * (uint32_t)hilink_static.arr_target[index].dist / (uint32_t)hilink_status.dist_limit;
+      value = 23 + 70 * (uint32_t)hilink_static.arr_target[index].dist / limit;
       WSContentSend_P (PSTR ("<div class='dot pres' style='left:%u%%;'>%u</div>\n"), value, index + 1);
     }
 
@@ -1074,7 +1087,7 @@ void HilinkWebSensor ()
   for (index = 0; index < HILINK_MAX_MOTION; index ++)
     if (hilink_motion.arr_target[index].active)
     {
-      value = 23 + 70 * (uint32_t)hilink_motion.arr_target[index].dist / (uint32_t)hilink_status.dist_limit;
+      value = 23 + 70 * (uint32_t)hilink_motion.arr_target[index].dist / limit;
       WSContentSend_P (PSTR ("<div class='dot move' style='left:%u%%;'>%u</div>\n"), value, index + 1);
     }
 
@@ -1101,7 +1114,6 @@ void HilinkWebSensor ()
   // -----------------
 
   // calculate unit size, number of values to display and display width
-  limit = (uint32_t)hilink_status.dist_limit;
   if (limit >= 1200) unit = 3;
     else if (limit >= 800) unit = 2;
     else unit = 1;
@@ -1376,67 +1388,71 @@ void HilinkGraphRadar ()
   WSContentSend_P (PSTR ("<div class='graph'>\n"));
   WSContentSend_P (PSTR ("<svg class='graph' viewBox='0 0 %u %u'>\n"), 400, 400);
 
-  // -------------
-  //     gates
-  // -------------
-
-  // gate height
-  quantity = (uint32_t)hilink_status.gate_qty;
-  h_gate   = 400 / quantity;
-
-  // detection zone
-  WSContentSend_P (PSTR ("<rect class='dot' x=160 y=0 width=80 height=400 rx=6 ry=6></rect>\n"));
-  WSContentSend_P (PSTR ("<rect class='act' id='act' x=160 y=0 width=80 height=0></rect>\n"));
-
-  // loop thru gates
-  for (gate = 0; gate < quantity; gate ++)
+  // if detector characteristics are set
+  if ((hilink_status.gate_qty > 0) && (hilink_status.dist_max > 0))
   {
-    // vertical start
-    y      = gate * h_gate;
-    y_text = y + 17 + (h_gate - 25) / 2;
+    // -------------
+    //     gates
+    // -------------
 
-    // presence gates
-    WSContentSend_P (PSTR ("<rect class='off' id='pgt%u' x=%u y=%u width=%u height=%u rx=6 ry=6 />\n"), gate, 0, y + 2, 150, h_gate - 4);
-    WSContentSend_P (PSTR ("<text id='pla%u' x=%u y=%u></text>\n"), gate, 125, y_text);
-    WSContentSend_P (PSTR ("<rect class='%s' x=%u y=%u width=%u height=%u rx=4 ry=4></rect>\n"), PSTR ("out"), 2, y + 4, 100, h_gate - 8);
-    WSContentSend_P (PSTR ("<rect class='off' id='ppw%u' x=%u y=%u width=%u height=%u rx=4 ry=4></rect>\n"), gate, 102 - hilink_static.arr_gate[gate].power, y + 4, hilink_static.arr_gate[gate].power, h_gate - 8);
-    WSContentSend_P (PSTR ("<rect class='off' id='pth%u' x=%u y=%u width=%u height=%u rx=2 ry=2></rect>\n"), gate, 102 - hilink_static.arr_gate[gate].threshold, y + 8, 2, h_gate - 16);
+    // gate height
+    quantity = (uint32_t)hilink_status.gate_qty;
+    h_gate = 400 / quantity;
 
-    // motion gates
-    WSContentSend_P (PSTR ("<rect class='off' id='mgt%u' x=%u y=%u width=%u height=%u rx=6 ry=6 />\n"), gate, 250, y + 2, 150, h_gate - 4);
-    WSContentSend_P (PSTR ("<text id='mla%u' x=%u y=%u></text>\n"), gate, 275, y_text);
-    WSContentSend_P (PSTR ("<rect class='out' x=%u y=%u width=%u height=%u rx=4 ry=4></rect>\n"), 298, y + 4, 100, h_gate - 8);
-    WSContentSend_P (PSTR ("<rect class='off' id='mpw%u' x=%u y=%u width=%u height=%u rx=4 ry=4></rect>\n"), gate, 298, y + 4, hilink_motion.arr_gate[gate].power, h_gate - 8);
-    WSContentSend_P (PSTR ("<rect class='off' id='mth%u' x=%u y=%u width=%u height=%u rx=2 ry=2></rect>\n"), gate, 298 + hilink_motion.arr_gate[gate].threshold, y + 8, 2, h_gate - 16);
-  }
+    // detection zone
+    WSContentSend_P (PSTR ("<rect class='dot' x=160 y=0 width=80 height=400 rx=6 ry=6></rect>\n"));
+    WSContentSend_P (PSTR ("<rect class='act' id='act' x=160 y=0 width=80 height=0></rect>\n"));
 
-  // ------------------
-  //   distance scale
-  // ------------------
-
-  // loop 1m gates
-  gate = (uint32_t)hilink_status.dist_limit / 100;
-  for (index = 1; index <= gate; index ++) 
-    if ((gate <= 8) || (index % 2 == 0))
+    // loop thru gates
+    for (gate = 0; gate < quantity; gate ++)
     {
-      y = 400 * 100 * (uint32_t)index / (uint32_t)hilink_status.dist_limit;
-      WSContentSend_P (PSTR ("<text class='scale' x=%u y=%u>%u m</text>\n"), 200, y, index);
+      // vertical start
+      y      = gate * h_gate;
+      y_text = y + 17 + (h_gate - 25) / 2;
+
+      // presence gates
+      WSContentSend_P (PSTR ("<rect class='off' id='pgt%u' x=%u y=%u width=%u height=%u rx=6 ry=6 />\n"), gate, 0, y + 2, 150, h_gate - 4);
+      WSContentSend_P (PSTR ("<text id='pla%u' x=%u y=%u></text>\n"), gate, 125, y_text);
+      WSContentSend_P (PSTR ("<rect class='%s' x=%u y=%u width=%u height=%u rx=4 ry=4></rect>\n"), PSTR ("out"), 2, y + 4, 100, h_gate - 8);
+      WSContentSend_P (PSTR ("<rect class='off' id='ppw%u' x=%u y=%u width=%u height=%u rx=4 ry=4></rect>\n"), gate, 102 - hilink_static.arr_gate[gate].power, y + 4, hilink_static.arr_gate[gate].power, h_gate - 8);
+      WSContentSend_P (PSTR ("<rect class='off' id='pth%u' x=%u y=%u width=%u height=%u rx=2 ry=2></rect>\n"), gate, 102 - hilink_static.arr_gate[gate].threshold, y + 8, 2, h_gate - 16);
+
+      // motion gates
+      WSContentSend_P (PSTR ("<rect class='off' id='mgt%u' x=%u y=%u width=%u height=%u rx=6 ry=6 />\n"), gate, 250, y + 2, 150, h_gate - 4);
+      WSContentSend_P (PSTR ("<text id='mla%u' x=%u y=%u></text>\n"), gate, 275, y_text);
+      WSContentSend_P (PSTR ("<rect class='out' x=%u y=%u width=%u height=%u rx=4 ry=4></rect>\n"), 298, y + 4, 100, h_gate - 8);
+      WSContentSend_P (PSTR ("<rect class='off' id='mpw%u' x=%u y=%u width=%u height=%u rx=4 ry=4></rect>\n"), gate, 298, y + 4, hilink_motion.arr_gate[gate].power, h_gate - 8);
+      WSContentSend_P (PSTR ("<rect class='off' id='mth%u' x=%u y=%u width=%u height=%u rx=2 ry=2></rect>\n"), gate, 298 + hilink_motion.arr_gate[gate].threshold, y + 8, 2, h_gate - 16);
     }
 
-  // -------------------------------
-  //   presence and motion circles
-  // -------------------------------
+    // ------------------
+    //   distance scale
+    // ------------------
 
-  for (index = 0; index < HILINK_MAX_PRESENCE; index ++)
-  {
-    WSContentSend_P (PSTR ("<circle id='pd%u' class='off' cx=%u cy=%u r=6></circle>\n"), index, 200, 0);
-    WSContentSend_P (PSTR ("<text id='pt%u' class='dot' x=%u y=%u></text>\n"), index, 200, 0);
-  }
+    // loop 1m gates
+    gate = (uint32_t)hilink_status.dist_max / 100;
+    for (index = 1; index <= gate; index ++) 
+      if ((gate <= 8) || (index % 2 == 0))
+      {
+        y = 400 * 100 * (uint32_t)index / (uint32_t)hilink_status.dist_max;
+        WSContentSend_P (PSTR ("<text class='scale' x=%u y=%u>%u m</text>\n"), 200, y, index);
+      }
 
-  for (index = 0; index < HILINK_MAX_MOTION; index ++)
-  {
-    WSContentSend_P (PSTR ("<circle id='md%u' class='off' cx=%u cy=%u r=6></circle>\n"), index, 200, 0);
-    WSContentSend_P (PSTR ("<text id='mt%u' class='dot' x=%u y=%u></text>\n"), index, 200, 0);
+    // -------------------------------
+    //   presence and motion circles
+    // -------------------------------
+
+    for (index = 0; index < HILINK_MAX_PRESENCE; index ++)
+    {
+      WSContentSend_P (PSTR ("<circle id='pd%u' class='off' cx=%u cy=%u r=6></circle>\n"), index, 200, 0);
+      WSContentSend_P (PSTR ("<text id='pt%u' class='dot' x=%u y=%u></text>\n"), index, 200, 0);
+    }
+
+    for (index = 0; index < HILINK_MAX_MOTION; index ++)
+    {
+      WSContentSend_P (PSTR ("<circle id='md%u' class='off' cx=%u cy=%u r=6></circle>\n"), index, 200, 0);
+      WSContentSend_P (PSTR ("<text id='mt%u' class='dot' x=%u y=%u></text>\n"), index, 200, 0);
+    }
   }
 
   // end of radar
@@ -1460,55 +1476,59 @@ void HilinkGraphRadarUpdate ()
   // start of update page
   WSContentBegin (200, CT_PLAIN);
 
-  // ------------------
-  //   detection zone
-  // ------------------
-
-  y = 400 * (uint32_t)hilink_config.dist_min / (uint32_t)hilink_status.dist_limit;
-  height = 400 * (uint32_t)max (hilink_config.pres_max, hilink_config.move_max) / (uint32_t)hilink_status.dist_limit - y;
-  WSContentSend_P (PSTR ("act;act;%u;%u\n"), y, height);
-
-  // ------------
-  //   targets
-  // ------------
-
-  // presence target
-  for (index = 0; index < HILINK_MAX_PRESENCE; index ++)
+  // if detector limit is set
+  if (hilink_status.dist_max > 0)
   {
-    // if target active, display target
-    if (HilinkPresenceGetTarget (index, distance, power))
+    // ------------------
+    //   detection zone
+    // ------------------
+
+    y = 400 * (uint32_t)hilink_config.dist_min / (uint32_t)hilink_status.dist_max;
+    height = 400 * (uint32_t)max (hilink_config.pres_max, hilink_config.move_max) / (uint32_t)hilink_status.dist_max - y;
+    WSContentSend_P (PSTR ("act;act;%u;%u\n"), y, height);
+
+    // ------------
+    //   targets
+    // ------------
+
+    // presence target
+    for (index = 0; index < HILINK_MAX_PRESENCE; index ++)
     {
-      y = (uint32_t)distance * 400 / (uint32_t)hilink_status.dist_limit;
-      r = 10 + power / 10;
-      WSContentSend_P (PSTR ("dot;pd%u;%s;%u;%u\n"), index, PSTR ("pr"), y, r);
-      WSContentSend_P (PSTR ("txt;pt%u;%u;%u%%\n"),  index, y + 3, power);
+      // if target active, display target
+      if (HilinkPresenceGetTarget (index, distance, power))
+      {
+        y = (uint32_t)distance * 400 / (uint32_t)hilink_status.dist_max;
+        r = 10 + power / 10;
+        WSContentSend_P (PSTR ("dot;pd%u;%s;%u;%u\n"), index, PSTR ("pr"), y, r);
+        WSContentSend_P (PSTR ("txt;pt%u;%u;%u%%\n"),  index, y + 3, power);
+      }
+
+      // else, hide target
+      else 
+      {
+        WSContentSend_P (PSTR ("dot;pd%u;%s;%u;%u\n"), index, PSTR ("off"), 0, 1);
+        WSContentSend_P (PSTR ("txt;pt%u;%u; \n"),     index, 0);
+      }
     }
 
-    // else, hide target
-    else 
+    // motion target
+    for (index = 0; index < HILINK_MAX_MOTION; index ++)
     {
-      WSContentSend_P (PSTR ("dot;pd%u;%s;%u;%u\n"), index, PSTR ("off"), 0, 1);
-      WSContentSend_P (PSTR ("txt;pt%u;%u; \n"),     index, 0);
-    }
-  }
+      // if target active, display target
+      if (HilinkMotionGetTarget (index, distance, power))
+      {
+        y = (uint32_t)distance * 400 / (uint32_t)hilink_status.dist_max;
+        r = 10 + power / 10;
+        WSContentSend_P (PSTR ("dot;md%u;%s;%u;%u\n"), index, PSTR ("mv"), y, r);
+        WSContentSend_P (PSTR ("txt;mt%u;%u;%u%%\n"),  index, y + 3, power);
+      }
 
-  // motion target
-  for (index = 0; index < HILINK_MAX_MOTION; index ++)
-  {
-    // if target active, display target
-    if (HilinkMotionGetTarget (index, distance, power))
-    {
-      y = (uint32_t)distance * 400 / (uint32_t)hilink_status.dist_limit;
-      r = 10 + power / 10;
-      WSContentSend_P (PSTR ("dot;md%u;%s;%u;%u\n"), index, PSTR ("mv"), y, r);
-      WSContentSend_P (PSTR ("txt;mt%u;%u;%u%%\n"),  index, y + 3, power);
-    }
-
-    // else, hide target
-    else 
-    {
-      WSContentSend_P (PSTR ("dot;md%u;%s;%u;%u\n"), index, PSTR ("off"), 0, 1);
-      WSContentSend_P (PSTR ("txt;mt%u;%u; \n"),     index, 0);
+      // else, hide target
+      else 
+      {
+        WSContentSend_P (PSTR ("dot;md%u;%s;%u;%u\n"), index, PSTR ("off"), 0, 1);
+        WSContentSend_P (PSTR ("txt;mt%u;%u; \n"),     index, 0);
+      }
     }
   }
 
@@ -1570,44 +1590,48 @@ void HilinkGraphRadar2dUpdate ()
   // start of update page
   WSContentBegin (200, CT_PLAIN);
 
-  // loop thru zones
-  GetTextIndexed (str_class, sizeof (str_class), hilink_zone.status, kHilinkZone);
-  for (index = 0; index < hilink_zone.max; index++)
+  // if detector limit is set
+  if (hilink_status.dist_max > 0)
   {
-    // calculate x and y coordonates
-    x = 400 + (int32_t)hilink_zone.arr_zone[index].x1 * 400 / hilink_status.dist_limit;
-    y = 20  + (int32_t)hilink_zone.arr_zone[index].y1 * 400 / hilink_status.dist_limit;
-
-    // calculate width and height
-    width  = (int32_t)(hilink_zone.arr_zone[index].x2 - hilink_zone.arr_zone[index].x1) * 400 / hilink_status.dist_limit;
-    height = (int32_t)(hilink_zone.arr_zone[index].y2 - hilink_zone.arr_zone[index].y1) * 400 / hilink_status.dist_limit;
-
-    // display target
-    WSContentSend_P (PSTR ("z;%u;%d;%d;%d;%d;%s\n"), index, x, y, width, height, str_class);
-  }
-
-  // loop thru targets
-  for (index = 0; index < HILINK_MAX_MOTION; index++)
-  {
-    // calculate button style
-    if (hilink_motion.arr_target[index].active)
+    // loop thru zones
+    GetTextIndexed (str_class, sizeof (str_class), hilink_zone.status, kHilinkZone);
+    for (index = 0; index < hilink_zone.max; index++)
     {
-      cx = 400 - hilink_motion.arr_target[index].x * 400 / hilink_status.dist_limit;
-      cy = 20  + hilink_motion.arr_target[index].y * 400 / hilink_status.dist_limit;
-      itoa (index + 1, str_label, 10);
-      strcpy_P (str_class, PSTR ("on"));
-    }
-    else 
-    {
-      cx = 0;
-      cy = 0;
-      str_label[0] = 0;
-      strcpy_P (str_class, PSTR ("off"));
+      // calculate x and y coordonates
+      x = 400 + (int32_t)hilink_zone.arr_zone[index].x1 * 400 / hilink_status.dist_max;
+      y = 20  + (int32_t)hilink_zone.arr_zone[index].y1 * 400 / hilink_status.dist_max;
+
+      // calculate width and height
+      width  = (int32_t)(hilink_zone.arr_zone[index].x2 - hilink_zone.arr_zone[index].x1) * 400 / hilink_status.dist_max;
+      height = (int32_t)(hilink_zone.arr_zone[index].y2 - hilink_zone.arr_zone[index].y1) * 400 / hilink_status.dist_max;
+
+      // display target
+      WSContentSend_P (PSTR ("z;%u;%d;%d;%d;%d;%s\n"), index, x, y, width, height, str_class);
     }
 
-    // display target
-    WSContentSend_P (PSTR ("c;%u;%d;%d;%s\n"), index, cx, cy, str_class);
-    WSContentSend_P (PSTR ("t;%u;%d;%d;%s\n"), index, cx, cy + 5, str_label);
+    // loop thru targets
+    for (index = 0; index < HILINK_MAX_MOTION; index++)
+    {
+      // calculate button style
+      if (hilink_motion.arr_target[index].active)
+      {
+        cx = 400 - hilink_motion.arr_target[index].x * 400 / hilink_status.dist_max;
+        cy = 20  + hilink_motion.arr_target[index].y * 400 / hilink_status.dist_max;
+        itoa (index + 1, str_label, 10);
+        strcpy_P (str_class, PSTR ("on"));
+      }
+      else 
+      {
+        cx = 0;
+        cy = 0;
+        str_label[0] = 0;
+        strcpy_P (str_class, PSTR ("off"));
+      }
+
+      // display target
+      WSContentSend_P (PSTR ("c;%u;%d;%d;%s\n"), index, cx, cy, str_class);
+      WSContentSend_P (PSTR ("t;%u;%d;%d;%s\n"), index, cx, cy + 5, str_label);
+    }
   }
 
   // end of update page
@@ -1633,25 +1657,25 @@ void HilinkGraphRadar2dJS ()
   WSContentSend_P (PSTR ("     arr_value=arr_param[i].split(';');\n"));
 
   WSContentSend_P (PSTR ("     if (arr_value[0]==='z'){\n"));
-  WSContentSend_P (PSTR ("      document.getElementById('z'+arr_value[1]).setAttribute('x',arr_value[2]);\n"));
-  WSContentSend_P (PSTR ("      document.getElementById('z'+arr_value[1]).setAttribute('y',arr_value[3]);\n"));
-  WSContentSend_P (PSTR ("      document.getElementById('z'+arr_value[1]).setAttribute('width',arr_value[4]);\n"));
-  WSContentSend_P (PSTR ("      document.getElementById('z'+arr_value[1]).setAttribute('height',arr_value[5]);\n"));
-  WSContentSend_P (PSTR ("      document.getElementById('z'+arr_value[1]).classList.remove('off','inc','exc');\n"));
-  WSContentSend_P (PSTR ("      document.getElementById('z'+arr_value[1]).classList.add(arr_value[6]);\n"));
+  WSContentSend_P (PSTR ("      document.getElementById(arr_value[0]+arr_value[1]).setAttribute('x',arr_value[2]);\n"));
+  WSContentSend_P (PSTR ("      document.getElementById(arr_value[0]+arr_value[1]).setAttribute('y',arr_value[3]);\n"));
+  WSContentSend_P (PSTR ("      document.getElementById(arr_value[0]+arr_value[1]).setAttribute('width',arr_value[4]);\n"));
+  WSContentSend_P (PSTR ("      document.getElementById(arr_value[0]+arr_value[1]).setAttribute('height',arr_value[5]);\n"));
+  WSContentSend_P (PSTR ("      document.getElementById(arr_value[0]+arr_value[1]).classList.remove('off','inc','exc');\n"));
+  WSContentSend_P (PSTR ("      document.getElementById(arr_value[0]+arr_value[1]).classList.add(arr_value[6]);\n"));
   WSContentSend_P (PSTR ("     }\n"));
 
   WSContentSend_P (PSTR ("     else if (arr_value[0]==='c'){\n"));
-  WSContentSend_P (PSTR ("      document.getElementById('c'+arr_value[1]).setAttribute('cx',arr_value[2]);\n"));
-  WSContentSend_P (PSTR ("      document.getElementById('c'+arr_value[1]).setAttribute('cy',arr_value[3]);\n"));
-  WSContentSend_P (PSTR ("      document.getElementById('c'+arr_value[1]).classList.remove('off','on');\n"));
-  WSContentSend_P (PSTR ("      document.getElementById('c'+arr_value[1]).classList.add(arr_value[4]);\n"));
+  WSContentSend_P (PSTR ("      document.getElementById(arr_value[0]+arr_value[1]).setAttribute('cx',arr_value[2]);\n"));
+  WSContentSend_P (PSTR ("      document.getElementById(arr_value[0]+arr_value[1]).setAttribute('cy',arr_value[3]);\n"));
+  WSContentSend_P (PSTR ("      document.getElementById(arr_value[0]+arr_value[1]).classList.remove('off','on');\n"));
+  WSContentSend_P (PSTR ("      document.getElementById(arr_value[0]+arr_value[1]).classList.add(arr_value[4]);\n"));
   WSContentSend_P (PSTR ("     }\n"));
 
   WSContentSend_P (PSTR ("     else if (arr_value[0]==='t'){\n"));
-  WSContentSend_P (PSTR ("      document.getElementById('t'+arr_value[1]).setAttribute('x',arr_value[2]);\n"));
-  WSContentSend_P (PSTR ("      document.getElementById('t'+arr_value[1]).setAttribute('y',arr_value[3]);\n"));
-  WSContentSend_P (PSTR ("      document.getElementById('t'+arr_value[1]).textContent=arr_value[4];\n"));
+  WSContentSend_P (PSTR ("      document.getElementById(arr_value[0]+arr_value[1]).setAttribute('x',arr_value[2]);\n"));
+  WSContentSend_P (PSTR ("      document.getElementById(arr_value[0]+arr_value[1]).setAttribute('y',arr_value[3]);\n"));
+  WSContentSend_P (PSTR ("      document.getElementById(arr_value[0]+arr_value[1]).textContent=arr_value[4];\n"));
   WSContentSend_P (PSTR ("     }\n"));
 
   WSContentSend_P (PSTR ("    }\n"));
@@ -1712,8 +1736,8 @@ void HilinkGraphRadar2d ()
 {
   long index;
   long x, y, r;
-  long cos[7] = {-1000, -866, -500, 0, 500, 866, 1000};
-  long sin[7] = {0, 500, 866, 1000, 866, 500, 0};
+  long cos[7] = {-1000, -866, -500,    0, 500, 866, 1000};
+  long sin[7] = {    0,  500,  866, 1000, 866, 500,    0};
 
   // if access not allowed, close
   if (!HttpCheckPriviledgedAccess ()) return;
@@ -1767,10 +1791,10 @@ void HilinkGraphRadar2d ()
   }
 
   // display targets
-  for (index = 0; index < LD2450_MAX_TARGET; index++)
+  for (index = 0; index < HILINK_MAX_TARGET; index++)
   {
-    WSContentSend_P (PSTR ("<circle id='c%d' class='off' cx=%u cy=%u r=14 />\n"), index + hilink_zone.max, 0, 20);
-    WSContentSend_P (PSTR ("<text id='t%d' x=%u y=%u></text>\n"),                 index + hilink_zone.max, 0, 20);
+    WSContentSend_P (PSTR ("<circle id='c%d' class='off' cx=%u cy=%u r=14 />\n"), index, 0, 20);
+    WSContentSend_P (PSTR ("<text id='t%d' x=%u y=%u></text>\n"),                 index, 0, 20);
   }
 
   // end of radar
@@ -1818,7 +1842,7 @@ bool Xsns102 (const uint32_t function)
       break;
 
     case FUNC_JSON_APPEND:
-      if (TasmotaGlobal.tele_period == 0) HilinkShowJSON ();
+      HilinkShowJSON ();
       break;
 
 #ifdef USE_WEBSERVER
