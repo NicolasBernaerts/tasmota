@@ -9,6 +9,7 @@
     20/03/2025 v2.0 - Complete rewrite
     30/04/2025 v2.1 - Optimize memory usage for ESP8266 
     10/07/2025 v3.0 - Refactoring based on Tasmota 15
+    17/08/2026 v3.1 - Use cache for CSS and Javascript
 
   RAM : 1944 bytes
 
@@ -32,26 +33,26 @@
  *               Variables
 \*************************************************/
 
-#define HISTO_VERSION                 2           // saved data version
+#define HISTO_VERSION                 2               // saved data version
 
-#define HISTO_LINE_SIZE               168         // size of historisation line
-#define HISTO_GRAPH_MAX               32          // maximum number of values in graph
+#define HISTO_LINE_SIZE               168             // size of historisation line
+#define HISTO_GRAPH_MAX               32              // maximum number of values in graph
 
-#define HISTO_FS_MINSIZE              50          // minimum left size on FS before cleaning old files (kB)
+#define HISTO_FS_MINSIZE              50              // minimum left size on FS before cleaning old files (kB)
 
 // graph default and boundaries
-#define HISTO_DEF_KWH_DAY             2           // default hourly power in day graph
-#define HISTO_DEF_KWH_WEEK            10          // default daily power in week graph
-#define HISTO_DEF_KWH_MONTH           10          // default daily power in month graph
-#define HISTO_DEF_KWH_YEAR            100         // default monthly power in year graph
+#define HISTO_DEF_KWH_DAY             2               // default hourly power in day graph
+#define HISTO_DEF_KWH_WEEK            10              // default daily power in week graph
+#define HISTO_DEF_KWH_MONTH           10              // default daily power in month graph
+#define HISTO_DEF_KWH_YEAR            100             // default monthly power in year graph
 
 // graph dimensions
-#define HISTO_LEFT                    60          // left position of the curve
-#define HISTO_WIDE                    1200        // graph usable width
-#define HISTO_RIGHT                   1260        // right position of the curve
-#define HISTO_WIDTH                   1320        // graph global width
-#define HISTO_HEIGHT                  600         // default graph height
-#define HISTO_BAR_HEIGHT_MIN          20          // min bar height to display value
+#define HISTO_LEFT                    60              // left position of the curve
+#define HISTO_WIDE                    1200            // graph usable width
+#define HISTO_RIGHT                   1260            // right position of the curve
+#define HISTO_WIDTH                   1320            // graph global width
+#define HISTO_HEIGHT                  600             // default graph height
+#define HISTO_BAR_HEIGHT_MIN          20              // min bar height to display value
 
 #define HISTO_HEAD                    "Histo"
 
@@ -65,19 +66,21 @@
 #define CMND_HISTO_DAYOFMONTH         "dom"
 #define CMND_HISTO_MONTHOFYEAR        "moy"
 
-// week days name for history
-static const char kTeleinfoHistoWeekdayNames[] = D_DAY3LIST;
-
-// web URL
-const char PSTR_PAGE_HISTO[] PROGMEM = "/histo";
-
 enum HistoFile { HISTO_FILE_BEFORE, HISTO_FILE_FOUND, HISTO_FILE_LAST, HISTO_FILE_BEYOND, HISTO_FILE_MAX };
 
+// week days name for history
+constexpr char kTeleinfoHistoWeekday[]    PROGMEM = D_DAY3LIST;
+
+// web URL
+constexpr char PSTR_HISTO_PAGE[]          PROGMEM = "/histo";
+constexpr char PSTR_HISTO_PAGE_CSS[]      PROGMEM = "/histo.css";
+constexpr char PSTR_HISTO_PAGE_JS[]       PROGMEM = "/histo.js";
+
 // files on FS
-const char PSTR_HISTO_DATA[]          PROGMEM = "/teleinfo-histo.dat";
-const char PSTR_HISTO_FILE_ORIGINAL[] PROGMEM = "/teleinfo-%04u.csv";
-const char PSTR_HISTO_FILE_CONTRACT[] PROGMEM = "/teleinfo-%s-%04u.csv";
-const char PSTR_HISTO_FILE_MASK[]     PROGMEM = "teleinfo-*.csv";
+constexpr char PSTR_HISTO_DATA[]          PROGMEM = "/teleinfo-histo.dat";
+constexpr char PSTR_HISTO_FILE_ORIGINAL[] PROGMEM = "/teleinfo-%04u.csv";
+constexpr char PSTR_HISTO_FILE_CONTRACT[] PROGMEM = "/teleinfo-%s-%04u.csv";
+constexpr char PSTR_HISTO_FILE_MASK[]     PROGMEM = "teleinfo-*.csv";
 
 /****************************************\
  *                 Data
@@ -85,10 +88,10 @@ const char PSTR_HISTO_FILE_MASK[]     PROGMEM = "teleinfo-*.csv";
 
 static struct {                     // 24 bytes
   uint8_t  hour      = UINT8_MAX;                 // last recorded hour
-  uint8_t  period    = CALENDAR_PERIOD_DAY;          // current period of graph
+  uint8_t  period    = CALENDAR_PERIOD_DAY;       // current period of graph
   uint16_t display   = UINT16_MAX;                // mask of data to display
   uint32_t timestamp = 0;                         // current timestamp for graph
-  long     max_value[CALENDAR_PERIOD_MAX];           // max value according to period
+  long     max_value[CALENDAR_PERIOD_MAX];        // max value according to period
 } histo_status;
 
 struct histo_delta {                // 68 bytes
@@ -98,7 +101,7 @@ struct histo_delta {                // 68 bytes
   long conso[TIC_PERIOD_MAX];                     // conso periods (in wh)
 };
 
-histo_delta histo_data[HISTO_GRAPH_MAX];          // display data for graph, 2048 bytes
+histo_delta histo_data[HISTO_GRAPH_MAX];          // display data for graph, 2176 bytes
 
 struct histo_value {                // 136 bytes
   long long forecast;                             // forecast solar production (in wh)
@@ -670,7 +673,7 @@ void TeleinfoHistoEverySecond ()
 
   // ignore if time is not valid
   if (!RtcTime.valid) return;
-  if (teleinfo_meter.nb_message <= TIC_MESSAGE_MIN) return;
+  if (teleinfo_meter.nb_message < TIC_MESSAGE_MIN) return;
 
   // extract current time
   BreakTime (LocalTime (), time_dst);
@@ -719,7 +722,7 @@ void TeleinfoHistoDisplayUnits ()
 // Append histo button to main page
 void TeleinfoHistoWebMainButton ()
 {
-  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), PSTR_PAGE_HISTO, PSTR ("Historisation compteur"));
+  WSContentSend_P (PSTR ("<p><form action='%s' method='get'><button>%s</button></form></p>\n"), PSTR_HISTO_PAGE, PSTR ("Historisation compteur"));
 }
 
 // Display bar graph
@@ -800,7 +803,7 @@ void TeleinfoHistoDisplayBar ()
 
       case CALENDAR_PERIOD_MONTH:
         BreakTime (timestamp, time_dst);
-        strlcpy (str_comp, kTeleinfoHistoWeekdayNames + (time_dst.day_of_week - 1) * 3, 3);
+        strlcpy (str_comp, kTeleinfoHistoWeekday + (time_dst.day_of_week - 1) * 3, 3);
         sprintf_P (str_value, PSTR ("%02d"), index + 1); 
         timestamp += 86400;
         break;
@@ -809,7 +812,7 @@ void TeleinfoHistoDisplayBar ()
         BreakTime (timestamp, time_dst);
         strlcpy (str_value, kMonthNames + 3 * (time_dst.month - 1), 4);
         sprintf_P (str_comp, PSTR ("%u %s"), time_dst.day_of_month, str_value);
-        strlcpy (str_value, kTeleinfoHistoWeekdayNames + ((index + 1) % 7) * 3, 4);
+        strlcpy (str_value, kTeleinfoHistoWeekday + ((index + 1) % 7) * 3, 4);
         timestamp += 86400;
         break;
 
@@ -850,7 +853,7 @@ void TeleinfoHistoDisplayBar ()
       // if possible, display bar
       if (bar_height > 0)
       {
-        if (strlen (str_param) > 0) WSContentSend_P (PSTR ("<a href='%s?%s=%u'>"), PSTR_PAGE_HISTO, str_param, index);
+        if (strlen (str_param) > 0) WSContentSend_P (PSTR ("<a href='%s?%s=%u'>"), PSTR_HISTO_PAGE, str_param, index);
         WSContentSend_P (PSTR ("<rect class='p%u' x=%d y=%d rx=4 ry=4 width=%d height=%d><title>%d</title></rect>"), TIC_LEVEL_SOLAR, graph_x, graph_y, bar_width, bar_height, histo_data[index].solar);
         if (strlen (str_param) > 0) WSContentSend_P (PSTR ("</a>"));
         WSContentSend_P (PSTR ("\n"));
@@ -878,7 +881,7 @@ void TeleinfoHistoDisplayBar ()
       // if possible, display bar
       if (bar_height > 0)
       {
-        if (strlen (str_param) > 0) WSContentSend_P (PSTR ("<a href='%s?%s=%u'>"), PSTR_PAGE_HISTO, str_param, index);
+        if (strlen (str_param) > 0) WSContentSend_P (PSTR ("<a href='%s?%s=%u'>"), PSTR_HISTO_PAGE, str_param, index);
         WSContentSend_P (PSTR ("<rect class='p%u' x=%d y=%d rx=4 ry=4 width=%d height=%d><title>%d</title></rect>"), TIC_LEVEL_PROD, graph_x, graph_y, bar_width, bar_height, histo_data[index].prod);
         if (strlen (str_param) > 0) WSContentSend_P (PSTR ("</a>"));
         WSContentSend_P (PSTR ("\n"));
@@ -908,7 +911,7 @@ void TeleinfoHistoDisplayBar ()
         // if possible, display bar
         if (bar_height > 0)
         {
-          if (strlen (str_param) > 0) WSContentSend_P (PSTR ("<a href='%s?%s=%u'>"), PSTR_PAGE_HISTO, str_param, index);
+          if (strlen (str_param) > 0) WSContentSend_P (PSTR ("<a href='%s?%s=%u'>"), PSTR_HISTO_PAGE, str_param, index);
           WSContentSend_P (PSTR ("<rect class='c%u' x=%d y=%d rx=4 ry=4 width=%d height=%d><title>%d</title></rect>"), period, graph_x, graph_y, bar_width, bar_height, histo_data[index].conso[period]);
           if (strlen (str_param) > 0) WSContentSend_P (PSTR ("</a>"));
           WSContentSend_P (PSTR ("\n"));
@@ -991,6 +994,144 @@ uint16_t TeleinfoHistoButtonStatus (const uint16_t shift, char *pstr_status, siz
   return choice;
 } 
 
+// Histo page javascript code
+void TeleinfoHistoWebPageJS ()
+{
+  // start of page
+  WSContentBeginJavascript (200, 0);
+
+  // javascript : remove parameters
+  WSContentSend_P (PSTR ("var newURL = location.href.split('?')[0];\n"));
+  WSContentSend_P (PSTR ("window.history.pushState('object', document.title, newURL);\n"));
+
+  // javascript : screen swipe for previous and next period
+  WSContentSend_P (PSTR ("let startX=0;let stopX=0;let startY=0;let stopY=0;\n"));
+  WSContentSend_P (PSTR ("window.addEventListener('touchstart',function(evt){startX=evt.changedTouches[0].pageX;startY=evt.changedTouches[0].pageY;},false);\n"));
+  WSContentSend_P (PSTR ("window.addEventListener('touchend',function(evt){stopX=evt.changedTouches[0].pageX;stopY=evt.changedTouches[0].pageY;handleGesture();},false);\n"));
+  WSContentSend_P (PSTR ("function handleGesture(){\n"));
+  WSContentSend_P (PSTR (" let deltaX=stopX-startX;let deltaY=Math.abs(stopY-startY);\n"));
+  WSContentSend_P (PSTR (" if(deltaY<10 && deltaX<-100){window.location='%s?next=1';}\n"), PSTR_HISTO_PAGE);
+  WSContentSend_P (PSTR (" else if(deltaY<10 && deltaX>100){window.location='%s?prev=1';}\n"), PSTR_HISTO_PAGE);
+  WSContentSend_P (PSTR ("}\n"));
+
+  // end of page
+  WSContentEnd ();
+}
+
+// Histo page CSS style
+void TeleinfoHistoWebPageCSS ()
+{
+  uint8_t  index, level, hchp;
+  char     str_color[8];
+  char     str_status[16];
+  char     str_text[32];
+
+  // start of page
+  WSContentBeginCSS (200, 0);
+
+  // -----------
+  //    Page
+  // -----------
+
+  WSContentSend_P (PSTR ("body {color:white;background-color:%s;font-size:2.2vmin;font-family:Arial, Helvetica, sans-serif;}\n"), PSTR (COLOR_BACKGROUND));
+  WSContentSend_P (PSTR ("div {margin:0.3vh auto;padding:2px 0px;text-align:center;vertical-align:top;}\n"));
+
+  WSContentSend_P (PSTR ("a {text-decoration:none;}\n"));
+  WSContentSend_P (PSTR ("div a {color:white;}\n"));
+
+  WSContentSend_P (PSTR ("div.head {font-size:24px;font-weight:bold;}\n"));
+
+  WSContentSend_P (PSTR ("div.range {position:absolute;left:2vw;width:2.5vw;margin:auto;border:1px #666 solid;border-radius:4px;}\n"));
+  WSContentSend_P (PSTR ("div.range:hover {background:#aaa;}\n"));
+
+  WSContentSend_P (PSTR ("div.lvl {display:inline-block;padding:1px;margin:0px;color:#fff;}\n"));
+  WSContentSend_P (PSTR ("div.lvl div {background:#666;}\n"));
+  WSContentSend_P (PSTR ("div.lvl a div {background:none;}\n"));
+  WSContentSend_P (PSTR ("div.l1 {border:1px #666 solid;border-radius:6px;}\n"));
+  WSContentSend_P (PSTR ("div.l1 div {padding:2px 10px;}\n"));
+  WSContentSend_P (PSTR ("div.l2 div {padding:2px 10px;border:1px #666 solid;}\n"));
+  WSContentSend_P (PSTR ("div.l3 div {padding:4px 12px;margin:auto 2px;border:1px #444 solid;border-radius:6px;}\n"));
+
+  // solar and production style
+  for (index = TIC_LEVEL_PROD; index < TIC_LEVEL_END; index ++)
+  {
+    GetTextIndexed (str_color, sizeof (str_color), index, kTeleinfoLevelCalColor);
+    GetTextIndexed (str_text,  sizeof (str_text),  index, kTeleinfoLevelCalText);
+    WSContentSend_P (PSTR ("div.l3 div.p%u {color:%s;background:%s;}\n"), index, str_text, str_color);
+  }
+
+  // conso style
+  for (index = 0; index < teleinfo_contract_db.period_qty; index ++)
+  {
+    level = teleinfo_contract_db.arr_period[index].level;
+    if (level > 0) hchp = teleinfo_contract_db.arr_period[index].hchp;
+      else hchp = TIC_HOUR_HP;
+    if (hchp == 0) strcpy_P (str_status, PSTR ("opacity:0.6;"));
+      else str_status[0] = 0;
+    GetTextIndexed (str_color, sizeof (str_color), level, kTeleinfoLevelCalColor);
+    GetTextIndexed (str_text,  sizeof (str_text),  level, kTeleinfoLevelCalText);
+    WSContentSend_P (PSTR ("div.l3 div.c%u {color:%s;background:%s;%s}\n"), index, str_text, str_color, str_status);      
+  }
+
+  WSContentSend_P (PSTR ("div.l3 div.disabled {color:#666;background:#333;}\n"));
+
+  WSContentSend_P (PSTR ("div.item {display:inline-block;margin:1px 0px;border-radius:4px;}\n"));
+  WSContentSend_P (PSTR ("a div.item:hover {background:#aaa;}\n"));
+
+  WSContentSend_P (PSTR ("button.menu {margin:1vh;padding:5px 20px;font-size:1.2rem;background:%s;color:%s;cursor:pointer;border:none;border-radius:8px;}\n"), PSTR (COLOR_BUTTON), PSTR (COLOR_BUTTON_TEXT));
+
+  WSContentSend_P (PSTR ("div.graph {width:100%%;margin:auto;margin-top:15px;}\n"));
+  WSContentSend_P (PSTR ("svg.graph {width:100%%;height:60vh;}\n"));
+
+  // ----------
+  //    SVG
+  // ----------
+
+  // bar graph : general style
+  WSContentSend_P (PSTR ("svg rect.main {fill:none;stroke:#888;}\n"));
+  WSContentSend_P (PSTR ("svg rect.dash {fill:#333;fill-opacity:0.5;stroke-width:0;}\n"));
+  WSContentSend_P (PSTR ("svg line.dash {stroke:grey;stroke-width:1;stroke-dasharray:2 8;}\n"));
+  WSContentSend_P (PSTR ("svg text {font-size:1.1rem;fill:white;text-anchor:middle;dominant-baseline:middle;}\n"));
+  WSContentSend_P (PSTR ("svg text.time {font-size:1rem;font-style:italic;fill-opacity:0.6;}\n"));
+  WSContentSend_P (PSTR ("svg text.comp {font-size:0.8rem;}\n"));
+  
+  // bar graph : production style
+  GetTextIndexed (str_color, sizeof (str_color), TIC_LEVEL_PROD, kTeleinfoLevelCalColor);
+  WSContentSend_P (PSTR ("svg rect.p%u {stroke:%s;fill:%s;fill-opacity:0.5;}\n"), TIC_LEVEL_PROD, str_color, str_color);
+  GetTextIndexed (str_color,  sizeof (str_color),  TIC_LEVEL_PROD, kTeleinfoLevelCalText);
+  WSContentSend_P (PSTR ("svg text.p%u {fill:%s;}\n"), TIC_LEVEL_PROD, str_color);
+
+  // bar graph : solar production style
+  GetTextIndexed (str_color, sizeof (str_color), TIC_LEVEL_SOLAR, kTeleinfoLevelCalColor);
+  WSContentSend_P (PSTR ("svg rect.p%u {stroke:%s;fill:%s;fill-opacity:0.7;}\n"), TIC_LEVEL_SOLAR, str_color, str_color);
+  GetTextIndexed (str_color,  sizeof (str_color),  TIC_LEVEL_SOLAR, kTeleinfoLevelCalText);
+  WSContentSend_P (PSTR ("svg text.p%u {fill:%s;}\n"), TIC_LEVEL_SOLAR, str_color);
+
+  // curve : solar production forecast style
+  GetTextIndexed (str_color, sizeof (str_color), TIC_LEVEL_FORECAST, kTeleinfoLevelCalColor);
+  WSContentSend_P (PSTR ("svg path.p%u {stroke:%s;fill:%s;fill-opacity:0.1;}\n"), TIC_LEVEL_FORECAST, str_color, str_color);
+
+  // bar graph : conso style
+  for (index = 0; index < teleinfo_contract_db.period_qty; index ++)
+  {
+    // get level value and color
+    level = teleinfo_contract_db.arr_period[index].level;
+    if (level > 0) hchp = teleinfo_contract_db.arr_period[index].hchp; else hchp = 1;
+    if (hchp == 0) strcpy_P (str_text, PSTR ("fill-opacity:0.2;")); else strcpy_P (str_text, PSTR ("fill-opacity:0.5;"));
+
+    // bar style
+    GetTextIndexed (str_color, sizeof (str_color), level, kTeleinfoLevelCalColor);
+    WSContentSend_P (PSTR ("svg rect.c%u {stroke:%s;fill:%s;%s}\n"), index, str_color, str_color, str_text);      
+
+    // text style
+    GetTextIndexed (str_color, sizeof (str_color), level, kTeleinfoLevelCalText);
+    WSContentSend_P (PSTR ("svg text.c%u {fill:%s;}\n"), index, str_color);      
+  }
+
+  // end of page
+  WSContentEnd ();
+}
+
 // Graph public page
 void TeleinfoHistoWebPage ()
 {
@@ -1006,6 +1147,7 @@ void TeleinfoHistoWebPage ()
 
   // beginning of form without authentification
   WSContentStart_P (PSTR (HISTO_HEAD), false);
+  WSContentSend_P (PSTR ("</script>\n"));
 
   // get period
   histo_status.period = (uint8_t)TeleinfoGetArgValue (CMND_HISTO_PERIOD, 0, CALENDAR_PERIOD_MAX - 1, histo_status.period);  
@@ -1061,83 +1203,14 @@ void TeleinfoHistoWebPage ()
     histo_status.period = CALENDAR_PERIOD_MONTH;
   }
 
-  // javascript : remove parameters
-  WSContentSend_P (PSTR ("\n\nvar newURL = location.href.split('?')[0];\n"));
-  WSContentSend_P (PSTR ("window.history.pushState('object', document.title, newURL);\n"));
-
-  // javascript : screen swipe for previous and next period
-  WSContentSend_P (PSTR ("\nlet startX=0;let stopX=0;let startY=0;let stopY=0;\n"));
-  WSContentSend_P (PSTR ("window.addEventListener('touchstart',function(evt){startX=evt.changedTouches[0].pageX;startY=evt.changedTouches[0].pageY;},false);\n"));
-  WSContentSend_P (PSTR ("window.addEventListener('touchend',function(evt){stopX=evt.changedTouches[0].pageX;stopY=evt.changedTouches[0].pageY;handleGesture();},false);\n"));
-  WSContentSend_P (PSTR ("function handleGesture(){\n"));
-  WSContentSend_P (PSTR (" let deltaX=stopX-startX;let deltaY=Math.abs(stopY-startY);\n"));
-  WSContentSend_P (PSTR (" if(deltaY<10 && deltaX<-100){window.location='%s?next=1';}\n"), PSTR_PAGE_HISTO);
-  WSContentSend_P (PSTR (" else if(deltaY<10 && deltaX>100){window.location='%s?prev=1';}\n"), PSTR_PAGE_HISTO);
-  WSContentSend_P (PSTR ("}\n"));
-
-  // end of script section
-  WSContentSend_P (PSTR ("</script>\n"));
-
   // set page as scalable
   WSContentSend_P (PSTR ("<meta name='viewport' content='width=device-width,initial-scale=1,user-scalable=yes'/>\n"));
 
-  // set cache policy, no cache for 12h
-  WSContentSend_P (PSTR ("<meta http-equiv='Cache-control' content='public,max-age=720000'/>\n"));
+  // load javascript
+  WSContentSend_P (PSTR ("<script type='text/javascript' src='%s?ts=%u'></script>\n"), PSTR_HISTO_PAGE_JS, Rtc.restart_time);
 
-  // page style
-  WSContentSend_P (PSTR ("<style>\n"));
-
-  WSContentSend_P (PSTR ("body {color:white;background-color:%s;font-size:2.2vmin;font-family:Arial, Helvetica, sans-serif;}\n"), PSTR (COLOR_BACKGROUND));
-  WSContentSend_P (PSTR ("div {margin:0.3vh auto;padding:2px 0px;text-align:center;vertical-align:top;}\n"));
-
-  WSContentSend_P (PSTR ("a {text-decoration:none;}\n"));
-  WSContentSend_P (PSTR ("div a {color:white;}\n"));
-
-  WSContentSend_P (PSTR ("div.head {font-size:24px;font-weight:bold;}\n"));
-
-  WSContentSend_P (PSTR ("div.range {position:absolute;left:2vw;width:2.5vw;margin:auto;border:1px #666 solid;border-radius:4px;}\n"));
-  WSContentSend_P (PSTR ("div.range:hover {background:#aaa;}\n"));
-
-  WSContentSend_P (PSTR ("div.lvl {display:inline-block;padding:1px;margin:0px;color:#fff;}\n"));
-  WSContentSend_P (PSTR ("div.lvl div {background:#666;}\n"));
-  WSContentSend_P (PSTR ("div.lvl a div {background:none;}\n"));
-  WSContentSend_P (PSTR ("div.l1 {border:1px #666 solid;border-radius:6px;}\n"));
-  WSContentSend_P (PSTR ("div.l1 div {padding:2px 10px;}\n"));
-  WSContentSend_P (PSTR ("div.l2 div {padding:2px 10px;border:1px #666 solid;}\n"));
-  WSContentSend_P (PSTR ("div.l3 div {padding:4px 12px;margin:auto 2px;border:1px #444 solid;border-radius:6px;}\n"));
-
-  // solar and production style
-  for (index = TIC_LEVEL_PROD; index < TIC_LEVEL_END; index ++)
-  {
-    GetTextIndexed (str_color, sizeof (str_color), index, kTeleinfoLevelCalColor);
-    GetTextIndexed (str_text,  sizeof (str_text),  index, kTeleinfoLevelCalText);
-    WSContentSend_P (PSTR ("div.l3 div.p%u {color:%s;background:%s;}\n"), index, str_text, str_color);
-  }
-
-  // conso style
-  for (index = 0; index < teleinfo_contract_db.period_qty; index ++)
-  {
-    level = teleinfo_contract_db.arr_period[index].level;
-    if (level > 0) hchp = teleinfo_contract_db.arr_period[index].hchp;
-      else hchp = TIC_HOUR_HP;
-    if (hchp == 0) strcpy_P (str_status, PSTR ("opacity:0.6;"));
-      else str_status[0] = 0;
-    GetTextIndexed (str_color, sizeof (str_color), level, kTeleinfoLevelCalColor);
-    GetTextIndexed (str_text,  sizeof (str_text),  level, kTeleinfoLevelCalText);
-    WSContentSend_P (PSTR ("div.l3 div.c%u {color:%s;background:%s;%s}\n"), index, str_text, str_color, str_status);      
-  }
-
-  WSContentSend_P (PSTR ("div.l3 div.disabled {color:#666;background:#333;}\n"));
-
-  WSContentSend_P (PSTR ("div.item {display:inline-block;margin:1px 0px;border-radius:4px;}\n"));
-  WSContentSend_P (PSTR ("a div.item:hover {background:#aaa;}\n"));
-
-  WSContentSend_P (PSTR ("button.menu {margin:1vh;padding:5px 20px;font-size:1.2rem;background:%s;color:%s;cursor:pointer;border:none;border-radius:8px;}\n"), PSTR (COLOR_BUTTON), PSTR (COLOR_BUTTON_TEXT));
-
-  WSContentSend_P (PSTR ("div.graph {width:100%%;margin:auto;margin-top:15px;}\n"));
-  WSContentSend_P (PSTR ("svg.graph {width:100%%;height:60vh;}\n"));
-
-  WSContentSend_P (PSTR ("</style>\n\n"));
+  // load page style sheet
+  WSContentSend_P (PSTR ("<link rel='stylesheet' type='text/css' href='%s?ts=%u'>\n"), PSTR_HISTO_PAGE_CSS, Rtc.restart_time);
 
   // page body
   WSContentSend_P (PSTR ("</head>\n"));
@@ -1150,13 +1223,13 @@ void TeleinfoHistoWebPage ()
   // ---------------------------
 
   WSContentSend_P (PSTR ("<div>\n"));
-  WSContentSend_P (PSTR ("<a href='%s?%s=1'><div class='range'>+</div></a>\n"), PSTR_PAGE_HISTO, PSTR (CMND_HISTO_PLUS));
+  WSContentSend_P (PSTR ("<a href='%s?%s=1'><div class='range'>+</div></a>\n"), PSTR_HISTO_PAGE, PSTR (CMND_HISTO_PLUS));
   WSContentSend_P (PSTR ("<div class='lvl l1'>\n"));
 
   for (index = 0; index < CALENDAR_PERIOD_MAX; index ++)
   {
     GetTextIndexed (str_text, sizeof (str_text), index, kHistoPeriod);
-    if (histo_status.period != index) WSContentSend_P (PSTR ("<a href='%s?period=%u'>"), PSTR_PAGE_HISTO, index);
+    if (histo_status.period != index) WSContentSend_P (PSTR ("<a href='%s?period=%u'>"), PSTR_HISTO_PAGE, index);
     WSContentSend_P (PSTR ("<div class='item'>%s</div>"), str_text);
     if (histo_status.period != index) WSContentSend_P (PSTR ("</a>"));
     WSContentSend_P (PSTR ("\n"));
@@ -1169,17 +1242,17 @@ void TeleinfoHistoWebPage ()
   // ----------------------
 
   WSContentSend_P (PSTR ("<div>\n"));
-  WSContentSend_P (PSTR ("<a href='%s?%s=1'><div class='range'>-</div></a>\n"), PSTR_PAGE_HISTO, PSTR (CMND_HISTO_MINUS));
+  WSContentSend_P (PSTR ("<a href='%s?%s=1'><div class='range'>-</div></a>\n"), PSTR_HISTO_PAGE, PSTR (CMND_HISTO_MINUS));
   WSContentSend_P (PSTR ("<div class='lvl l2'>\n"));
 
   // previous periods
   timestamp = CalendarGetPreviousTimestamp (histo_status.period, histo_status.timestamp, 5);
   CalendarGetPeriodLabel (histo_status.period, timestamp, str_text, sizeof (str_text));
-  WSContentSend_P (PSTR ("<a href='%s?prev=%u'><div class='item' title='%s'>&lt; &lt;</div></a>\n"), PSTR_PAGE_HISTO, 5, str_text);
+  WSContentSend_P (PSTR ("<a href='%s?prev=%u'><div class='item' title='%s'>&lt; &lt;</div></a>\n"), PSTR_HISTO_PAGE, 5, str_text);
 
   timestamp = CalendarGetPreviousTimestamp (histo_status.period, histo_status.timestamp, 1);
   CalendarGetPeriodLabel (histo_status.period, timestamp, str_text, sizeof (str_text));
-  WSContentSend_P (PSTR ("<a href='%s?prev=%u'><div class='item' title='%s'>&lt;</div></a>\n"), PSTR_PAGE_HISTO, 1, str_text);
+  WSContentSend_P (PSTR ("<a href='%s?prev=%u'><div class='item' title='%s'>&lt;</div></a>\n"), PSTR_HISTO_PAGE, 1, str_text);
 
   // current period
   CalendarGetPeriodLabel (histo_status.period, histo_status.timestamp, str_text, sizeof (str_text));
@@ -1188,11 +1261,11 @@ void TeleinfoHistoWebPage ()
   // next periods
   timestamp = CalendarGetNextTimestamp (histo_status.period, histo_status.timestamp, 1);
   CalendarGetPeriodLabel (histo_status.period, timestamp, str_text, sizeof (str_text));
-  WSContentSend_P (PSTR ("<a href='%s?next=%u'><div class='item' title='%s'>&gt;</div></a>\n"), PSTR_PAGE_HISTO, 1, str_text);
+  WSContentSend_P (PSTR ("<a href='%s?next=%u'><div class='item' title='%s'>&gt;</div></a>\n"), PSTR_HISTO_PAGE, 1, str_text);
 
   timestamp = CalendarGetNextTimestamp (histo_status.period, histo_status.timestamp, 5);
   CalendarGetPeriodLabel (histo_status.period, timestamp, str_text, sizeof (str_text));
-  WSContentSend_P (PSTR ("<a href='%s?next=%u'><div class='item' title='%s'>&gt; &gt;</div></a>\n"), PSTR_PAGE_HISTO, 5, str_text);
+  WSContentSend_P (PSTR ("<a href='%s?next=%u'><div class='item' title='%s'>&gt; &gt;</div></a>\n"), PSTR_HISTO_PAGE, 5, str_text);
 
   WSContentSend_P (PSTR ("</div></div>\n"));        // lvl l2
 
@@ -1204,6 +1277,7 @@ void TeleinfoHistoWebPage ()
   WSContentSend_P (PSTR ("<div class='graph'>\n"));
   WSContentSend_P (PSTR ("<svg class='graph' viewBox='0 0 %d %d' preserveAspectRatio='none'>\n"), HISTO_WIDTH, HISTO_HEIGHT + 1);
 
+  /*
   // svg : style
   WSContentSend_P (PSTR ("<style type='text/css'>\n"));
 
@@ -1249,6 +1323,7 @@ void TeleinfoHistoWebPage ()
   }
 
   WSContentSend_P (PSTR ("</style>\n"));
+*/
 
   // load data from file
   TeleinfoHistoFileLoadData ();
@@ -1277,7 +1352,7 @@ void TeleinfoHistoWebPage ()
   {
     choice = TeleinfoHistoButtonStatus (0, str_status, sizeof (str_status));
     GetTextIndexed (str_text, sizeof (str_text), TIC_LEVEL_SOLAR, kTeleinfoLevelLabel);
-    WSContentSend_P (PSTR ("<a href='%s?%s=%u'><div class='item p%u%s'>%s</div></a>\n"), PSTR_PAGE_HISTO, PSTR (CMND_HISTO_DISPLAY), choice, TIC_LEVEL_SOLAR, str_status, str_text);
+    WSContentSend_P (PSTR ("<a href='%s?%s=%u'><div class='item p%u%s'>%s</div></a>\n"), PSTR_HISTO_PAGE, PSTR (CMND_HISTO_DISPLAY), choice, TIC_LEVEL_SOLAR, str_status, str_text);
   }
 
   // production button
@@ -1285,7 +1360,7 @@ void TeleinfoHistoWebPage ()
   {
     choice = TeleinfoHistoButtonStatus (1, str_status, sizeof (str_status));
     GetTextIndexed (str_text, sizeof (str_text), TIC_LEVEL_PROD, kTeleinfoLevelLabel);
-    WSContentSend_P (PSTR ("<a href='%s?%s=%u'><div class='item p%u%s'>%s</div></a>\n"), PSTR_PAGE_HISTO, PSTR (CMND_HISTO_DISPLAY), choice, TIC_LEVEL_PROD, str_status, str_text);
+    WSContentSend_P (PSTR ("<a href='%s?%s=%u'><div class='item p%u%s'>%s</div></a>\n"), PSTR_HISTO_PAGE, PSTR (CMND_HISTO_DISPLAY), choice, TIC_LEVEL_PROD, str_status, str_text);
   }
 
   // conso period buttons
@@ -1294,7 +1369,7 @@ void TeleinfoHistoWebPage ()
     {
       choice = TeleinfoHistoButtonStatus (2 + index, str_status, sizeof (str_status));
       TeleinfoContractGetPeriodLabel (str_text, sizeof (str_text), index);
-      WSContentSend_P (PSTR ("<a href='%s?%s=%u'><div class='item c%u%s'>%s</div></a>\n"), PSTR_PAGE_HISTO, PSTR (CMND_HISTO_DISPLAY), choice, index, str_status, str_text);
+      WSContentSend_P (PSTR ("<a href='%s?%s=%u'><div class='item c%u%s'>%s</div></a>\n"), PSTR_HISTO_PAGE, PSTR (CMND_HISTO_DISPLAY), choice, index, str_status, str_text);
     }
 
   WSContentSend_P (PSTR ("</div></div>\n"));          // lvl l3
@@ -1345,7 +1420,9 @@ bool XdrvTeleinfoHisto (const uint32_t function)
       break;
 
     case FUNC_WEB_ADD_HANDLER:
-      Webserver->on (FPSTR (PSTR_PAGE_HISTO), TeleinfoHistoWebPage);
+      Webserver->on (FPSTR (PSTR_HISTO_PAGE),     TeleinfoHistoWebPage);
+      Webserver->on (FPSTR (PSTR_HISTO_PAGE_JS),  TeleinfoHistoWebPageJS);
+      Webserver->on (FPSTR (PSTR_HISTO_PAGE_CSS), TeleinfoHistoWebPageCSS);
     break;
 #endif    // USE_WEBSERVER
   }

@@ -8,8 +8,9 @@
 
   Integration flags are stored in Settings :
 
-    - Settings->rf_code[10][0..8]
-    - Settings->rf_code[11][0..2] : Main screen display flags
+    - Settings->rf_code[10][0..8] : Main screen display flags
+    - Settings->rf_code[11][0..2]
+    
     - Settings->rf_code[15][8]    : Teleinfo baud rate
     - Settings->rf_code[16][0]    : Home Assistant integration flag
     - Settings->rf_code[16][2]    : Domoticz integration flag
@@ -18,6 +19,7 @@
     - Settings->rf_code[16][5]    : Influxdb extension flag
     - Settings->rf_code[16][6]    : Minimum production power level to activate local relay (x50 W)
     - Settings->rf_code[16][7]    : LED brightness
+    - Settings->rf_code[16][8]    : Number of samples to average cosphi
 
   RAM : esp8266 ~ 5600 bytes
         esp32   ~ 20000 bytes
@@ -65,7 +67,7 @@ TasmotaSerial *teleinfo_serial = nullptr;
 #ifdef ESP32
   #define TIC_LINE_QTY              74        // maximum number of lines handled in a TIC message
   #define TIC_DONNEE_SIZE           112       // maximum size of a TIC donnee
-  #define TIC_RX_BUFFER             1024
+  #define TIC_RX_BUFFER             512
 #else
   #define TIC_LINE_QTY              54        // maximum number of lines handled in a TIC message
   #define TIC_DONNEE_SIZE           36        // maximum size of a TIC donnee
@@ -92,8 +94,9 @@ TasmotaSerial *teleinfo_serial = nullptr;
 
 #define TIC_COSPHI_DEFAULT          850       // default start value for cosphi
 #define TIC_COSPHI_MIN              4         // minimum cosphi calculation before publication
-#define TIC_COSPHI_SAMPLE           12        // number of samples to calculate cosphi (minimum = 4)
-#define TIC_COSPHI_PAGE             20        // number of previous cosphi values
+#define TIC_COSPHI_SAMPLE_MIN       2         // minimum number of samples to average cosphi
+#define TIC_COSPHI_SAMPLE_MAX       12        // maximum number of samples to average cosphi
+#define TIC_COSPHI_PAGE             20        // number of pages to store cosphi values
 
 // timeout and delays
 #define TELEINFO_RECEPTION_TIMEOUT  3000      // timeout for TIC frame reception (in ms)
@@ -106,10 +109,6 @@ TasmotaSerial *teleinfo_serial = nullptr;
 
 // calendar display
 #define TIC_CALENDAR_SLOT           34        // each slot is 3.4% width
-
-// data file
-#define TIC_DATA_VERSION            1         // saved data version
-const char PSTR_DRIVER_DATA_FILE[]  PROGMEM = "/teleinfo-contract.dat";
 
 // commands : MQTT
 #define CMND_TIC_RATE               "rate"
@@ -138,17 +137,18 @@ const char PSTR_DRIVER_DATA_FILE[]  PROGMEM = "/teleinfo-contract.dat";
 #define TIC_MESSAGE                 "Messages"
 
 // web URL
-#define TIC_PAGE_CONFIG             "/tic-cfg"
-#define TIC_PAGE_MESSAGE            "/tic-msg"
-#define TIC_PAGE_UPDATE             "/tic-upd"
-#define TIC_PAGE_DISPLAY            "/tic-disp"
+constexpr char PSTR_TIC_PAGE_DISPLAY[] PROGMEM = "/tic-disp";
+
+// data file
+#define TIC_DATA_VERSION            1         // saved data version
+const char PSTR_DRIVER_DATA_FILE[]  PROGMEM = "/teleinfo-contract.dat";
 
 // default LED brightness
 #define TIC_BRIGHT_DEFAULT          50        // default LED brightness
 
 // EnergyConfig commands
-const char kTeleinfoEnergyCommands[] PROGMEM =    "historique"   "|"   "standard"   "|"   "speed"   "|"   "detect"   "|"   "noraw"   "|"   "full"   "|"   "period"   "|"   "live"   "|"   "skip"   "|"   "bright"   "|"   "percent"   "|"   "stats"   "|"   "error"   "|"   "reset"   "|"    "calraz"   "|"   "calhexa"   "|"   "prod"   "|"   "trigger"   "|"    "display"   "|" CMND_TIC_POLICY "|" CMND_TIC_METER "|" CMND_TIC_CALENDAR "|" CMND_TIC_RELAY;
-enum TeleinfoEnergyCommand                   { TIC_CMND_HISTORIQUE, TIC_CMND_STANDARD, TIC_CMND_SPEED, TIC_CMND_DETECT, TIC_CMND_NORAW, TIC_CMND_FULL, TIC_CMND_PERIOD, TIC_CMND_LIVE, TIC_CMND_SKIP, TIC_CMND_BRIGHT, TIC_CMND_PERCENT, TIC_CMND_STATS, TIC_CMND_ERROR, TIC_CMND_RESET,  TIC_CMND_CALRAZ, TIC_CMND_CALHEXA, TIC_CMND_PROD, TIC_CMND_TRIGGER,  TIC_CMND_DISPLAY,  TIC_CMND_POLICY  ,  TIC_CMND_METER  ,  TIC_CMND_CALENDAR  ,  TIC_CMND_RELAY};
+const char kTeleinfoEnergyCommands[] PROGMEM =    "historique"   "|"   "standard"   "|"   "speed"   "|"   "detect"   "|"   "noraw"   "|"   "full"   "|"   "period"   "|"   "live"   "|"   "skip"   "|"   "bright"   "|"   "percent"   "|"   "stats"   "|"   "error"   "|"   "reset"   "|"    "calraz"   "|"   "calhexa"   "|"   "prod"   "|"   "trigger"   "|"    "display"   "|"    "cosphi"   "|" CMND_TIC_POLICY "|" CMND_TIC_METER "|" CMND_TIC_CALENDAR "|" CMND_TIC_RELAY;
+enum TeleinfoEnergyCommand                   { TIC_CMND_HISTORIQUE, TIC_CMND_STANDARD, TIC_CMND_SPEED, TIC_CMND_DETECT, TIC_CMND_NORAW, TIC_CMND_FULL, TIC_CMND_PERIOD, TIC_CMND_LIVE, TIC_CMND_SKIP, TIC_CMND_BRIGHT, TIC_CMND_PERCENT, TIC_CMND_STATS, TIC_CMND_ERROR, TIC_CMND_RESET,  TIC_CMND_CALRAZ, TIC_CMND_CALHEXA, TIC_CMND_PROD, TIC_CMND_TRIGGER,  TIC_CMND_DISPLAY,  TIC_CMND_COSPHI,  TIC_CMND_POLICY  ,  TIC_CMND_METER  ,  TIC_CMND_CALENDAR  ,  TIC_CMND_RELAY};
 
 // Data publication commands
 static const char kTeleinfoDriverCommands[]  PROGMEM =          "|tic";
@@ -165,8 +165,8 @@ enum TeleinfoContractUnit { TIC_UNIT_NONE, TIC_UNIT_KVA, TIC_UNIT_KW, TIC_UNIT_M
 enum TeleinfoDisplayType { TIC_DISPLAY_CONTRACT, TIC_DISPLAY_CONSO, TIC_DISPLAY_PRODUCTION, TIC_DISPLAY_CALENDAR, TIC_DISPLAY_RELAY, TIC_DISPLAY_SOLAR, TIC_DISPLAY_FORECAST, TIC_DISPLAY_WINKY, TIC_DISPLAY_ECOWATT, TIC_DISPLAY_TEMPO, TIC_DISPLAY_POINTE, TIC_DISPLAY_MAX };
 
 // publication type
-enum TeleinfoWebType                   { TIC_WEB_MQTT, TIC_WEB_HTTP, TIC_WEB_HTTPS, TIC_WEB_MAX };
-const uint16_t arrTeleinfoWebDelay[] = {      490    ,     1090    ,      2490                  };
+//enum TeleinfoWebType                   { TIC_WEB_MQTT, TIC_WEB_HTTP, TIC_WEB_HTTPS, TIC_WEB_MAX };
+//const uint16_t arrTeleinfoWebDelay[] = {      490    ,     1090    ,      2490                  };
 
 // config : contract
 enum TeleinfoContractKey { TIC_CONTRACT_INDEX, TIC_CONTRACT_NAME, TIC_CONTRACT_PERIOD, TIC_CONTRACT_MAX };                                                                                                                                 // contract parameters
@@ -205,8 +205,6 @@ enum TeleinfoPublish { TIC_PUB_CONNECT,
 enum TeleinfoPhase                       { TIC_PHASE_CONSO1, TIC_PHASE_CONSO2, TIC_PHASE_CONSO3, TIC_PHASE_PROD,    TIC_PHASE_SOLAR     ,  TIC_PHASE_FORECAST , TIC_PHASE_END };
 const char kTeleinfoPhaseLabel[] PROGMEM =    "Phase 1"   "|"   "Phase 2"   "|"   "Phase 3"   "|"  "Revente"  "|" "Production Solaire" "|" "Prévision Solaire"; // phase label
 const char kTeleinfoPhaseColor[] PROGMEM =   "#04a5fb"  "|"  "#e72eff"  "|"  "#91919c"  "|" "#29a842" "|"     "#dd9900"      "|"     "#ccaa00"    ; // phase bar graph colors
-const char kTeleinfoPhaseCurve[] PROGMEM =   "#04a5fb"  "|"  "#e72eff"  "|"  "#91919c"  "|" "#29a842" "|"     "#dd9900"      "|"     "#ccaa00"    ; // phase curve colors
-const char kTeleinfoPhasePeak[]  PROGMEM =   "#04a5fb"  "|"  "#e72eff"  "|"  "#91919c"  "|"                                                             ; // phase peak colors
 
 // contract periods
 #define TIC_DAY_SLOT_MAX 48
@@ -429,25 +427,26 @@ const char *const arr_kTicPeriod[] PROGMEM = { kTicPeriodUnknown,           // T
 // ------------------------
 
 struct {                   // 38 bytes
-  bool     display  = false;                           // display data on main page
-  bool     battery  = false;                           // device is running on battery
-  bool     meter    = true;                            // publish METER & PROD section
-  bool     energy   = false;                           // publish ENERGY section
-  bool     tic      = false;                           // publish TIC topic
-  bool     live     = false;                           // publish LIVE topic
-  bool     calendar = true;                            // publish CALENDAR section
-  bool     relay    = true;                            // publish RELAY section
-  bool     error    = false;                           // force display of errors on home page 
-  bool     cal_hexa = true;                            // flag to set format of period profiles as hexa
-  bool     led      = false;                           // adjust LED color according to period color 
-  bool     arr_main[TIC_DISPLAY_MAX];                  // display flags for sections on main page
-  uint8_t  policy       = TIC_POLICY_TELEMETRY;        // data publishing policy
-  uint8_t  percent      = 100;                         // maximum acceptable power in percentage of contract power
-  uint8_t  skip         = 2;                           // number of frames to skip while publishing TIC or LIVE
-  uint8_t  brightness   = 0;
-  uint16_t baudrate     = 0;
-  long     prod_max     = 0;                           // maximum power produced
-  long     prod_trigger = 0;                           // average production power to trigger production relay
+  bool     display  = false;                            // display data on main page
+  bool     battery  = false;                            // device is running on battery
+  bool     meter    = true;                             // publish METER & PROD section
+  bool     energy   = false;                            // publish ENERGY section
+  bool     tic      = false;                            // publish TIC topic
+  bool     live     = false;                            // publish LIVE topic
+  bool     calendar = true;                             // publish CALENDAR section
+  bool     relay    = true;                             // publish RELAY section
+  bool     error    = false;                            // force display of errors on home page 
+  bool     cal_hexa = true;                             // flag to set format of period profiles as hexa
+  bool     led      = false;                            // adjust LED color according to period color 
+  bool     arr_main[TIC_DISPLAY_MAX];                   // display flags for sections on main page
+  uint8_t  policy        = TIC_POLICY_TELEMETRY;        // data publishing policy
+  uint8_t  percent       = 100;                         // maximum acceptable power in percentage of contract power
+  uint8_t  skip          = 2;                           // number of frames to skip while publishing TIC or LIVE
+  uint8_t  brightness    = 0;
+  uint8_t  cosphi_sample = TIC_COSPHI_SAMPLE_MAX;       // number of samples to average cosphi
+  uint16_t baudrate      = 0;
+  long     prod_max      = 0;                           // maximum power produced
+  long     prod_trigger  = 0;                           // average production power to trigger production relay
 } teleinfo_config;
 
 // teleinfo : calendar
@@ -476,18 +475,18 @@ struct tic_pointe {               // 8 bytes
 };
 
 struct {                   // esp8266 4469 bytes, esp32 18825 bytes
-  uint8_t     injection      = 0;                     // flag to detect injection part of message (Emeraude 4 quadrand)
-  uint8_t     error          = 0;                     // error during current message reception
-  uint8_t     period         = UINT8_MAX;             // period index in current message
-  uint32_t    timestamp_last = UINT32_MAX;            // timestamp of last message (ms)
-  int         index_line     = 0;                     // index of current received message line
-  int         index_last     = 0;                     // number of lines in last message
-  int         index_max      = 0;                     // max number of lines in a message
-  long        duration       = 1000;                  // average duration of between 2 message (ms)
-  char        str_total[12];                          // meter total index 
-  char        str_contract[TIC_CONTRACT_CODE_SIZE];   // contract name in current message
-  char        str_period[TIC_PERIOD_CODE_SIZE];       // period name in current message
-  char        str_line[TIC_LINE_SIZE];                // reception buffer for current line
+  bool     injection      = false;                    // flag to detect injection part of message (Emeraude 4 quadrand)
+  bool     error          = false;                    // error during current message reception
+  uint8_t  period         = UINT8_MAX;                // period index in current message
+  uint8_t  index_line     = 0;                        // index of current received message line
+  uint8_t  index_last     = 0;                        // number of lines in last message
+  uint8_t  index_display  = 0;                        // number of lines in the last display
+  uint32_t timestamp_last = UINT32_MAX;               // timestamp of last message (ms)
+  long     duration       = 1000;                     // average duration of between 2 message (ms)
+  char     str_total[12];                             // meter total index 
+  char     str_contract[TIC_CONTRACT_CODE_SIZE];      // contract name in current message
+  char     str_period[TIC_PERIOD_CODE_SIZE];          // period name in current message
+  char     str_line[TIC_LINE_SIZE];                   // reception buffer for current line
   tic_pointe  arr_pointe[TIC_POINTE_MAX];             // array of pointe dates, 24 bytes
   tic_line    arr_line[TIC_LINE_QTY];                 // array of lines in current message, esp8266 2072 bytes, esp32 9250 bytes
   tic_line    arr_last[TIC_LINE_QTY];                 // array of lines in last message received, esp8266 2072 bytes, esp32 9250 bytes
@@ -560,7 +559,7 @@ struct {                     // 71 bytes
   uint8_t   slot        = UINT8_MAX;            // current slot
   uint16_t  year        = 0;                    // year of manufacturing of the meter
   uint32_t  date        = 0;                    // current date with slot
-  uint32_t  arr_web_ts[TIC_WEB_MAX];            // timestamp of next web access
+//  uint32_t  arr_web_ts[TIC_WEB_MAX];            // timestamp of next web access
 
   long      nb_message  = 0;                    // total number of messages sent by the meter
   long      nb_reset    = 0;                    // total number of message reset sent by the meter
@@ -590,11 +589,11 @@ struct {                     // 11 bytes
 struct tic_cosphi {                 // 142 bytes
   uint8_t index;                                // index of cosphy array current value
   uint8_t page;                                 // index of current power page
-  long value;                                   // current value of cosphi
-  long quantity;                                // number of measure done 
-  long nb_message;                              // number of messages with last cosphi calculation 
-  long arr_value[TIC_COSPHI_SAMPLE];            // array of cosphi values
-  long arr_page[TIC_COSPHI_PAGE];               // array of average cosphi for power pages 
+  long    value;                                // current value of cosphi
+  long    quantity;                             // number of measure done 
+  long    nb_message;                           // number of messages with last cosphi calculation 
+  long    arr_value[TIC_COSPHI_SAMPLE_MAX];     // array of cosphi values
+  long    arr_page[TIC_COSPHI_PAGE];            // array of average cosphi for power pages 
 }; 
 
 struct tic_phase {                  // 34 bytes

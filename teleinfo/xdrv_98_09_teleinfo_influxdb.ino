@@ -13,6 +13,7 @@
     07/09/2025 v2.1 - Limit publications to 1 per sec.
     26/12/2025 v2.2 - Add data to publication
     17/03/2026 v2.3 - Publish production excess for CACSI contract
+    28/09/2026 v2.4 - Check network connectivity before publication
 
   Configuration values are stored in :
 
@@ -48,7 +49,6 @@ void (* const TeleinfoInfluxDbCommand[])(void) PROGMEM = { &CmndTeleinfoInfluxDb
 static struct {
   bool enabled = false;                  // flag to enable integration
   bool ready   = false;                  // all data ready for publication
-  bool init    = false;                  // influxdb initialisation done
   bool publish = false;                  // flag to publish data
 } teleinfo_influxdb;
 
@@ -75,25 +75,25 @@ void TeleinfoInfluxDbSaveConfig ()
 // set integration
 void TeleinfoInfluxDbSet (const bool enabled) 
 {
-  // update status
-  teleinfo_influxdb.enabled = enabled;
-
-  // save configuration
-  TeleinfoInfluxDbSaveConfig ();
+  // if status has changed, update and save
+  if (teleinfo_influxdb.enabled != enabled)
+  {
+    teleinfo_influxdb.enabled = enabled;
+    TeleinfoInfluxDbSaveConfig ();
+  }
 }
 
 // get integration
 bool TeleinfoInfluxDbGet () 
 {
-  return (teleinfo_influxdb.enabled == 1);
+  return (teleinfo_influxdb.enabled);
 }
 
 void TeleinfoInfluxDbData ()
 {
-  // check if enabled, ready and if there is conso or production 
-  if (TasmotaGlobal.global_state.network_down) return;
-  if (!teleinfo_influxdb.enabled) return;
+  // check if enabled  ready and if there is conso or production 
   if (!teleinfo_influxdb.ready) return;
+  if (TasmotaGlobal.global_state.network_down) return;
 
   // set publication flag
   teleinfo_influxdb.publish = true;
@@ -229,16 +229,7 @@ void TeleinfoInfluxDbAppendData ()
 void TeleinfoInfluxDbPublishAllData ()
 {
   // if nothing to publish, ignore
-  if (TasmotaGlobal.global_state.network_down) return;
-  if (!teleinfo_influxdb.enabled) return;
   if (!teleinfo_influxdb.ready) return;
-
-  // if needed, init connexion
-  if (!teleinfo_influxdb.init)
-  {
-    InfluxDbLoop ();
-    teleinfo_influxdb.init = true;
-  }
 
   // collect data from drivers and sensors
   TasmotaGlobal.mqtt_data = "";
@@ -252,13 +243,13 @@ void TeleinfoInfluxDbPublishAllData ()
   if (TasmotaGlobal.mqtt_data.length () > 0)
   {
     InfluxDbPostData (TasmotaGlobal.mqtt_data.c_str ());
-    AddLog (LOG_LEVEL_INFO,  PSTR("IDB: Emission InfluxDB"));
+    AddLog (LOG_LEVEL_INFO,  PSTR("IDB: Emission Winky done"));
     TasmotaGlobal.mqtt_data = "";
   }
 
   // reset publication flag and declare last publication
   teleinfo_influxdb.publish = false;
-  TeleinfoDriverWebDeclare (TIC_WEB_HTTPS);
+  HelperPublishDeclareHttps ();
 }
 
 /*******************************\
@@ -292,16 +283,37 @@ void TeleinfoInfluxDbInit ()
   TeleinfoInfluxDbLoadConfig ();
 
   // check if all influxdb data are defined
-  teleinfo_influxdb.ready  = true;
-  teleinfo_influxdb.ready &= (strlen (SettingsText(SET_INFLUXDB_HOST))   > 0);
-  teleinfo_influxdb.ready &= (strlen (SettingsText(SET_INFLUXDB_ORG))    > 0);
-  teleinfo_influxdb.ready &= (strlen (SettingsText(SET_INFLUXDB_BUCKET)) > 0);
-  teleinfo_influxdb.ready &= (strlen (SettingsText(SET_INFLUXDB_TOKEN))  > 0);
-  teleinfo_influxdb.ready &= (Settings->influxdb_port > 0);
+  if (teleinfo_influxdb.enabled)
+  {
+    // check configuration
+    teleinfo_influxdb.ready  = true;
+    teleinfo_influxdb.ready &= (strlen (SettingsText(SET_INFLUXDB_HOST))   > 0);
+    teleinfo_influxdb.ready &= (strlen (SettingsText(SET_INFLUXDB_ORG))    > 0);
+    teleinfo_influxdb.ready &= (strlen (SettingsText(SET_INFLUXDB_BUCKET)) > 0);
+    teleinfo_influxdb.ready &= (strlen (SettingsText(SET_INFLUXDB_TOKEN))  > 0);
+    teleinfo_influxdb.ready &= (Settings->influxdb_port > 0);
 
-  // log help command
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Run ifx_tic <0/1> to manage InfluxDB publication"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Run ifx_ver <1/2> to set InfluxDB version"));
+    // if config is ok
+    if (teleinfo_influxdb.ready)
+    {
+      // if running on capa
+      if (TeleinfoDriverIsOnBattery ())
+      {
+        // disable generic InfluxDB driver management
+        Settings->sbflag1.influxdb_state = 0;
+        AddLog (LOG_LEVEL_INFO, PSTR ("IFX: InfluxDB enabled in Capa mode"));
+      }
+
+      // else running on USB mode
+      else
+      {
+        Settings->sbflag1.influxdb_state = 1;
+        AddLog (LOG_LEVEL_INFO, PSTR ("IFX: InfluxDB enabled in USB mode"));
+        AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Run ifxtic <0/1> to manage InfluxDB publication"));
+        AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Run ifxver <1/2> to set InfluxDB version"));
+      }
+    }
+  }
 }
 
 // called every second
@@ -309,10 +321,9 @@ void TeleinfoInfluxDbEverySecond ()
 {
   // if nothing to publish, ignore
   if (!teleinfo_influxdb.publish) return;
-  if (!TeleinfoDriverWebAllow (TIC_WEB_HTTPS)) return;
 
-  // publish data and declare publication
-  TeleinfoInfluxDbPublishAllData ();
+  // if allowed, publish data and declare publication
+  if (HelperPublishAllowHttps ()) TeleinfoInfluxDbPublishAllData ();
 }
 
 /*********************************************\

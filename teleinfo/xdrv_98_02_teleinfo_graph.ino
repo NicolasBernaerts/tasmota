@@ -11,6 +11,7 @@
     10/07/2025 v3.0 - Refactoring based on Tasmota 15
     22/08/2025 v3.1 - Add solar production active power
     17/03/2026 v3.2 - Display production excess for CACSI contract
+    17/08/2026 v3.3 - Use cache for CSS and Javascript
 
   RAM : esp8266 2239 bytes
         esp32   19283 bytes
@@ -34,6 +35,8 @@
  *               Variables
 \*************************************************/
 
+#define GRAPH_BASE_VERSION            2               // saved database version
+
 #define GRAPH_LIVE_DURATION           15              // live recording delay (in minutes)
 
 // graph constant
@@ -53,33 +56,38 @@
 #define GRAPH_DEF_POWER               6000            // default power maximum consumption in graph
 #define GRAPH_MAX_POWER               150000
 
+#define GRAPH_COUNTER_LIVE            2               // refresh live curves every 2 messages
+#define GRAPH_COUNTER_DAY             50              // refresh daily curves every 50 messages
+#define GRAPH_COUNTER_WEEK            100             // refresh weekly curves every 100 messages
+
 #define GRAPH_HEAD                    "Graph"
 
 #define CMND_GRAPH_MINUS              "minus"
 #define CMND_GRAPH_PLUS               "plus"
 #define CMND_GRAPH_DISPLAY            "display"
+#define CMND_GRAPH_ENABLE             "enable"
+#define CMND_GRAPH_DISABLE            "disable"
 #define CMND_GRAPH_PERIOD             "period"
 
 // web URL
-const char PSTR_GRAPH_PAGE[]          PROGMEM = "/graph";
-const char PSTR_GRAPH_PAGE_DATA[]     PROGMEM = "/data.upd";
-const char PSTR_GRAPH_PAGE_CURVE[]    PROGMEM = "/curve.upd";
+constexpr char PSTR_GRAPH_PAGE[]      PROGMEM = "/graph";
+constexpr char PSTR_GRAPH_PAGE_CSS[]  PROGMEM = "/graph.css";
+constexpr char PSTR_GRAPH_PAGE_JS[]   PROGMEM = "/graph.js";
+constexpr char PSTR_GRAPH_PAGE_UPD[]  PROGMEM = "/graph.upd";
 
 // data file
-#define GRAPH_VERSION                 2               // saved data version
-const char PSTR_GRAPH_DATA_FILE[]     PROGMEM = "/teleinfo-graph.dat";
+constexpr char PSTR_GRAPH_DATA_FILE[] PROGMEM = "/teleinfo-graph.dat";
 
 // graph resolution and periods
 #ifdef ESP32
   #define GRAPH_SAMPLE                300
-  enum TeleinfoGraphPeriod                    { GRAPH_PERIOD_LIVE, GRAPH_PERIOD_DAY, GRAPH_PERIOD_WEEK, GRAPH_PERIOD_MAX };      // available graph periods
-  const char kTeleinfoGraphPeriod[]   PROGMEM =       "Live"    "|"      "24 h"   "|"     "Semaine";                             // units labels
+  enum TeleinfoGraphPeriod                      { GRAPH_PERIOD_LIVE, GRAPH_PERIOD_DAY, GRAPH_PERIOD_WEEK, GRAPH_PERIOD_MAX };      // available graph periods
+  constexpr char kTeleinfoGraphPeriod[] PROGMEM =       "Live"    "|"      "24 h"   "|"     "Semaine";                             // units labels
 #else
   #define GRAPH_SAMPLE                100
-  enum TeleinfoGraphPeriod                    { GRAPH_PERIOD_LIVE, GRAPH_PERIOD_MAX, GRAPH_PERIOD_DAY, GRAPH_PERIOD_WEEK };       // available graph periods
-  const char kTeleinfoGraphPeriod[]   PROGMEM =       "Live";                                                                     // units labels
+  enum TeleinfoGraphPeriod                      { GRAPH_PERIOD_LIVE, GRAPH_PERIOD_MAX, GRAPH_PERIOD_DAY, GRAPH_PERIOD_WEEK };       // available graph periods
+  constexpr char kTeleinfoGraphPeriod[] PROGMEM =       "Live";                                                                     // units labels
 #endif    // ESP32
-
 
 /****************************************\
  *                 Data
@@ -87,12 +95,18 @@ const char PSTR_GRAPH_DATA_FILE[]     PROGMEM = "/teleinfo-graph.dat";
 
 // main graph data, 17 bytes
 static struct {
-  uint8_t  data      = TELEINFO_UNIT_VA;        // graph default data
-  uint8_t  period    = GRAPH_PERIOD_LIVE;       // graph period
-  uint8_t  display   = UINT8_MAX;               // mask of data to display
-  long     max_volt  = GRAPH_DEF_VOLTAGE;       // maximum voltage on graph
-  long     max_power = GRAPH_DEF_POWER;         // maximum power on graph
+  uint8_t data      = TELEINFO_UNIT_VA;         // graph default data
+  uint8_t period    = GRAPH_PERIOD_LIVE;        // graph period
+  uint8_t counter   = 0;                        // counter for data display
+  long    max_volt  = GRAPH_DEF_VOLTAGE;        // maximum voltage on graph
+  long    max_power = GRAPH_DEF_POWER;          // maximum power on graph
 } graph_status;
+
+static struct {
+  bool arr_value[TIC_PHASE_END];                // phase value enabled for display
+  bool arr_peak[TIC_PHASE_END];                 // phase peak value enabled for display
+  bool arr_select[TIC_PHASE_END];               // phase selected for display
+} graph_display;
 
 // data collection structure, 138 bytes
 struct tic_record {
@@ -140,12 +154,14 @@ static tic_slot tic_graph_slot[GRAPH_PERIOD_MAX][GRAPH_SAMPLE];     // live grap
 // reset data
 void TeleinfoGraphDataInit ()
 {
-  uint8_t period;
+  uint8_t index;
 
-  for (period = 0; period < GRAPH_PERIOD_MAX; period ++)
+  for (index = 0; index < TIC_PHASE_END; index++) graph_display.arr_select[index] = true;
+
+  for (index = 0; index < GRAPH_PERIOD_MAX; index ++)
   {
-    TeleinfoGraphInitRecord (period, UINT16_MAX);
-    TeleinfoGraphInitPeriodData (period);
+    TeleinfoGraphInitRecord (index, UINT16_MAX);
+    TeleinfoGraphInitPeriodData (index);
   }
 }
 
@@ -159,12 +175,15 @@ void TeleinfoGraphInitRecord (const uint8_t period, const uint16_t slot)
   // init data
   teleinfo_record[period].slot = slot;
   teleinfo_record[period].sample = 0;
-  for (index = 0; index < TIC_PHASE_MAX; index ++) teleinfo_record[period].arr_volt_min[index] = 0;
-  for (index = 0; index < TIC_PHASE_MAX; index ++) teleinfo_record[period].arr_volt_max[index] = 0;
-  for (index = 0; index < TIC_PHASE_MAX; index ++) teleinfo_record[period].arr_papp_max[index] = 0;
-  for (index = 0; index < TIC_PHASE_MAX; index ++) teleinfo_record[period].arr_cphi_sum[index] = 0;
-  for (index = 0; index < TIC_PHASE_MAX; index ++) teleinfo_record[period].arr_papp_sum[index] = 0;
-  for (index = 0; index < TIC_PHASE_MAX; index ++) teleinfo_record[period].arr_pact_sum[index] = 0;
+  for (index = 0; index < TIC_PHASE_MAX; index ++)
+  {
+    teleinfo_record[period].arr_volt_min[index] = 0;
+    teleinfo_record[period].arr_volt_max[index] = 0;
+    teleinfo_record[period].arr_papp_max[index] = 0;
+    teleinfo_record[period].arr_cphi_sum[index] = 0;
+    teleinfo_record[period].arr_papp_sum[index] = 0;
+    teleinfo_record[period].arr_pact_sum[index] = 0;
+  }
   teleinfo_record[period].prod_cphi_sum  = 0;
   teleinfo_record[period].prod_papp_sum  = 0;
   teleinfo_record[period].prod_pact_sum  = 0;
@@ -338,7 +357,7 @@ void TeleinfoGraphInit ()
   {
     file = ffsp->open (str_filename, "r");
     file.read ((uint8_t*)&version, sizeof (version));
-    if (version == GRAPH_VERSION)
+    if (version == GRAPH_BASE_VERSION)
     {
       file.read ((uint8_t*)&time_save,      sizeof (time_save));
       file.read ((uint8_t*)&tic_graph_slot, sizeof (tic_graph_slot));
@@ -390,7 +409,7 @@ void TeleinfoGraphSaveBeforeRestart ()
   File     file;
 
   // init data
-  version  = GRAPH_VERSION;
+  version  = GRAPH_BASE_VERSION;
   time_now = LocalTime ();
 
   // open file in write mode
@@ -706,118 +725,58 @@ void TeleinfoGraphDisplayCurve (const uint8_t data, const uint8_t period, const 
   }
 }
 
-// Graph dislay page
-void TeleinfoGraphWebDisplayPage ()
+// graph page javascript 
+void TeleinfoGraphWebPageJS ()
 {
-  bool     display;
-  uint8_t  phase, choice, counter, mask;  
-  uint16_t index;
-  uint32_t timestart;
-  char     str_label[24];
-  char     str_text[16];
-  uint8_t  arr_data[4] = { TELEINFO_UNIT_VA, TELEINFO_UNIT_W, TELEINFO_UNIT_COS, TELEINFO_UNIT_V };
+  // start of page
+  WSContentBeginJavascript (200, 0);
 
-  // timestamp
-  timestart = millis ();
-
-  // beginning of form without authentification
-  WSContentStart_P (PSTR (GRAPH_HEAD), false);
-
-  // check data selection argument
-  if (Webserver->hasArg (F (CMND_TIC_DATA))) graph_status.data = (uint8_t)TeleinfoGetArgValue (CMND_TIC_DATA, 0, TELEINFO_UNIT_MAX - 1, graph_status.data);
-
-  // check period selection argument
-  if (Webserver->hasArg (F (CMND_GRAPH_PERIOD))) graph_status.period = (uint8_t)TeleinfoGetArgValue (CMND_GRAPH_PERIOD, 0, GRAPH_PERIOD_MAX - 1, graph_status.period);  
-
-  // check phase display argument
-  if (Webserver->hasArg (F (CMND_GRAPH_DISPLAY)))
-  {
-    WebGetArg (PSTR (CMND_GRAPH_DISPLAY), str_text, sizeof (str_text));
-    graph_status.display = (uint8_t)atoi (str_text);
-  }
-
-  // graph increment
-  if (TeleinfoGetArgValue (CMND_GRAPH_PLUS, 0, 1, 0) == 1)
-  {
-    if ((graph_status.data == TELEINFO_UNIT_VA) || (graph_status.data == TELEINFO_UNIT_W)) graph_status.max_power *= 2;
-      else if (graph_status.data == TELEINFO_UNIT_V) graph_status.max_volt += GRAPH_INC_VOLTAGE;
-  }
-
-  // graph decrement
-  if (TeleinfoGetArgValue (CMND_GRAPH_MINUS, 0, 1, 0) == 1)
-  {
-    if ((graph_status.data == TELEINFO_UNIT_VA) || (graph_status.data == TELEINFO_UNIT_W)) graph_status.max_power = max (GRAPH_MIN_POWER, graph_status.max_power / 2);
-      else if (graph_status.data == TELEINFO_UNIT_V) graph_status.max_volt = max ((long)GRAPH_MIN_VOLTAGE, graph_status.max_volt - GRAPH_INC_VOLTAGE);
-  }
-
-  // javascript : remove parameters
-  WSContentSend_P (PSTR ("\n\nvar newURL = location.href.split('?')[0];\n"));
+  // remove parameters
+  WSContentSend_P (PSTR ("var newURL = location.href.split('?')[0];\n"));
   WSContentSend_P (PSTR ("window.history.pushState('object', document.title, newURL);\n"));
 
   //   data update
-  //   -> messages, phase 1, phase 2, phase 3, prod, solar, forecast
-  // ----------------------------------------
-  counter = 0;
-  WSContentSend_P (PSTR ("\nfunction updateData(){\n"));
+  WSContentSend_P (PSTR ("function updateData(){\n"));
   WSContentSend_P (PSTR (" httpData=new XMLHttpRequest();\n"));
-  WSContentSend_P (PSTR (" httpData.open('GET','%s',true);\n"), PSTR_GRAPH_PAGE_DATA);
+  WSContentSend_P (PSTR (" httpData.open('GET','%s',true);\n"), PSTR_GRAPH_PAGE_UPD);
   WSContentSend_P (PSTR (" httpData.onreadystatechange=function(){\n"));
   WSContentSend_P (PSTR ("  if (httpData.readyState===XMLHttpRequest.DONE){\n"));
   WSContentSend_P (PSTR ("   if (httpData.status===0 || (httpData.status>=200 && httpData.status<400)){\n"));
-  WSContentSend_P (PSTR ("    arr_value=httpData.responseText.split(';');\n"));
-  WSContentSend_P (PSTR ("    if (document.getElementById('msg')!=null) document.getElementById('msg').textContent=arr_value[%u];\n"), counter++ );                   // number of messages                                                                   // number of received messages
-  for (phase = 0; phase < TIC_PHASE_END; phase++) 
-    WSContentSend_P (PSTR ("    if (document.getElementById('v%u')!=null) document.getElementById('v%u').textContent=arr_value[%u];\n"), phase, phase, counter++ );   // phase values
+  WSContentSend_P (PSTR ("    let arr_param=httpData.responseText.split('\\n');\n"));
+
+  WSContentSend_P (PSTR ("    for (i=0; i<arr_param.length; i++){\n"));
+  WSContentSend_P (PSTR ("     arr_value=arr_param[i].split(';');\n"));
+  WSContentSend_P (PSTR ("     if (arr_value.length === 2) document.getElementById(arr_value[0]).textContent=arr_value[1];\n"));
+  WSContentSend_P (PSTR ("     else if (arr_value.length === 3) document.getElementById(arr_value[0]).setAttribute(arr_value[1],arr_value[2]);\n"));
+  WSContentSend_P (PSTR ("    }\n"));
+
   WSContentSend_P (PSTR ("   }\n"));
-  WSContentSend_P (PSTR ("   setTimeout(updateData,%u);\n"), 1000);       // ask for data update every second 
+  WSContentSend_P (PSTR ("   setTimeout(updateData,%u);\n"), 500);       // ask for data update every 1/2 sec. 
   WSContentSend_P (PSTR ("  }\n"));
   WSContentSend_P (PSTR (" }\n"));
   WSContentSend_P (PSTR (" httpData.send();\n"));
   WSContentSend_P (PSTR ("}\n"));
 
   // ask for first data update after 100ms
-  WSContentSend_P (PSTR ("setTimeout(updateData,%u);\n\n"), 100);
+  WSContentSend_P (PSTR ("setTimeout(updateData,%u);\n"), 100);
 
-  //   curve update
-  //   -> phase 1, phase 2, phase 3, prod, solar, forecast, peak 1, ...
-  // -------------------------------------------
+  // end of page
+  WSContentEnd ();
+}
 
-  counter = 0;
-  WSContentSend_P (PSTR ("\nfunction updateCurve(){\n"));
-  WSContentSend_P (PSTR (" httpCurve=new XMLHttpRequest();\n"));
-  WSContentSend_P (PSTR (" httpCurve.open('GET','%s',true);\n"), PSTR_GRAPH_PAGE_CURVE);
-  WSContentSend_P (PSTR (" httpCurve.onreadystatechange=function(){\n"));
-  WSContentSend_P (PSTR ("  if (httpCurve.readyState===XMLHttpRequest.DONE){\n"));
-  WSContentSend_P (PSTR ("   if (httpCurve.status===0 || (httpCurve.status>=200 && httpCurve.status<400)){\n"));
-  WSContentSend_P (PSTR ("    arr_value=httpCurve.responseText.split(';');\n"));
-  for (phase = 0; phase < TIC_PHASE_END; phase++)
-    if (graph_status.data == TELEINFO_UNIT_COS) WSContentSend_P (PSTR ("    if (document.getElementById('m%u')!=null) document.getElementById('m%u').setAttribute('points',arr_value[%u]);\n"), phase, phase, counter++ );
-      else WSContentSend_P (PSTR ("    if (document.getElementById('m%u')!=null) document.getElementById('m%u').setAttribute('d',arr_value[%u]);\n"), phase, phase, counter++ );
-  for (phase = 0; phase < teleinfo_contract.phase; phase++) WSContentSend_P (PSTR ("    if (document.getElementById('p%u')!=null) document.getElementById('p%u').setAttribute('points',arr_value[%u]);\n"), phase, phase, counter++ );     // phase peak curve
-  WSContentSend_P (PSTR ("   }\n"));
-  if (graph_status.period == GRAPH_PERIOD_LIVE) WSContentSend_P (PSTR ("   setTimeout(updateCurve,%u);\n"), 2000);     // ask for next curve update 
-  WSContentSend_P (PSTR ("  }\n"));
-  WSContentSend_P (PSTR (" }\n"));
-  WSContentSend_P (PSTR (" httpCurve.send();\n"));
-  WSContentSend_P (PSTR ("}\n"));
+// Graph page CSS style
+void TeleinfoGraphWebPageCSS ()
+{
+  uint8_t  phase;  
+  char     str_text[12];
 
-  // ask for first curve update after 200ms
-  WSContentSend_P (PSTR ("setTimeout(updateCurve,%u);\n\n"), 200);
+  // start of page
+  WSContentBeginCSS (200, 0);
 
-  WSContentSend_P (PSTR ("</script>\n\n"));
+  // -----------
+  //    Page
+  // -----------
 
-  // ------------
-  //   page CSS
-  // ------------
-
-  // set page as scalable
-  WSContentSend_P (PSTR ("<meta name='viewport' content='width=device-width,initial-scale=1,user-scalable=yes'/>\n"));
-
-  // set cache policy, no cache for 12h
-  WSContentSend_P (PSTR ("<meta http-equiv='Cache-control' content='public,max-age=720000'/>\n"));
-
-  // page style
-  WSContentSend_P (PSTR ("<style>\n"));
   WSContentSend_P (PSTR ("body {color:white;background-color:%s;font-size:2.2vmin;font-family:Arial, Helvetica, sans-serif;}\n"), COLOR_BACKGROUND);
   WSContentSend_P (PSTR ("div {margin:0.3vh auto;padding:2px 0px;text-align:center;vertical-align:top;}\n"));
 
@@ -840,17 +799,17 @@ void TeleinfoGraphWebDisplayPage ()
   WSContentSend_P (PSTR ("div.live div {display:inline-block;min-width:8vw;padding:2px 10px;margin:0px 1.5vw;border-radius:6px;}\n"));
 
   // solar forecast, solar production and production color
-  GetTextIndexed (str_text, sizeof (str_text), TIC_PHASE_FORECAST, kTeleinfoPhaseCurve);
+  GetTextIndexed (str_text, sizeof (str_text), TIC_PHASE_FORECAST, kTeleinfoPhaseColor);
   WSContentSend_P (PSTR ("div.live div.ph%u {color:%s;border:1px %s solid;}\n"), TIC_PHASE_FORECAST, str_text, str_text);    
-  GetTextIndexed (str_text, sizeof (str_text), TIC_PHASE_SOLAR, kTeleinfoPhaseCurve);
+  GetTextIndexed (str_text, sizeof (str_text), TIC_PHASE_SOLAR, kTeleinfoPhaseColor);
   WSContentSend_P (PSTR ("div.live div.ph%u {color:%s;border:1px %s solid;}\n"), TIC_PHASE_SOLAR, str_text, str_text);    
-  GetTextIndexed (str_text, sizeof (str_text), TIC_PHASE_PROD, kTeleinfoPhaseCurve);
+  GetTextIndexed (str_text, sizeof (str_text), TIC_PHASE_PROD, kTeleinfoPhaseColor);
   WSContentSend_P (PSTR ("div.live div.ph%u {color:%s;border:1px %s solid;}\n"), TIC_PHASE_PROD, str_text, str_text);    
 
   // phases color
   for (phase = 0; phase < teleinfo_contract.phase; phase++)
   {
-    GetTextIndexed (str_text, sizeof (str_text), phase, kTeleinfoPhaseCurve);
+    GetTextIndexed (str_text, sizeof (str_text), phase, kTeleinfoPhaseColor);
     WSContentSend_P (PSTR ("div.live div.ph%d {color:%s;border:1px %s solid;}\n"), phase, str_text, str_text);    
   }
 
@@ -858,13 +817,112 @@ void TeleinfoGraphWebDisplayPage ()
 
   WSContentSend_P (PSTR ("button.menu {margin:1vh;padding:5px 20px;font-size:1.2rem;background:%s;color:%s;cursor:pointer;border:none;border-radius:8px;}\n"), COLOR_BUTTON, COLOR_BUTTON_TEXT);
 
+  // ----------
+  //    SVG
+  // ----------
+
   WSContentSend_P (PSTR ("div.graph {width:100%%;margin:auto;margin-top:15px;}\n"));
   WSContentSend_P (PSTR ("svg.graph {width:100%%;height:60vh;}\n"));
 
-  WSContentSend_P (PSTR ("</style>\n\n"));
+  WSContentSend_P (PSTR ("svg rect.main {fill:none;stroke:#888;stroke-width:1;}\n"));
+  WSContentSend_P (PSTR ("svg rect.dash {fill:#333;fill-opacity:0.5;stroke-width:0;}\n"));
+  WSContentSend_P (PSTR ("svg line.dash {stroke:grey;stroke-width:1;stroke-dasharray:2 6;}\n"));
+  WSContentSend_P (PSTR ("svg line.time {stroke-width:1;stroke:white;stroke-dasharray:1 8;}\n"));
+  WSContentSend_P (PSTR ("svg text {fill:white;text-anchor:middle;dominant-baseline:middle;}\n"));
+  WSContentSend_P (PSTR ("svg text.time {font-style:italic;fill-opacity:0.6;}\n"));
+  WSContentSend_P (PSTR ("svg text.power {font-size:1.2rem;}\n"));
+
+  // svg : curves
+  WSContentSend_P (PSTR ("svg path {fill-opacity:0.25;}\n"));
+  WSContentSend_P (PSTR ("svg polyline {fill:none;}\n"));
+
+  // svg : style of curves for phases, solar production, forecast and production curves
+  for (phase = 0; phase < TIC_PHASE_END; phase++) 
+  {
+    // phase color
+    GetTextIndexed (str_text, sizeof (str_text), phase, kTeleinfoPhaseColor);
+
+    // path and polyline
+    WSContentSend_P (PSTR ("svg path.ph%u {stroke:%s;fill:%s;}\n"), phase, str_text, str_text);
+    WSContentSend_P (PSTR ("svg polyline.ph%u {stroke:%s;}\n"), phase, str_text);
+
+    // peak polyline
+    GetTextIndexed (str_text, sizeof (str_text), phase, kTeleinfoPhaseColor);
+    WSContentSend_P (PSTR ("svg polyline.pk%u {stroke:%s;stroke-dasharray:1 3;}\n"), phase, str_text);
+  }
+
+  // end of page
+  WSContentEnd ();
+}
+
+// Graph dislay page
+void TeleinfoGraphWebPage ()
+{
+  bool     display;
+  uint8_t  phase, choice, mask;  
+  uint16_t index;
+  uint32_t timestart;
+  char     str_link[8];
+  char     str_text[16];
+  char     str_label[24];
+  uint8_t  arr_data[4] = { TELEINFO_UNIT_VA, TELEINFO_UNIT_W, TELEINFO_UNIT_COS, TELEINFO_UNIT_V };
+
+  // init
+  timestart = millis ();
+  graph_status.counter = 0;
+
+  // check data selection argument
+  if (Webserver->hasArg (F (CMND_TIC_DATA))) graph_status.data = (uint8_t)TeleinfoGetArgValue (CMND_TIC_DATA, 0, TELEINFO_UNIT_MAX, graph_status.data);
+
+  // check period selection argument
+  if (Webserver->hasArg (F (CMND_GRAPH_PERIOD))) graph_status.period = (uint8_t)TeleinfoGetArgValue (CMND_GRAPH_PERIOD, 0, GRAPH_PERIOD_MAX - 1, graph_status.period);  
+
+  // check if one phase should be enabled
+  if (Webserver->hasArg (F (CMND_GRAPH_ENABLE)))
+  {
+    WebGetArg (PSTR (CMND_GRAPH_ENABLE), str_text, sizeof (str_text));
+    choice = (uint8_t)atoi (str_text);
+    if (choice < TIC_PHASE_END) graph_display.arr_select[choice] = true;
+  }
+
+  // check if one phase should be disabled
+  if (Webserver->hasArg (F (CMND_GRAPH_DISABLE)))
+  {
+    WebGetArg (PSTR (CMND_GRAPH_DISABLE), str_text, sizeof (str_text));
+    choice = (uint8_t)atoi (str_text);
+    if (choice < TIC_PHASE_END) graph_display.arr_select[choice] = false;
+  }
+
+  // graph increment
+  if (TeleinfoGetArgValue (CMND_GRAPH_PLUS, 0, 1, 0) == 1)
+  {
+    if ((graph_status.data == TELEINFO_UNIT_VA) || (graph_status.data == TELEINFO_UNIT_W)) graph_status.max_power *= 2;
+      else if (graph_status.data == TELEINFO_UNIT_V) graph_status.max_volt += GRAPH_INC_VOLTAGE;
+  }
+
+  // graph decrement
+  if (TeleinfoGetArgValue (CMND_GRAPH_MINUS, 0, 1, 0) == 1)
+  {
+    if ((graph_status.data == TELEINFO_UNIT_VA) || (graph_status.data == TELEINFO_UNIT_W)) graph_status.max_power = max (GRAPH_MIN_POWER, graph_status.max_power / 2);
+      else if (graph_status.data == TELEINFO_UNIT_V) graph_status.max_volt = max ((long)GRAPH_MIN_VOLTAGE, graph_status.max_volt - GRAPH_INC_VOLTAGE);
+  }
+
+  // beginning of form without authentification
+  WSContentStart_P (PSTR (GRAPH_HEAD), false);
+  WSContentSend_P (PSTR ("</script>\n"));
+
+  // set page as scalable
+  WSContentSend_P (PSTR ("<meta name='viewport' content='width=device-width,initial-scale=1,user-scalable=yes'/>\n"));
+
+  // load javascript
+  WSContentSend_P (PSTR ("<script type='text/javascript' src='%s?ts=%u'></script>\n"), PSTR_GRAPH_PAGE_JS, Rtc.restart_time);
+
+  // load page style sheet
+  WSContentSend_P (PSTR ("<link rel='stylesheet' type='text/css' href='%s?ts=%u'>\n"), PSTR_GRAPH_PAGE_CSS, Rtc.restart_time);
 
   // page body
   WSContentSend_P (PSTR ("</head>\n"));
+
   WSContentSend_P (PSTR ("<body>\n"));
 
   // title and message counter
@@ -916,8 +974,6 @@ void TeleinfoGraphWebDisplayPage ()
 
   WSContentSend_P (PSTR ("</div></div>\n"));      // choice & level2
 
-  WSContentSend_P (PSTR ("</form>\n"));
-
   // ------------
   //     SVG
   // ------------
@@ -925,38 +981,6 @@ void TeleinfoGraphWebDisplayPage ()
   // svg : start 
   WSContentSend_P (PSTR ("<div class='graph'>\n"));
   WSContentSend_P (PSTR ("<svg class='graph' viewBox='0 0 %d %d' preserveAspectRatio='none'>\n"), GRAPH_WIDTH, GRAPH_HEIGHT + 1);
-
-  // svg : main styles
-  WSContentSend_P (PSTR ("<style type='text/css'>\n"));
-  
-  WSContentSend_P (PSTR ("rect.main {fill:none;stroke:#888;stroke-width:1;}\n"));
-  WSContentSend_P (PSTR ("rect.dash {fill:#333;fill-opacity:0.5;stroke-width:0;}\n"));
-  WSContentSend_P (PSTR ("line.dash {stroke:grey;stroke-width:1;stroke-dasharray:2 6;}\n"));
-  WSContentSend_P (PSTR ("line.time {stroke-width:1;stroke:white;stroke-dasharray:1 8;}\n"));
-  WSContentSend_P (PSTR ("text {fill:white;text-anchor:middle;dominant-baseline:middle;}\n"));
-  WSContentSend_P (PSTR ("text.time {font-style:italic;fill-opacity:0.6;}\n"));
-  WSContentSend_P (PSTR ("text.power {font-size:1.2rem;}\n"));
-
-  // svg : curves
-  WSContentSend_P (PSTR ("path {fill-opacity:0.25;}\n"));
-  WSContentSend_P (PSTR ("polyline {fill:none;}\n"));
-
-  // svg : style of curves for phases, solar production, forecast and production curves
-  for (phase = 0; phase < TIC_PHASE_END; phase++) 
-  {
-    // phase color
-    GetTextIndexed (str_text, sizeof (str_text), phase, kTeleinfoPhaseCurve);
-
-    // if curve is cosphi use polyline, else use path
-    if (graph_status.data == TELEINFO_UNIT_COS) WSContentSend_P (PSTR ("polyline.ph%u {stroke:%s;}\n"), phase, str_text);
-      else WSContentSend_P (PSTR ("path.ph%u {stroke:%s;fill:%s;}\n"), phase, str_text, str_text);
-
-    // if conso pahse, set peak curve
-    GetTextIndexed (str_text, sizeof (str_text), phase, kTeleinfoPhasePeak);
-    if (phase < TIC_PHASE_PROD) WSContentSend_P (PSTR ("polyline.pk%u {stroke:%s;stroke-dasharray:1 3;}\n"), phase, str_text);
-  }
-
-  WSContentSend_P (PSTR ("</style>\n"));
 
   // svg : units
   TeleinfoGraphDisplayUnits (graph_status.data);
@@ -992,76 +1016,46 @@ void TeleinfoGraphWebDisplayPage ()
   //    Live values
   // ------------------
 
+
+  // set value and peak to be displayed
+  for (phase = 0; phase < TIC_PHASE_END; phase++)
+  {
+    graph_display.arr_value[phase] = false;
+    graph_display.arr_peak[phase]  = false;
+
+    // conso
+    if (phase < teleinfo_contract.phase)
+    {
+      graph_display.arr_value[phase] = true;
+      graph_display.arr_peak[phase]  = ((graph_status.data == TELEINFO_UNIT_VA) || (graph_status.data == TELEINFO_UNIT_V));
+    }
+
+    // production
+    else if (phase == TIC_PHASE_PROD && teleinfo_prod.enabled) graph_display.arr_value[phase] = ((graph_status.data == TELEINFO_UNIT_VA) || (graph_status.data == TELEINFO_UNIT_W));
+
+    // cacsi
+    else if (phase == TIC_PHASE_PROD && teleinfo_prod.cacsi) graph_display.arr_value[phase] = (graph_status.data == TELEINFO_UNIT_VA);
+
+    // solar production
+    else if (phase == TIC_PHASE_SOLAR && teleinfo_solar.enabled) graph_display.arr_value[phase] = (graph_status.data == TELEINFO_UNIT_W);
+
+    // solar forecast
+    else if (phase == TIC_PHASE_FORECAST && teleinfo_forecast.enabled) graph_display.arr_value[phase] = (graph_status.data == TELEINFO_UNIT_W);
+  }
+
+  // loop to display buttons
   WSContentSend_P (PSTR ("<div><div class='live'>\n"));
+  for (phase = 0; phase < TIC_PHASE_END; phase++)
+    if (graph_display.arr_value[phase]) 
+    {
+      // link to invert display
+      if (graph_display.arr_select[phase]) { strcpy (str_link, PSTR ("disable")); strcpy (str_text, ""); }
+        else { strcpy (str_link, PSTR ("enable")); strcpy_P (str_text, PSTR (" disabled")); }
 
-  // solar production forecast
-  if (teleinfo_forecast.enabled && (graph_status.data == TELEINFO_UNIT_W)) 
-  {
-    // display context
-    mask = 0x01 << 0;
-    display = (graph_status.display & mask);
-
-    // link to invert display
-    if (display) choice = graph_status.display & (mask ^ 0xff);
-      else choice = graph_status.display | mask;
-    if (display) strcpy (str_text, ""); else strcpy_P (str_text, PSTR (" disabled"));
-
-    // display phase data
-    GetTextIndexed (str_label, sizeof (str_label), TIC_PHASE_FORECAST, kTeleinfoPhaseLabel);
-    WSContentSend_P (PSTR ("<a href='%s?%s=%u'><div id='v%u' class='ph%u%s' title='%s'>&nbsp;</div></a>\n"), PSTR_GRAPH_PAGE, PSTR (CMND_GRAPH_DISPLAY), choice, TIC_PHASE_FORECAST, TIC_PHASE_FORECAST, str_text, str_label);
-  }
-
-  // solar production
-  if (teleinfo_solar.enabled && (graph_status.data == TELEINFO_UNIT_W)) 
-  {
-    // display context
-    mask = 0x01 << 1;
-    display = (graph_status.display & mask);
-
-    // link to invert display
-    if (display) choice = graph_status.display & (mask ^ 0xff);
-      else choice = graph_status.display | mask;
-    if (display) strcpy (str_text, ""); else strcpy_P (str_text, PSTR (" disabled"));
-
-    // display phase data
-    GetTextIndexed (str_label, sizeof (str_label), TIC_PHASE_SOLAR, kTeleinfoPhaseLabel);
-    WSContentSend_P (PSTR ("<a href='%s?%s=%u'><div id='v%u' class='ph%u%s' title='%s'>&nbsp;</div></a>\n"), PSTR_GRAPH_PAGE, PSTR (CMND_GRAPH_DISPLAY), choice, TIC_PHASE_SOLAR, TIC_PHASE_SOLAR, str_text, str_label);
-  }
-
-  // production
-  if (teleinfo_prod.enabled || (teleinfo_prod.cacsi && (graph_status.data == TELEINFO_UNIT_VA)))
-  {
-    // display context
-    mask = 0x01 << 2;
-    display = (graph_status.display & mask);
-
-    // link to invert display
-    if (display) choice = graph_status.display & (mask ^ 0xff);
-      else choice = graph_status.display | mask;
-    if (display) strcpy (str_text, ""); else strcpy_P (str_text, PSTR (" disabled"));
-
-    // display phase data
-    GetTextIndexed (str_label, sizeof (str_label), TIC_PHASE_PROD, kTeleinfoPhaseLabel);
-    WSContentSend_P (PSTR ("<a href='%s?%s=%u'><div id='v%u' class='ph%u%s' title='%s'>&nbsp;</div></a>\n"), PSTR_GRAPH_PAGE, PSTR (CMND_GRAPH_DISPLAY), choice, TIC_PHASE_PROD, TIC_PHASE_PROD, str_text, str_label);
-  }
-
-  // conso
-  if (teleinfo_conso.enabled) for (phase = 0; phase < teleinfo_contract.phase; phase++)
-  {
-    // display context
-    mask = 0x01 << (phase + 3);
-    display = (graph_status.display & mask);
-
-    // link to invert display
-    if (display) choice = graph_status.display & (mask ^ 0xff);
-      else choice = graph_status.display | mask;
-    if (display) strcpy (str_text, ""); else strcpy_P (str_text, PSTR (" disabled"));
-
-    // display phase data
-    GetTextIndexed (str_label, sizeof (str_label), phase, kTeleinfoPhaseLabel);
-    WSContentSend_P (PSTR ("<a href='%s?%s=%u'><div id='v%u' class='phase ph%u%s' title='%s'>&nbsp;</div></a>\n"), PSTR_GRAPH_PAGE, PSTR (CMND_GRAPH_DISPLAY), choice, phase, phase, str_text, str_label);
-  }
-
+      // display phase button
+      GetTextIndexed (str_label, sizeof (str_label), phase, kTeleinfoPhaseLabel);
+      WSContentSend_P (PSTR ("<a href='%s?%s=%u'><div id='v%u' class='ph%u%s' title='%s'>&nbsp;</div></a>\n"), PSTR_GRAPH_PAGE, str_link, phase, phase, phase, str_text, str_label);
+    }
   WSContentSend_P (PSTR ("</div></div>\n"));      // live
 
   // ----------------
@@ -1122,8 +1116,7 @@ void TeleinfoGraphGetCurrentDataDisplay (const int unit_type, const int phase, c
 // Graph data update
 void TeleinfoGraphWebUpdateData ()
 {
-  bool     display;
-  uint8_t  phase;
+  uint8_t  phase, curve;
   uint32_t timestart;
   char     str_text[16];
 
@@ -1134,80 +1127,57 @@ void TeleinfoGraphWebUpdateData ()
   WSContentBegin (200, CT_PLAIN);
 
   // send number of received messages
-  WSContentSend_P (PSTR ("%u"), teleinfo_meter.nb_message);
+  WSContentSend_P (PSTR ("msg;%u\n"), teleinfo_meter.nb_message);
 
   // loop thru phases
   for (phase = 0; phase < TIC_PHASE_END; phase ++)
-  {
-    // check if data should be displayed
-    display  = (phase < teleinfo_contract.phase);
-    display |= ((phase == TIC_PHASE_PROD) && (teleinfo_prod.enabled || teleinfo_prod.cacsi));
-//    display |= (phase == TIC_PHASE_PROD);
-    display |= ((phase == TIC_PHASE_SOLAR) && teleinfo_solar.enabled);
-    display |= ((phase == TIC_PHASE_FORECAST) && teleinfo_forecast.enabled);
+    if (graph_display.arr_value[phase]) 
+    {
+      TeleinfoGraphGetCurrentDataDisplay (graph_status.data, phase, str_text, sizeof (str_text));
+      WSContentSend_P (PSTR ("v%u;%s\n"), phase, str_text);
+    }
 
-    // display data
-    str_text[0] = 0;
-    if (display) TeleinfoGraphGetCurrentDataDisplay (graph_status.data, phase, str_text, sizeof (str_text));
-    WSContentSend_P (PSTR (";%s"), str_text);
+  // if needed, refresh curves
+  if (graph_status.counter == 0)
+  {
+    // loop thru phases
+    for (phase = 0; phase < TIC_PHASE_END; phase ++)
+      if (graph_display.arr_value[phase]) 
+      {
+        WSContentSend_P (PSTR ("m%u;"), phase);
+        (graph_status.data == TELEINFO_UNIT_COS) ? WSContentSend_P (PSTR ("points;")) : WSContentSend_P (PSTR ("d;"));
+        if (graph_display.arr_select[phase]) TeleinfoGraphDisplayCurve (graph_status.data, graph_status.period, phase);
+        WSContentSend_P (PSTR ("\n"));
+      }
+
+    // loop thru phases to display peak curve
+    for (phase = 0; phase < teleinfo_contract.phase; phase++)
+      if (graph_display.arr_peak[phase])
+      {
+        if (graph_status.data == TELEINFO_UNIT_VA) curve = TELEINFO_UNIT_VAMAX;
+        else if (graph_status.data == TELEINFO_UNIT_V) curve = TELEINFO_UNIT_VMAX;
+        WSContentSend_P (PSTR ("p%u;points;"), phase);
+        if (graph_display.arr_select[phase]) TeleinfoGraphDisplayCurve (curve, graph_status.period, phase);
+        WSContentSend_P (PSTR ("\n"));
+      }
+
+    // reset counter
+    switch (graph_status.period)
+    {
+      case GRAPH_PERIOD_LIVE : graph_status.counter = GRAPH_COUNTER_LIVE; break;
+      case GRAPH_PERIOD_DAY  : graph_status.counter = GRAPH_COUNTER_DAY;  break;
+      case GRAPH_PERIOD_WEEK : graph_status.counter = GRAPH_COUNTER_WEEK; break;
+    }
   }
+
+  // else decrease counter
+  else graph_status.counter--;
 
   // end of stream
   WSContentEnd ();
 
   // log page serving time
   AddLog (LOG_LEVEL_DEBUG, PSTR ("TIC: Update Data in %ums"), millis () - timestart);
-}
-
-// Graph data update
-void TeleinfoGraphWebUpdateCurve ()
-{
-  bool     display;
-  uint8_t  phase, curve;
-  uint32_t timestart;
-
-  // timestamp
-  timestart = millis ();
-
-  // start stream
-  WSContentBegin (200, CT_PLAIN);
-
-  // loop thru phases
-  for (phase = 0; phase < TIC_PHASE_END; phase ++)
-  {
-    // check if curve should be displayed
-    display = false;
-    if (phase < TIC_PHASE_PROD)           display = ((graph_status.display & (0x01 << (phase + 3))) && teleinfo_conso.enabled);
-    else if (phase == TIC_PHASE_PROD)     display = ((graph_status.display & (0x01 << 2))           && (teleinfo_prod.enabled || teleinfo_prod.cacsi));
-    else if (phase == TIC_PHASE_SOLAR)    display = ((graph_status.display & (0x01 << 1))           && teleinfo_solar.enabled);
-    else if (phase == TIC_PHASE_FORECAST) display = ((graph_status.display & (0x01 << 0))           && teleinfo_forecast.enabled);
-    
-    // if needed, display curve
-    if (display) TeleinfoGraphDisplayCurve (graph_status.data, graph_status.period, phase);
-    WSContentSend_P (PSTR (";"));
-  }
-
-  // loop thru phases to display peak curve
-  for (phase = 0; phase < teleinfo_contract.phase; phase++)
-  {
-    // check if curve should be displayed
-    display = (teleinfo_conso.enabled && (graph_status.display & (0x01 << (phase + 3))));
-
-    // set curve to display (VA max or V max)
-    if (graph_status.data == TELEINFO_UNIT_VA) curve = TELEINFO_UNIT_VAMAX;
-    else if (graph_status.data == TELEINFO_UNIT_V) curve = TELEINFO_UNIT_VMAX;
-    else curve = TELEINFO_UNIT_MAX;
-
-    // if needed, display curve
-    if (display && (curve != TELEINFO_UNIT_MAX)) TeleinfoGraphDisplayCurve (curve, graph_status.period, phase);
-    WSContentSend_P (PSTR (";"));
-  }
-
-  // end of stream
-  WSContentEnd ();
-
-  // log page serving time
-  AddLog (LOG_LEVEL_DEBUG, PSTR ("TIC: [%ums] Curve period %u"), millis () - timestart);
 }
 
 #endif    // USE_WEBSERVER
@@ -1237,9 +1207,10 @@ bool XdrvTeleinfoGraph (const uint32_t function)
       break;
 
     case FUNC_WEB_ADD_HANDLER:
-      Webserver->on (FPSTR (PSTR_GRAPH_PAGE),       TeleinfoGraphWebDisplayPage);
-      Webserver->on (FPSTR (PSTR_GRAPH_PAGE_DATA),  TeleinfoGraphWebUpdateData);
-      Webserver->on (FPSTR (PSTR_GRAPH_PAGE_CURVE), TeleinfoGraphWebUpdateCurve);
+      Webserver->on (FPSTR (PSTR_GRAPH_PAGE),     TeleinfoGraphWebPage);
+      Webserver->on (FPSTR (PSTR_GRAPH_PAGE_JS),  TeleinfoGraphWebPageJS);
+      Webserver->on (FPSTR (PSTR_GRAPH_PAGE_CSS), TeleinfoGraphWebPageCSS);
+      Webserver->on (FPSTR (PSTR_GRAPH_PAGE_UPD), TeleinfoGraphWebUpdateData);
     break;
 #endif    // USE_WEBSERVER
   }

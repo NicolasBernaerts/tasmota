@@ -638,7 +638,7 @@ void TeleinfoRtePublishJson ()
 
   // plan next update and declare publication
   rte_update.publish = false;
-  TeleinfoDriverWebDeclare (TIC_WEB_MQTT);
+  HelperPublishDeclareMqtt ();
 }
 
 /***********************************\
@@ -735,7 +735,7 @@ bool TeleinfoRteStreamToken ()
   }
 
   // declare query
-  TeleinfoDriverWebDeclare (TIC_WEB_HTTPS);
+  HelperPublishDeclareHttps ();
 
   return is_ok;
 }
@@ -948,7 +948,7 @@ bool TeleinfoRteEcowattStream ()
   }
 
   // declare query
-  TeleinfoDriverWebDeclare (TIC_WEB_HTTPS);
+  HelperPublishDeclareHttps ();
 
   return is_ok;
 }
@@ -1243,7 +1243,7 @@ bool TeleinfoRteTempoStream ()
   }
 
   // declare query
-  TeleinfoDriverWebDeclare (TIC_WEB_HTTPS);
+  HelperPublishDeclareHttps ();
 
   return is_ok;
 }
@@ -1442,7 +1442,7 @@ bool TeleinfoRteTempoLightStream ()
   }
 
   // declare query
-  TeleinfoDriverWebDeclare (TIC_WEB_HTTPS);
+  HelperPublishDeclareHttps ();
 
   return is_ok;
 }
@@ -1575,7 +1575,7 @@ bool TeleinfoRteOpenDpeStream ()
   }
 
   // declare query
-  TeleinfoDriverWebDeclare (TIC_WEB_HTTPS);
+  HelperPublishDeclareHttps ();
 
   return is_ok;
 }
@@ -1731,7 +1731,7 @@ bool TeleinfoRtePointeStream ()
   }
 
   // declare query
-  TeleinfoDriverWebDeclare (TIC_WEB_HTTPS);
+  HelperPublishDeclareHttps ();
 
   return is_ok;
 }
@@ -1921,7 +1921,7 @@ void TeleinfoRteEverySecond ()
 
     // Open DPE reception
     case RTE_UPDATE_OPENDPE:
-      if (TeleinfoDriverWebAllow (TIC_WEB_HTTPS))
+      if (HelperPublishAllowHttps ())
       {
         // update data and calculate next update slot
         result = TeleinfoRteOpenDpeStream ();
@@ -1935,7 +1935,7 @@ void TeleinfoRteEverySecond ()
 
     // Tempo Light reception
     case RTE_UPDATE_TEMPOLIGHT:
-      if (TeleinfoDriverWebAllow (TIC_WEB_HTTPS))
+      if (HelperPublishAllowHttps ())
       {
         // update data and calculate next update slot
         result = TeleinfoRteTempoLightStream ();
@@ -1949,7 +1949,7 @@ void TeleinfoRteEverySecond ()
 
     // token reception
     case RTE_UPDATE_TOKEN:
-      if (TeleinfoDriverWebAllow (TIC_WEB_HTTPS))
+      if (HelperPublishAllowHttps ())
       {
         // init token update
         result = TeleinfoRteStreamToken ();
@@ -1971,7 +1971,7 @@ void TeleinfoRteEverySecond ()
 
     // ecowatt reception
     case RTE_UPDATE_ECOWATT:
-      if (TeleinfoDriverWebAllow (TIC_WEB_HTTPS))
+      if (HelperPublishAllowHttps ())
       {
         // update data and calculate next update slot
         result = TeleinfoRteEcowattStream ();
@@ -1985,7 +1985,7 @@ void TeleinfoRteEverySecond ()
 
     // tempo reception
     case RTE_UPDATE_TEMPO:
-      if (TeleinfoDriverWebAllow (TIC_WEB_HTTPS))
+      if (HelperPublishAllowHttps ())
       {
         // update data and calculate next update slot
         result = TeleinfoRteTempoStream ();
@@ -1999,7 +1999,7 @@ void TeleinfoRteEverySecond ()
       
     // pointe reception
     case RTE_UPDATE_POINTE:
-      if (TeleinfoDriverWebAllow (TIC_WEB_HTTPS))
+      if (HelperPublishAllowHttps ())
       {
         // update data and calculate next update slot
         result = TeleinfoRtePointeStream ();
@@ -2034,7 +2034,7 @@ void TeleinfoRteEverySecond ()
   }
 
   // if needed, publish TEMPO, POINTE and/or ECOWATT
-  if (rte_update.publish && TeleinfoDriverWebAllow (TIC_WEB_MQTT)) TeleinfoRtePublishJson ();
+  if (rte_update.publish && HelperPublishAllowMqtt ()) TeleinfoRtePublishJson ();
 }
 
 // Append RTE data to SENSOR
@@ -2164,7 +2164,7 @@ void TeleinfoRteWebSensorTempo ()
   time_update = min (rte_update.time_opendpe, rte_update.time_tempolight);
   time_update = min (time_update, rte_update.time_tempo);
   TeleinfoRteGetDelay (time_update, str_text, sizeof (str_text));
-  WSContentSend_P (PSTR ("<div class='sec' title='%s' onclick=\"onClickMain(\'%s?%s=%u\')\">\n"), str_text, PSTR (TIC_PAGE_DISPLAY), PSTR (CMND_TIC_MAIN), TIC_DISPLAY_TEMPO);
+  WSContentSend_P (PSTR ("<div class='sec' title='%s' onclick=\"onClickMain(\'%s?%s=%u\')\">\n"), str_text, PSTR_TIC_PAGE_DISPLAY, PSTR (CMND_TIC_MAIN), TIC_DISPLAY_TEMPO);
   WSContentSend_P (PSTR ("<div class='tic ticb'><div class='tic48l'>Tempo</div>"));
 
   // first line display (minimized or not)
@@ -2253,7 +2253,7 @@ void TeleinfoRteWebSensorEcowatt ()
 
   // header of ecowatt data
   TeleinfoRteGetDelay (rte_update.time_ecowatt, str_text, sizeof (str_text));
-  WSContentSend_P (PSTR ("<div class='sec' title='%s' onclick=\"onClickMain(\'%s?%s=%u\')\">\n"), str_text, PSTR (TIC_PAGE_DISPLAY), PSTR (CMND_TIC_MAIN), TIC_DISPLAY_ECOWATT);
+  WSContentSend_P (PSTR ("<div class='sec' title='%s' onclick=\"onClickMain(\'%s?%s=%u\')\">\n"), str_text, PSTR_TIC_PAGE_DISPLAY, PSTR (CMND_TIC_MAIN), TIC_DISPLAY_ECOWATT);
 
   // title display
   level = rte_ecowatt_status.arr_day[RTE_ECOWATT_DAY_TODAY].arr_hvalue[RtcTime.hour];

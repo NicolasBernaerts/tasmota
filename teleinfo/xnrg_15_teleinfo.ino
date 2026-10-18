@@ -119,6 +119,7 @@
                           Rework of ALERT section to separate volt, load and period
     17/03/2026 - v15.2  - Estimate production excess for CACSI contract
                           Disable baudrate auto-detect, set to 1200 by default (mode Historique)
+    26/06/2026 - v15.5  - Flush reception buffer at start
 
   Configuration :
       Settings->rf_code[15][8] : connexion speed
@@ -174,6 +175,7 @@ bool TeleinfoEnergyHandleCommand ()
       AddLog (LOG_LEVEL_INFO, PSTR ("  calhexa=%u      format plages horaires Linky [0:decimal/1:hexa]"), teleinfo_config.cal_hexa);
       AddLog (LOG_LEVEL_INFO, PSTR ("  error=%u        affichage compteurs d'erreurs [0/1]"), teleinfo_config.error);
       AddLog (LOG_LEVEL_INFO, PSTR ("  percent=%u    pourcentage acceptable du contrat (%%)"), teleinfo_config.percent);
+      AddLog (LOG_LEVEL_INFO, PSTR ("  cosphi=%u      nombre de mesures pour moyennage cosphi (%u..%u)"), teleinfo_config.cosphi_sample, TIC_COSPHI_SAMPLE_MIN, TIC_COSPHI_SAMPLE_MAX);
 
       AddLog (LOG_LEVEL_INFO, PSTR ("Production :"));
       AddLog (LOG_LEVEL_INFO, PSTR ("  prod=%d        puissance maximum (W)"), teleinfo_config.prod_max);
@@ -231,7 +233,6 @@ bool TeleinfoEnergyHandleCommand ()
     {
       TeleinfoDriverSaveData ();
       TeleinfoDriverSaveSettings ();
-//      SettingsSave (0);
     }
   }
 
@@ -407,6 +408,12 @@ bool TeleinfoEnergyExecuteCommand (const int command, const long value)
       teleinfo_config.display = status;
       AddLog (LOG_LEVEL_INFO, PSTR ("TIC: display=%u"), teleinfo_config.display);
       break;
+
+      case TIC_CMND_COSPHI:
+      to_save = ((value >= TIC_COSPHI_SAMPLE_MIN) && (value <= TIC_COSPHI_SAMPLE_MAX) && (teleinfo_config.cosphi_sample != (uint8_t)value));
+      if (to_save) teleinfo_config.cosphi_sample = (uint8_t)value;
+      AddLog (LOG_LEVEL_INFO, PSTR ("TIC: cosphi=%u"), teleinfo_config.cosphi_sample);
+      break;
     }
 
   //  return result;
@@ -460,6 +467,7 @@ void TeleinfoEnergySerialStart ()
   teleinfo_serial = new TasmotaSerial (Pin (GPIO_TELEINFO_RX), -1, 2, 0);
 #else
   // on ESP32, hardware serial in native
+//  teleinfo_serial = new TasmotaSerial (Pin (GPIO_TELEINFO_RX), -1, 1, 0, TIC_RX_BUFFER);
   teleinfo_serial = new TasmotaSerial (Pin (GPIO_TELEINFO_RX), -1, 1, 0);
 #endif
 
@@ -473,7 +481,7 @@ void TeleinfoEnergySerialStart ()
   {
 #ifdef ESP32
       // set serial reception buffer
-      teleinfo_serial->setRxBufferSize (TIC_RX_BUFFER);
+//      teleinfo_serial->setRxBufferSize (TIC_RX_BUFFER);
 
       // log
       AddLog (LOG_LEVEL_INFO, PSTR("TIC: Serial UART %d démarré à %ubps (buffer %u)"), teleinfo_serial->getUart (), baudrate, teleinfo_serial->getRxBufferSize ());
@@ -488,6 +496,7 @@ void TeleinfoEnergySerialStart ()
 
     // flush serial data
     teleinfo_serial->flush();
+    while (teleinfo_serial->available ()) teleinfo_serial->read ();
 
     // serial init succeeded
     teleinfo_meter.serial = TIC_SERIAL_ACTIVE;
@@ -681,8 +690,8 @@ char TeleinfoEnergyCalculateChecksum (const char* pstr_line, char* pstr_etiquett
   if (line_checksum != given_checksum)
   {
     // declare error
-    line_checksum = 0;
-    teleinfo_message.error = 1;
+    line_checksum          = 0;
+    teleinfo_message.error = true;
 
     // if network is up, account error
     if (!TasmotaGlobal.global_state.network_down)
@@ -727,7 +736,7 @@ char TeleinfoEnergyCalculateChecksum (const char* pstr_line, char* pstr_etiquett
   else
   {
     line_checksum = 0;
-    teleinfo_message.error = 1;
+    teleinfo_message.error = true;
     AddLog (LOG_LEVEL_DEBUG, PSTR ("TIC: No data [%s]"), str_line);
   }
 
@@ -825,7 +834,7 @@ void TeleinfoEnergyMeterSetModel (const char* pstr_serial)
   char str_text[64];
 
   // check if alread done and parameter
-  if (teleinfo_meter.ident != 0) return;
+  if (teleinfo_meter.ident > 0) return;
   if (pstr_serial == nullptr) return;
   if (pstr_serial[0] == 0) return;
 
@@ -882,9 +891,9 @@ void TeleinfoEnergyMessageReset ()
   teleinfo_message.index_line = 0;
   for (index = 0; index < TIC_LINE_QTY; index ++)
   {
-    strcpy_P (teleinfo_message.arr_line[index].str_etiquette, PSTR(""));
-    strcpy_P (teleinfo_message.arr_line[index].str_donnee, PSTR (""));
-    teleinfo_message.arr_line[index].checksum = 0;
+    teleinfo_message.arr_line[index].str_etiquette[0] = 0;
+    teleinfo_message.arr_line[index].str_donnee[0]    = 0;
+    teleinfo_message.arr_line[index].checksum         = 0;
   }
 }
 
@@ -1804,7 +1813,7 @@ uint16_t TeleinfoCalculateCRC (const char *pstr_donnee)
 void TeleinfoUpdateCosphi (long cosphi, struct tic_cosphi &struct_cosphi, const long papp)
 {
   uint8_t index;
-  long    page, page_size, page_low, page_high;
+  long    page, page_size, papp_low, papp_high;
   long    result, sample;
 
   // ignore first measure as duration was not good
@@ -1814,21 +1823,21 @@ void TeleinfoUpdateCosphi (long cosphi, struct tic_cosphi &struct_cosphi, const 
   // if contract not defined, ignore
   if (teleinfo_contract.ssousc == 0) return;
 
-  // calculate numbre of messsages to get cosphi
+  // calculate number of messsages to get cosphi
   result = teleinfo_meter.nb_message - struct_cosphi.nb_message;
   struct_cosphi.nb_message = teleinfo_meter.nb_message;
 
   // cosphi under 0.05 is lowered to 0 (used in production mode)
   if (cosphi < 50) cosphi = 0;
 
-  // caculate current page limoits (with acceptable delta of 50VA)
+  // caculate current page limits (with acceptable delta of 50VA)
   page      = struct_cosphi.page;
   page_size = teleinfo_contract.ssousc / TIC_COSPHI_PAGE;
-  page_low  = page_size * page - 50;
-  page_high = page_low + page_size + 50;
+  papp_low  = page_size * page - 50;
+  papp_high = papp_low + page_size + 50;
 
   // if apparent power is outside of current page, calculate new power page
-  if ((papp < page_low) || (papp > page_high))
+  if ((papp < papp_low) || (papp > papp_high))
   {
     page = papp * TIC_COSPHI_PAGE / teleinfo_contract.ssousc;
     if (page >= TIC_COSPHI_PAGE) page = TIC_COSPHI_PAGE - 1;
@@ -1842,15 +1851,15 @@ void TeleinfoUpdateCosphi (long cosphi, struct tic_cosphi &struct_cosphi, const 
   // if page has changed, load array of values for new page (current cosphi is ignored as it is a transition one)
   if (struct_cosphi.page != page)
   {
-    struct_cosphi.index = TIC_COSPHI_SAMPLE / 2;
+    struct_cosphi.index = teleinfo_config.cosphi_sample / 2;
     for (index = 0; index < struct_cosphi.index; index++) struct_cosphi.arr_value[index] = struct_cosphi.arr_page[page];
-    for (index = struct_cosphi.index; index < TIC_COSPHI_SAMPLE; index++) struct_cosphi.arr_value[index] = LONG_MAX;
+    for (index = struct_cosphi.index; index < TIC_COSPHI_SAMPLE_MAX; index++) struct_cosphi.arr_value[index] = LONG_MAX;
   }
 
   // if page has not changed, update array of values
   else
   {
-    if (struct_cosphi.index >= TIC_COSPHI_SAMPLE) struct_cosphi.index = 0;
+    if (struct_cosphi.index >= teleinfo_config.cosphi_sample) struct_cosphi.index = 0;
     struct_cosphi.arr_value[struct_cosphi.index] = cosphi;
     struct_cosphi.index++;
   }
@@ -1858,7 +1867,7 @@ void TeleinfoUpdateCosphi (long cosphi, struct tic_cosphi &struct_cosphi, const 
   // calculate current cosphi average
   result = 0;
   sample = 0;
-  for (index = 0; index < TIC_COSPHI_SAMPLE; index++) if (struct_cosphi.arr_value[index] != LONG_MAX)
+  for (index = 0; index < teleinfo_config.cosphi_sample; index++) if (struct_cosphi.arr_value[index] != LONG_MAX)
   {
     result += struct_cosphi.arr_value[index];
     sample++;
@@ -2266,9 +2275,9 @@ void TeleinfoReceptionMessageStart ()
   teleinfo_meter.reception = TIC_RECEPTION_MESSAGE;
 
   // reset error flag, line index
-  teleinfo_message.error      = 0;
+  teleinfo_message.error      = false;
   teleinfo_message.index_line = 0;
-  teleinfo_message.injection  = 0;
+  teleinfo_message.injection  = false;
 
   // reset line and total
   strcpy_P (teleinfo_message.str_line,  PSTR(""));
@@ -2342,7 +2351,7 @@ void TeleinfoReceptionMessageStop ()
   TeleinfoEnergyMessageReset ();
 
   // save max number of lines
-  teleinfo_message.index_max = max (teleinfo_message.index_last, teleinfo_message.index_max);
+//  teleinfo_message.index_max = max (teleinfo_message.index_last, teleinfo_message.index_max);
 
   // reset line and total
   strcpy_P (teleinfo_message.str_line,  PSTR(""));
@@ -2479,7 +2488,7 @@ void TeleinfoReceptionMessageStop ()
 
 #ifdef USE_LIGHT
   // set last LED timestamp and status
-  if (teleinfo_message.error == 0) TeleinfoDriverLedSetStatus (TIC_LED_STEP_OK);
+  if (!teleinfo_message.error) TeleinfoDriverLedSetStatus (TIC_LED_STEP_OK);
     else TeleinfoDriverLedSetStatus (TIC_LED_STEP_ERR);
 #endif    // USE_LIGHT
 */
@@ -2498,7 +2507,7 @@ void TeleinfoReceptionLineStart ()
 // handle end of line
 void TeleinfoReceptionLineStop ()
 {
-  uint8_t phase, relay;
+  uint8_t phase, relay, line;
   int     index = -1;
   long    value;
   char    checksum;
@@ -2596,7 +2605,7 @@ void TeleinfoReceptionLineStop ()
 
       // switching to production data
       case TIC_EME_APPLI:
-        teleinfo_message.injection = 1;
+        teleinfo_message.injection = true;
         break;
 
       // period index
@@ -2966,10 +2975,10 @@ void TeleinfoReceptionLineStop ()
   }
 
   // if maximum number of lines not reached, save new line
-  index = teleinfo_message.index_line;
-  teleinfo_message.arr_line[index].checksum = checksum;
-  strlcpy (teleinfo_message.arr_line[index].str_etiquette, str_etiquette, TIC_ETIQUETTE_SIZE);
-  strlcpy (teleinfo_message.arr_line[index].str_donnee, str_donnee, TIC_DONNEE_SIZE);
+  line = teleinfo_message.index_line;
+  teleinfo_message.arr_line[line].checksum = checksum;
+  strlcpy (teleinfo_message.arr_line[line].str_etiquette, str_etiquette, TIC_ETIQUETTE_SIZE);
+  strlcpy (teleinfo_message.arr_line[line].str_donnee, str_donnee, TIC_DONNEE_SIZE);
 
   // increment line index and stay on last line if reached
   teleinfo_message.index_line = min (teleinfo_message.index_line + 1, TIC_LINE_QTY - 1);
@@ -3076,8 +3085,8 @@ void TeleinfoEnergyInit ()
   teleinfo_conso.cosphi.page       = 0;
   teleinfo_conso.cosphi.nb_message = 0;
   teleinfo_conso.cosphi.value      = TIC_COSPHI_DEFAULT;     
-  for (index = 0; index < TIC_COSPHI_PAGE;   index++) teleinfo_conso.cosphi.arr_page[index]  = TIC_COSPHI_DEFAULT;
-  for (index = 0; index < TIC_COSPHI_SAMPLE; index++) teleinfo_conso.cosphi.arr_value[index] = LONG_MAX;
+  for (index = 0; index < TIC_COSPHI_PAGE;       index++) teleinfo_conso.cosphi.arr_page[index]  = TIC_COSPHI_DEFAULT;
+  for (index = 0; index < TIC_COSPHI_SAMPLE_MAX; index++) teleinfo_conso.cosphi.arr_value[index] = LONG_MAX;
 
   // prod data
   teleinfo_prod.enabled           = false;
@@ -3087,8 +3096,8 @@ void TeleinfoEnergyInit ()
   teleinfo_prod.cosphi.page       = 0;
   teleinfo_prod.cosphi.nb_message = 0;
   teleinfo_prod.cosphi.value      = TIC_COSPHI_DEFAULT;
-  for (index = 0; index < TIC_COSPHI_PAGE;   index++) teleinfo_prod.cosphi.arr_page[index]  = TIC_COSPHI_DEFAULT;
-  for (index = 0; index < TIC_COSPHI_SAMPLE; index++) teleinfo_prod.cosphi.arr_value[index] = LONG_MAX;
+  for (index = 0; index < TIC_COSPHI_PAGE;       index++) teleinfo_prod.cosphi.arr_page[index]  = TIC_COSPHI_DEFAULT;
+  for (index = 0; index < TIC_COSPHI_SAMPLE_MAX; index++) teleinfo_prod.cosphi.arr_value[index] = LONG_MAX;
 
   // conso data per phase
   for (phase = 0; phase < TIC_PHASE_MAX; phase++)

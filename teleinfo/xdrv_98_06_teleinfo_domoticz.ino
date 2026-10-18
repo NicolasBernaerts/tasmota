@@ -13,6 +13,7 @@
     10/07/2025 v2.0 - Refactoring based on Tasmota 15
     07/09/2025 v2.1 - Limit publications to 1 per sec.
     17/03/2026 v2.2 - Publish production excess for CACSI contract
+    28/09/2026 v2.3 - Check network connectivity before publication
 
   Configuration values are stored in :
 
@@ -251,7 +252,7 @@ void TeleinfoDomoticzEvery250ms ()
   if (!MqttIsConnected ()) return;
 
   // check query timestamp
-  if (!TeleinfoDriverWebAllow (TIC_WEB_MQTT)) return;  
+  if (!HelperPublishAllowMqtt ()) return;  
 
   // publish if needed
   if (teleinfo_domoticz.index < DOMO_DATA_MAX) TeleinfoDomoticzPublishNext ();
@@ -392,7 +393,7 @@ uint8_t TeleinfoDomoticzPublishNext ()
 
   // increase next index and declare publication
   teleinfo_domoticz.index++;
-  TeleinfoDriverWebDeclare (TIC_WEB_MQTT);  
+  HelperPublishDeclareMqtt ();  
 
   return teleinfo_domoticz.index;
 }
@@ -404,6 +405,7 @@ void TeleinfoDomoticzPublishAll ()
 
   // if not enabled, ignore
   if (!teleinfo_domoticz.enabled) return;
+  if (!MqttIsConnected ()) return;
 
   // loop to publish all data
   while (result < DOMO_DATA_MAX) result = TeleinfoDomoticzPublishNext ();

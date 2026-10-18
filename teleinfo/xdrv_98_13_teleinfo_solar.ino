@@ -316,7 +316,7 @@ void TeleinfoSolarPublishJson ()
 
   // declare publication
   teleinfo_forecast.time_publish = UINT32_MAX;
-  TeleinfoDriverWebDeclare (TIC_WEB_MQTT);
+  HelperPublishDeclareMqtt ();
 }
 
 /***********************************\
@@ -344,7 +344,7 @@ bool TeleinfoSolarForecastUpdate ()
   if (!RtcTime.valid) return false;
 
   // check query timestamp
-  if (!TeleinfoDriverWebAllow (TIC_WEB_HTTP)) return false;
+  if (!HelperPublishAllowHttp ()) return false;
 
   // check compulsory data
   is_ok = true;
@@ -393,7 +393,7 @@ bool TeleinfoSolarForecastUpdate ()
       phttp->end ();
       
       // declare query
-      TeleinfoDriverWebDeclare (TIC_WEB_HTTP);
+      HelperPublishDeclareHttp ();
 
       // log
       AddLog (LOG_LEVEL_INFO, PSTR ("SOL: Forecast: [%d] %u char in %d ms"), http_code, str_result.length (), time_response);
@@ -686,7 +686,7 @@ void TeleinfoSolarWebSensor ()
     if (teleinfo_config.prod_max > 0) percentage = min (100L, 100L * teleinfo_solar.pact / teleinfo_config.prod_max);
 
     // section
-    WSContentSend_P (PSTR ("<div class='sec' onclick=\"onClickMain(\'%s?%s=%u\')\">\n"), PSTR (TIC_PAGE_DISPLAY), PSTR (CMND_TIC_MAIN), TIC_DISPLAY_SOLAR);
+    WSContentSend_P (PSTR ("<div class='sec' onclick=\"onClickMain(\'%s?%s=%u\')\">\n"), PSTR_TIC_PAGE_DISPLAY, PSTR (CMND_TIC_MAIN), TIC_DISPLAY_SOLAR);
 
     // header
     WSContentSend_P (PSTR ("<div class='tic ticb'><div class='tic70l'>Production ☀️</div>"));
@@ -717,7 +717,7 @@ void TeleinfoSolarWebSensor ()
     if (teleinfo_config.prod_max > 0) percentage = min (100L, 100L * teleinfo_forecast.pact / teleinfo_config.prod_max);
 
     // section
-    WSContentSend_P (PSTR ("<div class='sec' onclick=\"onClickMain(\'%s?%s=%u\')\">\n"), PSTR (TIC_PAGE_DISPLAY), PSTR (CMND_TIC_MAIN), TIC_DISPLAY_FORECAST);
+    WSContentSend_P (PSTR ("<div class='sec' onclick=\"onClickMain(\'%s?%s=%u\')\">\n"), PSTR_TIC_PAGE_DISPLAY, PSTR (CMND_TIC_MAIN), TIC_DISPLAY_FORECAST);
 
     // header
     WSContentSend_P (PSTR ("<div class='tic ticb'><div class='tic70l'>Prévision ☀️</div>"));
@@ -764,30 +764,30 @@ void TeleinfoSolarWebPageConfigure ()
   if (Webserver->hasArg (F ("save")))
   {
     // get production api and mqtt usage
-    changed |= MiscWebGetArgFlag (PSTR ("api"), teleinfo_solar.use_api);
-    reboot  |= MiscWebGetArgFlag (PSTR ("mqtt"), teleinfo_solar.use_mqtt);
+    changed |= WebGetArgFlag (PSTR ("api"), teleinfo_solar.use_api);
+    reboot  |= WebGetArgFlag (PSTR ("mqtt"), teleinfo_solar.use_mqtt);
 
     // get production MQTT topics and keys
-    reboot |= MiscWebGetArgString (PSTR (D_CMND_SOLAR_TOPIC),  teleinfo_solar.str_topic,  sizeof (teleinfo_solar.str_topic));
-    reboot |= MiscWebGetArgString (PSTR (D_CMND_SOLAR_TTOPIC), teleinfo_solar.str_ttopic, sizeof (teleinfo_solar.str_ttopic));
-    reboot |= MiscWebGetArgString (PSTR (D_CMND_SOLAR_PKEY),   teleinfo_solar.str_pkey,   sizeof (teleinfo_solar.str_pkey));
-    reboot |= MiscWebGetArgString (PSTR (D_CMND_SOLAR_TKEY),   teleinfo_solar.str_tkey,   sizeof (teleinfo_solar.str_tkey));
+    reboot |= WebGetArgString (PSTR (D_CMND_SOLAR_TOPIC),  teleinfo_solar.str_topic,  sizeof (teleinfo_solar.str_topic));
+    reboot |= WebGetArgString (PSTR (D_CMND_SOLAR_TTOPIC), teleinfo_solar.str_ttopic, sizeof (teleinfo_solar.str_ttopic));
+    reboot |= WebGetArgString (PSTR (D_CMND_SOLAR_PKEY),   teleinfo_solar.str_pkey,   sizeof (teleinfo_solar.str_pkey));
+    reboot |= WebGetArgString (PSTR (D_CMND_SOLAR_TKEY),   teleinfo_solar.str_tkey,   sizeof (teleinfo_solar.str_tkey));
 
     // production forecast
-    changed |= MiscWebGetArgFlag    (PSTR (D_CMND_FORECAST),        teleinfo_forecast.enabled);
-    changed |= MiscWebGetArgInteger (PSTR (D_CMND_FORECAST_POWER),  teleinfo_config.prod_max, 0L, 50000L);
-    changed |= MiscWebGetArgInteger (PSTR (D_CMND_FORECAST_DECLIN), teleinfo_forecast.declination, 0, 90);
-    changed |= MiscWebGetArgInteger (PSTR (D_CMND_FORECAST_AZIMUT), teleinfo_forecast.azimuth, -180, 180);
-    changed |= MiscWebGetArgString  (PSTR (D_CMND_FORECAST_KEY),    teleinfo_forecast.str_apikey, sizeof (teleinfo_forecast.str_apikey));
+    changed |= WebGetArgFlag   (PSTR (D_CMND_FORECAST),        teleinfo_forecast.enabled);
+    changed |= WebGetArgLong   (PSTR (D_CMND_FORECAST_POWER),  teleinfo_config.prod_max, 0L, 50000L);
+    changed |= WebGetArgInt    (PSTR (D_CMND_FORECAST_DECLIN), teleinfo_forecast.declination, 0, 90);
+    changed |= WebGetArgInt    (PSTR (D_CMND_FORECAST_AZIMUT), teleinfo_forecast.azimuth, -180, 180);
+    changed |= WebGetArgString (PSTR (D_CMND_FORECAST_KEY),    teleinfo_forecast.str_apikey, sizeof (teleinfo_forecast.str_apikey));
 
     // latitude
     value = (float)Settings->latitude / 1000000;
-    changed |= MiscWebGetArgFloat (PSTR ("lat"), value, 0,  90);
+    changed |= WebGetArgFloat (PSTR ("lat"), value, 0,  90);
     Settings->latitude = (int)(value * 1000000);
 
     // longitude
     value = (float)Settings->longitude / 1000000;
-    changed |= MiscWebGetArgFloat (PSTR ("long"), value, -180, 180);
+    changed |= WebGetArgFloat (PSTR ("long"), value, -180, 180);
     Settings->longitude = (int)(value * 1000000);
 
     // save configuration and reboot if needed
@@ -907,6 +907,7 @@ bool XdrvTeleinfoSolar (const uint32_t function)
   {
     case FUNC_COMMAND:
       result = DecodeCommand (kSolarCommands, SolarCommand);
+      if (!result) result = DecodeCommand (kForecastCommands, ForecastCommand);
       break;
 
     case FUNC_INIT:

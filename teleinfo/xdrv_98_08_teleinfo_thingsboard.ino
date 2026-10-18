@@ -11,6 +11,7 @@
     25/08/2025 v2.1 - Add PAVG (production average active power) and PR (production relay)
     07/09/2025 v2.2 - Limit publications to 1 per sec.
     17/03/2026 v2.3 - Publish production excess for CACSI contract
+    28/09/2026 v2.4 - Check network connectivity before publication
                         
   Configuration values are stored in :
     - Settings->rf_code[16][3]  : Flag en enable/disable integration
@@ -28,6 +29,7 @@
 */
 
 #ifdef USE_TELEINFO
+#ifdef USE_TELEINFO_THINGSBOARD
 
 /*************************************************\
  *               Variables
@@ -120,7 +122,7 @@ void TeleinfoThingsboardEvery250ms ()
   if (!MqttIsConnected ()) return;
 
   // check query timestamp and publish current data if needed
-  if (!TeleinfoDriverWebAllow (TIC_WEB_MQTT)) return;
+  if (!HelperPublishAllowMqtt ()) return;
   else if (teleinfo_thingsboard.pub_data) TeleinfoThingsboardPublishData ();
   else if (teleinfo_thingsboard.pub_attr) TeleinfoThingsboardPublishAttribute ();
 }
@@ -135,7 +137,9 @@ void TeleinfoThingsboardPublishData ()
 
   // if not enabled, ignore
   if (!teleinfo_thingsboard.enabled) return;
+  if (!MqttIsConnected ()) return;
 
+  // reset message
   ResponseClear ();
   ResponseAppend_P (PSTR ("{"));
 
@@ -252,7 +256,7 @@ void TeleinfoThingsboardPublishData ()
 
   // reset publication flag and declare publication
   teleinfo_thingsboard.pub_data = false;
-  TeleinfoDriverWebDeclare (TIC_WEB_MQTT);
+  HelperPublishDeclareMqtt ();
 }
 
 // publish current data
@@ -287,7 +291,7 @@ void TeleinfoThingsboardPublishAttribute ()
 
   // reset publication flag and declare publication
   teleinfo_thingsboard.pub_attr = false;
-  TeleinfoDriverWebDeclare (TIC_WEB_MQTT);
+  HelperPublishDeclareMqtt ();
 }
 
 /***************************************\
@@ -334,5 +338,6 @@ bool XdrvTeleinfoThingsboard (const uint32_t function)
   return result;
 }
 
-#endif      // USE_TELEINFO
+#endif    // USE_TELEINFO_THINGSBOARD
+#endif    // USE_TELEINFO
 

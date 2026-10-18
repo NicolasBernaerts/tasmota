@@ -10,6 +10,7 @@
     20/06/2024 v1.2 - Add meter serial number and global conso counter
     10/07/2025 v2.0 - Refactoring based on Tasmota 15
     07/09/2025 v2.1 - Limit publications to 1 per sec.
+    28/09/2026 v2.2 - Check network connectivity before publication
                        
   Configuration values are stored in :
     - Settings->rf_code[16][1]  : Flag en enable/disable integration
@@ -203,7 +204,7 @@ void TeleinfoHomieEvery100ms ()
   if (teleinfo_homie.stage != UINT8_MAX) return;
 
   // check query timestamp
-  if (!TeleinfoDriverWebAllow (TIC_WEB_MQTT)) return; 
+  if (!HelperPublishAllowMqtt ()) return; 
 
   // publish current data
   if (TeleinfoHomiePublishStage (teleinfo_homie.data)) teleinfo_homie.data++;
@@ -225,7 +226,7 @@ void TeleinfoHomieEvery250ms ()
   if (!MqttIsConnected ()) return;
 
   // check query timestamp
-  if (!TeleinfoDriverWebAllow (TIC_WEB_MQTT)) return; 
+  if (!HelperPublishAllowMqtt ()) return; 
 
   // publish current data
   result = TeleinfoHomiePublishSubStage (teleinfo_homie.stage, teleinfo_homie.sub_stage, teleinfo_homie.sub_step);
@@ -307,6 +308,7 @@ void TeleinfoHomiePublishAllData ()
 {
   // if not enabled, ignore
   if (!teleinfo_homie.enabled) return;
+  if (!MqttIsConnected ()) return;
 
   // loop to publish next available value
   teleinfo_homie.stage = UINT8_MAX;
@@ -606,7 +608,7 @@ bool TeleinfoHomiePublishSubStage (const uint8_t stage, const uint8_t index, con
     MqttPublish (str_text, (data != 0));
 
     // declare publication
-    TeleinfoDriverWebDeclare (TIC_WEB_MQTT);  
+    HelperPublishDeclareMqtt ();  
   }
 
   return true;

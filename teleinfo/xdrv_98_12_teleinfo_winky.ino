@@ -1,5 +1,5 @@
 /*
-  xdrv_98_12_teleinfo_winky.ino - Teleinfo sensor for Winky boards to handle voltages and deep sleep
+  xdrv_98_12_winky_status.ino - Teleinfo sensor for Winky boards to handle voltages and deep sleep
 
   Copyright (C) 2024-2025  Nicolas Bernaerts
 
@@ -15,18 +15,20 @@
     01/08/2025 v3.1 - Add winky_display command
     19/09/2025 v3.2 - Hide and Show with click on main page display
     12/10/2025 v3.3 - Change on winky_max command
-
+    21/06/2026 v4.0 - Complete rewrite of deepsleep triggers and calculation
+                      Supercapa safe voltage is now targeted to extend lifetime
+                      Removed winky_max, winky_sleep, winky_start, winky_stop, winky_coeff and winky_meter
+                      Added winky_target and winky_cosphi
+    26/06/2026 v4.1 - Add mw in InfluxDB message
+                      Reboot if too many reception errors
+    27/08/2026 v4.2 - Add mw in InfluxDB message
+    28/09/2026 v3.1 - Check network connectivity before suspend
+                      
   Configuration values are stored in :
-    - Settings->knx_GA_addr[0..2] : multiplicator
-    - Settings->knx_GA_addr[3]    : minimum start voltage (mV)
-    - Settings->knx_GA_addr[4]    : minimum stop voltage (mV)
-    - Settings->knx_GA_addr[5]    : reference capacity (mF)
-    - Settings->knx_GA_addr[6]    : meter average current (mA)
-    - Settings->knx_GA_addr[7]    : meter max voltage (mV)
-    - Settings->knx_GA_addr[8]    : Maximum number of message before sleep (0 no max.)
-    - Settings->knx_GA_addr[9]    : nominal super capa voltage (mV)
-
     - Settings->knx_GA_param[0]   : main page display
+    - Settings->knx_GA_param[1]   : number of cosphi before deepsleep
+    - Settings->knx_GA_addr[3]    : targeted start voltage (mV)
+    - Settings->knx_GA_addr[5]    : reference capacity (mF)
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -47,107 +49,79 @@
  *               Constants
 \*****************************************/
 
-#define mS_TO_uS_FACTOR            1000ULL                            // conversion factor from seconds to micro seconds
+#define mS_TO_uS_FACTOR             1000ULL                            // conversion factor from seconds to micro seconds
 
-#define WINKY_SLEEP_MINIMUM        10000                              // minimum acceptable sleep time (ms)
-#define WINKY_SLEEP_DEFAULT        30000                              // default deep sleep time (ms)
-#define WINKY_SLEEP_MAXIMUM        60000                              // maximum acceptable sleep time (ms)
+#define WINKY_SLEEP_MINIMUM         10000                              // minimum sleep time (10 sec)
+#define WINKY_SLEEP_RESTART         30000                              // minimum sleep time if sleep started at boot (30 sec)
 
-#define WINKY_VOLTAGE_ADC_MAX      4095                               // max counter for ADC input
+#define WINKY_VOLTAGE_ADC_MAX       4095                               // max counter for ADC input
 
-#define WINKY_CAPA_REFERENCE       1500                               // by default 1.5F 
-#define WINKY_POWER_LINKY          130                                // Linky average power (mW)
-#define WINKY_CURRENT_ESP          60                                 // ESP32 average current (mA)
+#define WINKY_CAPA_CREF             1500                               // by default 1.5F
+#define WINKY_CAPA_CMIN             500                                // minimum is 0.5F
+
+#define WINKY_LOAD_REFERENCE        130                                // reference linky load capability (130 mW)
+
+#define WINKY_ERROR_MAX             10                                 // maximum number of errors before reboot
 
 // voltage levels
-#define WINKY_USB_MAXIMUM          5000                               // USB max voltage
-#define WINKY_USB_CHARGED          4400                               // USB voltage correct
-#define WINKY_USB_DISCHARGED       4000                               // USB voltage disconnected
-#define WINKY_USB_CRITICAL         3000                               // USB voltage disconnected
+#define WINKY_USB_VMAX              5000                               // USB max voltage
+#define WINKY_USB_VMIN              4400                               // minimum USB voltage
 
-#define WINKY_CAPA_MAXIMUM         5000                               // Capa max voltage
-#define WINKY_CAPA_TARGET          4250                               // target capa voltage during deepsleep charge
-#define WINKY_CAPA_CHARGED         4200                               // minimum capa voltage to start cycle
-#define WINKY_CAPA_DISCHARGED      3700                               // minimum capa voltage to start sleep process
-#define WINKY_CAPA_CRITICAL        3600                               // minimum capa voltage to sleep immediatly
+#define WINKY_CAPA_VMAX             5000                               // Capa max voltage
+#define WINKY_CAPA_VTARGET          4500                               // target capa voltage to start cycle
+#define WINKY_CAPA_VMIN             3800                               // minimum capa voltage to start sleep process
+#define WINKY_CAPA_VDELTA           100                                // minimum delta between discharged and charged
 
-#define WINKY_LINKY_MAXIMUM        WINKY_CAPA_MAXIMUM * 57 / 20       // Linky max voltage
-#define WINKY_LINKY_CHARGED        9000                               // minimum linky voltage to consider as connected
-#define WINKY_LINKY_DISCHARGED     7000                               // minimum linky voltage to consider as low
-#define WINKY_LINKY_CRITICAL       5000                               // minimum linky voltage to consider as very low
+#define WINKY_LINKY_VMAX            14250                              // Linky max voltage (57 / 20 * 5 V)
+#define WINKY_LINKY_VDISPLAY        12000                              // Linky max display voltage (12 V)
 
-/***************************************\
- *               Variables
-\***************************************/
+enum TeleinfoWinkySusupend { WINKY_SUSPEND_NONE, WINKY_SUSPEND_SOON, WINKY_SUSPEND_IMMEDIATE, WINKY_SUSPEND_MAX };
+enum TeleinfoWinkyPublish  { WINKY_PUBLISH_NONE, WINKY_PUBLISH_HTTP, WINKY_PUBLISH_MQTT, WINKY_PUBLISH_DONE };
 
 // Commands
-static const char kTeleinfoWinkyCommands[]  PROGMEM =          "winky|"      "|"       "_ref"       "|"       "_start"       "|"       "_stop"       "|"        "_coeff"      "|"        "_meter"      "|"        "_sleep"      "|"      "_max"        "|"       "_display";
-void (* const TeleinfoWinkyCommand[])(void) PROGMEM = { &CmndTeleinfoWinkyHelp, &CmndTeleinfoWinkyRef, &CmndTeleinfoWinkyStart, &CmndTeleinfoWinkyStop, &CmndTeleinfoWinkyCoeff, &CmndTeleinfoWinkyMeter, &CmndTeleinfoWinkySleep, &CmndTeleinfoWinkyMax, &CmndTeleinfoWinkyDisplay };
-
-// capacitor voltage (mV)
-//  - WINKY_VCAP_START   : minimal capa voltage to start
-//  - WINKY_VCAP_STOP    : minimal capa voltage before switching off
-//  - WINKY_VCAP_BOOT    : capa voltage at start
-//  - WINKY_VCAP_MEASURE : capa voltage at beginning of capacitor measure
-enum TeleinfoWinkyVolt  { WINKY_VCAP_START, WINKY_VCAP_STOP, WINKY_VCAP_BOOT, WINKY_VCAP_MEASURE, WINKY_VCAP_MAX };
-
-// voltage levels
-enum  TeleinfoWinkyLevel                    { WINKY_LEVEL_CRITICAL, WINKY_LEVEL_DISCHARGED, WINKY_LEVEL_CORRECT, WINKY_LEVEL_CHARGED, WINKY_LEVEL_MAX };  // voltage levels
-const char kTeleinfoWinkyColor[] PROGMEM    =       "red"        "|"     "orange"        "|"     "yellow"     "|"     "white";                            // level display color
+static const char kTeleinfoWinkyCommands[]  PROGMEM =          "winky|"      "|"       "_capa"       "|"       "_target"       "|"       "_display"       "|"       "_cosphi";
+void (* const TeleinfoWinkyCommand[])(void) PROGMEM = { &CmndTeleinfoWinkyHelp, &CmndTeleinfoWinkyCapa, &CmndTeleinfoWinkyTarget, &CmndTeleinfoWinkyDisplay, &CmndTeleinfoWinkyCosPhi };
 
 /***************************************\
- *                  Data
+ *               Data
 \***************************************/
 
-struct winky_source {
-  uint8_t  pin;                     // pin used for source
-  uint32_t raw;                     // raw value
-  uint32_t ref;                     // raw max reference
-  uint32_t volt;                    // voltage (mV)
-};
+// configuration
+struct {
+  bool     display = false;             // flag set if winky is displayed in main mage
+  uint32_t capa_mf;                     // reference capacitor value (mF)
+  uint32_t target_mv;                   // target supercapa voltage at boot (mV)
+  uint32_t linky_mv;                    // meter max voltage (mV)
+  long     cosphi;                      // number of cosphi calculation to do before deepsleep
+} winky_config;
 
-struct winky_time {                 // ms
-  uint32_t wifi;                    // wifi connexion timestamp
-  uint32_t rtc;                     // RTC synchro timestamp
-  uint32_t mqtt;                    // MQTT connexion timestamp
-  uint32_t capa;                    // Capa discharge timestamp
-};
+// RTC protected data
+RTC_DATA_ATTR struct {      // data in NVRAM to survive deepsleep
+  uint32_t sleep_ms;                    // last deepsleep delay (ms)
+  uint32_t sleep_mv;                    // capa voltage when entering last deepsleep (mV)
+  uint32_t charge_mw;                   // average charging power during deepsleep (mW)
+} winky_rtc;
 
-struct winky_volt {                 // mV
-  uint32_t start;                   // minimal capa voltage to start
-  uint32_t stop;                    // minimal capa voltage before switching off
-  uint32_t boot;                    // capa voltage at boot
-  uint32_t measure;                 // capa voltage at beginning of discharge
-};
-
-struct winky_farad {                // mF
-  uint32_t ref;                     // reference capacitor value
-};
-
-struct winky_meter {
-  long     max_msg;                 // max number of messsage before going to deepsleep
-  uint32_t volt;                    // meter max voltage (mV)
+struct winky_src {
+  uint8_t  pin;                         // pin used for source
+  uint32_t raw;                         // raw value
+  uint32_t volt;                        // voltage (mV)
 };
 
 struct {
-  bool         enabled   = false;       // flag set if winky configured
-  bool         display   = false;       // flag set if winky is displayed in main mage
-  bool         suspend   = false;       // flag set if suspending soon
-  uint32_t     deepsleep = 0;           // calculated deepsleep time (ms)
-  winky_meter  meter;
-  winky_farad  farad;
-  winky_volt   volt;
-  winky_time   timestamp;
-  winky_source usb;
-  winky_source capa;
-  winky_source linky;
-} teleinfo_winky;
-
-RTC_DATA_ATTR struct {               // data in NVRAM to survive deepsleep
-  uint32_t delay_ms;                 // last deepsleep delay (ms)
-  uint32_t volt_mv;                  // last deepsleep voltage (mV)
-  uint32_t charge_mw;                // average charging power during deepsleep (mW)
-} teleinfo_winky_sleep;
+  bool      enabled   = false;          // flag set if winky configured
+  uint8_t   suspend   = WINKY_SUSPEND_NONE;          // suspend steps
+  uint8_t   publish   = WINKY_PUBLISH_NONE;          // publication steps
+  bool      pub_http  = false;          // flag to validate http publication
+  uint32_t  deepsleep = 0;              // calculated deepsleep time (ms)
+  uint32_t  boot_mv   = 0;              // capa voltage at boot (mV)
+  uint32_t  wifi_ms   = 0;              // wifi connexion timestamp
+  uint32_t  mqtt_ms   = 0;              // MQTT connexion timestamp
+  uint32_t  rtc_ms    = 0;              // RTC synchro timestamp
+  winky_src usb;
+  winky_src capa;
+  winky_src linky;
+} winky_status;
 
 /************************\
  *        Commands
@@ -157,62 +131,62 @@ RTC_DATA_ATTR struct {               // data in NVRAM to survive deepsleep
 void CmndTeleinfoWinkyHelp ()
 {
   AddLog (LOG_LEVEL_INFO, PSTR ("HLP: gestion du winky"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - winky_display <0/1> = display data on main page [%u]"), teleinfo_winky.display);
-  AddLog (LOG_LEVEL_INFO, PSTR (" - winky_sleep <val>   = deepsleep [%u.%02u]"), Settings->deepsleep / 1000, (Settings->deepsleep % 1000) / 10);
-  AddLog (LOG_LEVEL_INFO, PSTR ("                         0           : calcul base sur la tension"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("                         1.00 a 9.99 : multiplicateur duree eveil"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("                         10 ou +     : duree fixe (max %us)"), WINKY_SLEEP_MAXIMUM / 1000);
-  AddLog (LOG_LEVEL_INFO, PSTR (" - winky_max <val>     = nbre de trames avant deepsleep [%d]"), teleinfo_winky.meter.max_msg);
-  AddLog (LOG_LEVEL_INFO, PSTR ("                         0      : attente tension basse"));
-  AddLog (LOG_LEVEL_INFO, PSTR ("                         %u ou + : valeurs acceptables"), TIC_MESSAGE_MIN);
-  AddLog (LOG_LEVEL_INFO, PSTR (" - winky_start <volt>  = tension min. démarrage [%u.%02u]"), teleinfo_winky.volt.start / 1000, (teleinfo_winky.volt.start % 1000) / 10);
-  AddLog (LOG_LEVEL_INFO, PSTR (" - winky_stop <volt>   = tension min. arrêt [%u.%02u]"), teleinfo_winky.volt.stop / 1000, (teleinfo_winky.volt.stop % 1000) / 10);
-  AddLog (LOG_LEVEL_INFO, PSTR (" - winky_ref <farad>   = capacité super capa (F) [%u.%02u]"), teleinfo_winky.farad.ref / 1000, (teleinfo_winky.farad.ref % 1000) / 10);
-  AddLog (LOG_LEVEL_INFO, PSTR (" - winky_coeff         = raz coefficients ajustement des tensions"));
-  AddLog (LOG_LEVEL_INFO, PSTR (" - winky_meter         = raz tension/courant linky"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - winky_display <0/1> = données sur page d'accueil [%u]"), winky_config.display);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - winky_target <volt> = tension cible au démarrage [%u.%02u]"), winky_config.target_mv / 1000, (winky_config.target_mv % 1000) / 10);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - winky_capa <farad>  = capacité de la super capa (F) [%u.%02u]"), winky_config.capa_mf / 1000, (winky_config.capa_mf % 1000) / 10);
+  AddLog (LOG_LEVEL_INFO, PSTR (" - winky_cosphi <num>  = nombre de calculs cosphi avant sommeil [%d]"), winky_config.cosphi);
   ResponseCmndDone ();
 }
 
-// Set deepsleep time in seconds (0 : auto)
-void CmndTeleinfoWinkySleep ()
+// Set reference of super capa
+void CmndTeleinfoWinkyCapa ()
 {
-  float value;
-  char  str_result[8];
-  
-  // set limits
+  uint32_t capa_mf;
+  char     str_result[8];
+
+  // if voltage is set
   if (XdrvMailbox.data_len > 0)
   {
-    value = atof (XdrvMailbox.data) * 1000;
-    Settings->deepsleep = (uint32_t)value;
-    if (Settings->deepsleep > WINKY_SLEEP_MAXIMUM) Settings->deepsleep = WINKY_SLEEP_MAXIMUM;
-    SettingsSave (0);
+    // if new start voltage greater than stop voltage, set and save
+    capa_mf = (uint32_t)(atof (XdrvMailbox.data) * 1000);
+    if (capa_mf > 0)
+    {
+      winky_config.capa_mf = capa_mf;
+      Settings->knx_GA_addr[5] = (uint16_t)capa_mf;
+      SettingsSave (0);
+    }
   }
-
+  
   // display value
-  sprintf_P (str_result, PSTR ("%u.%02u"), Settings->deepsleep / 1000, Settings->deepsleep % 1000 / 10);
+  sprintf_P (str_result, PSTR ("%u.%02u Farad"), winky_config.capa_mf / 1000, (winky_config.capa_mf % 1000) / 10);
   ResponseCmndChar (str_result);
 }
 
-// Set maximum number of messages before deepsleep
-void CmndTeleinfoWinkyMax ()
+// Set target super capacitor voltage to start Winky
+void CmndTeleinfoWinkyTarget ()
 {
-  if (XdrvMailbox.payload >= 0)
-  {
-    // set value
-    teleinfo_winky.meter.max_msg = (long)XdrvMailbox.payload;
-    if ((teleinfo_winky.meter.max_msg > 0) && (teleinfo_winky.meter.max_msg < TIC_MESSAGE_MIN)) teleinfo_winky.meter.max_msg = TIC_MESSAGE_MIN;
+  uint32_t voltage;
+  char     str_result[8];
 
-    // save value
-    Settings->knx_GA_addr[8] = (uint16_t)teleinfo_winky.meter.max_msg;
-    SettingsSave (0);
+  // if voltage is set
+  if (XdrvMailbox.data_len > 0)
+  {
+    // if new start voltage greater than stop voltage, set and save
+    voltage = (uint32_t)(atof (XdrvMailbox.data) * 1000);
+    if (voltage > WINKY_CAPA_VMIN + WINKY_CAPA_VDELTA)
+    {
+      winky_config.target_mv = voltage;
+      Settings->knx_GA_addr[3] = (uint16_t)voltage;
+      SettingsSave (0);
+    }
   }
   
   // display value
-  ResponseCmndNumber (teleinfo_winky.meter.max_msg);
+  sprintf_P (str_result, PSTR ("%u.%02u Volt"), winky_config.target_mv / 1000, (winky_config.target_mv % 1000) / 10);
+  ResponseCmndChar (str_result);
 }
 
-// Set reference of super capa
-void CmndTeleinfoWinkyRef ()
+void CmndTeleinfoWinkyDisplay ()
 {
   uint32_t capa_ref;
   char     str_result[8];
@@ -221,104 +195,28 @@ void CmndTeleinfoWinkyRef ()
   if (XdrvMailbox.data_len > 0)
   {
     // if new start voltage greater than stop voltage, set and save
-    capa_ref = (uint32_t)(atof (XdrvMailbox.data) * 1000);
-    if (capa_ref > 0)
-    {
-      teleinfo_winky.farad.ref = capa_ref;
-      Settings->knx_GA_addr[5] = (uint16_t)capa_ref;
-      SettingsSave (0);
-    }
-  }
-  
-  // display value
-  sprintf_P (str_result, PSTR ("%u.%02u Farad"), teleinfo_winky.farad.ref / 1000, (teleinfo_winky.farad.ref % 1000) / 10);
-  ResponseCmndChar (str_result);
-}
-
-// Set minimal super capacitor voltage to start Winky
-void CmndTeleinfoWinkyStart ()
-{
-  uint32_t voltage;
-  char     str_result[8];
-
-  // if voltage is set
-  if (XdrvMailbox.data_len > 0)
-  {
-    // if new start voltage greater than stop voltage, set and save
-    voltage = (uint32_t)(atof (XdrvMailbox.data) * 1000);
-    if (voltage > teleinfo_winky.volt.stop)
-    {
-      teleinfo_winky.volt.start = voltage;
-      Settings->knx_GA_addr[3] = (uint16_t)voltage;
-      SettingsSave (0);
-    }
-  }
-  
-  // display value
-  sprintf_P (str_result, PSTR ("%u.%02u Volt"), teleinfo_winky.volt.start / 1000, (teleinfo_winky.volt.start % 1000) / 10);
-  ResponseCmndChar (str_result);
-}
-
-// Set minimal super capacitor voltage to stop Winky
-void CmndTeleinfoWinkyStop ()
-{
-  uint32_t voltage;
-  char     str_result[8];
-
-  // if voltage is set
-  if (XdrvMailbox.data_len > 0)
-  {
-    // if new stop voltage lower than start voltage, set and save
-    voltage = (uint32_t)(atof (XdrvMailbox.data) * 1000);
-    if (voltage < teleinfo_winky.volt.start)
-    {
-      teleinfo_winky.volt.stop = voltage;
-      Settings->knx_GA_addr[4] = (uint16_t)voltage;
-      SettingsSave (0);
-    }
-  }
-  
-  // display value
-  sprintf_P (str_result, PSTR ("%u.%02u Volt"), teleinfo_winky.volt.stop / 1000, (teleinfo_winky.volt.stop % 1000) / 10);
-  ResponseCmndChar (str_result);
-}
-
-// Reset winky ajustemnt coefficient
-void CmndTeleinfoWinkyCoeff ()
-{
-  teleinfo_winky.usb.ref   = (uint16_t)(WINKY_VOLTAGE_ADC_MAX / 2);
-  teleinfo_winky.capa.ref  = (uint16_t)(WINKY_VOLTAGE_ADC_MAX / 2);
-  teleinfo_winky.linky.ref = (uint16_t)(WINKY_VOLTAGE_ADC_MAX / 2);
-  ResponseCmndDone ();
-}
-
-// Reset winky ajustemnt coefficient
-void CmndTeleinfoWinkyMeter ()
-{
-  uint8_t index;
-  
-  // reset meter values and save
-  teleinfo_winky.meter.volt = 0;
-  SettingsSave (0);
-  ResponseCmndDone ();
-}
-
-void CmndTeleinfoWinkyDisplay ()
-{
-    uint32_t capa_ref;
-  char     str_result[8];
-
-  // if voltage is set
-  if (XdrvMailbox.data_len > 0)
-  {
-    // if new start voltage greater than stop voltage, set and save
-    teleinfo_winky.display    = (XdrvMailbox.payload != 0);
-    Settings->knx_GA_param[0] = (uint8_t)(!teleinfo_winky.display);
+    winky_config.display = (XdrvMailbox.payload != 0);
+    Settings->knx_GA_param[0] = (uint8_t)(!winky_config.display);
     SettingsSave (0);
   }
 
   // display value
-  ResponseCmndNumber (teleinfo_winky.display);
+  ResponseCmndNumber (winky_config.display);
+}
+
+void CmndTeleinfoWinkyCosPhi ()
+{
+  // if voltage is set
+  if (XdrvMailbox.payload >= 0)
+  {
+    // if new start voltage greater than stop voltage, set and save
+    winky_config.cosphi = (long)XdrvMailbox.payload;
+    Settings->knx_GA_param[1] = (uint8_t)winky_config.cosphi;
+    SettingsSave (0);
+  }
+
+  // display value
+  ResponseCmndNumber (winky_config.cosphi);
 }
 
 /************************************\
@@ -328,179 +226,295 @@ void CmndTeleinfoWinkyDisplay ()
 // save multipliers to settings
 void TeleinfoWinkyLoadConfiguration () 
 {
-  uint8_t index;
-  
-  // display
-  teleinfo_winky.display = !(bool)Settings->knx_GA_param[0];
-
-  // load USB reference
-  teleinfo_winky.usb.raw  = 0;
-  teleinfo_winky.usb.volt = 0;
-  teleinfo_winky.usb.ref  = max (Settings->knx_GA_addr[0], (uint16_t)(WINKY_VOLTAGE_ADC_MAX / 2));
-
-  // load Capa reference
-  teleinfo_winky.capa.raw  = 0;
-  teleinfo_winky.capa.volt = 0;
-  teleinfo_winky.capa.ref  = max (Settings->knx_GA_addr[1], (uint16_t)(WINKY_VOLTAGE_ADC_MAX / 2));
-
-  // load Linky reference
-  teleinfo_winky.linky.raw  = 0;
-  teleinfo_winky.linky.volt = 0;
-  teleinfo_winky.linky.ref  = max (Settings->knx_GA_addr[2], (uint16_t)(WINKY_VOLTAGE_ADC_MAX / 2));
+  // load display and cosphi calculation
+  winky_config.display = !(bool)Settings->knx_GA_param[0];
+  winky_config.cosphi  = (long)Settings->knx_GA_param[1];
 
   // load super capacitor voltage limits
-  teleinfo_winky.volt.boot    = 0;
-  teleinfo_winky.volt.measure = 0;
-  teleinfo_winky.volt.start   = (uint32_t)Settings->knx_GA_addr[3];
-  teleinfo_winky.volt.stop    = (uint32_t)Settings->knx_GA_addr[4];
-  if (teleinfo_winky.volt.start == 0) teleinfo_winky.volt.start = WINKY_CAPA_CHARGED;
-  if (teleinfo_winky.volt.stop  == 0) teleinfo_winky.volt.stop  = WINKY_CAPA_DISCHARGED;
+  winky_config.target_mv = (uint32_t)Settings->knx_GA_addr[3];
+  if (winky_config.target_mv <= WINKY_CAPA_VMIN) winky_config.target_mv = WINKY_CAPA_VTARGET;
+    else if (winky_config.target_mv >= WINKY_CAPA_VMAX) winky_config.target_mv = WINKY_CAPA_VTARGET;
 
   // load super capacitor reference
-  teleinfo_winky.farad.ref  = (uint32_t)Settings->knx_GA_addr[5];
-  if (teleinfo_winky.farad.ref == 0) teleinfo_winky.farad.ref = WINKY_CAPA_REFERENCE;
-
-  // load meter data
-  teleinfo_winky.meter.volt    = (uint32_t)Settings->knx_GA_addr[7];
-  teleinfo_winky.meter.max_msg = (long)Settings->knx_GA_addr[8];
-}
-
-// save multipliers to settings
-void TeleinfoWinkySaveBeforeRestart () 
-{
-  // save reference maximum voltage
-  Settings->knx_GA_addr[0] = teleinfo_winky.usb.ref;
-  Settings->knx_GA_addr[1] = teleinfo_winky.capa.ref;
-  Settings->knx_GA_addr[2] = teleinfo_winky.linky.ref;
+  winky_config.capa_mf = (uint32_t)Settings->knx_GA_addr[5];
+  if (winky_config.capa_mf <= WINKY_CAPA_CMIN) winky_config.capa_mf = WINKY_CAPA_CREF;
 }
 
 // update USB voltage : get raw value, calculate max raw for 5V and calculate voltage
 void TeleinfoWinkyReadVoltageUSB ()
 {
-  if (teleinfo_winky.usb.pin > 0)
+  if (winky_status.usb.pin > 0)
   {
-    teleinfo_winky.usb.raw = (uint32_t)AdcRead (teleinfo_winky.usb.pin, 3);
-    teleinfo_winky.usb.ref = max (teleinfo_winky.usb.ref, teleinfo_winky.usb.raw);
-    if (teleinfo_winky.usb.ref > 0) teleinfo_winky.usb.volt = WINKY_USB_MAXIMUM * teleinfo_winky.usb.raw / teleinfo_winky.usb.ref;
-  }
+    // read USB voltage
+    winky_status.usb.raw  = (uint32_t)AdcRead (winky_status.usb.pin, 3);
+    winky_status.usb.volt = 5000 * winky_status.usb.raw * 33 / 25 / 4095;         // 10k/10k, 5 V -> 2.5 V
 
-  // if no usb, declare tasmota on battery
-  if (teleinfo_winky.usb.volt < WINKY_USB_CHARGED) TeleinfoDriverSetBattery (true);
-    else TeleinfoDriverSetBattery (false);
+    // check if running on battery
+    if (winky_status.usb.volt < WINKY_USB_VMIN) TeleinfoDriverSetBattery (true);
+      else TeleinfoDriverSetBattery (false);
+
+    // log
+    AddLog (LOG_LEVEL_DEBUG, PSTR ("HLP: USB voltage = %u mV (%u)"), winky_status.usb.volt, winky_status.usb.raw);
+  }
 }
 
 // update CAPA voltage : get raw value, calculate max raw for 5V and calculate voltage
 void TeleinfoWinkyReadVoltageCapa ()
 {
-  if (teleinfo_winky.capa.pin > 0)
+  if (winky_status.capa.pin > 0)
   {
-    teleinfo_winky.capa.raw = (uint32_t)AdcRead (teleinfo_winky.capa.pin, 3);
-    teleinfo_winky.capa.ref  = max (teleinfo_winky.capa.ref, teleinfo_winky.capa.raw);
-    if (teleinfo_winky.capa.ref > 0) teleinfo_winky.capa.volt = WINKY_CAPA_MAXIMUM * teleinfo_winky.capa.raw / teleinfo_winky.capa.ref;
+    // read Capa voltage
+    winky_status.capa.raw  = (uint32_t)AdcRead (winky_status.capa.pin, 5);
+    winky_status.capa.volt = 5000 * winky_status.capa.raw * 33 / 25 / 4095;       // 470k/470k, 2.5 V -> 5 V
 
-    // if needed; update boot voltage
-    if (teleinfo_winky.volt.boot == 0) teleinfo_winky.volt.boot = teleinfo_winky.capa.volt;
+    // log
+    AddLog (LOG_LEVEL_DEBUG, PSTR ("HLP: Capa voltage = %u mV (%u)"), winky_status.capa.volt, winky_status.capa.raw);
   }
 }
 
 // update LINKY voltage : get raw value and calculate voltage based on dividers
 void TeleinfoWinkyReadVoltageLinky ()
 {
-  if (teleinfo_winky.linky.pin > 0)
+  uint32_t meter_mv;
+
+  if (winky_status.linky.pin > 0)
   {
-    teleinfo_winky.linky.raw = (uint32_t)AdcRead (teleinfo_winky.linky.pin, 5);
-    if (teleinfo_winky.capa.ref > 0) teleinfo_winky.linky.volt = WINKY_LINKY_MAXIMUM * teleinfo_winky.linky.raw / teleinfo_winky.capa.ref;
+    // read Linky voltage
+    winky_status.linky.raw = (uint32_t)AdcRead (winky_status.linky.pin, 3);
+    meter_mv = 18810 * winky_status.linky.raw / 4095;                             // 470k/100k, 18.81 V -> 3.3 V
+
+    // average linky voltage
+    if (winky_status.linky.volt == 0) winky_status.linky.volt = meter_mv;
+      else winky_status.linky.volt = (3 * winky_status.linky.volt + meter_mv) / 4;
+
+    // log
+    AddLog (LOG_LEVEL_DEBUG, PSTR ("HLP: Linky voltage = %u mV (%u)"), winky_status.linky.volt, winky_status.linky.raw);
   }
 }
 
-uint32_t TeleinfoWinkyCalculateChargePower (const uint32_t high_mv, const uint32_t low_mv, const uint32_t capa_mf, const uint32_t delay_ms)
+// calculate meter charging capability according to 
+//   - voltage when charge started
+//   - voltage when charge stopped
+//   - supercapa value
+//   - charging duration
+uint32_t TeleinfoWinkyCalculateChargePower (const uint32_t capa_mf, const uint32_t start_mv, const uint32_t stop_mv, const uint32_t duration_ms)
 {
-  float high_v, low_v, capa_f, delay_s, energy_mj, power_mw;
+  uint32_t power_mw = WINKY_LOAD_REFERENCE;
+  float    duration_s, capa_f, start_v, stop_v, energy_j, power_w;
 
-  // collect data
-  high_v  = (float)high_mv  / 1000;
-  low_v   = (float)low_mv   / 1000;
-  capa_f  = (float)capa_mf  / 1000;
-  delay_s = (float)delay_ms / 1000;
+  // if calculation is possible
+  duration_s = (float)duration_ms / 1000;
+  if ((duration_s > 0) && (start_mv < stop_mv))
+  {
+    // convert data to float
+    capa_f  = (float)capa_mf  / 1000;
+    start_v = (float)start_mv / 1000;
+    stop_v  = (float)stop_mv  / 1000;
 
-  // calculate energy charged (mJ)
-  energy_mj = 500 * capa_f * (high_v * high_v - low_v * low_v);
+    // calculate energy charged (mJ)
+    energy_j = 0.5 * capa_f * (stop_v * stop_v - start_v * start_v);
 
-  // convert into power (mW)
-  if (delay_s > 0) power_mw = energy_mj / delay_s;
-    else power_mw = 0;
+    // convert into power (mW)
+    power_w  = energy_j / duration_s;
+    power_mw = (uint32_t)(1000 * power_w);
+  }
 
-  return (uint32_t)power_mw;
+  return power_mw;
 }
 
-uint32_t TeleinfoWinkyCalculateChargeTime (const uint32_t high_mv, const uint32_t low_mv, const uint32_t capa_mf, const uint32_t power_mw)
+// calculate supercapa charging time according to
+//   - current voltage
+//   - target voltage
+//   - supercapa value
+//   - average meter charge capability
+uint32_t TeleinfoWinkyCalculateChargeTime (const uint32_t capa_mf, const uint32_t start_mv, const uint32_t target_mv, const uint32_t charge_mw)
 {
-  float high_v, low_v, capa_f, power_w, energy_mj, time_ms;
+  uint32_t time_ms = WINKY_SLEEP_MINIMUM;
+  float    charge_w, capa_f, start_v, target_v, energy_j, time_s;
 
-  // check parameters
-  if (power_mw == 0) return WINKY_SLEEP_DEFAULT;
-  if (high_mv <= low_mv) return WINKY_SLEEP_MINIMUM;
+  // if calculation is possible
+  charge_w = (float)charge_mw / 1000;
+  if ((charge_w > 0) && (start_mv < target_mv))
+  {
+    // convert data to float
+    capa_f   = (float)capa_mf   / 1000;
+    start_v  = (float)start_mv  / 1000;
+    target_v = (float)target_mv / 1000;
 
-  // collect data
-  high_v  = (float)high_mv  / 1000;
-  low_v   = (float)low_mv   / 1000;
-  capa_f  = (float)capa_mf  / 1000;
-  power_w = (float)power_mw / 1000;
+    // calculate needed energy (mJ)
+    energy_j = 0.5 * capa_f * (target_v * target_v - start_v * start_v);
 
-  // calculate needed energy (mJ)
-  energy_mj = 500 * capa_f * (high_v * high_v - low_v * low_v);
+    // convert energy to charging time
+    time_s  = energy_j / charge_w;
+    time_ms = (uint32_t)(1000 * time_s);
+  }
 
-  // convert into power (mW)
-  if (power_w > 0) time_ms = energy_mj / power_w;
-    else time_ms = 0;
-
-  return (uint32_t)time_ms;
+  return time_ms;
 }
 
-uint32_t TeleinfoWinkyCalculateSleepTime ()
+void TeleinfoWinkyCalculateSleepTime ()
 {
   uint32_t delay_ms;
 
-  // if fixed deepsleep time should be applied
-  if (Settings->deepsleep >= 10000) delay_ms = Settings->deepsleep;
+  // read capa voltage
+  TeleinfoWinkyReadVoltageCapa ();
 
-  // else if needed apply a multiplicator to awake time
-  else if (Settings->deepsleep >= 1000) delay_ms = millis () * Settings->deepsleep / 1000;
+  // calculate charging time to reach target voltage
+  delay_ms = TeleinfoWinkyCalculateChargeTime (winky_config.capa_mf, winky_status.capa.volt, winky_config.target_mv, winky_rtc.charge_mw);
 
-  // else read capa voltage and calculate estimated charging time to VSTART
-  else
-  {
-    TeleinfoWinkyReadVoltageCapa ();
-    delay_ms = TeleinfoWinkyCalculateChargeTime (teleinfo_winky.volt.start, teleinfo_winky.capa.volt, teleinfo_winky.farad.ref, teleinfo_winky_sleep.charge_mw);
-  }
-
-  // cap min and max deepsleep time
-  delay_ms = max (delay_ms, (uint32_t)WINKY_SLEEP_MINIMUM);
-  delay_ms = min (delay_ms, (uint32_t)WINKY_SLEEP_MAXIMUM);
-
-  return delay_ms;
+  // set deep sleep time with a minimum value
+  winky_status.deepsleep = max (delay_ms, (uint32_t)WINKY_SLEEP_MINIMUM);
 }
 
 // Enter deep sleep mode
-void TeleinfoWinkyEnterSleepMode (const uint32_t sleep_ms, const bool append)
+void TeleinfoWinkyEnterSleepMode (const bool at_boot)
 {
   uint64_t sleep_us;
 
-  // update deepsleep data
-  if (append) teleinfo_winky_sleep.delay_ms += sleep_ms;
+  // switch off wifi
+  WifiShutdown ();
+
+  // if update deepsleep data, disable charge calculation during next wake-up
+  if (at_boot) 
+  {
+    // force immediate restart sleep time
+    winky_status.deepsleep = WINKY_SLEEP_RESTART;
+
+    // reset sleep time to cancel next calculation charge
+    winky_rtc.sleep_ms = 0;
+  }
+
+  // else set data for wake-up charge calculation
   else
   {
-    teleinfo_winky_sleep.delay_ms = sleep_ms;
-    teleinfo_winky_sleep.volt_mv  = teleinfo_winky.capa.volt;
+    // calculate sleep time
+    TeleinfoWinkyCalculateSleepTime ();
+
+    // save current capa voltage and sllep time
+    winky_rtc.sleep_ms = winky_status.deepsleep;
+    winky_rtc.sleep_mv = winky_status.capa.volt;
   }
 
   // convert sleeptime in micro seconds
-  sleep_us = (uint64_t)sleep_ms * mS_TO_uS_FACTOR;
+  sleep_us = (uint64_t)winky_status.deepsleep * mS_TO_uS_FACTOR;
 
-  // switch off wifi and enter deepsleep
-  WifiShutdown ();
+  // enter deepsleep
   esp_sleep_enable_timer_wakeup (sleep_us);
   esp_deep_sleep_start ();
+}
+
+
+// called 10 times per second to update start times
+void TeleinfoWinkyCheckConnectivity ()
+{
+  // check for network connectivity
+  if ((winky_status.wifi_ms == 0) && !TasmotaGlobal.global_state.network_down) winky_status.wifi_ms = millis ();
+
+  // check for RTC connexion
+  if ((winky_status.rtc_ms == 0) && RtcTime.valid) winky_status.rtc_ms = millis ();
+
+  // check for mqtt connectivity
+  if ((winky_status.mqtt_ms == 0) && MqttIsConnected ()) winky_status.mqtt_ms = millis ();
+}
+
+uint8_t TeleinfoWinkyReadyToPublish ()
+{
+  bool    ready;
+  uint8_t result = WINKY_PUBLISH_NONE;
+
+  // check minimum massages and cosphi
+  ready  = (teleinfo_meter.nb_message >= TIC_MESSAGE_MIN);
+  ready &= ((teleinfo_conso.cosphi.quantity >= winky_config.cosphi) || (teleinfo_prod.cosphi.quantity >= winky_config.cosphi));
+  
+  // if ready, set result
+  if (ready) result = WINKY_PUBLISH_HTTP;
+
+  return result;
+}
+
+uint8_t TeleinfoWinkyPublishHTTP ()
+{
+  uint8_t result = WINKY_PUBLISH_HTTP;
+
+  // if wifi is active
+  if (!TasmotaGlobal.global_state.network_down)
+  {
+#ifdef USE_TELEINFO_INFLUXDB
+    // if influxDB is enabled and configured
+    if (teleinfo_influxdb.ready)
+    {
+      // if InfluxDB connexion init ok, publish
+      if (InfluxDbParameterInit ())
+      {
+        // estimate next sleeping time
+        TeleinfoWinkyCalculateSleepTime ();
+
+        // publish data
+        TeleinfoInfluxDbPublishAllData ();
+      }
+
+      // HTTP publication done
+      result = WINKY_PUBLISH_MQTT;
+    }
+    else
+#endif      // USE_TELEINFO_INFLUXDB
+
+#ifdef USE_TELEINFO_AWTRIX
+    if (strlen (awtrix_config.str_device) > 0)
+    {
+      // update next awtrix page
+      TeleinfoAwtrixUpdatePage ();
+
+      // HTTP publication done
+      result = WINKY_PUBLISH_MQTT;
+    }
+    else
+#endif      // USE_TELEINFO_AWTRIX
+
+    // if no HTTP clients, declare HTTP publication done
+    result = WINKY_PUBLISH_MQTT;
+  }
+
+  return result;
+}
+
+uint8_t TeleinfoWinkyPublishMQTT ()
+{
+  uint8_t result = WINKY_PUBLISH_MQTT;
+
+  // if wifi is active
+  if (MqttIsConnected ())
+  {
+    // publish raw tic
+    if (teleinfo_meter.json.tic) TeleinfoDriverPublishTic ();
+
+#ifdef USE_TELEINFO_DOMOTICZ
+    // publish domoticz data
+    else if (teleinfo_domoticz.enabled) TeleinfoDomoticzPublishAll ();
+#endif      // USE_TELEINFO_DOMOTICZ
+
+#ifdef USE_TELEINFO_HOMIE
+    // publish homie data
+    else if (teleinfo_homie.enabled) TeleinfoHomiePublishAllData ();
+#endif      // USE_TELEINFO_HOMIE
+
+#ifdef USE_TELEINFO_THINGSBOARD
+    // publish thingsboard data
+    else if (teleinfo_thingsboard.enabled) TeleinfoThingsboardPublishData ();
+#endif      // USE_TELEINFO_THINGSBOARD
+
+    // publish SENSOR data
+    else
+    {
+      TeleinfoWinkyCalculateSleepTime ();
+      TeleinfoDriverJsonPublish ();
+    }
+
+    // set data as published
+    result = WINKY_PUBLISH_DONE;
+  }
+
+  return result;
 }
 
 /************************************\
@@ -510,23 +524,12 @@ void TeleinfoWinkyEnterSleepMode (const uint32_t sleep_ms, const bool append)
 // Generate WINKY section
 void TeleinfoWinkyAppendSensor ()
 {
-//  bool      ipv4, ipv6;
-//  IPAddress ip_addr;
-
-  // detect IP configuration
-//  ipv4 = (static_cast<uint32_t>(WiFi.localIP ()) != 0);
-//  ipv6 = WifiGetIPv6 (&ip_addr);
-
   // message
   MiscOptionPrepareJsonSection ();
   ResponseAppend_P (PSTR ("\"WINKY\":{"));
-  ResponseAppend_P (PSTR ("\"nmsg\":%u,\"ncos\":%d,\"nboot\":%d"), teleinfo_meter.nb_message, teleinfo_conso.cosphi.quantity + teleinfo_prod.cosphi.quantity, Settings->bootcount);
-//  if (ipv4) ResponseAppend_P (PSTR ("\"mac\":\"%s\",\"ipv4\":\"%_I\","), WiFiHelper::macAddress ().c_str (), (uint32_t)WiFi.localIP ());
-//  if (ipv6) ResponseAppend_P (PSTR ("\"ipv6\":\"%s\","), ip_addr.toString (true).c_str ());
-  ResponseAppend_P (PSTR (",\"vboot\":%u.%02u,\"vsleep\":%u.%02u,\"vmeter\":%u.%02u"), teleinfo_winky.volt.boot / 1000, teleinfo_winky.volt.boot % 1000 / 10, teleinfo_winky.capa.volt / 1000, teleinfo_winky.capa.volt % 1000 / 10, teleinfo_winky.meter.volt / 1000, teleinfo_winky.meter.volt % 1000 / 10);
-//  ResponseAppend_P (PSTR (",\"capa\":{\"Vmax\":%u.%02u,\"Vmin\":%u.%02u}"), teleinfo_winky.volt.boot / 1000, teleinfo_winky.volt.boot % 1000 / 10, teleinfo_winky.capa.volt / 1000, teleinfo_winky.capa.volt % 1000 / 10);
-//  ResponseAppend_P (PSTR (",\"vmeter\":%u.%02u"), teleinfo_winky.meter.volt / 1000, teleinfo_winky.meter.volt % 1000 / 10);
-  ResponseAppend_P (PSTR (",\"net\":%u,\"rtc\":%u,\"mqtt\":%u,\"up\":%u,\"sleep\":%u}"), teleinfo_winky.timestamp.wifi, teleinfo_winky.timestamp.rtc, teleinfo_winky.timestamp.mqtt, millis (), teleinfo_winky.deepsleep);
+  ResponseAppend_P (PSTR ("\"msg\":%u,\"cos\":%d,\"mw\":%u"), teleinfo_meter.nb_message, teleinfo_conso.cosphi.quantity + teleinfo_prod.cosphi.quantity, winky_rtc.charge_mw);
+  ResponseAppend_P (PSTR (",\"vboot\":%u.%02u,\"vsleep\":%u.%02u,\"vmeter\":%u.%02u"), winky_status.boot_mv / 1000, winky_status.boot_mv % 1000 / 10, winky_status.capa.volt / 1000, winky_status.capa.volt % 1000 / 10, winky_status.linky.volt / 1000, winky_status.linky.volt % 1000 / 10);
+  ResponseAppend_P (PSTR (",\"net\":%u,\"rtc\":%u,\"mqtt\":%u,\"up\":%u,\"sleep\":%u}"), winky_status.wifi_ms, winky_status.rtc_ms, winky_status.mqtt_ms, millis (), winky_status.deepsleep);
 }
 
 /************************************\
@@ -534,189 +537,126 @@ void TeleinfoWinkyAppendSensor ()
 \************************************/
 
 // Domoticz init message
-void TeleinfoWinkyInit ()
+void TeleinfoWinkyPreInit ()
 {
   uint8_t  counter;
-  uint32_t pin;
+  uint8_t  pin;
+  uint16_t adc_type;
   uint32_t charge_mw;
-  uint32_t adc_type;
 
-  // init timestamps
-  teleinfo_winky.timestamp.wifi = 0;
-  teleinfo_winky.timestamp.rtc  = 0;
-  teleinfo_winky.timestamp.mqtt = 0;
-  teleinfo_winky.timestamp.capa = 0;
+  // init measures
+  memset (&winky_status.usb,   0, sizeof (winky_src));
+  memset (&winky_status.capa,  0, sizeof (winky_src));
+  memset (&winky_status.linky, 0, sizeof (winky_src));
 
   // detect analog GPIO
   counter = 0;
-  teleinfo_winky.usb.pin   = 0;
-  teleinfo_winky.capa.pin  = 0;
-  teleinfo_winky.linky.pin = 0;
-  for (pin = 0; pin < nitems (TasmotaGlobal.gpio_pin); pin++) 
+  for (pin = 0; pin < nitems (TasmotaGlobal.gpio_pin); pin++)
   {
     adc_type = TasmotaGlobal.gpio_pin[pin] >> 5;
     if (adc_type == GPIO_ADC_INPUT)
     {
       switch (counter)
       {
-        case 0: teleinfo_winky.usb.pin   = pin; counter ++; break;
-        case 1: teleinfo_winky.capa.pin  = pin; counter ++; break;
-        case 2: teleinfo_winky.linky.pin = pin; counter ++; break;
+        case 0: winky_status.usb.pin   = pin; counter ++; break;
+        case 1: winky_status.capa.pin  = pin; counter ++; break;
+        case 2: winky_status.linky.pin = pin; counter ++; break;
       }
     }
   }
+  winky_status.enabled = (winky_status.capa.pin > 0);
 
-  // check if winky configured
-  if (teleinfo_winky.capa.pin > 0) teleinfo_winky.enabled = true;
+  // read initial voltage
+  TeleinfoWinkyReadVoltageCapa ();
+  TeleinfoWinkyReadVoltageUSB ();
+
+  // set boot voltage
+  winky_status.boot_mv = winky_status.capa.volt;
+
+  // reset tasmota deepsleep
+  Settings->deepsleep = 0;
 
   // load configuration
   TeleinfoWinkyLoadConfiguration ();
 
-  // calculate charge power
-  TeleinfoWinkyReadVoltageCapa ();
-  TeleinfoWinkyReadVoltageUSB ();
+  // if first boot, init default linky charge 
+  if (winky_rtc.charge_mw == 0) winky_rtc.charge_mw = WINKY_LOAD_REFERENCE;
 
-  // if running on capa
-  if (teleinfo_winky.enabled && TeleinfoDriverIsOnBattery ())
+  // enable winky if capa is declared
+  if (winky_status.enabled)
   {
-    // if voltage too low to start, back to sleep mode
-    if (teleinfo_winky.capa.volt < teleinfo_winky.volt.start - 50) TeleinfoWinkyEnterSleepMode (WINKY_SLEEP_DEFAULT, true);
-
-    // if waking-up from deepslep, calculate charging power
-    if (ESP_SLEEP_WAKEUP_TIMER == esp_sleep_get_wakeup_cause ())
+    if (TeleinfoDriverIsOnBattery ())
     {
-      // calculate charge power
-      charge_mw = TeleinfoWinkyCalculateChargePower (teleinfo_winky.volt.boot, teleinfo_winky_sleep.volt_mv, teleinfo_winky.farad.ref, teleinfo_winky_sleep.delay_ms);
+      // if voltage too low to start, back to sleep mode
+      if (winky_status.capa.volt < winky_config.target_mv - WINKY_CAPA_VDELTA) TeleinfoWinkyEnterSleepMode (true);
 
-      // save average charging power
-      if (teleinfo_winky_sleep.charge_mw == 0) teleinfo_winky_sleep.charge_mw = charge_mw;
-        else teleinfo_winky_sleep.charge_mw = (3 * teleinfo_winky_sleep.charge_mw + charge_mw) / 4;
+      // if waking-up from deepslep and charge calculation flag is set, calculate charging power with average on 4 samples
+      if ((ESP_SLEEP_WAKEUP_TIMER == esp_sleep_get_wakeup_cause ()) && (winky_rtc.sleep_ms > 0))
+      {
+        charge_mw = TeleinfoWinkyCalculateChargePower (winky_config.capa_mf, winky_rtc.sleep_mv, winky_status.boot_mv, winky_rtc.sleep_ms);
+        winky_rtc.charge_mw = (3 * winky_rtc.charge_mw + charge_mw) / 4;
+      }
     }
-  } 
 
-  // save boot voltage
-  teleinfo_winky.volt.boot = teleinfo_winky.capa.volt;
-
-  // log help command
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Run winky to get help on Winky commands"));
+    // log help command
+    AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Run winky to get help on Winky commands"));
+  }
 }
 
 // called 10 times per second to update start times
 void TeleinfoWinkyEvery100ms ()
 {
-  // check for RTC connexion
-  if ((teleinfo_winky.timestamp.rtc == 0) && RtcTime.valid) teleinfo_winky.timestamp.rtc = millis ();
+  // if too many reception errrors, back to sleep
+  if (teleinfo_meter.nb_error >= WINKY_ERROR_MAX) TeleinfoWinkyEnterSleepMode (true);
 
-  // check for network connectivity
-  if (teleinfo_winky.timestamp.wifi == 0)
-  {
-    if (WifiHasIPv4 ())      teleinfo_winky.timestamp.wifi = millis ();
-    else if (WifiHasIPv6 ()) teleinfo_winky.timestamp.wifi = millis ();
-  }
-
-  // check for mqtt connectivity
-  if ((teleinfo_winky.timestamp.mqtt == 0) && MqttIsConnected ()) teleinfo_winky.timestamp.mqtt = millis ();
+  // check for connectivity
+  TeleinfoWinkyCheckConnectivity ();
 }
 
 // called every second to check capa level and deepsleep condition
 void TeleinfoWinkyEverySecond ()
 {
-  bool     voltage_low, cosphi_reached, max_reached;
-  uint32_t value;
-
   // if not enabled, ignore
-  if (!teleinfo_winky.enabled) return;
+  if (!winky_status.enabled) return;
 
-  //  voltage calculation
-  //  -------------------
+  // check network connectivity
+  TeleinfoWinkyCheckConnectivity ();
 
-  // check voltages
+  // read USB and super capa voltage
   TeleinfoWinkyReadVoltageUSB ();
   TeleinfoWinkyReadVoltageCapa ();
-  TeleinfoWinkyReadVoltageLinky ();
-
-  // check and save max voltage
-  if (teleinfo_winky.meter.volt < teleinfo_winky.linky.volt)
-  {
-    // update value
-    teleinfo_winky.meter.volt = teleinfo_winky.linky.volt;
-    Settings->knx_GA_addr[7]  = (uint16_t)teleinfo_winky.meter.volt;
-    
-    // save config
-    SettingsSave (0);
-  }
-
-  // if not on super capa, reset calculation
-  if (TeleinfoDriverIsPowered ()) teleinfo_winky.timestamp.capa = 0;
-
-  // else if first time on battery, init capacitor calculation
-  else if (teleinfo_winky.timestamp.capa == 0)
-  {
-    teleinfo_winky.timestamp.capa = millis ();
-    teleinfo_winky.volt.measure = teleinfo_winky.capa.volt;
-  }
 
   // if on battery mode
   if (TeleinfoDriverIsOnBattery ())
   {
-    // check if capa voltage is too low
-    voltage_low = (teleinfo_winky.capa.volt <= teleinfo_winky.volt.stop);
+    // if capa voltage is too low, suspend
+    if (winky_status.capa.volt <= WINKY_CAPA_VMIN) winky_status.suspend = WINKY_SUSPEND_IMMEDIATE;
 
-    // check cosphi calculation quantity
-    cosphi_reached = ((teleinfo_conso.cosphi.quantity >= TIC_COSPHI_SAMPLE) || (teleinfo_prod.cosphi.quantity >= TIC_COSPHI_SAMPLE));
+    // else if capa voltage is lower than the target, check data reception
+    else if (winky_status.capa.volt < winky_config.target_mv - WINKY_CAPA_VDELTA) winky_status.suspend = WINKY_SUSPEND_SOON;
 
-    // check if maximum message reception is reached
-    if (teleinfo_winky.meter.max_msg == 0) max_reached = false;
-      else max_reached = (teleinfo_meter.nb_message >= teleinfo_winky.meter.max_msg);
-
-    // if voltage is low, uptime to long, cosphi ratio reached or max received message reached, start suspend
-    teleinfo_winky.suspend = (voltage_low || cosphi_reached || max_reached);
-    if (teleinfo_winky.suspend)
+    // if suspend process started and minimum data received
+    if (winky_status.suspend == WINKY_SUSPEND_SOON)
     {
-      // publish MQTT JSON data
-      TeleinfoDriverJsonPublish ();
+      // check minimum message and cosphi
+      if (winky_status.publish == WINKY_PUBLISH_NONE) winky_status.publish = TeleinfoWinkyReadyToPublish ();
 
-      // if needed, publish raw TIC
-      if (teleinfo_meter.json.tic) TeleinfoDriverPublishTic ();
+      // handle HTTP publication stage
+      if (winky_status.publish == WINKY_PUBLISH_HTTP) winky_status.publish = TeleinfoWinkyPublishHTTP ();
 
-#ifdef USE_TELEINFO_DOMOTICZ
-      // publish Domoticz data
-      TeleinfoDomoticzPublishAll ();
-#endif    // USE_TELEINFO_DOMOTICZ
+      // else handle MQTT publication stage
+      else if (winky_status.publish == WINKY_PUBLISH_MQTT) winky_status.publish = TeleinfoWinkyPublishMQTT ();
 
-#ifdef USE_TELEINFO_HOMIE
-      // publish Homie data
-      TeleinfoHomiePublishAllData ();
-#endif    // USE_TELEINFO_HOMIE
-
-#ifdef USE_TELEINFO_THINGSBOARD
-      // publish Thingsboard data
-      TeleinfoThingsboardPublishData ();
-#endif    // USE_TELEINFO_THINGSBOARD
-
-#ifdef USE_TELEINFO_INFLUXDBD
-      if (teleinfo_influxdb.enabled)
-      {
-        // calculate deepsleep time to publish it
-        teleinfo_winky.deepsleep = TeleinfoWinkyCalculateSleepTime ();
-
-        // publish InfluxDB data
-        TeleinfoInfluxDbPublishAllData ();
-      }
-#endif    // USE_TELEINFO_INFLUXDBD
-
-#ifdef USE_TELEINFO_AWTRIX
-      // update Awtrix data
-      TeleinfoAwtrixUpdatePage ();
-#endif    // USE_TELEINFO_AWTRIX
-
-      // calculate deepsleep time to go to sleep
-      teleinfo_winky.deepsleep = TeleinfoWinkyCalculateSleepTime ();
-
-      // enter deepsleep
-      TeleinfoWinkyEnterSleepMode (teleinfo_winky.deepsleep, false);
+      // if all publication done, suspend can start
+      if (winky_status.publish == WINKY_PUBLISH_DONE) winky_status.suspend = WINKY_SUSPEND_IMMEDIATE;
     }
+
+    // if validated, enter deepsleep
+    if (winky_status.suspend == WINKY_SUSPEND_IMMEDIATE) TeleinfoWinkyEnterSleepMode (false);
   }
+
+  // read meter voltage
+  TeleinfoWinkyReadVoltageLinky ();
 }
 
 // called to append winky InfluxDB data
@@ -729,39 +669,39 @@ void TeleinfoWinkyInfluxDbAppendData ()
   TasmotaGlobal.mqtt_data += str_line;
 
   // capacitor reference
-  snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u.%02u\n"), PSTR ("winky"), TasmotaGlobal.hostname, PSTR ("capa"), teleinfo_winky.farad.ref / 1000, teleinfo_winky.farad.ref % 1000 / 10);
+  snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u.%02u\n"), PSTR ("winky"), TasmotaGlobal.hostname, PSTR ("capa"), winky_config.capa_mf / 1000, winky_config.capa_mf % 1000 / 10);
+  TasmotaGlobal.mqtt_data += str_line;
+
+  // meter charging power
+  snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u\n"), PSTR ("winky"), TasmotaGlobal.hostname, PSTR ("mw"), winky_rtc.charge_mw);
   TasmotaGlobal.mqtt_data += str_line;
 
   // meter voltage
-  snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u.%02u\n"), PSTR ("winky"), TasmotaGlobal.hostname, PSTR ("vmeter"), teleinfo_winky.meter.volt / 1000, teleinfo_winky.meter.volt % 1000 / 10);
+  snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u.%02u\n"), PSTR ("winky"), TasmotaGlobal.hostname, PSTR ("vmeter"), winky_status.linky.volt / 1000, winky_status.linky.volt % 1000 / 10);
   TasmotaGlobal.mqtt_data += str_line;
 
   // voltage capacitor at start
-  snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u.%02u\n"), PSTR ("winky"), TasmotaGlobal.hostname, PSTR ("vstart"), teleinfo_winky.volt.boot / 1000, teleinfo_winky.volt.boot % 1000 / 10);
+  snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u.%02u\n"), PSTR ("winky"), TasmotaGlobal.hostname, PSTR ("vstart"), winky_status.boot_mv / 1000, winky_status.boot_mv % 1000 / 10);
   TasmotaGlobal.mqtt_data += str_line;
 
   // voltage capacitor at stop
-  snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u.%02u\n"), PSTR ("winky"), TasmotaGlobal.hostname, PSTR ("vstop"), teleinfo_winky.capa.volt / 1000, teleinfo_winky.capa.volt % 1000 / 10);
+  snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u.%02u\n"), PSTR ("winky"), TasmotaGlobal.hostname, PSTR ("vstop"), winky_status.capa.volt / 1000, winky_status.capa.volt % 1000 / 10);
   TasmotaGlobal.mqtt_data += str_line;
 
   // time to establish network (ms)
-  snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u\n"), PSTR ("winky"), TasmotaGlobal.hostname, PSTR ("net"), teleinfo_winky.timestamp.wifi);
+  snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u\n"), PSTR ("winky"), TasmotaGlobal.hostname, PSTR ("net"), winky_status.wifi_ms);
   TasmotaGlobal.mqtt_data += str_line;
 
   // time to establish rtc (ms)
-  snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u\n"), PSTR ("winky"), TasmotaGlobal.hostname, PSTR ("rtc"), teleinfo_winky.timestamp.rtc);
+  snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u\n"), PSTR ("winky"), TasmotaGlobal.hostname, PSTR ("rtc"), winky_status.rtc_ms);
   TasmotaGlobal.mqtt_data += str_line;
-
-  // time to establish mqtt (ms)
-//  snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u\n"), PSTR ("winky"), TasmotaGlobal.hostname, PSTR ("ms-mqtt"), teleinfo_winky.timestamp.mqtt);
-//  TasmotaGlobal.mqtt_data += str_line;
 
   // total alive time (ms)
   snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u\n"), PSTR ("winky"), TasmotaGlobal.hostname, PSTR ("up"), millis ());
   TasmotaGlobal.mqtt_data += str_line;
 
   // duration of next deepsleep (ms)
-  snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u\n"), PSTR ("winky"), TasmotaGlobal.hostname, PSTR ("sleep"), teleinfo_winky.deepsleep);
+  snprintf_P (str_line, sizeof (str_line), PSTR("%s,device=%s,sensor=%s value=%u\n"), PSTR ("winky"), TasmotaGlobal.hostname, PSTR ("sleep"), winky_status.deepsleep);
   TasmotaGlobal.mqtt_data += str_line;
 }
 
@@ -785,45 +725,43 @@ void TeleinfoWinkyWebMainButton ()
 // Append winky state to main page
 void TeleinfoWinkyWebSensor ()
 {
-  long percent;
-  char str_color[8];
+  uint32_t percent;
+  char     str_color[8];
 
   // if not configured, ignore
-  if (!teleinfo_winky.enabled) return;
-  if (!teleinfo_winky.display) return;
+  if (!winky_status.enabled) return;
+  if (!winky_config.display) return;
 
   // section
-  WSContentSend_P (PSTR ("<div class='sec' onclick=\"onClickMain(\'%s?%s=%u\')\">\n"), PSTR (TIC_PAGE_DISPLAY), PSTR (CMND_TIC_MAIN), TIC_DISPLAY_WINKY);
+  WSContentSend_P (PSTR ("<div class='sec' onclick=\"onClickMain(\'%s?%s=%u\')\">\n"), PSTR_TIC_PAGE_DISPLAY, PSTR (CMND_TIC_MAIN), TIC_DISPLAY_WINKY);
 
   // title and USB icon
-  if (teleinfo_winky.usb.volt > WINKY_USB_CHARGED) strcpy_P (str_color, PSTR ("load")); else strcpy_P (str_color, PSTR ("disc")); 
-  WSContentSend_P (PSTR ("<div class='tic ticb'><div class='tic70l'>Winky</div><div class='winky %s' title='Entrée %u/4095 (%u.%02u V)'></div></div>\n"), str_color, teleinfo_winky.usb.raw, teleinfo_winky.usb.volt / 1000, teleinfo_winky.usb.volt % 1000 / 10);
+  if (winky_status.usb.volt > WINKY_USB_VMIN) strcpy_P (str_color, PSTR ("load")); else strcpy_P (str_color, PSTR ("disc")); 
+  WSContentSend_P (PSTR ("<div class='tic ticb'><div class='tic70l'>Winky</div><div class='winky %s' title='Entrée %u/4095 (%u.%02u V)'></div></div>\n"), str_color, winky_status.usb.raw, winky_status.usb.volt / 1000, winky_status.usb.volt % 1000 / 10);
 
   if (teleinfo_config.arr_main[TIC_DISPLAY_WINKY])
   {
     // capa status bar
-    if (teleinfo_winky.capa.pin > 0)
+    if (winky_status.capa.pin > 0)
     {
       // calculate percentage
-      percent = 0;
-      if (teleinfo_winky.capa.ref > 0) percent = min (100L, 100 * (long)teleinfo_winky.capa.raw / (long)teleinfo_winky.capa.ref); 
+      percent = 100 * min (winky_status.capa.volt, (uint32_t)WINKY_CAPA_VMAX) / WINKY_CAPA_VMAX; 
 
       // display bar graph percentage
       WSContentSend_P (PSTR ("<div class='tic bar'><div class='tic16l'>%s</div>"), PSTR ("Capa"));
-      WSContentSend_P (PSTR ("<div class='bar30'><div class='barv load' style='width:%u%%;' title='Entrée %u/4095'>%u.%02u</div></div><div class='tic46'></div><div class='tic10l'>V</div>"), percent, teleinfo_winky.capa.raw, teleinfo_winky.capa.volt / 1000, teleinfo_winky.capa.volt % 1000 / 10);
+      WSContentSend_P (PSTR ("<div class='bar30'><div class='barv load' style='width:%u%%;' title='Entrée %u/4095'>%u.%02u</div></div><div class='tic46'></div><div class='tic10l'>V</div>"), percent, winky_status.capa.raw, winky_status.capa.volt / 1000, winky_status.capa.volt % 1000 / 10);
       WSContentSend_P (PSTR ("</div>\n"));
     }
 
     // linky status bar
-    if (teleinfo_winky.linky.pin > 0)
+    if (winky_status.linky.pin > 0)
     {
       // calculate percentage
-      percent = 0;
-      if (teleinfo_winky.capa.ref > 0) percent = min (100L, 119 * (long)teleinfo_winky.linky.raw / (long)teleinfo_winky.capa.ref); 
+      percent = 100 * min (winky_status.linky.volt, (uint32_t)WINKY_LINKY_VDISPLAY) / WINKY_LINKY_VDISPLAY; 
 
       // display bar graph percentage
       WSContentSend_P (PSTR ("<div class='tic bar'><div class='tic16l'>%s</div>"), PSTR ("Linky"));
-      WSContentSend_P (PSTR ("<div class='bar72'><div class='barv linky' style='width:%u%%;' title='Entrée %u/4095'>%u.%02u</div></div><div class='tic02'></div><div class='tic10l'>V</div>"), percent, teleinfo_winky.linky.raw, teleinfo_winky.linky.volt / 1000, teleinfo_winky.linky.volt % 1000 / 10);
+      WSContentSend_P (PSTR ("<div class='bar72'><div class='barv linky' style='width:%u%%;' title='Entrée %u/4095'>%u.%02u</div></div><div class='tic02'></div><div class='tic10l'>V</div>"), percent, winky_status.linky.raw, winky_status.linky.volt / 1000, winky_status.linky.volt % 1000 / 10);
       WSContentSend_P (PSTR ("</div>\n"));
     }
   }
@@ -848,8 +786,8 @@ bool XdrvTeleinfoWinky (const uint32_t function)
       result = DecodeCommand (kTeleinfoWinkyCommands, TeleinfoWinkyCommand);
       break;
 
-    case FUNC_INIT:
-      TeleinfoWinkyInit ();
+    case FUNC_PRE_INIT:
+      TeleinfoWinkyPreInit ();
       break;
 
     case FUNC_EVERY_100_MSECOND:
@@ -860,10 +798,6 @@ bool XdrvTeleinfoWinky (const uint32_t function)
        TeleinfoWinkyEverySecond ();
       break;
 
-    case FUNC_SAVE_BEFORE_RESTART:
-      TeleinfoWinkySaveBeforeRestart ();
-      break;
-
 #ifdef USE_WEBSERVER
     case FUNC_WEB_SENSOR:
       TeleinfoWinkyWebSensor ();
@@ -872,7 +806,6 @@ bool XdrvTeleinfoWinky (const uint32_t function)
     case FUNC_WEB_ADD_MAIN_BUTTON:
       TeleinfoWinkyWebMainButton ();
       break;
-
 #endif    // USE_WEBSERVER
   }
 

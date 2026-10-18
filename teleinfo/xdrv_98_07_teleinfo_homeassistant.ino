@@ -243,7 +243,7 @@ void TeleinfoHomeAssistantEvery250ms ()
 {
   // if already published, not connected or no message received, ignore 
   if (teleinfo_hass_sleep.stage == UINT8_MAX) return;
-  if (!TeleinfoDriverWebAllow (TIC_WEB_MQTT)) return;
+  if (!HelperPublishAllowMqtt ()) return;
 
   // publish next home assistant integration message
   TeleinfoHomeAssistantPublishNextRetain ();
@@ -436,7 +436,7 @@ void TeleinfoHomeAssistantPublish (const uint8_t stage, const uint8_t index)
     MqttPublish (str_text2, true);
 
     // declare publication
-    TeleinfoDriverWebDeclare (TIC_WEB_MQTT);
+    HelperPublishDeclareMqtt ();
   }
 }
 

@@ -19,6 +19,7 @@
     03/01/2024 v2.0 - tcp_status bug correction
                       Dynamic loading thru tcp_start
     10/07/2025 v3.0 - Refactoring based on Tasmota 15
+    28/09/2026 v3.1 - Check network connectivity before publication
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -201,7 +202,7 @@ void CmndTeleinfoTCPStart (void)
   // if port is provided
   if (XdrvMailbox.data_len > 0) tcp_port = XdrvMailbox.payload;
   
-  if (tcp_port > 0)
+  if (!TasmotaGlobal.global_state.network_down && (tcp_port > 0))
   {
     // if TCP server not created, create it
     if (ptcp_server == nullptr)

@@ -79,6 +79,13 @@
 #ifdef USE_ENERGY_SENSOR
 #ifdef USE_TELEINFO
 
+// web URL
+constexpr char PSTR_TIC_PAGE_CONFIG[]      PROGMEM = "/tic-cfg";
+constexpr char PSTR_TIC_PAGE_MESSAGE[]     PROGMEM = "/tic-msg";
+constexpr char PSTR_TIC_PAGE_MESSAGE_JS[]  PROGMEM = "/tic-msg.js";
+constexpr char PSTR_TIC_PAGE_MESSAGE_CSS[] PROGMEM = "/tic-msg.css";
+constexpr char PSTR_TIC_PAGE_MESSAGE_UPD[] PROGMEM = "/tic-msg.upd";
+
 /*********************************************\
  *               Helper functions
 \*********************************************/
@@ -263,22 +270,23 @@ void TeleinfoDriverLoadSettings ()
   uint8_t index;
 
   // load standard settings
-  teleinfo_config.display      = (Settings->teleinfo.display  == 0);
-  teleinfo_config.meter        = (Settings->teleinfo.meter    == 0);
-  teleinfo_config.relay        = (Settings->teleinfo.relay    != 0);
-  teleinfo_config.calendar     = (Settings->teleinfo.calendar != 0);
-  teleinfo_config.tic          = (Settings->teleinfo.tic      != 0);
-  teleinfo_config.energy       = (Settings->teleinfo.energy   != 0);
-  teleinfo_config.live         = (Settings->teleinfo.live     != 0);
-  teleinfo_config.cal_hexa     = (Settings->teleinfo.cal_hexa != 0);
-  teleinfo_config.led          = (Settings->teleinfo.led      != 0);
-  teleinfo_config.percent      = Settings->teleinfo.percent;
-  teleinfo_config.skip         = Settings->teleinfo.skip;
-  teleinfo_config.policy       = min ((uint)Settings->teleinfo.policy, (uint)(TIC_POLICY_MAX - 1));
-  teleinfo_config.prod_max     = (long)Settings->energy_max_power_limit;
-  teleinfo_config.prod_trigger = 50 * (long)Settings->rf_code[16][6];
-  teleinfo_config.brightness   = max (Settings->rf_code[16][7], (uint8_t)100);
-  teleinfo_config.baudrate     = (uint32_t)Settings->rf_code[15][8] * 300;
+  teleinfo_config.display       = (Settings->teleinfo.display  == 0);
+  teleinfo_config.meter         = (Settings->teleinfo.meter    == 0);
+  teleinfo_config.relay         = (Settings->teleinfo.relay    != 0);
+  teleinfo_config.calendar      = (Settings->teleinfo.calendar != 0);
+  teleinfo_config.tic           = (Settings->teleinfo.tic      != 0);
+  teleinfo_config.energy        = (Settings->teleinfo.energy   != 0);
+  teleinfo_config.live          = (Settings->teleinfo.live     != 0);
+  teleinfo_config.cal_hexa      = (Settings->teleinfo.cal_hexa != 0);
+  teleinfo_config.led           = (Settings->teleinfo.led      != 0);
+  teleinfo_config.percent       = Settings->teleinfo.percent;
+  teleinfo_config.skip          = Settings->teleinfo.skip;
+  teleinfo_config.policy        = min ((uint)Settings->teleinfo.policy, (uint)(TIC_POLICY_MAX - 1));
+  teleinfo_config.prod_max      = (long)Settings->energy_max_power_limit;
+  teleinfo_config.prod_trigger  = 50 * (long)Settings->rf_code[16][6];
+  teleinfo_config.brightness    = min (Settings->rf_code[16][7], (uint8_t)100);
+  teleinfo_config.cosphi_sample = min (Settings->rf_code[16][8], (uint8_t)TIC_COSPHI_SAMPLE_MAX);
+  teleinfo_config.baudrate      = (uint32_t)Settings->rf_code[15][8] * 300;
 
   // load display flags
   for (index = 0; index < 9; index ++) teleinfo_config.arr_main[index] = !(bool)Settings->rf_code[10][index];
@@ -286,6 +294,8 @@ void TeleinfoDriverLoadSettings ()
   
   // validate boundaries
   if (teleinfo_config.skip == 0) teleinfo_config.skip = 3;
+  if (teleinfo_config.baudrate == 0) teleinfo_config.baudrate = 1200;
+  if (teleinfo_config.cosphi_sample < TIC_COSPHI_SAMPLE_MIN) teleinfo_config.cosphi_sample = TIC_COSPHI_SAMPLE_MAX;
   if (teleinfo_config.percent < TIC_PERCENT_MIN) teleinfo_config.percent = 100;
   if (teleinfo_config.percent > TIC_PERCENT_MAX) teleinfo_config.percent = 100;
 }
@@ -310,6 +320,8 @@ void TeleinfoDriverSaveSettings ()
   Settings->teleinfo.skip          = teleinfo_config.skip;
   Settings->rf_code[15][8]         = (uint8_t)(teleinfo_config.baudrate / 300);
   Settings->rf_code[16][6]         = (uint8_t)(teleinfo_config.prod_trigger / 50);
+  Settings->rf_code[16][7]         = teleinfo_config.brightness;
+  Settings->rf_code[16][8]         = teleinfo_config.cosphi_sample;
   Settings->energy_max_power_limit = (uint16_t)teleinfo_config.prod_max;
 
   // save display flags
@@ -385,6 +397,7 @@ uint32_t TeleinfoDriverWebGetDelay (const uint8_t type)
 }
 */
 
+/*
 bool TeleinfoDriverWebAllow (const uint8_t type)
 {
   uint8_t index;
@@ -429,6 +442,7 @@ void TeleinfoDriverWebDeclare (const uint8_t type)
       break;
   }
 }
+*/
 
 void TeleinfoDriverRemoveSpace (char* pstr_source)
 {
@@ -564,7 +578,10 @@ void TeleinfoDriverCalendarGetDate (const uint32_t delta, char *pstr_date, const
 // Trigger publication flags
 void TeleinfoDriverJsonPublish ()
 {
-  // message start
+  // check mqtt connexion
+  if (!MqttIsConnected ()) return;
+
+  // reset message data
   ResponseClear ();
   if (RtcTime.valid) ResponseAppendTime ();
     else ResponseAppend_P (PSTR ("{"));
@@ -579,7 +596,7 @@ void TeleinfoDriverJsonPublish ()
 
   // reset flag and declare publication
   teleinfo_meter.json.data = false;
-  TeleinfoDriverWebDeclare (TIC_WEB_MQTT);
+  HelperPublishDeclareMqtt ();
 }
 
 // Generate LIVE JSON
@@ -605,7 +622,7 @@ void TeleinfoDriverPublishLive ()
 
   // reset JSON flag and declare publication
   teleinfo_meter.json.live = false;
-  TeleinfoDriverWebDeclare (TIC_WEB_MQTT);
+  HelperPublishDeclareMqtt ();
 }
 
 // Generate TIC full JSON
@@ -613,6 +630,9 @@ void TeleinfoDriverPublishTic ()
 {
   bool    is_first = true;
   uint8_t index;
+
+  // check mqtt connexion
+  if (!MqttIsConnected ()) return;
 
   // start of message
   ResponseClear ();
@@ -635,7 +655,7 @@ void TeleinfoDriverPublishTic ()
 
   // reset JSON flag and declare publication
   teleinfo_meter.json.tic = false;
-  TeleinfoDriverWebDeclare (TIC_WEB_MQTT);
+  HelperPublishDeclareMqtt ();
 }
 
 // Append ALERT to JSON
@@ -1427,7 +1447,7 @@ void TeleinfoDriverInit ()
   teleinfo_meter.json.tic  = false;
 
   // meter timestamps
-  for (index = 0; index < TIC_WEB_MAX; index ++) teleinfo_meter.arr_web_ts[index] = 0;
+//  for (index = 0; index < TIC_WEB_MAX; index ++) teleinfo_meter.arr_web_ts[index] = 0;
 
   // reset contract data
   TeleinfoContractInit ();
@@ -1452,7 +1472,6 @@ void TeleinfoDriverSaveBeforeRestart ()
   // if graph unit have been changed, save configuration
   TeleinfoDriverSaveData ();
   TeleinfoDriverSaveSettings ();
-//  SettingsSave (0);
 
   // update energy counters
   EnergyUpdateToday ();
@@ -1461,7 +1480,7 @@ void TeleinfoDriverSaveBeforeRestart ()
 // Handling of received teleinfo data, called 20x / second
 //     Message :    0x02 = start      Ox03 = stop        0x04 = reset 
 //     Line    :    0x0A = start      0x0D = stop        0x09 = separator
-void TeleinfoDriverEvery50ms ()
+void TeleinfoDriverReception ()
 {
   char     character;
   size_t   index, buffer;
@@ -1475,8 +1494,10 @@ void TeleinfoDriverEvery50ms ()
   buffer = 0;
   if (teleinfo_serial->available ()) buffer = teleinfo_serial->read (str_buffer, TIC_RX_BUFFER);
 
+#ifdef ESP8266
   // for ESP8266, wait for network to be up before handling reception
   if (TasmotaGlobal.global_state.network_down) return;
+#endif
 
   // loop thru reception buffer
   for (index = 0; index < buffer; index++)
@@ -1486,7 +1507,7 @@ void TeleinfoDriverEvery50ms ()
 
 #ifdef USE_TELEINFO_TCP
     // send character thru TCP stream
-    TeleinfoTCPSend (character);
+    if (!TasmotaGlobal.global_state.network_down) TeleinfoTCPSend (character);
 #endif  // USE_TELEINFO_TCP
 
     // analyse character
@@ -1518,8 +1539,9 @@ void TeleinfoDriverEvery50ms ()
 // called 4 times per second
 void TeleinfoDriverEvery250ms ()
 {
-  // if meter not ready, ignore
+  // if meter not ready or on supercapa, ignore
   if (!TeleinfoDriverMeterReady ()) return;
+  if (TeleinfoDriverIsOnBattery ()) return;
 
   // check if TIC or LIVE topic should be published (according to frame skip ratio)
   if ((teleinfo_config.tic || teleinfo_config.live) && (teleinfo_meter.nb_message >= teleinfo_meter.nb_skip + (long)teleinfo_config.skip))
@@ -1530,7 +1552,7 @@ void TeleinfoDriverEvery250ms ()
   }
 
   // if minimum delay between 2 publications is reached
-  if (TeleinfoDriverWebAllow (TIC_WEB_MQTT))
+  if (HelperPublishAllowMqtt ())
   {
     // if something to publish
     if (teleinfo_meter.json.live) TeleinfoDriverPublishLive ();
@@ -1543,9 +1565,12 @@ void TeleinfoDriverEvery250ms ()
   }
 }
 
-// Handle MQTT teleperiod
+// Handle teleperiod
 void TeleinfoDriverTriggerExtension ()
 {
+  // if no contract reference, ignore
+  if (teleinfo_meter.ident == 0) return;
+  
   // trigger domoticz data publication
 #ifdef USE_TELEINFO_DOMOTICZ
   TeleinfoDomoticzData ();
@@ -1589,11 +1614,25 @@ void TeleinfoDriverJsonAppend ()
   // Populate current message
   // ------------------------
 
-  // if needed, remove ENERGY and append data
+  // if needed, remove ENERGY
   if (!teleinfo_config.energy)  TeleinfoDriverRemoveEnergySensor ();
-  if (teleinfo_config.meter)    TeleinfoDriverAppendMeterSensor ();
-  if (teleinfo_config.meter)    TeleinfoDriverAppendContractSensor ();
-  if (teleinfo_config.relay)    TeleinfoDriverAppendRelaySensor ();
+
+  // if no contract reference, ignore
+  if (teleinfo_meter.ident == 0) return;
+
+  // winky data
+#ifdef USE_TELEINFO_WINKY
+  if (winky_status.suspend) TeleinfoWinkyAppendSensor ();
+#endif    // USE_TELEINFO_WINKY
+
+  // append data and contract
+  if (teleinfo_config.meter) TeleinfoDriverAppendMeterSensor ();
+  if (teleinfo_config.meter) TeleinfoDriverAppendContractSensor ();
+
+  // append relay
+  if (teleinfo_config.relay) TeleinfoDriverAppendRelaySensor ();
+
+  // append calendar
   if (teleinfo_config.calendar) TeleinfoDriverAppendCalendarSensor ();
 
   // alerts
@@ -1601,7 +1640,7 @@ void TeleinfoDriverJsonAppend ()
 
   // solar production
 #ifdef USE_TELEINFO_SOLAR
-  TeleinfoSolarAppendSensor ();
+  if (TeleinfoDriverIsPowered ()) TeleinfoSolarAppendSensor ();
 #endif  // USE_TELEINFO_SOLAR
 
   // RTE main data
@@ -1609,14 +1648,9 @@ void TeleinfoDriverJsonAppend ()
   if (TeleinfoDriverIsPowered ()) TeleinfoRteAppendSensor ();
 #endif  // USE_TELEINFO_RTE
 
-  // winky data
-#ifdef USE_TELEINFO_WINKY
-  if (teleinfo_winky.suspend) TeleinfoWinkyAppendSensor ();
-#endif    // USE_TELEINFO_WINKY
-
   // reset flag and declare publication
   teleinfo_meter.json.data = false;
-  TeleinfoDriverWebDeclare (TIC_WEB_MQTT);
+  HelperPublishDeclareMqtt ();
 }
 
 /*********************************************\
@@ -1720,13 +1754,13 @@ void TeleinfoDriverWebMainButton ()
   WSContentSend_P (PSTR ("\n<script>function onClickMain(url){xmlhttp=new XMLHttpRequest();xmlhttp.open('GET',url,false);xmlhttp.send();location.reload();};</script>\n"));
 
   // Teleinfo message page button
-  WSContentSend_P (PSTR ("\n<p><form action='%s' method='get'><button>%s %s</button></form></p>\n"), PSTR (TIC_PAGE_MESSAGE), PSTR (TIC_TELEINFO), PSTR (TIC_MESSAGE));
+  WSContentSend_P (PSTR ("\n<p><form action='%s' method='get'><button>%s %s</button></form></p>\n"), PSTR_TIC_PAGE_MESSAGE, PSTR (TIC_TELEINFO), PSTR (TIC_MESSAGE));
 }
 
 // Append Teleinfo configuration button
 void TeleinfoDriverWebConfigButton ()
 {
-  WSContentSend_P (PSTR ("\n<p><form action='%s' method='get'><button>Teleinfo</button></form></p>\n"), PSTR (TIC_PAGE_CONFIG));
+  WSContentSend_P (PSTR ("\n<p><form action='%s' method='get'><button>Teleinfo</button></form></p>\n"), PSTR_TIC_PAGE_CONFIG);
 }
 
 // Teleinfo web page
@@ -1826,11 +1860,7 @@ void TeleinfoDriverWebPageConfigure ()
     if (restart) WebRestart (1);
 
     // save configuration
-    else
-    {
-      TeleinfoDriverSaveSettings ();
-//      SettingsSave (0);
-    }    
+    else TeleinfoDriverSaveSettings ();
   }
 
   // beginning of form
@@ -1858,7 +1888,7 @@ void TeleinfoDriverWebPageConfigure ()
   WSContentSend_P (PSTR ("</style>\n"));
 
   // form
-  WSContentSend_P (PSTR ("<form method='get' action='%s'>\n"), PSTR (TIC_PAGE_CONFIG));
+  WSContentSend_P (PSTR ("<form method='get' action='%s'>\n"), PSTR_TIC_PAGE_CONFIG);
 
   // speed selection
   // ---------------
@@ -2065,7 +2095,7 @@ void TeleinfoDriverWebSensor ()
   //   meter and contract
   // ----------------------
 
-  WSContentSend_P (PSTR ("<div class='sec' onclick=\"onClickMain(\'%s?%s=%u\')\">\n"), PSTR (TIC_PAGE_DISPLAY), PSTR (CMND_TIC_MAIN), TIC_DISPLAY_CONTRACT);
+  WSContentSend_P (PSTR ("<div class='sec' onclick=\"onClickMain(\'%s?%s=%u\')\">\n"), PSTR_TIC_PAGE_DISPLAY, PSTR (CMND_TIC_MAIN), TIC_DISPLAY_CONTRACT);
 
   // set reception status
   pstr_alert = nullptr;
@@ -2202,7 +2232,7 @@ void TeleinfoDriverWebSensor ()
   if (teleinfo_conso.enabled)
   {
     // section
-    WSContentSend_P (PSTR ("<div class='sec' onclick=\"onClickMain(\'%s?%s=%u\')\">\n"), PSTR (TIC_PAGE_DISPLAY), PSTR (CMND_TIC_MAIN), TIC_DISPLAY_CONSO);
+    WSContentSend_P (PSTR ("<div class='sec' onclick=\"onClickMain(\'%s?%s=%u\')\">\n"), PSTR_TIC_PAGE_DISPLAY, PSTR (CMND_TIC_MAIN), TIC_DISPLAY_CONSO);
 
     // header
     WSContentSend_P (PSTR ("<div class='tic ticb'><div class='tic70l'>%s"), PSTR ("Consommation"));
@@ -2267,7 +2297,7 @@ void TeleinfoDriverWebSensor ()
   if (teleinfo_prod.enabled)
   {
     // separator and header
-    WSContentSend_P (PSTR ("<div class='sec' onclick=\"onClickMain(\'%s?%s=%u\')\">\n"), PSTR (TIC_PAGE_DISPLAY), PSTR (CMND_TIC_MAIN), TIC_DISPLAY_PRODUCTION);
+    WSContentSend_P (PSTR ("<div class='sec' onclick=\"onClickMain(\'%s?%s=%u\')\">\n"), PSTR_TIC_PAGE_DISPLAY, PSTR (CMND_TIC_MAIN), TIC_DISPLAY_PRODUCTION);
     WSContentSend_P (PSTR ("<div class='tic ticb'><div class='tic48l'>%s</div>"), PSTR ("Revente"));
     if (teleinfo_config.arr_main[TIC_DISPLAY_PRODUCTION]) WSContentSend_P (PSTR ("<div class='tic40r'>%d.%d</div><div class='tic02'></div><div class='tic10l'>kW</div>"), teleinfo_config.prod_max / 1000, teleinfo_config.prod_max % 1000 / 100);
       else WSContentSend_P (PSTR ("<div class='tic40r'>%d</div><div class='tic02'></div><div class='tic10l'>W</div>"), teleinfo_prod.pact); 
@@ -2322,7 +2352,7 @@ void TeleinfoDriverWebSensor ()
   {
     // separator and header
     GetTextIndexed (str_color, sizeof (str_color), TeleinfoContractGetPeriodLevel (), kTeleinfoLevelIcon);  
-    WSContentSend_P (PSTR ("<div class='sec' onclick=\"onClickMain(\'%s?%s=%u\')\">\n"), PSTR (TIC_PAGE_DISPLAY), PSTR (CMND_TIC_MAIN), TIC_DISPLAY_CALENDAR);
+    WSContentSend_P (PSTR ("<div class='sec' onclick=\"onClickMain(\'%s?%s=%u\')\">\n"), PSTR_TIC_PAGE_DISPLAY, PSTR (CMND_TIC_MAIN), TIC_DISPLAY_CALENDAR);
     WSContentSend_P (PSTR ("<div class='tic ticb'><div class='tic48l'>Calendrier</div>"));
     if (!teleinfo_config.arr_main[TIC_DISPLAY_CALENDAR]) WSContentSend_P (PSTR ("<div class='tic40r'></div><div class='tic02'></div><div class='tic10l'>%s</div>"), str_color);
     WSContentSend_P (PSTR ("</div>\n"));
@@ -2392,34 +2422,36 @@ void TeleinfoDriverWebSensor ()
 
     WSContentSend_P (PSTR ("</div>\n"));    // sec
   }
-
-  // declare sensor publication
-//  TeleinfoDriverWebDeclare (TIC_WEB_HTTP);
 }
 
 // TIC raw message data
-void TeleinfoDriverWebTicUpdate ()
+void TeleinfoDriverWebPageUpdate ()
 {
-  int  index;
-  char checksum;
-  char str_class[4];
-  char str_line[TIC_LINE_SIZE];
+  uint8_t index, limit, checksum;
+  char    str_class[4];
 
   // start of data page
   WSContentBegin (200, CT_PLAIN);
 
   // send line number
-  sprintf_P (str_line, PSTR ("%d\n"), teleinfo_meter.nb_message);
-  WSContentSend_P (PSTR ("%s"), str_line); 
+  WSContentSend_P (PSTR ("msg;%u\n"), teleinfo_meter.nb_message);
+
+  // set number of data to refresh
+  if (teleinfo_message.index_display == 0) teleinfo_message.index_display = teleinfo_message.index_last;
+  (teleinfo_message.index_display != teleinfo_message.index_last) ? limit = TIC_LINE_QTY : limit = teleinfo_message.index_last;
+  teleinfo_message.index_display = teleinfo_message.index_last;
 
   // loop thru TIC message lines to publish if defined
-  for (index = 0; index < teleinfo_message.index_last; index ++)
+  for (index = 0; index < limit; index ++)
   {
-    checksum = teleinfo_message.arr_last[index].checksum;
-    if (checksum == 0) strcpy_P (str_class, PSTR ("ko")); else strcpy_P (str_class, PSTR ("ok"));
-    if (checksum == 0) checksum = 0x20;
-    sprintf_P (str_line, PSTR ("%s|%s|%s|%c\n"), str_class, teleinfo_message.arr_last[index].str_etiquette, teleinfo_message.arr_last[index].str_donnee, checksum);
-    WSContentSend_P (PSTR ("%s"), str_line); 
+    // set class
+    if (teleinfo_message.arr_last[index].str_etiquette[0] == 0) strcpy_P (str_class, PSTR ("no"));
+      else if (teleinfo_message.arr_last[index].checksum == 0) strcpy_P (str_class, PSTR ("ko"));
+      else strcpy_P (str_class, PSTR ("ok"));
+
+    // add data line
+    (teleinfo_message.arr_last[index].checksum == 0) ? checksum = ' ' : checksum = teleinfo_message.arr_last[index].checksum;
+    WSContentSend_P (PSTR ("%u;%s;%s;%s;%c\n"), index, str_class, teleinfo_message.arr_last[index].str_etiquette, teleinfo_message.arr_last[index].str_donnee, checksum); 
   }
 
   // end of data page
@@ -2446,40 +2478,34 @@ void TeleinfoDriverWebTicDisplay ()
   WSContentEnd ();
 }
 
-// TIC message page
-void TeleinfoDriverWebPageMessage ()
+// Message page CSS style
+void TeleinfoDriverWebPageJavascript ()
 {
-  int index;
+  // start of page
+  WSContentBeginJavascript (200, 0);
 
-  // beginning of form without authentification
-  WSContentStart_P (PSTR (TIC_MESSAGE), false);
-  WSContentSend_P (PSTR ("</script>\n\n"));
-
-  // page data refresh script
-  WSContentSend_P (PSTR ("<script type='text/javascript'>\n\n"));
-
-  WSContentSend_P (PSTR ("function updateData(){\n"));
+    WSContentSend_P (PSTR ("function updateData(){\n"));
 
   WSContentSend_P (PSTR (" httpData=new XMLHttpRequest();\n"));
-  WSContentSend_P (PSTR (" httpData.open('GET','%s',true);\n"), PSTR (TIC_PAGE_UPDATE));
+  WSContentSend_P (PSTR (" httpData.open('GET','%s',true);\n"), PSTR_TIC_PAGE_MESSAGE_UPD);
 
   WSContentSend_P (PSTR (" httpData.onreadystatechange=function(){\n"));
   WSContentSend_P (PSTR ("  if (httpData.readyState===XMLHttpRequest.DONE){\n"));
   WSContentSend_P (PSTR ("   if (httpData.status===0 || (httpData.status>=200 && httpData.status<400)){\n"));
-  WSContentSend_P (PSTR ("    arr_param=httpData.responseText.split('\\n');\n"));
-  WSContentSend_P (PSTR ("    num_param=arr_param.length-2;\n"));
-  WSContentSend_P (PSTR ("    if (document.getElementById('msg')!=null) document.getElementById('msg').textContent=arr_param[0];\n"));
-  WSContentSend_P (PSTR ("    for (i=0;i<num_param;i++){\n"));
-  WSContentSend_P (PSTR ("     arr_value=arr_param[i+1].split('|');\n"));
-  WSContentSend_P (PSTR ("     if (document.getElementById('l'+i)!=null) document.getElementById('l'+i).style.display='table-row';\n"));
-  WSContentSend_P (PSTR ("     if (document.getElementById('l'+i)!=null) document.getElementById('l'+i).className=arr_value[0];\n"));
-  WSContentSend_P (PSTR ("     if (document.getElementById('e'+i)!=null) document.getElementById('e'+i).textContent=arr_value[1];\n"));
-  WSContentSend_P (PSTR ("     if (document.getElementById('d'+i)!=null) document.getElementById('d'+i).textContent=arr_value[2];\n"));
-  WSContentSend_P (PSTR ("     if (document.getElementById('c'+i)!=null) document.getElementById('c'+i).textContent=arr_value[3];\n"));
+
+  WSContentSend_P (PSTR ("    let arr_param=httpData.responseText.split('\\n');\n"));
+
+  WSContentSend_P (PSTR ("    for (i=0; i<arr_param.length; i++){\n"));
+  WSContentSend_P (PSTR ("     arr_value=arr_param[i].split(';');\n"));
+  WSContentSend_P (PSTR ("     if (arr_value.length === 2) document.getElementById(arr_value[0]).textContent=arr_value[1];\n"));
+  WSContentSend_P (PSTR ("     else if (arr_value.length === 5){\n"));
+  WSContentSend_P (PSTR ("      document.getElementById('l'+arr_value[0]).className=arr_value[1];\n"));
+  WSContentSend_P (PSTR ("      document.getElementById('e'+arr_value[0]).textContent=arr_value[2];\n"));
+  WSContentSend_P (PSTR ("      document.getElementById('d'+arr_value[0]).textContent=arr_value[3];\n"));
+  WSContentSend_P (PSTR ("      document.getElementById('c'+arr_value[0]).textContent=arr_value[4];\n"));
+  WSContentSend_P (PSTR ("     }\n"));
   WSContentSend_P (PSTR ("    }\n"));
-  WSContentSend_P (PSTR ("    for (i=num_param;i<%d;i++){\n"), teleinfo_message.index_max);
-  WSContentSend_P (PSTR ("     if (document.getElementById('l'+i)!=null) document.getElementById('l'+i).style.display='none';\n"));
-  WSContentSend_P (PSTR ("    }\n"));
+
   WSContentSend_P (PSTR ("   }\n"));
   WSContentSend_P (PSTR ("   setTimeout(updateData,%u);\n"), 1000);               // ask for next update in 1 sec
   WSContentSend_P (PSTR ("  }\n"));
@@ -2488,12 +2514,17 @@ void TeleinfoDriverWebPageMessage ()
   WSContentSend_P (PSTR (" httpData.send();\n"));
   WSContentSend_P (PSTR ("}\n"));
 
-  WSContentSend_P (PSTR ("setTimeout(updateData,%u);\n\n"), 100);                   // ask for first update after 100ms
+  WSContentSend_P (PSTR ("setTimeout(updateData,%u);\n"), 100);                   // ask for first update after 100ms
 
-  WSContentSend_P (PSTR ("</script>\n\n"));
+  // end of page
+  WSContentEnd ();
+}
 
-  // page style
-  WSContentSend_P (PSTR ("<style>\n"));
+// Message page CSS style
+void TeleinfoDriverWebPageCSS ()
+{
+  // start of page
+  WSContentBeginCSS (200, 0);
 
   WSContentSend_P (PSTR ("body {color:white;background-color:%s;font-size:2.2vmin;font-family:Arial, Helvetica, sans-serif;}\n"), COLOR_BACKGROUND);
   WSContentSend_P (PSTR ("div {margin:0.3vh auto;padding:2px 0px;text-align:center;vertical-align:middle;}\n"));
@@ -2507,14 +2538,33 @@ void TeleinfoDriverWebPageMessage ()
   WSContentSend_P (PSTR ("th {font-style:bold;background:#555;}\n"));
   WSContentSend_P (PSTR ("th.label {width:30%%;}\n"));
   WSContentSend_P (PSTR ("th.value {width:60%%;}\n"));
+  WSContentSend_P (PSTR ("tr.no {display:none;}\n"));
+  WSContentSend_P (PSTR ("tr.ok {color:white;}\n"));
   WSContentSend_P (PSTR ("tr.ko {color:red;}\n"));
 
   WSContentSend_P (PSTR ("button.menu {background:%s;color:%s;line-height:2rem;font-size:1.2rem;cursor:pointer;border:none;border-radius:0.3rem;width:150px;margin:2vh;}\n"), COLOR_BUTTON, COLOR_BUTTON_TEXT);
 
-  WSContentSend_P (PSTR ("</style>\n\n"));
+  // end of page
+  WSContentEnd ();
+}
 
-  // set cache policy, no cache for 12 hours
-  WSContentSend_P (PSTR ("<meta http-equiv='Cache-control' content='public,max-age=720000'/>\n"));
+// TIC message page
+void TeleinfoDriverWebPageMessage ()
+{
+  uint8_t index;
+
+  // init display
+  teleinfo_message.index_display = 0;
+
+  // beginning of form without authentification
+  WSContentStart_P (PSTR (TIC_MESSAGE), false);
+  WSContentSend_P (PSTR ("</script>\n\n"));
+
+  // load javascript
+  WSContentSend_P (PSTR ("<script type='text/javascript' src='%s?ts=%u'></script>\n"), PSTR_TIC_PAGE_MESSAGE_JS, Rtc.restart_time);
+
+  // load page style sheet
+  WSContentSend_P (PSTR ("<link rel='stylesheet' type='text/css' href='%s?ts=%u'>\n"), PSTR_TIC_PAGE_MESSAGE_CSS, Rtc.restart_time);
 
   // page body
   WSContentSend_P (PSTR ("</head>\n"));
@@ -2531,8 +2581,7 @@ void TeleinfoDriverWebPageMessage ()
   WSContentSend_P (PSTR ("<tr><th class='label'>🏷️</th><th class='value'>📄</th><th>✅</th></tr>\n"));
 
   // loop to display TIC messsage lines
-  for (index = 0; index < teleinfo_message.index_max; index ++)
-    WSContentSend_P (PSTR ("<tr id='l%d'><td id='e%d'>&nbsp;</td><td id='d%d'>&nbsp;</td><td id='c%d'>&nbsp;</td></tr>\n"), index, index, index, index);
+  for (index = 0; index < TIC_LINE_QTY; index ++) WSContentSend_P (PSTR ("<tr id='l%u' class='no'><td id='e%u'></td><td id='d%u'></td><td id='c%u'></td></tr>\n"), index, index, index, index);
 
   // end of table and end of page
   WSContentSend_P (PSTR ("</table></div>\n"));
@@ -2572,17 +2621,13 @@ bool Xdrv98 (const uint32_t function)
       result = true;
       break;
 
-    case FUNC_EVERY_50_MSECOND:
-      TeleinfoDriverEvery50ms ();
+    case FUNC_LOOP:
+      TeleinfoDriverReception ();
       break;
 
     case FUNC_EVERY_250_MSECOND:
       TeleinfoDriverEvery250ms ();
       break;
-
-//    case FUNC_SAVE_SETTINGS:
-//      TeleinfoDriverSaveSettings ();
-//      break;
 
     case FUNC_SAVE_BEFORE_RESTART:
       TeleinfoDriverSaveBeforeRestart ();
@@ -2618,16 +2663,22 @@ bool Xdrv98 (const uint32_t function)
       break;
 
       case FUNC_WEB_ADD_HANDLER:
-      Webserver->on (F (TIC_PAGE_CONFIG),  TeleinfoDriverWebPageConfigure);
-      Webserver->on (F (TIC_PAGE_MESSAGE), TeleinfoDriverWebPageMessage  );
-      Webserver->on (F (TIC_PAGE_UPDATE),  TeleinfoDriverWebTicUpdate    );
-      Webserver->on (F (TIC_PAGE_DISPLAY), TeleinfoDriverWebTicDisplay   );
+      Webserver->on (FPSTR (PSTR_TIC_PAGE_CONFIG),      TeleinfoDriverWebPageConfigure);
+      Webserver->on (FPSTR (PSTR_TIC_PAGE_MESSAGE),     TeleinfoDriverWebPageMessage);
+      Webserver->on (FPSTR (PSTR_TIC_PAGE_MESSAGE_CSS), TeleinfoDriverWebPageCSS);
+      Webserver->on (FPSTR (PSTR_TIC_PAGE_MESSAGE_JS),  TeleinfoDriverWebPageJavascript);
+      Webserver->on (FPSTR (PSTR_TIC_PAGE_MESSAGE_UPD), TeleinfoDriverWebPageUpdate);
+      Webserver->on (FPSTR (PSTR_TIC_PAGE_DISPLAY),     TeleinfoDriverWebTicDisplay);
       break;
 #endif    // USE_WEBSERVER
   }
 
   // call extension modules
   // ----------------------
+
+#ifdef USE_TELEINFO_WINKY
+  if (!result) result = XdrvTeleinfoWinky (function);
+#endif  // USE_TELEINFO_WINKY
 
 #ifdef USE_TELEINFO_HOMIE
   if (!result) result = XdrvTeleinfoHomie (function);
@@ -2646,7 +2697,7 @@ bool Xdrv98 (const uint32_t function)
 #endif  // USE_TELEINFO_THINGSBOARD
 
 #ifdef USE_TELEINFO_TCP
-  if (!result) result = XdrvTeleinfoTCP (function);
+  if (!result && TeleinfoDriverIsPowered ()) if (!result) result = XdrvTeleinfoTCP (function);
 #endif  // USE_TELEINFO_TCP
 
 #ifdef USE_TELEINFO_PROMETHEUS
@@ -2669,17 +2720,13 @@ bool Xdrv98 (const uint32_t function)
   if (!result) result = XdrvTeleinfoInfluxDB (function);
 #endif  // USE_TELEINFO_INFLUXDB
 
-#ifdef USE_TELEINFO_RTE
-  if (!result && TeleinfoDriverIsPowered ()) result = XdrvTeleinfoRte (function);
-#endif    // USE_TELEINFO_RTE
-
 #ifdef USE_TELEINFO_AWTRIX
 if (!result) result = XdrvTeleinfoAwtrix (function);
 #endif  // USE_TELEINFO_AWTRIX
 
-#ifdef USE_TELEINFO_WINKY
-  if (!result) result = XdrvTeleinfoWinky (function);
-#endif  // USE_TELEINFO_WINKY
+#ifdef USE_TELEINFO_RTE
+  if (!result && TeleinfoDriverIsPowered ()) result = XdrvTeleinfoRte (function);
+#endif    // USE_TELEINFO_RTE
 
 #ifdef USE_TELEINFO_RELAY
   if (!result) result = XdrvTeleinfoRelay (function);

@@ -1,5 +1,5 @@
 /*
-  xdrv_97_02_relay_teleinfo.ino - Virtual relay management from Linky meter
+  xdrv_95_02_relay_teleinfo.ino - Virtual relay management from Linky meter
   
   Copyright (C) 2024-2025  Nicolas Bernaerts
     10/08/2024 v1.0 - Creation
@@ -8,9 +8,9 @@
     19/09/2025 v1.3 - Hide and Show with click on main page display
 
   Settings are stored using :
-    - Settings->rf_code[13][0..7] = Assocation of virtual relay R1..R7 to local relays
-    - Settings->rf_code[14][0..7] = Assocation of periods P1..P8 to local relays
-    - Settings->rf_code[15][0]    = Assocation of production relay to local relays
+    - Settings->rf_code[11][0..7] = Assocation of virtual relay R1..R7 to local relays
+    - Settings->rf_code[11][8]    = Assocation of production relay to local relays
+    - Settings->rf_code[12][0..7] = Assocation of periods P1..P8 to local relays
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -43,7 +43,7 @@
 #define D_CMND_TELEINFO_RELAY_DELTA       "delta"
 
 // offloading commands
-const char kTeleinfoRelayCommands[]         PROGMEM = "relay|"               "|"       "_topic"       "|"        "_virtual"      "|"        "_period"      "|"       "_prod";
+const char kTeleinfoRelayCommands[]         PROGMEM = "relaytic|"            "|"       "_topic"       "|"        "_virtual"      "|"        "_period"      "|"       "_prod";
 void (* const TeleinfoRelayCommand[])(void) PROGMEM = { &CmndTeleinfoRelayHelp, &CmndTeleinfoRelayTopic, &CmndTeleinfoRelayVirtual, &CmndTeleinfoRelayPeriod, &CmndTeleinfoRelayProd };
 
 // relay commands
@@ -86,7 +86,7 @@ struct {
 } teleinfo_relay;
 
 /**************************************************\
- *                  Accessors
+ *                  Configuration
 \**************************************************/
 
 // load config parameters
@@ -102,20 +102,21 @@ void TeleinfoRelayLoadConfig ()
   // association between virtual relays and physical relays
   for (index = 0; index < RELAY_VIRTUAL_MAX; index ++)
   {
-    teleinfo_relay.arr_virtual[index].relay = Settings->rf_code[13][index];
+    teleinfo_relay.arr_virtual[index].relay = Settings->rf_code[11][index];
     if (teleinfo_relay.arr_virtual[index].relay > 8) teleinfo_relay.arr_virtual[index].relay = 0;
   }
+
+  // association between production relay and physical relay
+  teleinfo_relay.prod_relay.relay = Settings->rf_code[11][8];
+  if (teleinfo_relay.prod_relay.relay > 8) teleinfo_relay.prod_relay.relay = 0;
+
 
   // association between periods and physical relays
   for (index = 0; index < RELAY_PERIOD_MAX; index ++)
   {
-    teleinfo_relay.arr_period[index].relay = Settings->rf_code[14][index];
+    teleinfo_relay.arr_period[index].relay = Settings->rf_code[12][index];
     if (teleinfo_relay.arr_period[index].relay > 8) teleinfo_relay.arr_period[index].relay = 0;
   } 
-
-  // association between production relay and physical relay
-  teleinfo_relay.prod_relay.relay = Settings->rf_code[15][0];
-  if (teleinfo_relay.prod_relay.relay > 8) teleinfo_relay.prod_relay.relay = 0;
 
   // log
   AddLog (LOG_LEVEL_INFO, PSTR ("REL: Loaded linky relay association"));
@@ -132,13 +133,13 @@ void TeleinfoRelaySaveConfig ()
 #endif    // USE_TELEINFO
 
   // association between virtual relays and physical relays
-  for (index = 0; index < RELAY_VIRTUAL_MAX; index ++) Settings->rf_code[13][index] = teleinfo_relay.arr_virtual[index].relay;
-
-  // association between contract period relays and physical relays
-  for (index = 0; index < RELAY_PERIOD_MAX; index ++) Settings->rf_code[14][index] = teleinfo_relay.arr_period[index].relay;
+  for (index = 0; index < RELAY_VIRTUAL_MAX; index ++) Settings->rf_code[11][index] = teleinfo_relay.arr_virtual[index].relay;
 
   // association between production relay and physical relays
-  Settings->rf_code[15][0] = teleinfo_relay.prod_relay.relay;
+  Settings->rf_code[11][8] = teleinfo_relay.prod_relay.relay;
+
+  // association between contract period relays and physical relays
+  for (index = 0; index < RELAY_PERIOD_MAX; index ++) Settings->rf_code[12][index] = teleinfo_relay.arr_period[index].relay;
 
   // log
   AddLog (LOG_LEVEL_INFO, PSTR ("REL: saved linky relay association"));
@@ -151,16 +152,16 @@ void TeleinfoRelaySaveConfig ()
 // offload help
 void CmndTeleinfoRelayHelp ()
 {
-  AddLog (LOG_LEVEL_NONE, PSTR ("HLP: Commandes pour les relais associés au Linky :"));
-  AddLog (LOG_LEVEL_NONE, PSTR (" - relay_topic <topic>    topic du compteur Linky"));
-  AddLog (LOG_LEVEL_NONE, PSTR (" - relay_virtual <v,l>    association a un relai virtuel"));
-  AddLog (LOG_LEVEL_NONE, PSTR (" -                        v = index relai virtuel (1..8)"));
-  AddLog (LOG_LEVEL_NONE, PSTR (" -                        l = index relai local (1..8)"));
-  AddLog (LOG_LEVEL_NONE, PSTR (" - relay_period <p,l>     association a une période du compteur"));
-  AddLog (LOG_LEVEL_NONE, PSTR (" -                        p = index période (1..)"));
-  AddLog (LOG_LEVEL_NONE, PSTR (" -                        l = index relai local (1..8)"));
-  AddLog (LOG_LEVEL_NONE, PSTR (" - relay_prod <l>         association au relai de production"));
-  AddLog (LOG_LEVEL_NONE, PSTR (" -                        l = index relai local (1..8)"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Commandes pour les relais associés au Linky :"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - relaytic_topic <topic>   Topic du compteur Linky"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - relaytic_virtual <v,l>   Association a un relai virtuel"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" -   v = index relai virtuel (1..8)"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" -   l = index relai local (1..8)"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - relaytic_period <p,l>    Association a une période du compteur"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" -   p = index période (1..)"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" -   l = index relai local (1..8)"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" - relaytic_prod <l>        Association au relai de production"));
+  AddLog (LOG_LEVEL_INFO, PSTR (" -   l = index relai local (1..8)"));
   ResponseCmndDone();
 }
 
@@ -304,7 +305,7 @@ void TeleinfoRelayInit ()
   TeleinfoRelayLoadConfig ();
 
   // log help command
-  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Run relai to get help on Linky & relay"));
+  AddLog (LOG_LEVEL_INFO, PSTR ("HLP: Run relaitic to get help on relay managed by Linky"));
 }
 
 #ifdef USE_TELEINFO
@@ -580,7 +581,6 @@ void TeleinfoRelayWebPageConfigure ()
     {
       teleinfo_config.prod_trigger = delta;
       TeleinfoDriverSaveSettings ();
-//      SettingsSave (0);
     }
   }
 
@@ -837,12 +837,12 @@ void TeleinfoRelayWebAddMainButton ()
 
 #ifndef USE_TELEINFO
   // style inherited from teleinfo
-  WSContentSend_P (PSTR ("table hr{display:none;}\n"));
-  WSContentSend_P (PSTR (".sec{font-size:12px;text-align:center;padding:4px 6px;margin-bottom:5px;background:#333333;border-radius:12px;}"));
-  WSContentSend_P (PSTR (".tic{display:flex;padding:2px 0px;font-size:11px;}\n"));
-  WSContentSend_P (PSTR (".tic div{padding:0px;}\n"));
-  WSContentSend_P (PSTR (".ticb{font-size:14px;padding:0px 0px 4px 5px;}\n"));
-  WSContentSend_P (PSTR (".tic48l{width:48%%;text-align:left;font-weight:bold;}\n"));
+//  WSContentSend_P (PSTR ("table hr{display:none;}\n"));
+//  WSContentSend_P (PSTR (".sec{font-size:12px;text-align:center;padding:4px 6px;margin-bottom:5px;background:#333333;border-radius:12px;}"));
+  WSContentSend_P (PSTR ("div.tic{display:flex;padding:2px 0px;font-size:11px;}\n"));
+  WSContentSend_P (PSTR ("div.tic div{padding:0px;}\n"));
+  WSContentSend_P (PSTR ("div.ticb{font-size:14px;padding:0px 0px 4px 5px;}\n"));
+  WSContentSend_P (PSTR ("div.tic48l{width:48%%;text-align:left;font-weight:bold;}\n"));
 #endif    // USE_TELEINFO
 
   // relay style
@@ -921,12 +921,14 @@ void TeleinfoRelayWebSensor ()
 
 #ifdef USE_TELEINFO
   if (!teleinfo_config.relay) return;
+#else
+  if (teleinfo_relay.str_topic.length () == 0) return;
 #endif    // USE_TELEINFO
 
   // header
 #ifdef USE_TELEINFO
-  WSContentSend_P (PSTR ("<div class='sec' onclick=\"onClickMain(\'%s?%s=%u\')\">\n"), PSTR (TIC_PAGE_DISPLAY), PSTR (CMND_TIC_MAIN), TIC_DISPLAY_RELAY);
-  #else
+  WSContentSend_P (PSTR ("<div class='sec' onclick=\"onClickMain(\'%s?%s=%u\')\">\n"), PSTR_TIC_PAGE_DISPLAY, PSTR (CMND_TIC_MAIN), TIC_DISPLAY_RELAY);
+#else
   WSContentSend_P (PSTR ("<div class='sec'>\n"));
 #endif    // USE_TELEINFO
 

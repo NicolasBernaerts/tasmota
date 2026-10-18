@@ -36,7 +36,7 @@ xdrv_98_14_teleinfo_prometheus.ino - Publish Prometheus metrics
 
 char* TeleinfoPrometheusCleanupString (char *pstr_string)
 {
-  bool is_ok;
+  bool  is_ok;
   char *pstr_letter;
 
   // check parameter

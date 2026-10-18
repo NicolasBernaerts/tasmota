@@ -11,6 +11,7 @@
     23/09/2025 v2.3 - Handle publication for Winky with deepsleep on super capa
     01/03/2026 v3.0 - Complete rework (api/mqtt, colors, ...)
                       Data are now saved on FS
+    28/09/2026 v3.1 - Check network connectivity before publication
 
   Previous configuration values were stored in :
 
@@ -388,7 +389,7 @@ void TeleinfoAwtrixPublishAPI (const uint8_t type)
     else pstr_type = PSTR ("custom?name=tic");
 
   // declare publication
-  TeleinfoDriverWebDeclare (TIC_WEB_HTTP);
+  HelperPublishDeclareHttp ();
 
   // generate URL
   sprintf_P (str_url, PSTR ("http://%s/api/%s"), awtrix_config.str_device, pstr_type); 
@@ -430,7 +431,7 @@ void TeleinfoAwtrixPublishMQTT (const uint8_t type)
 
   // publish awtrix topic
   MqttPublish (str_topic, false);
-  TeleinfoDriverWebDeclare (TIC_WEB_MQTT);
+  HelperPublishDeclareMqtt ();
   ResponseClear ();
 }
 
@@ -695,6 +696,9 @@ void TeleinfoAwtrixUpdatePage ()
   bool    publish;
   uint8_t index;
 
+  // check network
+  if (!MiscOptionIsWifiActive ()) return;
+
   // check if anything to publish
   publish = false;
   for (index = 0; index < TIC_AWTRIX_DMAX; index ++) publish |= awtrix_config.arr_flag[index];
@@ -744,7 +748,7 @@ void TeleinfoAwtrixEverySecond ()
 
   // check if publication can be done
   if (awtrix_config.time_upd > LocalTime ()) return;
-  if (!TeleinfoDriverWebAllow (TIC_WEB_HTTP)) return;
+  if (!HelperPublishAllowHttp ()) return;
 
   // if needed display parameters, else 
   if (!awtrix_status.init) awtrix_status.init = TeleinfoAwtrixUpdateParameters ();
