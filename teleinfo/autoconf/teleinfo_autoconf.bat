@@ -69,3 +69,4 @@ cat ./esp32s3/esp32s3_wemos_teleinfo.bat     >> init.bat
 zip -j -0 ./esp32s3/.esp32s3_wemos_teleinfo.zip init.bat
 
 rm init.bat
+
