@@ -598,7 +598,7 @@ Le topic **../SENSOR** est enrichi des données suivantes :
 ## Compilation
 
 Si vous voulez compiler ce firmware vous-même, vous devez :
-1. installer les sources **tasmota** depuis la version officielle **15.0.1** (respectez cette version)
+1. installer les sources **tasmota** depuis la version officielle **16.0.0** (respectez cette version)
 2. déposez ou remplacez les fichiers de ce **repository**
 3. déposez ou remplacez les fichiers du repository **tasmota/common**
 
@@ -613,6 +613,7 @@ Voici la liste exhaustive des fichiers concernés :
 | tasmota/include/**tasmota.h**      | Add of in-memory variables |
 | tasmota/include/**tasmota_type.h** | Redefinition of teleinfo structure |
 | tasmota/tasmota_drv_driver/**xdrv_01_9_webserver.ino** | Add compilation target in footer  |
+| tasmota/tasmota_drv_driver/**xdrv_01_9_webserver_extension.ino** | Add cache management for page serving  |
 | tasmota/tasmota_drv_driver/**xdrv_98_00_teleinfo_data.ino** | Data structures used by teleinfo driver and modules |
 | tasmota/tasmota_drv_driver/**xdrv_98_01_teleinfo_tcp.ino** | Embedded TCP stream server |
 | tasmota/tasmota_drv_driver/**xdrv_98_02_teleinfo_graph.ino** | Teleinfo live graph provider |
@@ -627,7 +628,10 @@ Voici la liste exhaustive des fichiers concernés :
 | tasmota/tasmota_drv_driver/**xdrv_98_11_teleinfo_awtrix.ino** | Teleinfo Awtrix display integration |
 | tasmota/tasmota_drv_driver/**xdrv_98_12_teleinfo_winky.ino** | Handling of Winky module with deep sleep mode |
 | tasmota/tasmota_drv_driver/**xdrv_98_20_teleinfo.ino** | Teleinfo main driver  |
-| tasmota/tasmota_drv_driver/**xdrv_99_misc_option.ino** | Misc options including fixed IP address |
+| tasmota/tasmota_drv_driver/**xdrv_99_misc_helper.ino** | Misc helper functions |
+| tasmota/tasmota_drv_driver/**xdrv_99_01_timezone.ino** | Timezone management helper functions |
+| tasmota/tasmota_drv_driver/**xdrv_99_02_cpuload.ino** | CPU load visualisation |
+| tasmota/tasmota_drv_driver/**xdrv_99_03_ethernet_switch.ino** | Ethernet/Wifi automatic switching |
 | tasmota/tasmota_nrg_energy/**xnrg_15_teleinfo.ino** | Teleinfo energy driver  |
 
 Si tout se passe bien, vous devriez pouvoir compiler votre propre build.
