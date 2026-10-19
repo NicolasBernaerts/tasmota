@@ -1,7 +1,7 @@
 /*
   user_config_override.h - user configuration overrides my_user_config.h for Tasmota
 
-  Copyright (C) 2019-2024  Theo Arends, Nicolas Bernaerts
+  Copyright (C) 2019-2026  Theo Arends, Nicolas Bernaerts
 
     05/05/2019 - v1.0   Creation
     16/05/2019 - v1.1   Add Tempo and EJP contracts
@@ -213,6 +213,10 @@
     24/06/2026 - v15.5  Based on Tasmota 15.5
                         Complete rewrite of Winky deepsleep triggers and calculation
                         Flush reception buffer at start
+                        Use cache for CSS and Javascript (graph and histo)
+                        Add cosphi command to set number of samples to average cosphi
+                        Rewrite of Winky deepsleep process
+    19/10/2026 - v16.0  Based on Tasmota 16.0
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License aStart STGE managements published by
@@ -256,20 +260,16 @@
 // extension description
 #define EXTENSION_NAME    "Teleinfo"              // name
 #define EXTENSION_AUTHOR  "Nicolas Bernaerts"     // author
-#define EXTENSION_VERSION "15.5beta2"             // version
+#define EXTENSION_VERSION "16.0"                  // version
 
 // complementary modules
-#define USE_MISC_OPTION                          // Add IP and common options configuration page
-#define USE_CPU_LOAD                             // CPU load display
-
-// display wifi level on status line
-#define USE_WEB_STATUS_LINE_WIFI
+#define USE_MISC_HELPER                           // Add IP and common options configuration page
+#define USE_CPU_LOAD                              // CPU load display
+#define USE_WEB_STATUS_LINE_WIFI                  // display wifi level on status line
 
 // teleinfo modules
 #define USE_TELEINFO_TCP                          // Enable TCP server to forward meter stream to network
 #define USE_TELEINFO_GRAPH                        // Enable Power, voltage and cosphi graph
-#define USE_TELEINFO_HISTO                        // Enable consumption and production historisation
-#define USE_TELEINFO_RELAY                        // Enable Teleinfo period and virtual relay association to local relays
 
 // integration modules
 #define USE_TELEINFO_HASS                         // Teleinfo Home Assistant integration
@@ -278,6 +278,8 @@
 #define USE_TELEINFO_PROMETHEUS                   // Teleinfo Prometheus metrics API
 
 #ifdef ESP32
+  #define USE_TELEINFO_HISTO                      // Enable consumption and production historisation
+  #define USE_TELEINFO_RELAY                      // Enable Teleinfo period and virtual relay association to local relays
   #define USE_TELEINFO_THINGSBOARD                // Teleinfo Thingsboard integration
 #endif    // ESP32
 
@@ -687,6 +689,8 @@
 // ----------------------
 
 #ifdef ESP32
+
+  #define USE_W5500                             // support for ethernet W5500
 
   // teleinfo modules for ESP32
   #define USE_TELEINFO_INFLUXDB                 // support for InfluxDB
