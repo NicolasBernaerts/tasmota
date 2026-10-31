@@ -7,6 +7,11 @@ This evolution of Tasmota firmware is bsed on **Tasmota v12.5.0** and has been e
 
 Sensors
 -------
+
+:!: If you use Sonoff official SI7021 sensor, change delays in console for sensor to be detected :
+
+    DhtDelay 480,40
+
 According to the type of sensor you've connected to your Tasmota (temperature, humidity, presence, ...) you'll be able to keep history of the sensors activity.
 
 2 activity periods are handled :
