@@ -1347,7 +1347,7 @@ void TeleinfoSetSpeed (const uint32_t baudrate)
 
   // log
   if (teleinfo_config.baudrate == 1200) strcpy_P (str_mode, PSTR ("Historique"));
-    else if (teleinfo_config.baudrate == 1200) strcpy_P (str_mode, PSTR ("Standard"));
+    else if (teleinfo_config.baudrate == 9600) strcpy_P (str_mode, PSTR ("Standard"));
     else strcpy_P (str_mode, PSTR ("Spécifique"));
   AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Bascule en mode %s (%u bauds)"), str_mode, teleinfo_config.baudrate);
   AddLog (LOG_LEVEL_INFO, PSTR ("TIC: Redémarrage nécessaire"));
