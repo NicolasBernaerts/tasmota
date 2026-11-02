@@ -1520,7 +1520,7 @@ void TeleinfoDriverReception ()
       case 0x0D: TeleinfoReceptionLineStop ();     break;       // line stop
       default:
         // if needed, set line separator
-        if ((teleinfo_meter.nb_message == 0) && (character == 0x09)) teleinfo_meter.sep_line = 0x09;
+        if (character == 0x09) teleinfo_meter.sep_line = 0x09;
 
         // append separator to line
         str_character[0] = character;
