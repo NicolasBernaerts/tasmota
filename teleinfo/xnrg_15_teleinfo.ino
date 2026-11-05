@@ -3129,10 +3129,9 @@ void TeleinfoEnergyEverySecond ()
 {
   uint8_t phase, index;
 
-  // if needed, set contract change
+  // if needed, set contract change (keep current speed, messages are decoded so it is the right one)
   if (teleinfo_sleep.nb_change > TIC_NEW_CONTRACT_TRIGGER)
   {
-    TeleinfoSetSpeed (TIC_DEFAULT_SPEED);
     TeleinfoContractChange ();
     TasmotaGlobal.restart_flag = 2;
   }
