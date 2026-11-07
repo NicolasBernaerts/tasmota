@@ -1,0 +1,5 @@
+{"code":"H SUPER CREUSES","name":"Super Creuses","type":"Standard","unit":"kVA","period":3,"periods":[
+{"code":"H SUPER CREUSES","level":"blue","type":"hc","label":"Super Creuses"},
+{"code":"HEURES CREUSES","level":"blue","type":"hc","label":"Creuses"},
+{"code":"HEURES PLEINES","level":"blue","type":"hp","label":"Pleines"}
+]}

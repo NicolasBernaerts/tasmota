@@ -1,0 +1,5 @@
+{"code":"HC et Week-End","name":"HC et Week-End","type":"Standard","unit":"kVA","period":3,"periods":[
+{"code":"HEURE CREUSE","level":"blue","type":"hc","label":"Creuses"},
+{"code":"HEURE PLEINE","level":"blue","type":"hp","label":"Pleines"},
+{"code":"HEURE WEEK-END","level":"blue","type":"hc","label":"Week-End"}
+]}

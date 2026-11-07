@@ -1,0 +1,36 @@
+TH..;his-base.json
+HC..;his-hchp.json
+EJP.;his-ejp.json
+BBR;his-tempo.json
+BASE;std-base.json
+H PLEINE/CREUSE;std-hchp.json
+H PLEINE-CREUSE;std-hchp-bleu.json
+HC-12H30;std-hc-12h30.json
+EJP;std-ejp.json
+Pointe Mobile;std-pointe-mobile.json
+TEMPO;std-tempo.json
+TEMP00AP7;std-temp00ap7.json
+H SUPER CREUSES;std-super-creuses.json
+Week-End;std-week-end.json
+HC et Week-End;std-hc-week-end.json
+HSC ETE HIVER;std-hsc-ete-hiver.json
+BT 4 SUP36;pme-bt4-sup36.json
+BT 5 SUP36;pme-bt5-sup36.json
+TV A5 BASE;pme-tv-a5-base.json
+TV A8 BASE;pme-tv-a8-base.json
+TJ MU;pme-tj-mu.json
+TJ LU-SD;pme-tj-lu-sd.json
+TJ LU-P;pme-tj-lu-p.json
+TJ LU-PH;pme-tj-lu-ph.json
+TJ LU-CH;pme-tj-lu-ch.json
+TJ EJP;pme-tj-ejp.json
+TJ EJP-SD;pme-tj-ejp-sd.json
+TJ EJP-PM;pme-tj-ejp-pm.json
+TJ EJP-HH;pme-tj-ejp-hh.json
+HTA 5;pme-hta5.json
+HTA 8;pme-hta8.json
+BASE_A5;eme-base-a5.json
+BASE_A8;eme-base-a8.json
+EJP_A5;eme-ejp-a5.json
+EJP_A8;eme-ejp-a8.json
+MOD;eme-mod.json

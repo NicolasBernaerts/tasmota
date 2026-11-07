@@ -1,0 +1,6 @@
+{"code":"Pointe Mobile","name":"Pointe Mobile","type":"Standard","unit":"kVA","period":4,"periods":[
+{"code":"HC Jnormal","level":"blue","type":"hc","label":"Creuses Normal"},
+{"code":"HP Jnormal","level":"blue","type":"hp","label":"Pleines Normal"},
+{"code":"HC Pointe","level":"red","type":"hc","label":"Creuses Pointe"},
+{"code":"HP Pointe","level":"red","type":"hp","label":"Pleines Pointe"}
+]}

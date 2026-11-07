@@ -1,0 +1,16 @@
+{"code":"EJP_A8","name":"EJP A8","type":"Emeraude","unit":"kW","period":14,"periods":[
+{"code":"P","level":"red","type":"hp","label":"Pointe Fixe"},
+{"code":"PM","level":"red","type":"hp","label":"Pointe Mobile"},
+{"code":"HPH","level":"white","type":"hp","label":"Pleines Hiver"},
+{"code":"HPD","level":"blue","type":"hp","label":"Pleines demi-saison"},
+{"code":"HCH","level":"white","type":"hc","label":"Creuses Hiver"},
+{"code":"HCD","level":"blue","type":"hc","label":"Creuses demi-saison"},
+{"code":"HPE","level":"blue","type":"hp","label":"Pleines Ete"},
+{"code":"HCE","level":"blue","type":"hc","label":"Creuses Ete"},
+{"code":"JA","level":"blue","type":"hc","label":"Juillet-Aout"},
+{"code":"HH","level":"white","type":"hp","label":"Hiver"},
+{"code":"HD","level":"white","type":"hp","label":"Demi-saison"},
+{"code":"HM","level":"red","type":"hp","label":"Hiver Mobile"},
+{"code":"DSM","level":"red","type":"hp","label":"Demi-saison Mobile"},
+{"code":"SCM","level":"red","type":"hc","label":"Creuses Mobile"}
+]}

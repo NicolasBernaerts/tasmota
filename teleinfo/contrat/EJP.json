@@ -1,0 +1,4 @@
+{"code":"EJP","name":"EJP","type":"Standard","unit":"kVA","period":2,"periods":[
+{"code":"HEURE NORMALE","level":"blue","type":"hc","label":"Normale"},
+{"code":"HEURE POINTE","level":"blue","type":"hp","label":"Pointe Mobile"}
+]}

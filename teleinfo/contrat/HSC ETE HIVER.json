@@ -1,0 +1,8 @@
+{"code":"HSC ETE HIVER","name":"Zen Estival","type":"Standard","unit":"kVA","period":6,"periods":[
+{"code":"HSC ete","level":"blue","type":"hc","label":"Super Creuses Eté"},
+{"code":"HC ete","level":"blue","type":"hc","label":"Creuses Eté"},
+{"code":"HP ete","level":"blue","type":"hp","label":"Pleines Eté"},
+{"code":"HSC Hiver","level":"white","type":"hc","label":"Super Creuses Hiver"},
+{"code":"HC Hiver","level":"white","type":"hc","label":"Creuses Hiver"},
+{"code":"HP Hiver","level":"white","type":"hp","label":"Pleines Hiver"}
+]}

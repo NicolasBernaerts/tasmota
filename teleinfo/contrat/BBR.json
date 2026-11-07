@@ -1,0 +1,8 @@
+{"code":"BBR","name":"Tempo","type":"Historique","unit":"kVA","period":6,"periods":[
+{"code":"HCJB","level":"blue","type":"hc","label":"Creuses Bleu"},
+{"code":"HPJB","level":"blue","type":"hp","label":"Pleines Bleu"},
+{"code":"HCJW","level":"white","type":"hc","label":"Creuses Blanc"},
+{"code":"HPJW","level":"white","type":"hp","label":"Pleines Blanc"},
+{"code":"HCJR","level":"red","type":"hc","label":"Creuses Rouge"},
+{"code":"HPJR","level":"red","type":"hp","label":"Pleines Rouge"}
+]}

@@ -1,0 +1,4 @@
+{"code":"Week-End","name":"Week-End","type":"Standard","unit":"kVA","period":2,"periods":[
+{"code":"HEURE WEEK-END","level":"blue","type":"hc","label":"Week-End"},
+{"code":"HEURE SEMAINE","level":"blue","type":"hp","label":"Semaine"}
+]}

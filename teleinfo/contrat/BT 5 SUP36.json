@@ -1,0 +1,14 @@
+{"code":"BT 5 SUP36","name":"BT>36kVA 5p","type":"PME-PMI","unit":"kW","period":12,"periods":[
+{"code":"P","level":"red","type":"hc","label":"Pointe"},
+{"code":"M","level":"red","type":"hc","label":"Pointe Mobile"},
+{"code":"HH","level":"blue","type":"hc","label":"Hiver"},
+{"code":"HP","level":"blue","type":"hp","label":"Pleines"},
+{"code":"HC","level":"blue","type":"hc","label":"Creuses"},
+{"code":"HPH","level":"white","type":"hp","label":"Pleines Hiver"},
+{"code":"HCH","level":"white","type":"hc","label":"Creuses Hiver"},
+{"code":"HPE","level":"blue","type":"hp","label":"Pleines Ete"},
+{"code":"HCE","level":"blue","type":"hc","label":"Creuses Ete"},
+{"code":"HPD","level":"blue","type":"hp","label":"Pleines Demi-saison"},
+{"code":"HCD","level":"blue","type":"hc","label":"Creuses Demi-saison"},
+{"code":"JA","level":"blue","type":"hc","label":"Juillet-Aout"}
+]}

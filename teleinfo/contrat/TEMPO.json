@@ -1,0 +1,8 @@
+{"code":"TEMPO","name":"Tempo","type":"Standard","unit":"kVA","period":6,"periods":[
+{"code":"HC BLEU","level":"blue","type":"hc","label":"Creuses Bleu"},
+{"code":"HP BLEU","level":"blue","type":"hp","label":"Pleines Bleu"},
+{"code":"HC BLANC","level":"white","type":"hc","label":"Creuses Blanc"},
+{"code":"HP BLANC","level":"white","type":"hp","label":"Pleines Blanc"},
+{"code":"HC ROUGE","level":"red","type":"hc","label":"Creuses Rouge"},
+{"code":"HP ROUGE","level":"red","type":"hp","label":"Pleines Rouge"}
+]}

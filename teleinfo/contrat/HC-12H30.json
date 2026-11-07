@@ -1,0 +1,4 @@
+{"code":"HC-12H30","name":"HC/HP 12h30","type":"Standard","unit":"kVA","period":2,"periods":[
+{"code":"HEURES CREUSES","level":"blue","type":"hc","label":"Creuses"},
+{"code":"HEURES PLEINES","level":"blue","type":"hp","label":"Pleines"}
+]}
