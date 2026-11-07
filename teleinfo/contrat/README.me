@@ -1,3 +1,30 @@
 Vous trouvez ici la base de tous les contrats reconnus nativement par les firmware Teleinfo ESP32.
 Si votre contrat n'apparait pas, merci d'ouvrir un ticket et de fournir les éléménts nécessaires.
 Cela permettra de mettre la base à jour et d'en faire profiter la communauté.
+
+## Proposer un contrat
+
+Un fichier par contrat, nommé d'après son code (exemple : `HSC ETE HIVER.json`).
+
+Les valeurs se lisent sur la page **Teleinfo Messages** du module :
+- en mode Standard, `NGTF` pour le code du contrat et `LTARF` pour chaque période, dans l'ordre de `NTARF` (index 01, 02...)
+- en mode Historique, `OPTARIF` pour le code du contrat et `PTEC` pour les périodes
+
+Pensez à masquer `ADSC`, `ADCO` et `PRM` si vous joignez des trames.
+
+Modèle :
+
+```json
+{"code":"CODE DU CONTRAT","name":"Nom de l'offre","type":"Standard","unit":"kVA","period":2,"periods":[
+{"code":"LTARF 01","level":"blue","type":"hc","label":"Creuses"},
+{"code":"LTARF 02","level":"blue","type":"hp","label":"Pleines"}
+]}
+```
+
+- `code` : valeur exacte de `NGTF` (ou `OPTARIF`)
+- `name` : nom de l'offre
+- `type` : `Standard` ou `Historique`
+- `period` : nombre de périodes
+- `periods` : une ligne par période, dans l'ordre de `NTARF`, avec `code` = `LTARF` exact, `type` = `hp` ou `hc`, `level` = couleur du jour (`blue` hors Tempo) et `label` = libellé affiché
+
+Merci d'indiquer aussi le fournisseur et, si possible, les horaires de chaque période.
