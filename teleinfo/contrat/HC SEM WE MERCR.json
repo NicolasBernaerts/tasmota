@@ -1,0 +1,8 @@
+{"code":"HC SEM WE MERCR","name":"Zen Creuses+Week-End+Mercredi","type":"Standard","unit":"kVA","period":6,"periods":[
+{"code":"HC SEMAINE","level":"white","type":"hc","label":"Creuses Semaine"},
+{"code":"HP SEMAINE","level":"white","type":"hp","label":"Pleines Semaine"},
+{"code":"HC WEEK END","level":"blue","type":"hc","label":"Creuses Week-end"},
+{"code":"HP WEEK END","level":"blue","type":"hp","label":"Pleines Week-end"},
+{"code":"HC MERCREDI","level":"blue","type":"hc","label":"Creuses Mercredi"},
+{"code":"HP MERCREDI","level":"blue","type":"hp","label":"Pleines Mercredi"}
+]}

@@ -1,0 +1,8 @@
+{"code":"HC SEM WE LUNDI","name":"Zen Creuses+Week-End+Lundi","type":"Standard","unit":"kVA","period":6,"periods":[
+{"code":"HC SEMAINE","level":"white","type":"hc","label":"Creuses Semaine"},
+{"code":"HP SEMAINE","level":"white","type":"hp","label":"Pleines Semaine"},
+{"code":"HC WEEK END","level":"blue","type":"hc","label":"Creuses Week-end"},
+{"code":"HP WEEK END","level":"blue","type":"hp","label":"Pleines Week-end"},
+{"code":"HC LUNDI","level":"blue","type":"hc","label":"Creuses Lundi"},
+{"code":"HP LUNDI","level":"blue","type":"hp","label":"Pleines Lundi"}
+]}
