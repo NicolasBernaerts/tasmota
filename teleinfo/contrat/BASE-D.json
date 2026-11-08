@@ -1,6 +1,6 @@
 {"code":"BASE-D","name":"Index Distributeur","type":"Standard","unit":"kVA","period":4,"periods":[
-{"code":"BASE","level":"blue","type":"hc","label":"Saison Basse HC"},
-{"code":"BASE","level":"blue","type":"hp","label":"Saison Basse HP"},
-{"code":"BASE","level":"white","type":"hc","label":"Saison Haute HC"},
-{"code":"BASE","level":"white","type":"hp","label":"Saison Haute HP"}
+{"code":"INDEX1","level":"blue","type":"hc","label":"Saison Basse HC"},
+{"code":"INDEX2","level":"blue","type":"hp","label":"Saison Basse HP"},
+{"code":"INDEX3","level":"white","type":"hc","label":"Saison Haute HC"},
+{"code":"INDEX4","level":"white","type":"hp","label":"Saison Haute HP"}
 ]}
