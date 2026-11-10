@@ -9,10 +9,10 @@ Principe de fonctionnement est le suivant :
 | Etape | ESP32 | ESP8266 1M+ | ESP8266 | Description |   
 |  ---  |  ---  |    ---      |   ---   |     ---     |
 |   1   |   x   |     x       |         |  Au démarrage, le firmware charge le contrat depuis **/contrat/CODE.json** |
-|   2   |   x   |     x       |    x    |  Si non chargé et mode distributeur, chargement d'une version générique et enregistrement sous **/contrat/DISTRIBUTEUR.json** (si LittleFS) |
-|   3   |   x   |             |         |  Si non chargé et accès réseau est disponible, recherche depuis le repository Github et enregistrement sous **/contrat/CODE.json** |
-|   4   |   x   |     x       |    x    |  Si toujours non chargé, recherche depuis la base embarquée pat le firmware et enregistrement sous **/contrat/CODE.json** (si LittleFS) |
-|   5   |   x   |     x       |    x    |  Si toujours non chargé, positionnement en recherche de contrat inconnu  |
+|   2   |   x   |     x       |    x    |  Si contrat non chargé et mode distributeur, chargement d'une version générique et enregistrement sous **/contrat/DISTRIBUTEUR.json** (si LittleFS) |
+|   3   |   x   |             |         |  Si contrat non chargé et accès réseau est disponible, recherche depuis le repository Github et enregistrement sous **/contrat/CODE.json** |
+|   4   |   x   |     x       |    x    |  Si contrat non chargé, recherche depuis la base embarquée pat le firmware et enregistrement sous **/contrat/CODE.json** (si LittleFS) |
+|   5   |   x   |     x       |    x    |  Si contrat non chargé, positionnement en recherche de contrat inconnu  |
 
 
 En cas de contrat utilisant les index distributeurs (command **energyconfig distri=1** ), comme ces contrats sont totalement génériques, vous pouvez mettre à jour les données de vos périodes distributeur dans le fichier **/contrat/DISTRIBUTEUR.json**. Elles seront reconnues nativement au prochain démarrage.
