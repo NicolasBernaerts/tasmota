@@ -4,7 +4,7 @@ Base de contrats Teleleinfo
 
 Vous trouvez ici la base de tous les contrats reconnus nativement par la dernière génération des firmware Teleinfo (à partir de la v16.2beta2).
 
-#### Principe de fonctionnement
+## Principe de fonctionnement
 
 Au démarrage, l'ESP utilise la première trame reçue du compteur afin de déterminer le contrat utilisé.
 
@@ -18,7 +18,7 @@ Cette analyse se fait en plusieurs étapes et dépend des capacités de l'ESP :
 |   4   |   x   |     x       |    x    |  Si contrat non chargé, recherche depuis la base embarquée par le firmware et enregistrement sous **/contrat/_CODE_.json** (si LittleFS) |
 |   5   |   x   |     x       |    x    |  Si contrat non chargé, positionnement en recherche de contrat inconnu  |
 
-#### Cas des contrats avec Index Distributeurs
+## Cas des contrats avec Index Distributeurs
 
 Une minorité de contrats utilisant les index distributeur en lieu et place des index fournisseur.
 
@@ -32,7 +32,7 @@ Ces contrats étant totalement génériques, en cas de présence de LittleFS, un
 
 Vous pouvez mettre à jour les données de vos périodes distributeur directement dans ce fichier. Elles seront alors reconnues nativement au prochain démarrage.
 
-# Gestion des contrats inconnus
+## Gestion des contrats inconnus
 
 En cas de **contrat inconnu**, un enregistrement sera réalisé sous **/contrat/_CODE_.json** à chaque nouvelle période détectée si l'ESP dispose d'un LittleFS.
 Vous pouvez mettre à jour les caractéristiques des périodes dans le fichier JSON en fonction de votre contrat fournisseur. Elles seront reconnues nativement au prochain démarrage.
