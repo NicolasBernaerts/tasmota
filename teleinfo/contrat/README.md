@@ -22,6 +22,8 @@ Cette analyse se fait en plusieurs étapes et dépend des capacités de l'ESP :
 
 Une minorité de contrats utilisant les index distributeur en lieu et place des index fournisseur.
 
+Avec ces contrats, ce sont les étiquettes distributeur **EASD*xx*** qui sont utilisées à la place des éqtiquettes fournisseur **EASF*xx***.
+
 Si tel est le cas, la première chose est de passer la commande suivante pour déclarer cette spécificité :
 
     energyconfig distri=1
