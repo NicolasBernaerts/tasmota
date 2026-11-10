@@ -22,3 +22,5 @@ Vous pouvez mettre à jour les caractéristiques des périodes dans le fichier J
 
 Pour les contrats inconnus, une fois vos différentes périodes détectées, merci d'ouvrir un ticket sur Github en fournissant le JSON et les données de base de votre contrat.
 Cela permettra de mettre la base des contrats à jour et d'en faire profiter tous les utilisateurs.
+
+Si un contrat inconnu vient d'être publié sur **Github**, il vous suffit de le supprimer sous **/contrat** et de redémarrer l'ESP. Il ira récupérer la version officielle lors de son redémarrage.
