@@ -18,9 +18,9 @@ Cette analyse se fait en plusieurs étapes et dépend des capacités de l'ESP :
 |   4   |   x   |     x       |    x    |  Si contrat non trouvé, recherche depuis la base embarquée par le firmware et enregistrement sous **/contrat/_CODE_.json** (si LittleFS) |
 |   5   |   x   |     x       |    x    |  Si contrat non trouvé, positionnement en recherche de contrat inconnu  |
 
-## Cas des contrats avec Index Distributeurs
+## Cas des contrats avec Index Distributeur
 
-Une minorité de contrats utilisant les index distributeur en lieu et place des index fournisseur.
+Une minorité de contrats utilisent les index distributeur en lieu et place des index fournisseur.
 
 Avec ces contrats, ce sont les étiquettes distributeur **EASD*xx*** qui sont utilisées à la place des éqtiquettes fournisseur **EASF*xx***.
 
@@ -28,9 +28,9 @@ Si tel est le cas, la première chose est de passer la commande suivante pour d�
 
     energyconfig distri=1
     
-Ces contrats étant totalement génériques, en cas de présence de LittleFS, une base générique **/contrat/DISTRIBUTEUR.json** sera enregistrée au premier redémarrage.
+Ces contrats étant totalement génériques, en cas de présence de LittleFS, une base générique **/contrat/DISTRIBUTEUR.json** sera enregistrée au premier re-démarrage.
 
-Vous pouvez mettre à jour les données de vos périodes distributeur directement dans ce fichier. Elles seront alors reconnues nativement au prochain démarrage.
+Vous pouvez alors mettre à jour les données de vos périodes distributeur directement dans ce fichier. Elles seront reconnues nativement au prochain démarrage.
 
 ## Gestion des contrats inconnus
 
