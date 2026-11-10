@@ -26,7 +26,7 @@ Si tel est le cas, la première chose est de passer la commande suivante pour d�
 
     energyconfig distri=1
     
-Ces contrats étant totalement génériques, en cas de présence de LittleFS, une base générique **/contrat/DISTRIBUTEUR.json** sera enregistrée au premier démarrage suivant la configuration.
+Ces contrats étant totalement génériques, en cas de présence de LittleFS, une base générique **/contrat/DISTRIBUTEUR.json** sera enregistrée au premier redémarrage.
 
 Vous pouvez mettre à jour les données de vos périodes distributeur directement dans ce fichier. Elles seront alors reconnues nativement au prochain démarrage.
 
