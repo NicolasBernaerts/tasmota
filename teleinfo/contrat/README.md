@@ -14,9 +14,9 @@ Cette analyse se fait en plusieurs étapes et dépend des capacités de l'ESP :
 |  ---  |  ---  |    ---      |   ---   |     ---     |
 |   1   |   x   |     x       |         |  Au démarrage, le firmware charge le contrat depuis **/contrat/_CODE_.json** |
 |   2   |   x   |     x       |    x    |  Si contrat non trouvé et mode distributeur, chargement d'une version générique et enregistrement sous **/contrat/DISTRIBUTEUR.json** (si LittleFS) |
-|   3   |   x   |             |         |  Si contrat non chargé et accès réseau est disponible, recherche depuis le repository Github et enregistrement sous **/contrat/_CODE_.json** |
-|   4   |   x   |     x       |    x    |  Si contrat non chargé, recherche depuis la base embarquée par le firmware et enregistrement sous **/contrat/_CODE_.json** (si LittleFS) |
-|   5   |   x   |     x       |    x    |  Si contrat non chargé, positionnement en recherche de contrat inconnu  |
+|   3   |   x   |             |         |  Si contrat non chargé et accès réseau disponible, recherche depuis le repository Github et enregistrement sous **/contrat/_CODE_.json** si disponible |
+|   4   |   x   |     x       |    x    |  Si contrat non trouvé, recherche depuis la base embarquée par le firmware et enregistrement sous **/contrat/_CODE_.json** (si LittleFS) |
+|   5   |   x   |     x       |    x    |  Si contrat non trouvé, positionnement en recherche de contrat inconnu  |
 
 ## Cas des contrats avec Index Distributeurs
 
