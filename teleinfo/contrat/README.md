@@ -17,7 +17,7 @@ Principe de fonctionnement est le suivant :
 
 En cas de contrat utilisant les index distributeurs (command **energyconfig distri=1** ), comme ces contrats sont totalement génériques, vous pouvez mettre à jour les données de vos périodes distributeur dans le fichier **/contrat/DISTRIBUTEUR.json**. Elles seront reconnues nativement au prochain démarrage.
 
-En cas de contrat inconnu, un enregistrement sera réalisé sous **/contrat/CODE.json** à chaque nouvelle période détectée si l'ESP dispose d'un LittleFS.
+En cas de **contrat inconnu**, un enregistrement sera réalisé sous **/contrat/CODE.json** à chaque nouvelle période détectée si l'ESP dispose d'un LittleFS.
 Vous pouvez mettre à jour les caractéristiques des périodes dans le fichier JSON en fonction de votre contrat fournisseur. Elles seront reconnues nativement au prochain démarrage.
 
 Pour les contrats inconnus, une fois vos différentes périodes détectées, merci d'ouvrir un ticket sur Github en fournissant le JSON et les données de base de votre contrat.
