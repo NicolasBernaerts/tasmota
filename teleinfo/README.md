@@ -88,21 +88,24 @@ Voici un tableau récapitulatif des fonctionnalités par famille d'ESP :
 | Taille max d'une étiquette       |    28      |    28       |     112     |       112        |
 | Nombre max d'étiquettes          |    56      |    56       |     74      |       74         |
 
-Le firmware **ESP32** gère différentes cartes Ethernet :
+## Cartes Ethernet
+
+La versione **ESP32** du firmware gère différentes cartes Ethernet :
   * WT32-Eth01
   * W-ESP32
   * Olimex Ethernet
-La configuration de la carte peut se faire directement à travers l'un des menus de configuration.
+
+Le firmware intégrant les données**auto conf** de ces différentes cartes, la configuration de la carte peut se faire directement à travers un menu de configuration Web.
 
 ## Flash ##
-
-Des versions pré-compilées pour différentes familles d'ESP sont disponibles dans le répertoire [**binary**](./binary).
 
 > [!WARNING]
 > Tous les **ESP8266 4M+** et les **ESP32** utilisent une partition **LittleFS** pour stocker les données historisées qui servent à générer les graphs de suivi.
 > Le firmware Tasmota officiel utilise **320k** pour le FS, alors que ce build le maximise à **1.3M**.
 > Cela signifie que vous devez faire systématiquement un premier flash en mode **Série** afin de regénérer le partitionnement et d'éviter tout dysfonctionnement.
 > Si vous ne faites pas ce flash série, vous risquez des reboot intempestifs et inexpliqués !
+
+Des versions pré-compilées pour différentes familles d'ESP sont disponibles dans le répertoire [**binary**](./binary).
 
 Typiquement pour flasher ce firmware depuis un Tasmota officiel, il faut réaliser les opérations suivantes :
   * **reset 1** en mode console pour revenir en configuration usine
