@@ -2,7 +2,8 @@
 
 <img src="./screen/teleinfo-intro-power.png" width=500 height=300> <img src="./screen/teleinfo-intro-histo.png" width=500 height=300>
 
-⚠️ Ce firmware n'est pas le firmware officiel **Teleinfo** de **Tasmota**, c'est une version, originellement développée pour mes propres besoins, **from scratch**. 
+> [!WARNING]
+> Ce firmware n'est pas le firmware officiel **Teleinfo** de **Tasmota**, c'est une version, originellement développée pour mes propres besoins, **from scratch**. 
 
 Grâce à son approche Open source, ce projet a fortement évolué, en particulier grâce à **Charles Hallard** (à l'origine du port officiel Teleinfo de Tasmota) et à **Jérôme Ferrari** (université de Grenoble, GE2lab). L'association avec un concepteur hardware hors pair (Charles) et un universitaire travaillant pour des projets européens (Jérôme) a permis à ce fork de se développer et de coller au plus près des besoins de notre transition énergétique.
 
@@ -97,7 +98,11 @@ La configuration de la carte peut se faire directement à travers l'un des menus
 
 Des versions pré-compilées pour différentes familles d'ESP sont disponibles dans le répertoire [**binary**](./binary).
 
-⚠️ Tous les **ESP8266 4M+** et les **ESP32** utilisent une partition **LittleFS** pour stocker les données historisées qui servent à générer les graphs de suivi. Le firmware Tasmota officiel utilise **320k** pour le FS, alors que ce build le maximise à **1.3M**. Cela signifie que vous devez faire systématiquement un premier flash en mode **Série** afin de regénérer le partitionnement et d'éviter tout dysfonctionnement. Si vous ne faites pas ce flash série, vous risquez des reboot intempestifs et inexpliqués !
+> [!WARNING]
+> Tous les **ESP8266 4M+** et les **ESP32** utilisent une partition **LittleFS** pour stocker les données historisées qui servent à générer les graphs de suivi.
+> Le firmware Tasmota officiel utilise **320k** pour le FS, alors que ce build le maximise à **1.3M**.
+> Cela signifie que vous devez faire systématiquement un premier flash en mode **Série** afin de regénérer le partitionnement et d'éviter tout dysfonctionnement.
+> Si vous ne faites pas ce flash série, vous risquez des reboot intempestifs et inexpliqués !
 
 Typiquement pour flasher ce firmware depuis un Tasmota officiel, il faut réaliser les opérations suivantes :
   * **reset 1** en mode console pour revenir en configuration usine
