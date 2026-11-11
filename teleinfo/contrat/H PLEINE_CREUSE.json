@@ -1,4 +1,4 @@
-{"code":"H PLEINE/CREUSE","name":"Tarif HP/HC","type":"Standard","unit":"kVA","period":2,"periods":[
+{"code":"H PLEINE_CREUSE","name":"Tarif HP/HC","type":"Standard","unit":"kVA","period":2,"periods":[
 {"code":"HEURE CREUSE","level":"blue","type":"hc","label":"Creuses"},
 {"code":"HEURE PLEINE","level":"blue","type":"hp","label":"Pleines"}
 ]}
