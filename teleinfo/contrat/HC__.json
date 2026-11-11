@@ -1,4 +1,4 @@
-{"code":"HC..","name":"HC/HP","type":"Historique","unit":"kVA","period":2,"periods":[
+{"code":"HC__","name":"HC/HP","type":"Historique","unit":"kVA","period":2,"periods":[
 {"code":"HC..","level":"blue","type":"hc","label":"Creuses"},
 {"code":"HP..","level":"blue","type":"hp","label":"Pleines"}
 ]}
