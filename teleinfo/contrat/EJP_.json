@@ -1,4 +1,4 @@
-{"code":"EJP.","name":"EJP","type":"Historique","unit":"kVA","period":2,"periods":[
+{"code":"EJP_","name":"EJP","type":"Historique","unit":"kVA","period":2,"periods":[
 {"code":"HN..","level":"blue","type":"hc","label":"Normale"},
 {"code":"HP..","level":"red","type":"hp","label":"Pointe Mobile"}
 ]}
