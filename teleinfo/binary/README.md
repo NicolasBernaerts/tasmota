@@ -1,6 +1,10 @@
-You'll find here pre-compiled binaries for Teleinfo project.
+Vous trouvez dans cette section les firmware pré-compilés du projet Teleinfo.
 
-These binaries are ready to be flashed on ESP8266 or ESP32. Each binary has its own specificities :
+Je ne publie classiquement que les versions considérées comme stable. Certaines version Beta sont publiées afin de permettre de tester de nouvelles fonctionnalités.
+
+Tout comme pour le Tasmota officiel, il est conseillé de ne réaliser une mise à jour que si c'est strictement nécessaire.
+
+Chaque binaire permet de programmer une famille d'ESP spécifique :
 
 |         Firmware           |      Target      | LittleFS |           Notice                |
 | -------------------------- | ---------------- | -------- | ------------------------------- |
@@ -15,18 +19,19 @@ These binaries are ready to be flashed on ESP8266 or ESP32. Each binary has its 
 | tasmota32s3-teleinfo       | **ESP32S3 4Mb**  | 1.34 Mb  |                                 |
 | tasmota32s3-teleinfo-16m   | **ESP32S3 16Mb** |   10 Mb  |                                 |
 
-Here are the flash method to use under Linux :
+> [!WARNING]
+> Tous les **ESP8266 4M+** et les **ESP32** utilisent une partition **LittleFS** maximisée à **1.3M**, au lieu des **320k** du firmware officiel.
+> Cela signifie que vous devez faire systématiquement un premier flash en mode **Série** afin de regénérer le partitionnement et d'éviter tout dysfonctionnement.
+> Si vous ne faites pas ce flash série, vous seerez face à des reboot intempestifs et inexpliqués !
 
-|        Flash method        |       ESP8266      |         ESP32         |
+Voici les images à utiliser en fonction du type d'ESP et du type de programmation :
+
+|        Programmation       |       ESP8266      |         ESP32         |
 | -------------------------- | ------------------ | --------------------- |
-| Serial flash (esptool)     |   firmware.bin     |  firmware.factory.bin | 
+| Série / USB (esptool)      |   firmware.bin     |  firmware.factory.bin | 
 | OTA                        |   firmware.bin.gz  |  firmware.bin         | 
 
-**Important** : If your ESP runs another firmware than this one (for example official Tasmota build), as partitioning is not identical, it is **very** important to do a full serial flash first to avoid any boot loop or crashes.
-
-The **tasmota-flash** wrapper provided in this repository should simplify the flash process for ESP8266 or ESP32.
-
-Here are the command lines to flash firmware and do partitionning at the same time :
+Si vous utilisez les outils publiés dans le section **/tools** de ce repository, voici les commandes à passer :
 
 **ESP8266**
 
