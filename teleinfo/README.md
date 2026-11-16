@@ -3,7 +3,7 @@
 <img src="./screen/teleinfo-intro-power.png" width=500 height=300> <img src="./screen/teleinfo-intro-histo.png" width=500 height=300>
 
 > [!WARNING]
-> Ce firmware n'est pas le firmware officiel **Teleinfo** de **Tasmota**, c'est une version, originellement développée pour mes propres besoins, **from scratch**. 
+> Ce firmware n'est pas le firmware officiel **Teleinfo** de **Tasmota**. c'est une version optimisée pour la gestion des spécificités de ce protocole et des nouveaux contrats associés. 
 
 Grâce à son approche Open source, ce projet a fortement évolué, en particulier grâce à **Charles Hallard** (à l'origine du port officiel Teleinfo de Tasmota) et à **Jérôme Ferrari** (université de Grenoble, GE2lab). L'association avec un concepteur hardware hors pair (Charles) et un universitaire travaillant pour des projets européens (Jérôme) a permis à ce fork de se développer et de coller au plus près des besoins de notre transition énergétique.
 
