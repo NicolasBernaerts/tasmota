@@ -40,9 +40,9 @@ You should see a graphical target range display on the main page with your devic
 
 # Real-time Radar
 
-These firmware provide a graphical real-time radar.
+This Tasmota driver provides a graphical real-time radar.
 
-This radar depends on the HLK device. It can be :
+The type of radar depends on the HLK device :
 
 |               distance + power                    |                X / Y position                     |
 |               ----------------                    |                --------------                     |
