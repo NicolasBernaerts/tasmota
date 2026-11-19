@@ -43,10 +43,10 @@ You should see a graphical target range display on the main page with your devic
 These firmware provide a graphical real-time radar.
 
 This radar depends on the HLK device. It can be :
-  * distance + power
-  * X / Y position
 
-<img src="./screen/ld2402-radar.png" height=300> 
+|               distance + power                    |                X / Y position                     |
+|               ----------------                    |                --------------                     |
+| <img src="./screen/ld2402-radar.png" height=300>  |  <img src="./screen/ld2450-radar.png" height=300> |
 
 # Generic commands
 
