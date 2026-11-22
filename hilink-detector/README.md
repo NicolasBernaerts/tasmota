@@ -44,7 +44,7 @@ This Tasmota driver provides a graphical real-time radar.
 
 The type of radar depends on the HLK device :
 
-|               distance + power                    |                X / Y position                     |
+|          1 Dimension : distance + power           |         2 Dimensions : X / Y position             |
 |               ----------------                    |                --------------                     |
 | <img src="./screen/ld2402-radar.png" height=300>  |  <img src="./screen/ld2450-radar.png" height=300> |
 
